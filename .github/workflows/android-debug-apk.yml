@@ -48,6 +48,44 @@ jobs:
         run: |
           gradle assembleDebug --stacktrace
 
+      - name: Diagnostic Step - Verify APK & Manifest
+        run: |
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::APK file not found at $APK_PATH"
+            exit 1
+          fi
+          echo "=== APK File Verification ==="
+          ls -lh "$APK_PATH"
+          file "$APK_PATH"
+
+          echo "=== Android SDK Diagnostic ==="
+          AAPT=$(find $ANDROID_SDK_ROOT/build-tools -name aapt2 -o -name aapt | head -n 1)
+          if [ -n "$AAPT" ]; then
+            echo "Using AAPT at: $AAPT"
+            BADGING=$($AAPT dump badging "$APK_PATH")
+            echo "--- Badging Output ---"
+            echo "$BADGING" | grep -E "package:|launchable-activity:|uses-permission:|sdkVersion:" || true
+
+            APP_ID=$(echo "$BADGING" | grep "package:" | sed -n "s/.*name='\([^']*\)'.*/\1/p")
+            LAUNCHER_ACT=$(echo "$BADGING" | grep "launchable-activity:" | sed -n "s/.*name='\([^']*\)'.*/\1/p")
+
+            echo "Extracted applicationId: $APP_ID"
+            echo "Extracted Launcher Activity: $LAUNCHER_ACT"
+
+            if [ "$LAUNCHER_ACT" != "com.google.androidbrowserhelper.trusted.LauncherActivity" ]; then
+              echo "::warning::Launcher activity is '$LAUNCHER_ACT', expected 'com.google.androidbrowserhelper.trusted.LauncherActivity'"
+            else
+              echo "SUCCESS: Valid LauncherActivity 'com.google.androidbrowserhelper.trusted.LauncherActivity' verified inside APK!"
+            fi
+          fi
+
+          echo "=== Merged Manifest Check ==="
+          MERGED_MANIFEST=$(find android/app/build/intermediates -name "AndroidManifest.xml" | grep "merged_manifest" | head -n 1)
+          if [ -f "$MERGED_MANIFEST" ]; then
+            grep -C 5 "LauncherActivity" "$MERGED_MANIFEST" || true
+          fi
+
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
