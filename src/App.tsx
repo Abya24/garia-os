@@ -360,6 +360,25 @@ export default function App() {
     saveSubjects(updated);
   };
 
+  const handleResetSubjectsToDefaults = () => {
+    const stream = activeStudent?.stream || "Commerce";
+    const defaults = getDefaultStudySubjectsForStream(stream);
+    setSubjects(defaults);
+    saveSubjects(defaults);
+  };
+
+  const syncSubjectTotals = (curSubjects: Subject[], curSessions: StudySession[]) => {
+    return curSubjects.map((s) => {
+      const matchingSessions = curSessions.filter((sess) => sess.subjectId === s.id);
+      const totalSecs = matchingSessions.reduce((acc, sess) => acc + (sess.durationSeconds || 0), 0);
+      return {
+        ...s,
+        completedMinutes: Math.round(totalSecs / 60),
+        totalSessions: matchingSessions.length,
+      };
+    });
+  };
+
   const handleLogStudySession = (
     session: Omit<StudySession, "id" | "timestamp">
   ) => {
@@ -372,18 +391,29 @@ export default function App() {
     setStudySessions(updatedSessions);
     saveStudySessions(updatedSessions);
 
-    // Update subject stats
-    const loggedMins = Math.round(session.durationSeconds / 60);
-    const updatedSubs = subjects.map((s) => {
-      if (s.id === session.subjectId) {
-        return {
-          ...s,
-          completedMinutes: s.completedMinutes + loggedMins,
-          totalSessions: s.totalSessions + 1,
-        };
-      }
-      return s;
-    });
+    const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
+    setSubjects(updatedSubs);
+    saveSubjects(updatedSubs);
+  };
+
+  const handleDeleteStudySession = (sessionId: string) => {
+    const updatedSessions = studySessions.filter((s) => s.id !== sessionId);
+    setStudySessions(updatedSessions);
+    saveStudySessions(updatedSessions);
+
+    const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
+    setSubjects(updatedSubs);
+    saveSubjects(updatedSubs);
+  };
+
+  const handleUpdateStudySession = (updatedSession: StudySession) => {
+    const updatedSessions = studySessions.map((s) =>
+      s.id === updatedSession.id ? updatedSession : s
+    );
+    setStudySessions(updatedSessions);
+    saveStudySessions(updatedSessions);
+
+    const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
     saveSubjects(updatedSubs);
   };
@@ -923,10 +953,15 @@ export default function App() {
             <StudyTracker
               subjects={subjects}
               studySessions={studySessions}
+              academicChapters={academicChapters}
+              activeStudent={activeStudent}
               onAddSubject={handleAddSubject}
               onUpdateSubject={handleUpdateSubject}
               onDeleteSubject={handleDeleteSubject}
+              onResetSubjectsToDefaults={handleResetSubjectsToDefaults}
               onLogStudySession={handleLogStudySession}
+              onDeleteStudySession={handleDeleteStudySession}
+              onUpdateStudySession={handleUpdateStudySession}
             />
           )}
 
