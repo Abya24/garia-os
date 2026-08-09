@@ -82,6 +82,7 @@ import {
   deleteStudentProfile,
   exportStudentProfileJSON,
   importStudentProfileJSON,
+  getDefaultStudySubjectsForStream,
 } from "./utils/storage";
 
 import {
@@ -174,10 +175,14 @@ export default function App() {
     const curProf = allProfs.find((p) => p.id === profileId);
     const stream = curProf?.stream || "Commerce";
 
+    const loadedSessions = loadStudySessions(profileId);
+    const loadedSubs = loadSubjects(profileId);
+    const syncedSubs = syncSubjectTotals(loadedSubs, loadedSessions);
+
     setSettings(loadSettings(profileId));
     setTasks(loadTasks(profileId));
-    setSubjects(loadSubjects(profileId));
-    setStudySessions(loadStudySessions(profileId));
+    setSubjects(syncedSubs);
+    setStudySessions(loadedSessions);
     setNotes(loadNotes(profileId));
     setHabits(loadHabits(profileId));
     setWater(loadWater(profileId));
@@ -215,9 +220,7 @@ export default function App() {
     const refreshed = loadProfiles();
     setProfiles(refreshed);
     if (updated.id === activeProfileId) {
-      setSettings(loadSettings(updated.id));
-      setCareerProfile(loadCareerProfile(updated.id));
-      setExamProfile(loadExamProfile(updated.id));
+      reloadAllDataForProfile(updated.id);
     }
   };
 
@@ -247,68 +250,68 @@ export default function App() {
     } else {
       root.classList.remove("light");
     }
-    saveSettings(settings);
-  }, [settings]);
+    saveSettings(settings, activeProfileId);
+  }, [settings, activeProfileId]);
 
   // Sync Data Save Handlers
   const handleUpdateSettings = (newSettings: UserSettings) => {
     setSettings(newSettings);
-    saveSettings(newSettings);
+    saveSettings(newSettings, activeProfileId);
   };
 
   const handleUpdateCareerProfile = (p: CareerProfile) => {
     setCareerProfile(p);
-    saveCareerProfile(p);
+    saveCareerProfile(p, activeProfileId);
   };
 
   const handleUpdateCareerAssessment = (a: CareerAssessment) => {
     setCareerAssessment(a);
-    saveCareerAssessment(a);
+    saveCareerAssessment(a, activeProfileId);
   };
 
   const handleUpdateCareerRoadmap = (r: CareerRoadmap) => {
     setCareerRoadmap(r);
-    saveCareerRoadmap(r);
+    saveCareerRoadmap(r, activeProfileId);
   };
 
   const handleUpdateAcademicSubjects = (subs: AcademicSubject[]) => {
     setAcademicSubjects(subs);
-    saveAcademicSubjects(subs);
+    saveAcademicSubjects(subs, activeProfileId);
   };
 
   const handleUpdateAcademicChapters = (chaps: AcademicChapter[]) => {
     setAcademicChapters(chaps);
-    saveAcademicChapters(chaps);
+    saveAcademicChapters(chaps, activeProfileId);
   };
 
   const handleUpdateAcademicTests = (tests: AcademicTest[]) => {
     setAcademicTests(tests);
-    saveAcademicTests(tests);
+    saveAcademicTests(tests, activeProfileId);
   };
 
   const handleUpdateAcademicPlan = (plan: SmartStudyPlan | null) => {
     setAcademicPlan(plan);
-    saveAcademicPlan(plan);
+    saveAcademicPlan(plan, activeProfileId);
   };
 
   const handleUpdateExamProfile = (prof: ExamProfile) => {
     setExamProfile(prof);
-    saveExamProfile(prof);
+    saveExamProfile(prof, activeProfileId);
   };
 
   const handleUpdateExamMilestones = (ms: ExamMilestone[]) => {
     setExamMilestones(ms);
-    saveExamMilestones(ms);
+    saveExamMilestones(ms, activeProfileId);
   };
 
   const handleUpdateExamMockTests = (tests: ExamMockTest[]) => {
     setExamMockTests(tests);
-    saveExamMockTests(tests);
+    saveExamMockTests(tests, activeProfileId);
   };
 
   const handleUpdateExamPlan = (plan: ExamDailyPlan | null) => {
     setExamPlan(plan);
-    saveExamDailyPlan(plan);
+    saveExamDailyPlan(plan, activeProfileId);
   };
 
   const handleAddTask = (newTask: Omit<Task, "id" | "createdAt">) => {
@@ -319,19 +322,19 @@ export default function App() {
     };
     const updated = [created, ...tasks];
     setTasks(updated);
-    saveTasks(updated);
+    saveTasks(updated, activeProfileId);
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
     const updated = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updated);
-    saveTasks(updated);
+    saveTasks(updated, activeProfileId);
   };
 
   const handleDeleteTask = (id: string) => {
     const updated = tasks.filter((t) => t.id !== id);
     setTasks(updated);
-    saveTasks(updated);
+    saveTasks(updated, activeProfileId);
   };
 
   const handleAddSubject = (
@@ -345,26 +348,26 @@ export default function App() {
     };
     const updated = [...subjects, created];
     setSubjects(updated);
-    saveSubjects(updated);
+    saveSubjects(updated, activeProfileId);
   };
 
   const handleUpdateSubject = (updatedSubj: Subject) => {
     const updated = subjects.map((s) => (s.id === updatedSubj.id ? updatedSubj : s));
     setSubjects(updated);
-    saveSubjects(updated);
+    saveSubjects(updated, activeProfileId);
   };
 
   const handleDeleteSubject = (id: string) => {
     const updated = subjects.filter((s) => s.id !== id);
     setSubjects(updated);
-    saveSubjects(updated);
+    saveSubjects(updated, activeProfileId);
   };
 
   const handleResetSubjectsToDefaults = () => {
     const stream = activeStudent?.stream || "Commerce";
     const defaults = getDefaultStudySubjectsForStream(stream);
     setSubjects(defaults);
-    saveSubjects(defaults);
+    saveSubjects(defaults, activeProfileId);
   };
 
   const syncSubjectTotals = (curSubjects: Subject[], curSessions: StudySession[]) => {
@@ -389,21 +392,21 @@ export default function App() {
     };
     const updatedSessions = [created, ...studySessions];
     setStudySessions(updatedSessions);
-    saveStudySessions(updatedSessions);
+    saveStudySessions(updatedSessions, activeProfileId);
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
-    saveSubjects(updatedSubs);
+    saveSubjects(updatedSubs, activeProfileId);
   };
 
   const handleDeleteStudySession = (sessionId: string) => {
     const updatedSessions = studySessions.filter((s) => s.id !== sessionId);
     setStudySessions(updatedSessions);
-    saveStudySessions(updatedSessions);
+    saveStudySessions(updatedSessions, activeProfileId);
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
-    saveSubjects(updatedSubs);
+    saveSubjects(updatedSubs, activeProfileId);
   };
 
   const handleUpdateStudySession = (updatedSession: StudySession) => {
@@ -411,11 +414,11 @@ export default function App() {
       s.id === updatedSession.id ? updatedSession : s
     );
     setStudySessions(updatedSessions);
-    saveStudySessions(updatedSessions);
+    saveStudySessions(updatedSessions, activeProfileId);
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
-    saveSubjects(updatedSubs);
+    saveSubjects(updatedSubs, activeProfileId);
   };
 
   const handleAddNote = (
@@ -429,19 +432,19 @@ export default function App() {
     };
     const updated = [created, ...notes];
     setNotes(updated);
-    saveNotes(updated);
+    saveNotes(updated, activeProfileId);
   };
 
   const handleUpdateNote = (updatedNote: Note) => {
     const updated = notes.map((n) => (n.id === updatedNote.id ? updatedNote : n));
     setNotes(updated);
-    saveNotes(updated);
+    saveNotes(updated, activeProfileId);
   };
 
   const handleDeleteNote = (id: string) => {
     const updated = notes.filter((n) => n.id !== id);
     setNotes(updated);
-    saveNotes(updated);
+    saveNotes(updated, activeProfileId);
   };
 
   const handleAddHabit = (
@@ -456,7 +459,7 @@ export default function App() {
     };
     const updated = [...habits, created];
     setHabits(updated);
-    saveHabits(updated);
+    saveHabits(updated, activeProfileId);
   };
 
   const handleToggleHabitDate = (habitId: string, dateStr: string) => {
@@ -476,18 +479,18 @@ export default function App() {
       return h;
     });
     setHabits(updated);
-    saveHabits(updated);
+    saveHabits(updated, activeProfileId);
   };
 
   const handleDeleteHabit = (id: string) => {
     const updated = habits.filter((h) => h.id !== id);
     setHabits(updated);
-    saveHabits(updated);
+    saveHabits(updated, activeProfileId);
   };
 
   const handleUpdateWater = (newWater: WaterLog) => {
     setWater(newWater);
-    saveWater(newWater);
+    saveWater(newWater, activeProfileId);
   };
 
   const handleLogFocusSession = (log: Omit<FocusSessionLog, "id">) => {
@@ -497,7 +500,7 @@ export default function App() {
     };
     const updated = [created, ...focusLogs];
     setFocusLogs(updated);
-    saveFocusSessions(updated);
+    saveFocusSessions(updated, activeProfileId);
   };
 
   // Last User Prompt for Abya AI Retry

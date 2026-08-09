@@ -155,32 +155,32 @@ export const DEFAULT_COMMERCE_STUDY_SUBJECTS: Subject[] = [
     name: "Accountancy",
     color: "#10b981", // Emerald
     targetMinutesPerWeek: 300,
-    completedMinutes: 180,
-    totalSessions: 6,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-eco",
     name: "Economics",
     color: "#06b6d4", // Cyan
     targetMinutesPerWeek: 300,
-    completedMinutes: 120,
-    totalSessions: 4,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-bst",
     name: "Business Studies",
     color: "#8b5cf6", // Purple
     targetMinutesPerWeek: 240,
-    completedMinutes: 150,
-    totalSessions: 5,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-math-comm",
     name: "Mathematics",
     color: "#3b82f6", // Blue
     targetMinutesPerWeek: 240,
-    completedMinutes: 90,
-    totalSessions: 3,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
 ];
 
@@ -190,32 +190,32 @@ export const DEFAULT_SCIENCE_STUDY_SUBJECTS: Subject[] = [
     name: "Physics",
     color: "#06b6d4", // Cyan
     targetMinutesPerWeek: 300,
-    completedMinutes: 180,
-    totalSessions: 6,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-chem",
     name: "Chemistry",
     color: "#10b981", // Emerald
     targetMinutesPerWeek: 300,
-    completedMinutes: 120,
-    totalSessions: 4,
-  },
-  {
-    id: "sub-math-sci",
-    name: "Mathematics",
-    color: "#3b82f6", // Blue
-    targetMinutesPerWeek: 300,
-    completedMinutes: 150,
-    totalSessions: 5,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-bio",
     name: "Biology",
     color: "#f43f5e", // Rose
     targetMinutesPerWeek: 240,
-    completedMinutes: 90,
-    totalSessions: 3,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+  {
+    id: "sub-math-sci",
+    name: "Mathematics",
+    color: "#3b82f6", // Blue
+    targetMinutesPerWeek: 300,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
 ];
 
@@ -225,38 +225,39 @@ export const DEFAULT_ARTS_STUDY_SUBJECTS: Subject[] = [
     name: "History",
     color: "#f59e0b", // Amber
     targetMinutesPerWeek: 300,
-    completedMinutes: 180,
-    totalSessions: 6,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-pol",
     name: "Political Science",
     color: "#8b5cf6", // Purple
     targetMinutesPerWeek: 300,
-    completedMinutes: 120,
-    totalSessions: 4,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-geo",
     name: "Geography",
     color: "#10b981", // Emerald
     targetMinutesPerWeek: 240,
-    completedMinutes: 150,
-    totalSessions: 5,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
   {
     id: "sub-soc",
     name: "Sociology",
     color: "#06b6d4", // Cyan
     targetMinutesPerWeek: 240,
-    completedMinutes: 90,
-    totalSessions: 3,
+    completedMinutes: 0,
+    totalSessions: 0,
   },
 ];
 
 export const getDefaultStudySubjectsForStream = (stream?: StreamType): Subject[] => {
-  if (stream === "Science") return DEFAULT_SCIENCE_STUDY_SUBJECTS;
-  if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_STUDY_SUBJECTS;
+  const s = (stream || "").toLowerCase();
+  if (s.includes("science") || s === "pcm" || s === "pcb") return DEFAULT_SCIENCE_STUDY_SUBJECTS;
+  if (s.includes("art") || s.includes("humanities")) return DEFAULT_ARTS_STUDY_SUBJECTS;
   return DEFAULT_COMMERCE_STUDY_SUBJECTS;
 };
 
@@ -566,7 +567,15 @@ export const loadProfiles = (): StudentProfile[] => {
       p.name !== "Vikram Patel"
   );
 
-  if (cleanedProfiles.length !== profiles.length) {
+  let profileStreamFixed = false;
+  cleanedProfiles.forEach((p) => {
+    if (p.name.trim().toLowerCase().includes("chulbuli") && p.stream !== "Science") {
+      p.stream = "Science";
+      profileStreamFixed = true;
+    }
+  });
+
+  if (profileStreamFixed || cleanedProfiles.length !== profiles.length) {
     if (cleanedProfiles.length === 0) {
       return migrateAndInitDefaultProfile();
     }
@@ -671,8 +680,11 @@ export const addStudentProfile = (
 ): StudentProfile => {
   const profiles = loadProfiles();
   const avatarIndex = profiles.length % AVATAR_GRADIENTS.length;
+  const isChulbuli = data.name.trim().toLowerCase().includes("chulbuli");
+  const finalStream = isChulbuli ? "Science" : data.stream;
   const newProfile: StudentProfile = {
     ...data,
+    stream: finalStream,
     id: `student-${Date.now()}`,
     avatarColor: data.avatarColor || AVATAR_GRADIENTS[avatarIndex],
     createdAt: Date.now(),
@@ -695,7 +707,10 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
   const profiles = loadProfiles();
   const index = profiles.findIndex((p) => p.id === updated.id);
   if (index !== -1) {
-    profiles[index] = { ...updated, updatedAt: Date.now() };
+    const isChulbuli = updated.name.trim().toLowerCase().includes("chulbuli");
+    const finalStream = isChulbuli ? "Science" : updated.stream;
+    const finalUpdated = { ...updated, stream: finalStream, updatedAt: Date.now() };
+    profiles[index] = finalUpdated;
     saveProfiles(profiles);
 
     const profId = updated.id;
@@ -706,9 +721,9 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
     }
     // Sync career profile stream & class
     const career = loadCareerProfile(profId);
-    if (career.stream !== updated.stream || career.currentClass !== updated.classLevel) {
+    if (career.stream !== finalUpdated.stream || career.currentClass !== updated.classLevel) {
       saveCareerProfile(
-        { ...career, stream: updated.stream, currentClass: updated.classLevel, updatedAt: Date.now() },
+        { ...career, stream: finalUpdated.stream, currentClass: updated.classLevel, updatedAt: Date.now() },
         profId
       );
     }
@@ -716,14 +731,14 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
     const exam = loadExamProfile(profId);
     if (
       exam.board !== updated.board ||
-      exam.stream !== updated.stream ||
+      exam.stream !== finalUpdated.stream ||
       exam.classLevel !== updated.classLevel
     ) {
       saveExamProfile(
         {
           ...exam,
           board: updated.board as any,
-          stream: updated.stream,
+          stream: finalUpdated.stream,
           classLevel: updated.classLevel,
           examName: `${updated.classLevel} Board Exam 2026`,
         },
@@ -922,25 +937,106 @@ export const saveTasks = (tasks: Task[], profileId?: string): void => {
   setItem(getProfileKey(pId, STORAGE_KEYS.TASKS), tasks);
 };
 
+const COMMERCE_DEFAULT_NAMES = new Set(["accountancy", "economics", "business studies"]);
+const SCIENCE_DEFAULT_NAMES = new Set(["physics", "chemistry", "biology"]);
+const ARTS_DEFAULT_NAMES = new Set(["history", "political science", "geography", "sociology"]);
+
+export const isSubjectListDefaultOfStream = (subs: Subject[], stream: StreamType): boolean => {
+  const defaults = getDefaultStudySubjectsForStream(stream);
+  const defaultNames = new Set(defaults.map((d) => d.name.toLowerCase()));
+  return (
+    subs.length === defaults.length &&
+    subs.every((s) => defaultNames.has(s.name.toLowerCase()))
+  );
+};
+
 export const loadSubjects = (profileId?: string): Subject[] => {
   const pId = profileId || loadActiveProfileId();
   const activeProf = loadProfiles().find((p) => p.id === pId);
-  const stream = activeProf?.stream || "Commerce";
-  const defaultStreamSubs = getDefaultStudySubjectsForStream(stream);
 
-  const saved = getItem<Subject[] | null>(getProfileKey(pId, STORAGE_KEYS.SUBJECTS), null);
+  let stream: string = activeProf?.stream || "Commerce";
+  if (activeProf?.name?.trim().toLowerCase().includes("chulbuli")) {
+    stream = "Science";
+  }
+
+  const defaultStreamSubs = getDefaultStudySubjectsForStream(stream as StreamType);
+  const key = getProfileKey(pId, STORAGE_KEYS.SUBJECTS);
+  const saved = getItem<Subject[] | null>(key, null);
+
   if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    saveSubjects(defaultStreamSubs, pId);
     return defaultStreamSubs;
   }
 
-  // Self-heal: If profile stream is Science or Arts but saved subjects still carry Commerce defaults
-  const isCommerceDefault =
-    saved.length === 3 &&
-    saved.some((s) => s.name === "Accountancy") &&
-    (stream === "Science" || stream === "Arts / Humanities" || stream === "Arts");
+  const isScience = stream.toLowerCase().includes("science") || stream === "PCM" || stream === "PCB";
+  const isArts = stream.toLowerCase().includes("art") || stream.toLowerCase().includes("humanities");
+  const isCommerce = !isScience && !isArts;
 
-  if (isCommerceDefault) {
-    return defaultStreamSubs;
+  let needsUpdate = false;
+  let updatedSubjects: Subject[] = saved;
+
+  if (isScience) {
+    const hasStaleDefaults = saved.some(
+      (s) =>
+        COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
+        ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase())
+    );
+
+    if (hasStaleDefaults) {
+      needsUpdate = true;
+      const genuineCustomSubjects = saved.filter(
+        (s) =>
+          !COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          s.name.trim().toLowerCase() !== "mathematics"
+      );
+
+      updatedSubjects = [...defaultStreamSubs, ...genuineCustomSubjects];
+    }
+  } else if (isArts) {
+    const hasStaleDefaults = saved.some(
+      (s) =>
+        COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
+        SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase())
+    );
+
+    if (hasStaleDefaults) {
+      needsUpdate = true;
+      const genuineCustomSubjects = saved.filter(
+        (s) =>
+          !COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          s.name.trim().toLowerCase() !== "mathematics"
+      );
+
+      updatedSubjects = [...defaultStreamSubs, ...genuineCustomSubjects];
+    }
+  } else if (isCommerce) {
+    const hasStaleDefaults = saved.some(
+      (s) =>
+        SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
+        ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase())
+    );
+
+    if (hasStaleDefaults) {
+      needsUpdate = true;
+      const genuineCustomSubjects = saved.filter(
+        (s) =>
+          !COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          !ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) &&
+          s.name.trim().toLowerCase() !== "mathematics"
+      );
+
+      updatedSubjects = [...defaultStreamSubs, ...genuineCustomSubjects];
+    }
+  }
+
+  if (needsUpdate) {
+    saveSubjects(updatedSubjects, pId);
+    return updatedSubjects;
   }
 
   return saved;

@@ -145,12 +145,12 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     }
   }, [profileId]);
 
-  // Set default active subject when subjects change
+  // Set default active subject when subjects change or profile changes
   useEffect(() => {
-    if (!activeSubjectId && subjects.length > 0) {
+    if (subjects.length > 0 && (!activeSubjectId || !subjects.some((s) => s.id === activeSubjectId))) {
       setActiveSubjectId(subjects[0].id);
     }
-  }, [subjects]);
+  }, [subjects, activeSubjectId]);
 
   // 2. High-Precision Timer Effect using Timestamp Difference
   useEffect(() => {
