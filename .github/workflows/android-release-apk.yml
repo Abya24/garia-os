@@ -1,4 +1,4 @@
-name: Build Garia OS Android App Bundle (AAB)
+name: Build Garia OS Android Release APK
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-android-aab:
-    name: Build Unsigned Release AAB
+  build-android-release-apk:
+    name: Build Unsigned Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -31,15 +31,15 @@ jobs:
           sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
 
-      - name: Build Unsigned Release App Bundle
+      - name: Build Release APK
         working-directory: ./android
         run: |
-          ./gradlew bundleRelease --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
-      - name: Upload Release AAB Artifact
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: garia-os-v1.6.0-release-unsigned-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: garia-os-v1.6.0-release-unsigned-apk
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 14

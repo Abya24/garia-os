@@ -16,7 +16,7 @@
             android:value="${assetStatements}" />
 
         <activity
-            android:name="com.google.android.comtwaintegration.LauncherActivity"
+            android:name="com.google.android.customtabs.trusted.LauncherActivity"
             android:exported="true"
             android:label="${launcherName}"
             android:screenOrientation="portrait">
