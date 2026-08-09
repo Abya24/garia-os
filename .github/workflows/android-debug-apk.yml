@@ -31,6 +31,18 @@ jobs:
           sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
 
+      - name: Gradle Wrapper Diagnostic
+        run: |
+          pwd
+          git rev-parse HEAD
+          git ls-files android/gradle/wrapper/
+          ls -lah android/gradle/wrapper/
+          file android/gradle/wrapper/gradle-wrapper.jar
+          unzip -t android/gradle/wrapper/gradle-wrapper.jar
+          unzip -l android/gradle/wrapper/gradle-wrapper.jar | grep 'org/gradle/wrapper/GradleWrapperMain.class'
+          sha256sum android/gradle/wrapper/gradle-wrapper.jar
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Build Debug APK
         working-directory: ./android
         run: |
