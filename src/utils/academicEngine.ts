@@ -11,19 +11,31 @@ export const DEFAULT_COMMERCE_SUBJECTS: AcademicSubject[] = [
   { id: "sub-acc", name: "Accountancy", stream: "Commerce", color: "emerald" },
   { id: "sub-bst", name: "Business Studies", stream: "Commerce", color: "cyan" },
   { id: "sub-eco", name: "Economics", stream: "Commerce", color: "purple" },
-  { id: "sub-math-comm", name: "Mathematics / Applied Math", stream: "Commerce", color: "blue" },
+  { id: "sub-math-comm", name: "Mathematics", stream: "Commerce", color: "blue" },
   { id: "sub-eng-comm", name: "English Core", stream: "Commerce", color: "amber" },
-  { id: "sub-ip", name: "Informatics Practices / Optional", stream: "Commerce", color: "rose" },
 ];
 
 export const DEFAULT_SCIENCE_SUBJECTS: AcademicSubject[] = [
   { id: "sub-phy", name: "Physics", stream: "Science", color: "cyan" },
   { id: "sub-chem", name: "Chemistry", stream: "Science", color: "emerald" },
-  { id: "sub-math-sci", name: "Mathematics", stream: "Science", color: "blue" },
   { id: "sub-bio", name: "Biology", stream: "Science", color: "rose" },
-  { id: "sub-cs", name: "Computer Science", stream: "Science", color: "purple" },
+  { id: "sub-math-sci", name: "Mathematics", stream: "Science", color: "blue" },
   { id: "sub-eng-sci", name: "English Core", stream: "Science", color: "amber" },
 ];
+
+export const DEFAULT_ARTS_SUBJECTS: AcademicSubject[] = [
+  { id: "sub-hist", name: "History", stream: "Arts / Humanities", color: "amber" },
+  { id: "sub-pol", name: "Political Science", stream: "Arts / Humanities", color: "purple" },
+  { id: "sub-geo", name: "Geography", stream: "Arts / Humanities", color: "emerald" },
+  { id: "sub-soc", name: "Sociology", stream: "Arts / Humanities", color: "cyan" },
+  { id: "sub-eng-arts", name: "English Core", stream: "Arts / Humanities", color: "blue" },
+];
+
+export function getDefaultSubjectsForStream(stream: StreamType): AcademicSubject[] {
+  if (stream === "Science") return DEFAULT_SCIENCE_SUBJECTS;
+  if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_SUBJECTS;
+  return DEFAULT_COMMERCE_SUBJECTS;
+}
 
 export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [
   // Commerce - Accountancy
@@ -263,6 +275,62 @@ export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [
     status: "In Progress",
     priority: "VVI",
     isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+
+  // Arts / Humanities - History
+  {
+    id: "ch-hist-1",
+    subjectId: "sub-hist",
+    chapterNumber: 1,
+    title: "Bricks, Beads and Bones - Harappan Civilisation",
+    topics: ["Harappan Seals", "Urban Planning & Citadel", "Agricultural Technologies", "Subsistence Strategies"],
+    status: "Completed",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-hist-2",
+    subjectId: "sub-hist",
+    chapterNumber: 2,
+    title: "Kings, Farmers and Towns - Early States & Economies",
+    topics: ["Principalities & Mahajanapadas", "Mauryan Empire & Ashoka Inscriptions", "Land Grants & Rural Society"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+
+  // Arts / Humanities - Political Science
+  {
+    id: "ch-pol-1",
+    subjectId: "sub-pol",
+    chapterNumber: 1,
+    title: "The End of Bipolarity & World Politics",
+    topics: ["Soviet System & Disintegration", "Shock Therapy & Consequences", "India & Post-Communist Countries"],
+    status: "Completed",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-pol-2",
+    subjectId: "sub-pol",
+    chapterNumber: 2,
+    title: "Contemporary Centres of Power",
+    topics: ["European Union", "ASEAN & Rise of China", "India & Regional Alliances"],
+    status: "In Progress",
+    priority: "Important",
+    isWeak: false,
     pyqStatus: "Pending",
     revisionCount: 1,
     testStatus: "Pending",

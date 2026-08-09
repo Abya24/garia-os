@@ -138,7 +138,7 @@ export interface StudentProfile {
   updatedAt: number;
 }
 
-export type StreamType = "Commerce" | "Science";
+export type StreamType = "Commerce" | "Science" | "Arts / Humanities" | "Arts";
 
 export interface CareerAssessment {
   strongSubjects: string[];

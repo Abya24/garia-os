@@ -56,6 +56,11 @@ const SUBJECT_OPTIONS = [
   "Biology",
   "Computer Science",
   "English",
+  "History",
+  "Political Science",
+  "Geography",
+  "Sociology",
+  "Psychology",
   "Statistics",
 ];
 
@@ -144,7 +149,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   // Search filter for catalog
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCatalogStream, setSelectedCatalogStream] = useState<
-    "All" | "Commerce" | "Science"
+    "All" | "Commerce" | "Science" | "Arts / Humanities" | "Arts"
   >(profile.stream);
 
   // Expanded card IDs
@@ -433,18 +438,18 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
           {/* Filters & Search Bar */}
           <div className="glass-card p-4 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
             {/* Stream Filter Pills */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              {(["Commerce", "Science", "All"] as const).map((s) => (
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+              {(["Commerce", "Science", "Arts / Humanities", "All"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setSelectedCatalogStream(s)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     selectedCatalogStream === s
                       ? "bg-emerald-500 text-slate-950 font-bold shadow-md"
                       : "glass-pill text-slate-400 hover:text-white border border-white/5"
                   }`}
                 >
-                  {s === "All" ? "All Streams" : `${s} Stream`}
+                  {s === "All" ? "All Streams" : `${s}`}
                 </button>
               ))}
             </div>
@@ -487,7 +492,9 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
                             className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                               career.stream === "Commerce"
                                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                                : career.stream === "Science"
+                                ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                                : "bg-purple-500/10 text-purple-400 border-purple-500/30"
                             }`}
                           >
                             {career.stream} • {career.category}

@@ -807,6 +807,8 @@ export default function App() {
               water={water}
               goals={goals}
               events={calendarEvents}
+              academicSubjects={academicSubjects}
+              chapters={academicChapters}
               settings={settings}
               activeStudent={activeStudent}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}

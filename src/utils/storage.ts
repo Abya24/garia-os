@@ -11,6 +11,7 @@ import {
   AbyaMessage,
   UserSettings,
   StudentProfile,
+  StreamType,
   CareerProfile,
   CareerAssessment,
   CareerRoadmap,
@@ -26,7 +27,9 @@ import {
 import {
   DEFAULT_COMMERCE_SUBJECTS,
   DEFAULT_SCIENCE_SUBJECTS,
+  DEFAULT_ARTS_SUBJECTS,
   DEFAULT_INITIAL_CHAPTERS,
+  getDefaultSubjectsForStream,
 } from "./academicEngine";
 
 export const PROFILES_KEY = "garia_profiles_v1";
@@ -779,7 +782,9 @@ Use this space to write formulas, key terms, or daily notes.`,
   const careerAssess: CareerAssessment = {
     ...defaultCareerAssessment,
     strongSubjects:
-      profile.stream === "Commerce"
+      profile.stream === "Arts / Humanities" || profile.stream === "Arts"
+        ? ["History", "Political Science", "Geography"]
+        : profile.stream === "Commerce"
         ? ["Accountancy", "Economics", "Business Studies"]
         : ["Physics", "Chemistry", "Mathematics"],
   };
@@ -793,8 +798,7 @@ Use this space to write formulas, key terms, or daily notes.`,
   saveCareerRoadmap(careerRoadmap, profId);
 
   // Academic Subjects & Chapters
-  const academicSubs =
-    profile.stream === "Commerce" ? DEFAULT_COMMERCE_SUBJECTS : DEFAULT_SCIENCE_SUBJECTS;
+  const academicSubs = getDefaultSubjectsForStream(profile.stream);
   saveAcademicSubjects(academicSubs, profId);
 
   const academicChaps = DEFAULT_INITIAL_CHAPTERS.filter((c) =>
@@ -978,11 +982,11 @@ export const saveCareerRoadmap = (roadmap: CareerRoadmap, profileId?: string): v
 
 // Academic Loaders & Savers
 export const loadAcademicSubjects = (
-  stream: "Commerce" | "Science" = "Commerce",
+  stream: StreamType = "Commerce",
   profileId?: string
 ): AcademicSubject[] => {
   const pId = profileId || loadActiveProfileId();
-  const fallback = stream === "Science" ? DEFAULT_SCIENCE_SUBJECTS : DEFAULT_COMMERCE_SUBJECTS;
+  const fallback = getDefaultSubjectsForStream(stream);
   return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_SUBJECTS), fallback);
 };
 export const saveAcademicSubjects = (subs: AcademicSubject[], profileId?: string): void => {

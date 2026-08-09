@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { StudentProfile, StreamType, ExamBoard } from "../types";
+import { StreamSelector } from "./StreamSelector";
 
 interface StudentProfileModalProps {
   isOpen: boolean;
@@ -360,7 +361,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
                       Class Level
@@ -374,20 +375,6 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       <option value="Class 11">Class 11</option>
                       <option value="Class 10">Class 10</option>
                       <option value="Dropper / Gap Year">Dropper / Gap Year</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Stream
-                    </label>
-                    <select
-                      value={stream}
-                      onChange={(e) => setStream(e.target.value as StreamType)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="Commerce">Commerce</option>
-                      <option value="Science">Science</option>
                     </select>
                   </div>
 
@@ -407,6 +394,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {/* Stream Selection Cards */}
+                <StreamSelector
+                  selectedStream={stream}
+                  onSelectStream={(s) => setStream(s)}
+                />
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-2">

@@ -26,9 +26,13 @@ import {
   Goal,
   CalendarEvent,
   StudentProfile,
+  AcademicSubject,
+  AcademicChapter,
 } from "../types";
 import { Users } from "lucide-react";
 import { getTodayString } from "../utils/storage";
+import { generateSmartSuggestions } from "../utils/suggestionsEngine";
+import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
 
 interface HomeDashboardProps {
   tasks: Task[];
@@ -38,6 +42,8 @@ interface HomeDashboardProps {
   water: WaterLog;
   goals?: Goal[];
   events?: CalendarEvent[];
+  academicSubjects?: AcademicSubject[];
+  chapters?: AcademicChapter[];
   settings: UserSettings;
   activeStudent?: StudentProfile;
   onNavigate: (tab: ActiveTab) => void;
@@ -55,6 +61,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   water,
   goals = [],
   events = [],
+  academicSubjects = [],
+  chapters = [],
   settings,
   activeStudent,
   onNavigate,
@@ -138,6 +146,39 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     (taskProgressPercent + habitProgressPercent + waterProgressPercent) / 3
   );
 
+  // Generate real dynamic data-driven suggestions for active student
+  const activeProfForSug: StudentProfile = activeStudent || {
+    id: "default",
+    name: settings.userName || "Student",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    board: "BSEB",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  const smartSuggestions = generateSmartSuggestions(
+    activeProfForSug,
+    tasks,
+    subjects,
+    academicSubjects,
+    chapters,
+    goals,
+    water,
+    habits
+  );
+
+  const handleSuggestionAction = (targetTab?: string) => {
+    if (targetTab === "home") return;
+    if (targetTab === "water") {
+      onAddWaterGlass();
+      return;
+    }
+    if (targetTab) {
+      onNavigate(targetTab as ActiveTab);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Top Banner Greeting & Time */}
@@ -162,7 +203,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               )}
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold font-heading text-white tracking-tight">
-              {greeting}, {activeStudent?.name || settings.userName} 👋
+              {greeting}, {activeStudent?.name || settings.userName || "Student"} 👋
             </h1>
             <p className="text-slate-300 text-sm mt-1">
               Your personal operating system is loaded for {activeStudent ? `${activeStudent.classLevel} (${activeStudent.stream} - ${activeStudent.board})` : "today's goals"}.
@@ -177,6 +218,13 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Smart OS Suggestions Widget */}
+      <SmartSuggestionsWidget
+        suggestions={smartSuggestions}
+        onAction={handleSuggestionAction}
+        studentName={activeStudent?.name}
+      />
 
       {/* Progress Ring / Overview Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
