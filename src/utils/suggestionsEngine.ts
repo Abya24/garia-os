@@ -139,7 +139,7 @@ export function generateSmartSuggestions(
       description: `Currently at ${nearGoal.progress}% completion. Keep pushing to reach 100%!`,
       priority: "medium",
       actionText: "View Goals",
-      targetTab: "home",
+      targetTab: "goals",
     });
   }
 
@@ -153,7 +153,7 @@ export function generateSmartSuggestions(
       description: `You have logged ${water.glasses}/${water.goal} glasses today (${remaining} remaining). Hydrate for peak performance!`,
       priority: "low",
       actionText: "+1 Glass Water",
-      targetTab: "home",
+      targetTab: "water",
     });
   }
 
