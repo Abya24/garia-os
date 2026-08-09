@@ -2,6 +2,12 @@ import {
   AcademicSubject,
   AcademicChapter,
   AcademicTest,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  AcademicRoadmapStage,
+  AcademicRoadmapData,
+  RoadmapStageStatus,
   SmartStudyPlan,
   SmartStudySlot,
   StreamType,
@@ -513,5 +519,544 @@ export function generateSmartDailyPlan(
     }),
     targetHours: hours,
     slots,
+  };
+}
+
+// ==========================================
+// GARIA OS V1.8 — PRACTICE STATS CALCULATOR
+// ==========================================
+
+export interface PracticeStatsResult {
+  totalAttempts: number;
+  avgScorePercentage: number;
+  bestScorePercentage: number;
+  avgAccuracyPercentage: number;
+  subjectWise: Record<
+    string,
+    {
+      subjectName: string;
+      attempts: number;
+      avgScorePct: number;
+      accuracyPct: number;
+    }
+  >;
+}
+
+export function calculatePracticeStats(
+  sessions: AcademicPracticeSession[]
+): PracticeStatsResult {
+  if (!sessions || sessions.length === 0) {
+    return {
+      totalAttempts: 0,
+      avgScorePercentage: 0,
+      bestScorePercentage: 0,
+      avgAccuracyPercentage: 0,
+      subjectWise: {},
+    };
+  }
+
+  let totalPctSum = 0;
+  let totalAccSum = 0;
+  let bestPct = 0;
+
+  const subjectWise: Record<
+    string,
+    {
+      subjectName: string;
+      attempts: number;
+      scoreSum: number;
+      accuracySum: number;
+    }
+  > = {};
+
+  sessions.forEach((s) => {
+    const scorePct = s.maxMarks > 0 ? (s.score / s.maxMarks) * 100 : 0;
+    const acc = s.accuracyPercentage || scorePct;
+
+    totalPctSum += scorePct;
+    totalAccSum += acc;
+    if (scorePct > bestPct) bestPct = scorePct;
+
+    const subKey = s.subjectId || s.subjectName;
+    if (!subjectWise[subKey]) {
+      subjectWise[subKey] = {
+        subjectName: s.subjectName,
+        attempts: 0,
+        scoreSum: 0,
+        accuracySum: 0,
+      };
+    }
+    subjectWise[subKey].attempts += 1;
+    subjectWise[subKey].scoreSum += scorePct;
+    subjectWise[subKey].accuracySum += acc;
+  });
+
+  const formattedSubjectWise: Record<
+    string,
+    {
+      subjectName: string;
+      attempts: number;
+      avgScorePct: number;
+      accuracyPct: number;
+    }
+  > = {};
+
+  Object.entries(subjectWise).forEach(([key, val]) => {
+    formattedSubjectWise[key] = {
+      subjectName: val.subjectName,
+      attempts: val.attempts,
+      avgScorePct: Math.round(val.scoreSum / val.attempts),
+      accuracyPct: Math.round(val.accuracySum / val.attempts),
+    };
+  });
+
+  return {
+    totalAttempts: sessions.length,
+    avgScorePercentage: Math.round(totalPctSum / sessions.length),
+    bestScorePercentage: Math.round(bestPct),
+    avgAccuracyPercentage: Math.round(totalAccSum / sessions.length),
+    subjectWise: formattedSubjectWise,
+  };
+}
+
+// ==========================================
+// VVI & REVISION SEEDERS FOR INITIAL DATA
+// ==========================================
+
+export function getDefaultVVITopicsForStream(
+  stream: StreamType,
+  subjects: AcademicSubject[],
+  chapters: AcademicChapter[]
+): AcademicVVITopic[] {
+  // Extract all VVI chapters from active profile chapters
+  const vviChaps = chapters.filter((c) => c.priority === "VVI");
+  if (vviChaps.length > 0) {
+    return vviChaps.map((ch) => {
+      const sub = subjects.find((s) => s.id === ch.subjectId);
+      return {
+        id: `vvi-${ch.id}`,
+        subjectId: ch.subjectId,
+        subjectName: sub ? sub.name : "Subject",
+        chapterTitle: ch.title,
+        topicName: ch.topics[0] || ch.title,
+        priority: "VVI",
+        status: ch.status,
+        revisionCount: ch.revisionCount,
+        lastRevisedAt: ch.lastRevisedAt,
+        notes: ch.notes || "High Priority / Suggested Focus topic for board exams.",
+        createdAt: Date.now(),
+      };
+    });
+  }
+
+  // Fallback defaults if no VVI chapters found
+  if (stream === "Science") {
+    return [
+      {
+        id: "vvi-phy-1",
+        subjectId: subjects.find((s) => s.name.includes("Physics"))?.id || "sub-phy",
+        subjectName: "Physics",
+        chapterTitle: "Electrostatics & Electric Charges",
+        topicName: "Gauss's Law Applications & Dipole",
+        priority: "VVI",
+        status: "Completed",
+        revisionCount: 2,
+        notes: "High priority board exam concept.",
+        createdAt: Date.now() - 86400000 * 5,
+      },
+      {
+        id: "vvi-chem-1",
+        subjectId: subjects.find((s) => s.name.includes("Chemistry"))?.id || "sub-chem",
+        subjectName: "Chemistry",
+        chapterTitle: "Electrochemistry",
+        topicName: "Nernst Equation & Molar Conductivity",
+        priority: "VVI",
+        status: "In Progress",
+        revisionCount: 1,
+        notes: "Crucial numerical topic for boards & entrance.",
+        createdAt: Date.now() - 86400000 * 3,
+      },
+      {
+        id: "vvi-math-1",
+        subjectId: subjects.find((s) => s.name.includes("Math"))?.id || "sub-math-sci",
+        subjectName: "Mathematics",
+        chapterTitle: "Calculus - Continuity & Differentiability",
+        topicName: "Chain Rule & Parametric Functions",
+        priority: "VVI",
+        status: "In Progress",
+        revisionCount: 1,
+        notes: "Core topic for calculus weightage.",
+        createdAt: Date.now() - 86400000 * 2,
+      },
+    ];
+  } else if (stream === "Arts / Humanities" || stream === "Arts") {
+    return [
+      {
+        id: "vvi-hist-1",
+        subjectId: subjects.find((s) => s.name.includes("History"))?.id || "sub-hist",
+        subjectName: "History",
+        chapterTitle: "Bricks, Beads and Bones",
+        topicName: "Harappan Urban Planning & Citadel",
+        priority: "VVI",
+        status: "Completed",
+        revisionCount: 2,
+        notes: "High priority long answer topic.",
+        createdAt: Date.now() - 86400000 * 5,
+      },
+      {
+        id: "vvi-pol-1",
+        subjectId: subjects.find((s) => s.name.includes("Political"))?.id || "sub-pol",
+        subjectName: "Political Science",
+        chapterTitle: "The End of Bipolarity",
+        topicName: "Disintegration of USSR & Consequences",
+        priority: "VVI",
+        status: "In Progress",
+        revisionCount: 1,
+        notes: "High priority conceptual question.",
+        createdAt: Date.now() - 86400000 * 2,
+      },
+    ];
+  } else {
+    // Commerce default
+    return [
+      {
+        id: "vvi-acc-1",
+        subjectId: subjects.find((s) => s.name.includes("Accountancy"))?.id || "sub-acc",
+        subjectName: "Accountancy",
+        chapterTitle: "Partnership Fundamentals",
+        topicName: "Profit & Loss Appropriation & Goodwill",
+        priority: "VVI",
+        status: "Completed",
+        revisionCount: 2,
+        notes: "Core topic for CA Foundation and Boards.",
+        createdAt: Date.now() - 86400000 * 5,
+      },
+      {
+        id: "vvi-eco-1",
+        subjectId: subjects.find((s) => s.name.includes("Economics"))?.id || "sub-eco",
+        subjectName: "Economics",
+        chapterTitle: "National Income Accounting",
+        topicName: "Value Added & Income Calculation Methods",
+        priority: "VVI",
+        status: "Completed",
+        revisionCount: 2,
+        notes: "High weightage numericals.",
+        createdAt: Date.now() - 86400000 * 4,
+      },
+      {
+        id: "vvi-acc-2",
+        subjectId: subjects.find((s) => s.name.includes("Accountancy"))?.id || "sub-acc",
+        subjectName: "Accountancy",
+        chapterTitle: "Issue of Shares",
+        topicName: "Pro-Rata Allotment & Forfeiture",
+        priority: "VVI",
+        status: "In Progress",
+        revisionCount: 1,
+        notes: "High Priority / Suggested Focus.",
+        createdAt: Date.now() - 86400000 * 1,
+      },
+    ];
+  }
+}
+
+export function getDefaultRevisionsForStream(
+  stream: StreamType,
+  subjects: AcademicSubject[],
+  chapters: AcademicChapter[]
+): AcademicRevisionItem[] {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Map weak / in progress / low revision chapters to initial revisions
+  const revisionTargetChaps = chapters.filter(
+    (c) => c.priority === "VVI" || c.isWeak || c.status === "In Progress"
+  );
+
+  if (revisionTargetChaps.length > 0) {
+    return revisionTargetChaps.slice(0, 4).map((ch, idx) => {
+      const sub = subjects.find((s) => s.id === ch.subjectId);
+      const isOverdue = idx === 0;
+      const daysOffset = isOverdue ? -1 : idx;
+      const targetDate = new Date(Date.now() + daysOffset * 86400000)
+        .toISOString()
+        .split("T")[0];
+
+      return {
+        id: `rev-${ch.id}`,
+        subjectId: ch.subjectId,
+        subjectName: sub ? sub.name : "Subject",
+        chapterId: ch.id,
+        chapterTitle: ch.title,
+        topicName: ch.topics[0] || ch.title,
+        priority: ch.priority,
+        scheduledDate: targetDate,
+        completed: ch.revisionCount >= 2,
+        notes: isOverdue
+          ? "Overdue revision! Re-read formula notes and key terms."
+          : "Scheduled revision.",
+        createdAt: Date.now(),
+      };
+    });
+  }
+
+  return [
+    {
+      id: "rev-1",
+      subjectId: subjects[0]?.id || "sub-1",
+      subjectName: subjects[0]?.name || "Core Subject",
+      chapterTitle: "Chapter 1 Overview",
+      priority: "VVI",
+      scheduledDate: today,
+      completed: false,
+      notes: "First revision pass.",
+      createdAt: Date.now(),
+    },
+  ];
+}
+
+// ==========================================
+// DYNAMIC ACADEMIC ROADMAP GENERATOR
+// ==========================================
+
+export function generateAcademicRoadmapData(
+  classLevel: string,
+  stream: StreamType,
+  subjects: AcademicSubject[],
+  chapters: AcademicChapter[],
+  vviTopics: AcademicVVITopic[],
+  revisions: AcademicRevisionItem[],
+  practiceSessions: AcademicPracticeSession[],
+  tests: AcademicTest[],
+  careerGoalTitle?: string
+): AcademicRoadmapData {
+  // 1. Overall Syllabus Progress
+  const totalChaps = chapters.length;
+  const completedChaps = chapters.filter((c) => c.status === "Completed").length;
+  const syllabusPct = totalChaps > 0 ? Math.round((completedChaps / totalChaps) * 100) : 0;
+
+  // 2. VVI Progress
+  const totalVVI = vviTopics.length;
+  const completedVVI = vviTopics.filter((v) => v.status === "Completed").length;
+  const vviPct = totalVVI > 0 ? Math.round((completedVVI / totalVVI) * 100) : 0;
+
+  // 3. Revision Progress
+  const totalRevisions = revisions.length;
+  const completedRevisions = revisions.filter((r) => r.completed).length;
+  const revisionPct =
+    totalRevisions > 0 ? Math.round((completedRevisions / totalRevisions) * 100) : 0;
+
+  // 4. Practice Progress
+  const pyqCompletedChaps = chapters.filter((c) => c.pyqStatus === "Completed").length;
+  const pyqTotalChaps = chapters.length;
+  const pyqPct = pyqTotalChaps > 0 ? Math.round((pyqCompletedChaps / pyqTotalChaps) * 100) : 0;
+
+  // 5. Exam Prep Status
+  const testCount = tests.length + practiceSessions.length;
+  const examPrepPct = Math.min(100, Math.round((testCount / Math.max(1, totalChaps)) * 100));
+
+  // Overall Roadmap Progress
+  const overallProgress = Math.round(
+    syllabusPct * 0.3 + vviPct * 0.2 + revisionPct * 0.2 + pyqPct * 0.15 + examPrepPct * 0.15
+  );
+
+  // Helper function for stage status
+  const getStageStatus = (pct: number): RoadmapStageStatus => {
+    if (pct >= 100) return "Completed";
+    if (pct >= 75) return "Almost Done";
+    if (pct > 0) return "In Progress";
+    return "Not Started";
+  };
+
+  // Stage 1: Current Stage
+  const currentStageStatus: RoadmapStageStatus =
+    overallProgress >= 80 ? "Almost Done" : overallProgress > 0 ? "In Progress" : "Not Started";
+
+  let stage1Desc = `${classLevel} (${stream}) — Standard Core Curriculum Phase`;
+  if (classLevel.includes("Dropper") || classLevel.includes("Gap")) {
+    stage1Desc = `Dropper / Gap Year (${stream}) — Intensive Review & Entrance Mastery Phase`;
+  } else if (classLevel.includes("10")) {
+    stage1Desc = `Class 10 Board Exam Track — Fundamental Concepts & Exam Foundation`;
+  }
+
+  const stage1: AcademicRoadmapStage = {
+    id: "stage-1-current",
+    title: "1. Current Stage & Academic Phase",
+    description: stage1Desc,
+    status: currentStageStatus,
+    progress: overallProgress,
+    pendingItems: [
+      `${totalChaps - completedChaps} chapters pending completion`,
+      `${revisions.filter((r) => !r.completed).length} pending revisions`,
+    ],
+    completedItems: [
+      `${completedChaps} chapters completed`,
+      `${completedRevisions} revisions done`,
+      `Target Career: ${careerGoalTitle || "General Higher Education"}`,
+    ],
+    suggestedAction:
+      totalChaps - completedChaps > 0
+        ? `Focus on finishing remaining ${totalChaps - completedChaps} syllabus chapters.`
+        : "Syllabus complete! Transition to full mock test series.",
+  };
+
+  // Stage 2: Syllabus Completion
+  const pendingChapsList = chapters
+    .filter((c) => c.status !== "Completed")
+    .map((c) => {
+      const sub = subjects.find((s) => s.id === c.subjectId);
+      return `${sub?.name || "Subject"}: ${c.title}`;
+    });
+
+  const completedChapsList = chapters
+    .filter((c) => c.status === "Completed")
+    .map((c) => {
+      const sub = subjects.find((s) => s.id === c.subjectId);
+      return `${sub?.name || "Subject"}: ${c.title}`;
+    });
+
+  const stage2: AcademicRoadmapStage = {
+    id: "stage-2-syllabus",
+    title: "2. Syllabus Completion",
+    description: `Targeting 100% syllabus coverage across all ${subjects.length} active stream subjects.`,
+    status: getStageStatus(syllabusPct),
+    progress: syllabusPct,
+    pendingItems:
+      pendingChapsList.length > 0
+        ? pendingChapsList.slice(0, 4)
+        : ["All registered chapters completed!"],
+    completedItems:
+      completedChapsList.length > 0
+        ? completedChapsList.slice(0, 4)
+        : ["No completed chapters yet."],
+    suggestedAction:
+      pendingChapsList.length > 0
+        ? `Start with top priority topic: ${pendingChapsList[0]}`
+        : "Syllabus 100% covered. Keep revising!",
+  };
+
+  // Stage 3: VVI Topics
+  const pendingVVI = vviTopics.filter((v) => v.status !== "Completed").map((v) => `${v.subjectName}: ${v.chapterTitle}`);
+  const completedVVIList = vviTopics.filter((v) => v.status === "Completed").map((v) => `${v.subjectName}: ${v.chapterTitle}`);
+
+  const stage3: AcademicRoadmapStage = {
+    id: "stage-3-vvi",
+    title: "3. High Priority / VVI Topics Focus",
+    description: "High-weightage topics selected for maximum score yield in board and entrance exams.",
+    status: getStageStatus(vviPct),
+    progress: vviPct,
+    pendingItems: pendingVVI.length > 0 ? pendingVVI : ["All VVI topics mastered!"],
+    completedItems: completedVVIList.length > 0 ? completedVVIList : ["No VVI topics completed yet."],
+    suggestedAction: pendingVVI.length > 0 ? `Master VVI topic: ${pendingVVI[0]}` : "VVI focus complete.",
+  };
+
+  // Stage 4: Revision
+  const todayStr = new Date().toISOString().split("T")[0];
+  const overdueRev = revisions.filter((r) => !r.completed && r.scheduledDate < todayStr).map((r) => `${r.subjectName}: ${r.chapterTitle} (Overdue)`);
+  const upcomingRev = revisions.filter((r) => !r.completed && r.scheduledDate >= todayStr).map((r) => `${r.subjectName}: ${r.chapterTitle} (${r.scheduledDate})`);
+  const doneRev = revisions.filter((r) => r.completed).map((r) => `${r.subjectName}: ${r.chapterTitle}`);
+
+  const stage4: AcademicRoadmapStage = {
+    id: "stage-4-revision",
+    title: "4. Revision Planner & Spaced Practice",
+    description: "Multi-pass revision strategy to consolidate memory and recall speed.",
+    status: getStageStatus(revisionPct),
+    progress: revisionPct,
+    pendingItems: [...overdueRev, ...upcomingRev].slice(0, 4),
+    completedItems: doneRev.slice(0, 4),
+    suggestedAction: overdueRev.length > 0 ? `⚠️ Clear ${overdueRev.length} overdue revisions immediately!` : upcomingRev.length > 0 ? `Next revision scheduled: ${upcomingRev[0]}` : "Add new revision tasks.",
+  };
+
+  // Stage 5: Mock/PYQ Practice
+  const pyqPending = chapters.filter((c) => c.pyqStatus === "Pending").map((c) => {
+    const sub = subjects.find((s) => s.id === c.subjectId);
+    return `${sub?.name || "Subject"}: ${c.title}`;
+  });
+  const pyqDone = chapters.filter((c) => c.pyqStatus === "Completed").map((c) => {
+    const sub = subjects.find((s) => s.id === c.subjectId);
+    return `${sub?.name || "Subject"}: ${c.title}`;
+  });
+
+  const stage5: AcademicRoadmapStage = {
+    id: "stage-5-practice",
+    title: "5. PYQ & Mock Practice Tracker",
+    description: "Previous Year Questions (5-10 year analysis) and simulated timing tests.",
+    status: getStageStatus(pyqPct),
+    progress: pyqPct,
+    pendingItems: pyqPending.slice(0, 4),
+    completedItems: pyqDone.slice(0, 4),
+    suggestedAction: pyqPending.length > 0 ? `Solve PYQs for ${pyqPending[0]}` : "PYQ coverage complete! Take full length mock tests.",
+  };
+
+  // Stage 6: Exam Preparation
+  const stage6Status: RoadmapStageStatus = testCount >= 5 ? "Almost Done" : testCount >= 1 ? "In Progress" : "Not Started";
+
+  const stage6: AcademicRoadmapStage = {
+    id: "stage-6-exam-prep",
+    title: "6. Exam & Board Readiness",
+    description: "Final exam simulation, error log review, and time management optimization.",
+    status: stage6Status,
+    progress: Math.min(100, testCount * 20),
+    pendingItems: [
+      `${Math.max(0, 5 - testCount)} additional mock exams recommended`,
+      "Formula & diagram cheat-sheets review",
+    ],
+    completedItems: [
+      `${testCount} mock tests/quizzes recorded`,
+      `Average Test Performance: ${calculatePracticeStats(practiceSessions).avgScorePercentage}%`,
+    ],
+    suggestedAction: "Conduct timed mock exam under exam-like hall conditions.",
+  };
+
+  // Stage 7: Career / Entrance Preparation
+  let careerTitleName = careerGoalTitle || "Target Career Path";
+  let careerFocusDetails = "General Entrance & Higher Studies Alignment";
+
+  if (stream === "Commerce" || careerTitleName.includes("CA") || careerTitleName.includes("Finance") || careerTitleName.includes("Business")) {
+    if (careerTitleName.includes("CA")) {
+      careerTitleName = "Chartered Accountant (CA Foundation)";
+      careerFocusDetails = "Focus: Accountancy, Business Laws, Economics & Quantitative Aptitude.";
+    } else {
+      careerFocusDetails = "Focus: Business Analytics, Corporate Finance, Banking & Economics.";
+    }
+  } else if (stream === "Science" || careerTitleName.includes("Engineering") || careerTitleName.includes("Medical") || careerTitleName.includes("NEET") || careerTitleName.includes("JEE")) {
+    if (careerTitleName.includes("NEET") || careerTitleName.includes("Medical") || careerTitleName.includes("Doctor")) {
+      careerTitleName = "Medical Entrance (NEET UG)";
+      careerFocusDetails = "Focus: Biology (Botany/Zoology NCERT line-by-line), Organic Chemistry & Physics numericals.";
+    } else {
+      careerTitleName = "Engineering Entrance (JEE Main / Advanced)";
+      careerFocusDetails = "Focus: Physics Mechanics/Electrodynamics, Calculus & Physical/Organic Chemistry.";
+    }
+  } else if (stream === "Arts / Humanities" || stream === "Arts" || careerTitleName.includes("Law") || careerTitleName.includes("Civil")) {
+    if (careerTitleName.includes("Law") || careerTitleName.includes("CLAT")) {
+      careerTitleName = "Law Entrance (CLAT / AILET)";
+      careerFocusDetails = "Focus: Legal Reasoning, Political Science, English Comprehension & General Knowledge.";
+    } else {
+      careerFocusDetails = "Focus: History, Political Theory, Analytical Writing & General Studies.";
+    }
+  }
+
+  const stage7: AcademicRoadmapStage = {
+    id: "stage-7-career",
+    title: `7. Career / Entrance Preparation: ${careerTitleName}`,
+    description: careerFocusDetails,
+    status: overallProgress >= 50 ? "In Progress" : "Not Started",
+    progress: overallProgress,
+    pendingItems: [
+      `Align study schedule with ${careerTitleName} exam pattern`,
+      "Solve career-specific entrance question banks",
+    ],
+    completedItems: [
+      `Stream Selected: ${stream}`,
+      `Target Goal Linked: ${careerTitleName}`,
+    ],
+    suggestedAction: `Review ${careerTitleName} syllabus requirements in Career Center.`,
+  };
+
+  return {
+    classLevel,
+    stream,
+    targetCareerTitle: careerTitleName,
+    overallProgress,
+    stages: [stage1, stage2, stage3, stage4, stage5, stage6, stage7],
+    lastCalculated: Date.now(),
   };
 }

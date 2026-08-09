@@ -38,10 +38,20 @@ import {
   StudentProfile,
   AcademicSubject,
   AcademicChapter,
+  AcademicRoadmapData,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  ExamTestRecord,
+  ExamProfile,
+  CareerProfile,
+  AcademicPracticeSession,
 } from "../types";
 import { getTodayString, loadSmartSuggestionsState, saveSmartSuggestionsState } from "../utils/storage";
 import { generateSmartSuggestions } from "../utils/suggestionsEngine";
+import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
 import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
+import { AcademicRoadmapWidget } from "../components/AcademicRoadmapWidget";
+import { ExamIntelligenceWidget } from "../components/ExamIntelligenceWidget";
 
 interface HomeDashboardProps {
   tasks: Task[];
@@ -55,6 +65,13 @@ interface HomeDashboardProps {
   events?: CalendarEvent[];
   academicSubjects?: AcademicSubject[];
   chapters?: AcademicChapter[];
+  roadmap?: AcademicRoadmapData;
+  vviTopics?: AcademicVVITopic[];
+  revisions?: AcademicRevisionItem[];
+  examTestRecords?: ExamTestRecord[];
+  examProfile?: ExamProfile;
+  careerProfile?: CareerProfile;
+  practiceSessions?: AcademicPracticeSession[];
   settings: UserSettings;
   activeStudent?: StudentProfile;
   onNavigate: (tab: ActiveTab) => void;
@@ -79,6 +96,13 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   events = [],
   academicSubjects = [],
   chapters = [],
+  roadmap,
+  vviTopics = [],
+  revisions = [],
+  examTestRecords = [],
+  examProfile,
+  careerProfile,
+  practiceSessions = [],
   settings,
   activeStudent,
   onNavigate,
@@ -270,6 +294,30 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     saveSmartSuggestionsState({ dismissedIds: updated, lastUpdated: Date.now() }, activeStudent?.id);
   };
 
+  // Exam Intelligence Report (V1.9)
+  const defaultExamProfile: ExamProfile = examProfile || {
+    board: activeProfForSug.board || "BSEB",
+    classLevel: activeProfForSug.classLevel || "Class 12",
+    stream: activeProfForSug.stream || "Commerce",
+    academicYear: "2025-2026",
+    examName: `${activeProfForSug.classLevel} Board Exam`,
+    startDate: getTodayString(),
+    subjectExamDates: {},
+    dailyStudyHours: 5,
+  };
+
+  const examReport = generateExamIntelligenceReport(
+    activeProfForSug,
+    defaultExamProfile,
+    examTestRecords || [],
+    academicSubjects,
+    chapters,
+    vviTopics,
+    revisions,
+    practiceSessions || [],
+    careerProfile
+  );
+
   const smartSuggestions = generateSmartSuggestions(
     activeProfForSug,
     tasks,
@@ -279,7 +327,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     goals,
     water,
     habits,
-    dismissedIds
+    dismissedIds,
+    examTestRecords || [],
+    vviTopics,
+    examReport
   );
 
   const handleSuggestionAction = (targetTab?: string) => {
@@ -346,6 +397,22 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         onDismiss={handleDismissSuggestion}
         studentName={activeStudent?.name}
       />
+
+      {/* Exam Intelligence V1.9 Summary Widget */}
+      <ExamIntelligenceWidget
+        report={examReport}
+        onNavigate={(tab) => onNavigate(tab as ActiveTab)}
+      />
+
+      {/* Academic Roadmap Widget */}
+      {roadmap && (
+        <AcademicRoadmapWidget
+          roadmap={roadmap}
+          vviTopics={vviTopics}
+          revisions={revisions}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* Overview Top Section: Daily Progress Ring + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

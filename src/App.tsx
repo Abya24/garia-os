@@ -25,6 +25,11 @@ import {
   ExamMilestone,
   ExamMockTest,
   ExamDailyPlan,
+  ExamTestRecord,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  AcademicRoadmapData,
 } from "./types";
 import {
   loadTasks,
@@ -65,6 +70,14 @@ import {
   saveAcademicTests,
   loadAcademicPlan,
   saveAcademicPlan,
+  loadVVITopics,
+  saveVVITopics,
+  loadAcademicRevisions,
+  saveAcademicRevisions,
+  loadAcademicPractice,
+  saveAcademicPractice,
+  loadAcademicRoadmapData,
+  saveAcademicRoadmapData,
   loadExamProfile,
   saveExamProfile,
   loadExamMilestones,
@@ -73,6 +86,8 @@ import {
   saveExamMockTests,
   loadExamDailyPlan,
   saveExamDailyPlan,
+  loadExamTestRecords,
+  saveExamTestRecords,
   getTodayString,
   clearAllData,
   loadProfiles,
@@ -87,6 +102,12 @@ import {
   importStudentProfileJSON,
   getDefaultStudySubjectsForStream,
 } from "./utils/storage";
+
+import {
+  getDefaultVVITopicsForStream,
+  getDefaultRevisionsForStream,
+  generateAcademicRoadmapData,
+} from "./utils/academicEngine";
 
 import {
   generateAbyaInsightCards,
@@ -159,11 +180,59 @@ export default function App() {
   const [academicTests, setAcademicTests] = useState<AcademicTest[]>(() => loadAcademicTests());
   const [academicPlan, setAcademicPlan] = useState<SmartStudyPlan | null>(() => loadAcademicPlan());
 
-  // Exam Intelligence States (v1.4.2)
+  // V1.8 Academic States
+  const [vviTopics, setVviTopics] = useState<AcademicVVITopic[]>(() => {
+    const loaded = loadVVITopics();
+    if (loaded && loaded.length > 0) return loaded;
+    return getDefaultVVITopicsForStream(careerProfile.stream, academicSubjects, academicChapters);
+  });
+
+  const [academicRevisions, setAcademicRevisions] = useState<AcademicRevisionItem[]>(() => {
+    const loaded = loadAcademicRevisions();
+    if (loaded && loaded.length > 0) return loaded;
+    return getDefaultRevisionsForStream(careerProfile.stream, academicSubjects, academicChapters);
+  });
+
+  const [academicPractice, setAcademicPractice] = useState<AcademicPracticeSession[]>(() => {
+    return loadAcademicPractice();
+  });
+
+  // Dynamic Academic Roadmap
+  const academicRoadmap: AcademicRoadmapData = generateAcademicRoadmapData(
+    activeStudent?.classLevel || "Class 12",
+    careerProfile.stream || "Commerce",
+    academicSubjects,
+    academicChapters,
+    vviTopics,
+    academicRevisions,
+    academicPractice,
+    academicTests,
+    careerRoadmap?.careerTitle
+  );
+
+  // Exam Intelligence States (V1.9)
   const [examProfile, setExamProfile] = useState<ExamProfile>(() => loadExamProfile());
   const [examMilestones, setExamMilestones] = useState<ExamMilestone[]>(() => loadExamMilestones());
   const [examMockTests, setExamMockTests] = useState<ExamMockTest[]>(() => loadExamMockTests());
   const [examPlan, setExamPlan] = useState<ExamDailyPlan | null>(() => loadExamDailyPlan());
+  const [examTestRecords, setExamTestRecords] = useState<ExamTestRecord[]>(() => loadExamTestRecords());
+
+  const handleSaveExamTestRecord = (testData: Omit<ExamTestRecord, "id" | "createdAt">) => {
+    const newRecord: ExamTestRecord = {
+      ...testData,
+      id: `test-rec-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    const updated = [newRecord, ...examTestRecords];
+    setExamTestRecords(updated);
+    saveExamTestRecords(updated, activeProfileId);
+  };
+
+  const handleDeleteExamTestRecord = (testId: string) => {
+    const updated = examTestRecords.filter((t) => t.id !== testId);
+    setExamTestRecords(updated);
+    saveExamTestRecords(updated, activeProfileId);
+  };
 
   // Attached Note Context for Abya AI
   const [attachedContextNote, setAttachedContextNote] = useState<string>("");
@@ -198,14 +267,26 @@ export default function App() {
     setCareerAssessment(loadCareerAssessment(profileId));
     setCareerRoadmap(loadCareerRoadmap(profileId));
     setCareerQuiz(loadCareerQuiz(profileId));
-    setAcademicSubjects(loadAcademicSubjects(stream, profileId));
-    setAcademicChapters(loadAcademicChapters(profileId));
+    const loadedAcadSubs = loadAcademicSubjects(stream, profileId);
+    const loadedAcadChaps = loadAcademicChapters(profileId);
+    setAcademicSubjects(loadedAcadSubs);
+    setAcademicChapters(loadedAcadChaps);
     setAcademicTests(loadAcademicTests(profileId));
     setAcademicPlan(loadAcademicPlan(profileId));
+
+    const loadedVVI = loadVVITopics(profileId);
+    setVviTopics(loadedVVI.length > 0 ? loadedVVI : getDefaultVVITopicsForStream(stream, loadedAcadSubs, loadedAcadChaps));
+
+    const loadedRev = loadAcademicRevisions(profileId);
+    setAcademicRevisions(loadedRev.length > 0 ? loadedRev : getDefaultRevisionsForStream(stream, loadedAcadSubs, loadedAcadChaps));
+
+    setAcademicPractice(loadAcademicPractice(profileId));
+
     setExamProfile(loadExamProfile(profileId));
     setExamMilestones(loadExamMilestones(profileId));
     setExamMockTests(loadExamMockTests(profileId));
     setExamPlan(loadExamDailyPlan(profileId));
+    setExamTestRecords(loadExamTestRecords(profileId));
   };
 
   // Profile Action Handlers
@@ -302,6 +383,25 @@ export default function App() {
   const handleUpdateAcademicPlan = (plan: SmartStudyPlan | null) => {
     setAcademicPlan(plan);
     saveAcademicPlan(plan, activeProfileId);
+  };
+
+  const handleUpdateVVITopics = (topics: AcademicVVITopic[]) => {
+    setVviTopics(topics);
+    saveVVITopics(topics, activeProfileId);
+  };
+
+  const handleUpdateAcademicRevisions = (revisions: AcademicRevisionItem[]) => {
+    setAcademicRevisions(revisions);
+    saveAcademicRevisions(revisions, activeProfileId);
+  };
+
+  const handleUpdateAcademicPractice = (sessions: AcademicPracticeSession[]) => {
+    setAcademicPractice(sessions);
+    saveAcademicPractice(sessions, activeProfileId);
+  };
+
+  const handleUpdateAcademicRoadmap = (roadmap: AcademicRoadmapData) => {
+    saveAcademicRoadmapData(roadmap, activeProfileId);
   };
 
   const handleUpdateExamProfile = (prof: ExamProfile) => {
@@ -854,6 +954,13 @@ export default function App() {
               events={calendarEvents}
               academicSubjects={academicSubjects}
               chapters={academicChapters}
+              roadmap={academicRoadmap}
+              vviTopics={vviTopics}
+              revisions={academicRevisions}
+              examTestRecords={examTestRecords}
+              examProfile={examProfile}
+              careerProfile={careerProfile}
+              practiceSessions={academicPractice}
               settings={settings}
               activeStudent={activeStudent}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
@@ -921,6 +1028,12 @@ export default function App() {
               academicTests={academicTests}
               careerProfile={careerProfile}
               careerRoadmap={careerRoadmap}
+              vviTopics={vviTopics}
+              revisions={academicRevisions}
+              practiceSessions={academicPractice}
+              examTestRecords={examTestRecords}
+              onSaveExamTestRecord={handleSaveExamTestRecord}
+              onDeleteExamTestRecord={handleDeleteExamTestRecord}
               onUpdateExamProfile={handleUpdateExamProfile}
               onUpdateExamMilestones={handleUpdateExamMilestones}
               onUpdateExamMockTests={handleUpdateExamMockTests}
@@ -942,10 +1055,18 @@ export default function App() {
               chapters={academicChapters}
               tests={academicTests}
               smartPlan={academicPlan}
+              roadmap={academicRoadmap}
+              vviTopics={vviTopics}
+              revisions={academicRevisions}
+              practiceSessions={academicPractice}
               onUpdateSubjects={handleUpdateAcademicSubjects}
               onUpdateChapters={handleUpdateAcademicChapters}
               onUpdateTests={handleUpdateAcademicTests}
               onUpdatePlan={handleUpdateAcademicPlan}
+              onUpdateVVITopics={handleUpdateVVITopics}
+              onUpdateRevisions={handleUpdateAcademicRevisions}
+              onUpdatePracticeSessions={handleUpdateAcademicPractice}
+              onUpdateRoadmap={handleUpdateAcademicRoadmap}
               onAskAbyaWithContext={handleAskAbyaWithContext}
             />
           )}

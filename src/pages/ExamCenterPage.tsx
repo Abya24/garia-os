@@ -36,6 +36,11 @@ import {
   AcademicTest,
   CareerProfile,
   CareerRoadmap,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  ExamTestRecord,
+  StudentProfile,
 } from "../types";
 import {
   calculateExamCountdown,
@@ -46,6 +51,13 @@ import {
   detectWeaknessTopics,
   generateExamStudyPlan,
 } from "../utils/examEngine";
+import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
+import { ExamTestLoggerModal } from "../components/ExamTestLoggerModal";
+import { PerformanceTrendChart } from "../components/PerformanceTrendChart";
+import { SubjectPerformanceAnalysisSection } from "../components/SubjectPerformanceAnalysisSection";
+import { WeakAreaDetectionSection } from "../components/WeakAreaDetectionSection";
+import { SubjectComparisonView } from "../components/SubjectComparisonView";
+import { ExamReadinessScoreCard } from "../components/ExamReadinessScoreCard";
 
 interface ExamCenterPageProps {
   examProfile: ExamProfile;
@@ -57,6 +69,12 @@ interface ExamCenterPageProps {
   academicTests: AcademicTest[];
   careerProfile: CareerProfile;
   careerRoadmap: CareerRoadmap | null;
+  vviTopics?: AcademicVVITopic[];
+  revisions?: AcademicRevisionItem[];
+  practiceSessions?: AcademicPracticeSession[];
+  examTestRecords?: ExamTestRecord[];
+  onSaveExamTestRecord?: (test: Omit<ExamTestRecord, "id" | "createdAt">) => void;
+  onDeleteExamTestRecord?: (testId: string) => void;
   onUpdateExamProfile: (profile: ExamProfile) => void;
   onUpdateExamMilestones: (milestones: ExamMilestone[]) => void;
   onUpdateExamMockTests: (tests: ExamMockTest[]) => void;
@@ -76,6 +94,12 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   academicTests,
   careerProfile,
   careerRoadmap,
+  vviTopics = [],
+  revisions = [],
+  practiceSessions = [],
+  examTestRecords = [],
+  onSaveExamTestRecord,
+  onDeleteExamTestRecord,
   onUpdateExamProfile,
   onUpdateExamMilestones,
   onUpdateExamMockTests,
@@ -91,10 +115,36 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   // Modals & Forms
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [showRecordLoggerModal, setShowRecordLoggerModal] = useState(false);
+  const [editingTestRecord, setEditingTestRecord] = useState<ExamTestRecord | null>(null);
   const [selectedSubjectDetail, setSelectedSubjectDetail] = useState<string | null>(null);
 
   // Profile Form state
   const [profileForm, setProfileForm] = useState<ExamProfile>(examProfile);
+
+  // Active Student Profile stub for engine
+  const activeStudentProfile: StudentProfile = {
+    id: "active",
+    name: "Active Student",
+    classLevel: examProfile.classLevel || "Class 12",
+    stream: careerProfile.stream || "Commerce",
+    board: examProfile.board || "BSEB",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  // V1.9 Exam Intelligence Engine Report
+  const v19Report = generateExamIntelligenceReport(
+    activeStudentProfile,
+    examProfile,
+    examTestRecords,
+    academicSubjects,
+    academicChapters,
+    vviTopics,
+    revisions,
+    practiceSessions,
+    careerProfile
+  );
 
   // Test Form state
   const [testForm, setTestForm] = useState({
@@ -419,6 +469,23 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       ========================================== */}
       {activeSubTab === "overview" && (
         <div className="space-y-6">
+          {/* V1.9 Overall Exam Readiness Card */}
+          <ExamReadinessScoreCard
+            report={v19Report}
+            onNavigate={(tab) => onNavigate(tab)}
+          />
+
+          {/* V1.9 Weak Area Detection & Priority Queue */}
+          <WeakAreaDetectionSection
+            weakAreas={v19Report.weakAreas}
+            onNavigate={(tab) => onNavigate(tab)}
+          />
+
+          {/* V1.9 Subject Performance Analysis Section */}
+          <SubjectPerformanceAnalysisSection
+            subjectAnalyses={v19Report.subjectAnalyses}
+          />
+
           {/* Readiness Score Breakdown Detailed Card */}
           <div className="glass-card p-6 rounded-3xl border border-white/10">
             <h3 className="text-lg font-bold text-white font-heading mb-4 flex items-center gap-2">
@@ -879,110 +946,149 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       ========================================== */}
       {activeSubTab === "tests" && (
         <div className="space-y-6">
-          <div className="glass-card p-5 rounded-3xl border border-white/10 flex items-center justify-between">
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-cyan-400" />
-                Mock Test & Performance Analytics
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                V1.9 Exam Intelligence & Performance Center
               </h3>
               <p className="text-xs text-slate-300 mt-1">
-                Record practice tests, track score percentages, and view improvement trends.
+                Record test scores, track question accuracy, view score progression trends, and compare subject matrices.
               </p>
             </div>
 
             <button
-              onClick={() => setShowTestModal(true)}
-              className="px-4 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-lg"
+              onClick={() => {
+                setEditingTestRecord(null);
+                setShowRecordLoggerModal(true);
+              }}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:opacity-90 transition-opacity shrink-0"
             >
-              <Plus className="w-4 h-4" /> Record Test
+              <Plus className="w-4 h-4" /> Record Test Performance
             </button>
           </div>
 
-          {/* Test Performance Metrics Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="glass-card p-4 rounded-3xl border border-white/10">
-              <span className="text-xs text-slate-400 font-mono block mb-1">Overall Test Average</span>
-              <div className="text-2xl font-extrabold text-cyan-400 font-heading">
-                {readiness.testScore}%
-              </div>
-            </div>
-            <div className="glass-card p-4 rounded-3xl border border-white/10">
-              <span className="text-xs text-slate-400 font-mono block mb-1">Tests Completed</span>
-              <div className="text-2xl font-extrabold text-white font-heading">
-                {examMockTests.length + academicTests.length}
-              </div>
-            </div>
-            <div className="glass-card p-4 rounded-3xl border border-white/10">
-              <span className="text-xs text-slate-400 font-mono block mb-1">Best Score</span>
-              <div className="text-2xl font-extrabold text-emerald-400 font-heading">
-                {examMockTests.length > 0
-                  ? Math.max(...examMockTests.map((t) => Math.round((t.marksObtained / t.maxMarks) * 100)))
-                  : 0}
-                %
-              </div>
-            </div>
-            <div className="glass-card p-4 rounded-3xl border border-white/10">
-              <span className="text-xs text-slate-400 font-mono block mb-1">Improvement Trend</span>
-              <div className="text-2xl font-extrabold text-purple-400 font-heading flex items-center gap-1">
-                <TrendingUp className="w-5 h-5 text-purple-400" /> Stable
-              </div>
-            </div>
-          </div>
+          {/* Performance Trend Chart */}
+          <PerformanceTrendChart tests={examTestRecords} />
 
-          {/* Recorded Mock Tests List */}
-          <div className="glass-card p-6 rounded-3xl border border-white/10">
-            <h4 className="text-base font-bold text-white font-heading mb-4">Recorded Mock Tests</h4>
+          {/* Side-by-Side Subject Matrix Comparison */}
+          <SubjectComparisonView subjectAnalyses={v19Report.subjectAnalyses} />
 
-            {examMockTests.length === 0 ? (
-              <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10">
-                <FileText className="w-10 h-10 text-slate-500 mx-auto mb-2" />
-                <p className="text-sm font-bold text-white">Not enough data yet</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Record your first board mock test or quiz score to enable trend analytics.
+          {/* Recorded Exam Performance Log Table */}
+          <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-bold text-white font-heading">
+                  Recorded Exam & Quiz Logs ({examTestRecords.length})
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Detailed question breakdown, accuracy, attempt rate & notes
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingTestRecord(null);
+                  setShowRecordLoggerModal(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors"
+              >
+                + Log New Test
+              </button>
+            </div>
+
+            {examTestRecords.length === 0 ? (
+              <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10 space-y-3">
+                <FileText className="w-10 h-10 text-slate-500 mx-auto" />
+                <p className="text-sm font-bold text-white">No exam data yet.</p>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Record your first exam or mock test score to generate performance trends and weak area intelligence.
                 </p>
                 <button
-                  onClick={() => setShowTestModal(true)}
-                  className="mt-3 px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-300 text-xs font-bold hover:bg-cyan-500/30 border border-cyan-500/30"
+                  onClick={() => {
+                    setEditingTestRecord(null);
+                    setShowRecordLoggerModal(true);
+                  }}
+                  className="mt-2 px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold shadow-lg"
                 >
-                  + Add First Test
+                  Record First Test
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
-                {examMockTests.map((test) => {
-                  const pct = Math.round((test.marksObtained / test.maxMarks) * 100);
+                {examTestRecords.map((test) => {
+                  const pct = test.maxMarks > 0 ? Math.round((test.marksObtained / test.maxMarks) * 100) : 0;
+                  const attempted = (test.correctAnswers || 0) + (test.incorrectAnswers || 0);
+                  const accuracy = attempted > 0 ? Math.round(((test.correctAnswers || 0) / attempted) * 100) : 0;
+
                   return (
                     <div
                       key={test.id}
-                      className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                     >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 font-mono">
-                            {test.testType}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {test.subjectName}
                           </span>
-                          <span className="text-xs text-slate-400 font-mono">{test.subjectName}</span>
-                          <span className="text-xs text-slate-500 font-mono">{test.testDate}</span>
+                          <span className="text-xs text-slate-400 font-medium">{test.date}</span>
+                          <span className="text-[11px] text-slate-500">
+                            Time: {test.timeTakenMinutes || 0} mins
+                          </span>
                         </div>
 
-                        <h5 className="text-sm font-bold text-white font-heading mt-1">{test.testName}</h5>
-                        {test.notes && <p className="text-xs text-slate-400 mt-0.5">{test.notes}</p>}
+                        <h5 className="text-base font-bold text-white">{test.testName}</h5>
+
+                        <div className="flex items-center gap-3 text-xs text-slate-300 flex-wrap pt-0.5">
+                          <span>
+                            Correct: <strong className="text-emerald-400">{test.correctAnswers || 0}</strong>
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Incorrect: <strong className="text-rose-400">{test.incorrectAnswers || 0}</strong>
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Unattempted: <strong className="text-amber-400">{test.unattemptedQuestions || 0}</strong>
+                          </span>
+                        </div>
+
+                        {test.notes && (
+                          <p className="text-xs text-slate-400 italic mt-1 bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                            "{test.notes}"
+                          </p>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-4 shrink-0">
+                      <div className="flex items-center gap-5 shrink-0 self-end md:self-center">
                         <div className="text-right">
-                          <div className="text-lg font-extrabold text-white font-heading">
+                          <div className="text-xl font-black text-white">
                             {test.marksObtained} / {test.maxMarks}
                           </div>
-                          <span className="text-xs font-bold font-mono text-emerald-400">{pct}% Score</span>
+                          <div className="flex items-center gap-2 text-xs font-bold mt-0.5">
+                            <span className="text-emerald-400">{pct}% Score</span>
+                            <span className="text-slate-500">•</span>
+                            <span className="text-cyan-400">{accuracy}% Acc</span>
+                          </div>
                         </div>
 
-                        <button
-                          onClick={() => handleDeleteTest(test.id)}
-                          className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingTestRecord(test);
+                              setShowRecordLoggerModal(true);
+                            }}
+                            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteExamTestRecord && onDeleteExamTestRecord(test.id)}
+                            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1310,6 +1416,22 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* V1.9 Detailed Exam Test Logger Modal */}
+      <ExamTestLoggerModal
+        isOpen={showRecordLoggerModal}
+        subjects={academicSubjects}
+        onClose={() => {
+          setShowRecordLoggerModal(false);
+          setEditingTestRecord(null);
+        }}
+        onSaveTest={(testData) => {
+          if (onSaveExamTestRecord) {
+            onSaveExamTestRecord(testData);
+          }
+        }}
+        editingTest={editingTestRecord}
+      />
     </div>
   );
 };

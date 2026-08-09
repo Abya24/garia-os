@@ -7,11 +7,14 @@ import {
   WaterLog,
   Habit,
   StudentProfile,
+  AcademicVVITopic,
+  ExamTestRecord,
+  ExamIntelligenceReport,
 } from "../types";
 
 export interface SmartSuggestion {
   id: string;
-  type: "task" | "study" | "chapter" | "goal" | "hydration" | "habit" | "general";
+  type: "task" | "study" | "chapter" | "goal" | "hydration" | "habit" | "exam" | "general";
   title: string;
   description: string;
   priority: "high" | "medium" | "low";
@@ -29,10 +32,58 @@ export function generateSmartSuggestions(
   goals: Goal[],
   water: WaterLog,
   habits: Habit[],
-  dismissedIds: string[] = []
+  dismissedIds: string[] = [],
+  examTestRecords: ExamTestRecord[] = [],
+  vviTopics: AcademicVVITopic[] = [],
+  examReport?: ExamIntelligenceReport | null
 ): SmartSuggestion[] {
   const rawSuggestions: SmartSuggestion[] = [];
   const todayStr = new Date().toISOString().split("T")[0];
+
+  // 0. EXAM INTELLIGENCE RECOMMENDATIONS (V1.9)
+  if (examReport && examReport.weakAreas.length > 0) {
+    const topWeak = examReport.weakAreas[0];
+    rawSuggestions.push({
+      id: `sug-exam-weak-${topWeak.subjectId}`,
+      type: "exam",
+      title: topWeak.areaTitle,
+      description: `${topWeak.reason} ${topWeak.suggestedAction}`,
+      priority: topWeak.priority === "HIGH" ? "high" : "medium",
+      actionText: "Exam Intelligence",
+      targetTab: "exam",
+      subjectName: topWeak.subjectName,
+    });
+  }
+
+  // Check unrevised VVI topics count
+  const unrevisedVVI = vviTopics.filter((v) => v.status !== "Completed" && v.priority === "VVI");
+  if (unrevisedVVI.length > 0) {
+    rawSuggestions.push({
+      id: "sug-vvi-unrevised",
+      type: "exam",
+      title: `${unrevisedVVI.length} VVI Topic(s) Unrevised`,
+      description: `High-yield VVI topics like "${unrevisedVVI[0].topicName}" (${unrevisedVVI[0].subjectName}) need revision before exams!`,
+      priority: "high",
+      actionText: "Review VVI Topics",
+      targetTab: "academic",
+      subjectName: unrevisedVVI[0].subjectName,
+    });
+  }
+
+  // Check strong subjects praise
+  if (examReport && examReport.strongSubjects.length > 0) {
+    const strongSub = examReport.strongSubjects[0];
+    rawSuggestions.push({
+      id: `sug-exam-strong-${strongSub.subjectId}`,
+      type: "exam",
+      title: `${strongSub.subjectName} is Strong (${strongSub.avgPercentage}%)`,
+      description: `Maintain your excellent ${strongSub.subjectName} score while focusing extra time on weaker subjects.`,
+      priority: "low",
+      actionText: "View Performance",
+      targetTab: "exam",
+      subjectName: strongSub.subjectName,
+    });
+  }
 
   // 1. Overdue Tasks Check (High priority)
   const overdueTasks = tasks.filter((t) => !t.completed && t.date && t.date < todayStr);

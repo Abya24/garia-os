@@ -19,11 +19,17 @@ import {
   AcademicSubject,
   AcademicChapter,
   AcademicTest,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  AcademicRoadmapData,
   SmartStudyPlan,
   ExamProfile,
   ExamMilestone,
   ExamMockTest,
   ExamDailyPlan,
+  ExamTestRecord,
+  ExamIntelligenceReport,
 } from "../types";
 import {
   DEFAULT_COMMERCE_SUBJECTS,
@@ -57,9 +63,15 @@ const STORAGE_KEYS = {
   ACADEMIC_CHAPTERS: "garia_academic_chapters_v1",
   ACADEMIC_TESTS: "garia_academic_tests_v1",
   ACADEMIC_PLAN: "garia_academic_plan_v1",
+  ACADEMIC_ROADMAP: "academic_roadmap_v1",
+  VVI_TOPICS: "vvi_topics_v1",
+  REVISIONS: "revisions_v1",
+  PRACTICE: "practice_v1",
   EXAM_PROFILE: "garia_exam_profile_v1",
   EXAM_MILESTONES: "garia_exam_milestones_v1",
   EXAM_TESTS: "garia_exam_tests_v1",
+  EXAM_TESTS_V19: "exam_tests_v1",
+  EXAM_ANALYSIS_V19: "exam_analysis_v1",
   EXAM_PLAN: "garia_exam_plan_v1",
 };
 
@@ -1267,6 +1279,42 @@ export const saveAcademicPlan = (plan: SmartStudyPlan | null, profileId?: string
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_PLAN), plan);
 };
 
+export const loadVVITopics = (profileId?: string): AcademicVVITopic[] => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.VVI_TOPICS), []);
+};
+export const saveVVITopics = (topics: AcademicVVITopic[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.VVI_TOPICS), topics);
+};
+
+export const loadAcademicRevisions = (profileId?: string): AcademicRevisionItem[] => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.REVISIONS), []);
+};
+export const saveAcademicRevisions = (revisions: AcademicRevisionItem[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.REVISIONS), revisions);
+};
+
+export const loadAcademicPractice = (profileId?: string): AcademicPracticeSession[] => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.PRACTICE), []);
+};
+export const saveAcademicPractice = (practice: AcademicPracticeSession[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.PRACTICE), practice);
+};
+
+export const loadAcademicRoadmapData = (profileId?: string): AcademicRoadmapData | null => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_ROADMAP), null);
+};
+export const saveAcademicRoadmapData = (roadmap: AcademicRoadmapData | null, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_ROADMAP), roadmap);
+};
+
 // Exam Loaders & Savers
 export const loadExamProfile = (profileId?: string): ExamProfile => {
   const pId = profileId || loadActiveProfileId();
@@ -1314,6 +1362,27 @@ export const saveExamDailyPlan = (plan: ExamDailyPlan | null, profileId?: string
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_PLAN), plan);
 };
 
+// V1.9 Exam Intelligence Persistence
+export const loadExamTestRecords = (profileId?: string): ExamTestRecord[] => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.EXAM_TESTS_V19), []);
+};
+
+export const saveExamTestRecords = (tests: ExamTestRecord[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_TESTS_V19), tests);
+};
+
+export const loadExamAnalysis = (profileId?: string): ExamIntelligenceReport | null => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.EXAM_ANALYSIS_V19), null);
+};
+
+export const saveExamAnalysis = (analysis: ExamIntelligenceReport | null, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_ANALYSIS_V19), analysis);
+};
+
 // =========================================================================
 // STUDENT-SPECIFIC EXPORT & IMPORT
 // =========================================================================
@@ -1343,12 +1412,18 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     academicChapters: loadAcademicChapters(pId),
     academicTests: loadAcademicTests(pId),
     academicPlan: loadAcademicPlan(pId),
+    vviTopics: loadVVITopics(pId),
+    academicRevisions: loadAcademicRevisions(pId),
+    academicPractice: loadAcademicPractice(pId),
+    academicRoadmap: loadAcademicRoadmapData(pId),
     examProfile: loadExamProfile(pId),
     examMilestones: loadExamMilestones(pId),
     examMockTests: loadExamMockTests(pId),
     examPlan: loadExamDailyPlan(pId),
+    examTests: loadExamTestRecords(pId),
+    examAnalysis: loadExamAnalysis(pId),
     exportedAt: new Date().toISOString(),
-    appVersion: "Garia OS v1.5 Multi-Student",
+    appVersion: "Garia OS v1.9 Exam Intelligence",
   };
 
   const safeName = student.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
@@ -1409,10 +1484,16 @@ export const importStudentProfileJSON = (
     if (data.academicChapters) saveAcademicChapters(data.academicChapters, newProfileId);
     if (data.academicTests) saveAcademicTests(data.academicTests, newProfileId);
     if (data.academicPlan) saveAcademicPlan(data.academicPlan, newProfileId);
+    if (data.vviTopics) saveVVITopics(data.vviTopics, newProfileId);
+    if (data.academicRevisions) saveAcademicRevisions(data.academicRevisions, newProfileId);
+    if (data.academicPractice) saveAcademicPractice(data.academicPractice, newProfileId);
+    if (data.academicRoadmap) saveAcademicRoadmapData(data.academicRoadmap, newProfileId);
     if (data.examProfile) saveExamProfile(data.examProfile, newProfileId);
     if (data.examMilestones) saveExamMilestones(data.examMilestones, newProfileId);
     if (data.examMockTests) saveExamMockTests(data.examMockTests, newProfileId);
     if (data.examPlan) saveExamDailyPlan(data.examPlan, newProfileId);
+    if (data.examTests) saveExamTestRecords(data.examTests, newProfileId);
+    if (data.examAnalysis) saveExamAnalysis(data.examAnalysis, newProfileId);
 
     saveActiveProfileId(newProfileId);
 

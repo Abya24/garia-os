@@ -252,6 +252,73 @@ export interface AcademicTest {
   notes?: string;
 }
 
+export interface AcademicVVITopic {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  chapterTitle: string;
+  topicName: string;
+  priority: ChapterPriority;
+  status: "Not Started" | "In Progress" | "Completed";
+  revisionCount: number;
+  lastRevisedAt?: number;
+  nextRevisionDue?: number;
+  notes?: string;
+  createdAt: number;
+}
+
+export interface AcademicRevisionItem {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  chapterId?: string;
+  chapterTitle: string;
+  topicName?: string;
+  priority: ChapterPriority;
+  scheduledDate: string; // YYYY-MM-DD
+  completed: boolean;
+  completedAt?: number;
+  notes?: string;
+  createdAt: number;
+}
+
+export interface AcademicPracticeSession {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  chapterId?: string;
+  chapterTitle: string;
+  practiceType: "PYQ" | "Mock Test" | "Chapter Test" | "Practice Set";
+  date: string; // YYYY-MM-DD
+  score: number;
+  maxMarks: number;
+  accuracyPercentage: number;
+  notes?: string;
+  createdAt: number;
+}
+
+export type RoadmapStageStatus = "Not Started" | "In Progress" | "Almost Done" | "Completed";
+
+export interface AcademicRoadmapStage {
+  id: string;
+  title: string;
+  description: string;
+  status: RoadmapStageStatus;
+  progress: number; // 0-100
+  pendingItems: string[];
+  completedItems: string[];
+  suggestedAction: string;
+}
+
+export interface AcademicRoadmapData {
+  classLevel: string;
+  stream: StreamType;
+  targetCareerTitle?: string;
+  overallProgress: number; // 0-100
+  stages: AcademicRoadmapStage[];
+  lastCalculated: number;
+}
+
 export interface SmartStudySlot {
   id: string;
   timeSlot: string;
@@ -270,6 +337,80 @@ export interface SmartStudyPlan {
 }
 
 // ==========================================
+// ==========================================
+// GARIA OS v1.9 EXAM INTELLIGENCE & ANALYTICS TYPES
+// ==========================================
+
+export interface ExamTestRecord {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  testName: string;
+  date: string; // YYYY-MM-DD
+  maxMarks: number;
+  marksObtained: number;
+  totalQuestions?: number;
+  correctAnswers?: number;
+  incorrectAnswers?: number;
+  unattemptedQuestions?: number;
+  timeTakenMinutes?: number;
+  notes?: string;
+  createdAt: number;
+}
+
+export type PerformanceTrend = "Improving" | "Stable" | "Declining" | "Insufficient Data";
+export type SubjectPerformanceStatus = "Strong" | "Average" | "Needs Attention" | "Insufficient Data";
+
+export interface SubjectPerformanceAnalysis {
+  subjectId: string;
+  subjectName: string;
+  avgPercentage: number;
+  bestPercentage: number;
+  latestPercentage: number;
+  testCount: number;
+  accuracy: number;
+  attemptRate: number;
+  trend: PerformanceTrend;
+  status: SubjectPerformanceStatus;
+  totalQuestions: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  totalUnattempted: number;
+  syllabusCoverage: number; // 0-100
+  vviCompletionRate: number; // 0-100
+  revisionCompletionRate: number; // 0-100
+  isCareerPriority: boolean;
+}
+
+export interface WeakAreaItem {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  areaTitle: string;
+  reason: string;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  metricDetail?: string;
+  suggestedAction: string;
+  targetTab?: string;
+}
+
+export interface ExamIntelligenceReport {
+  overallReadinessScore: number | null;
+  readinessCategory: "Needs Attention" | "Building" | "Good Progress" | "Strong Preparation" | "Not enough data";
+  hasSufficientData: boolean;
+  totalTestsRecorded: number;
+  strongSubjects: SubjectPerformanceAnalysis[];
+  weakSubjects: SubjectPerformanceAnalysis[];
+  subjectAnalyses: SubjectPerformanceAnalysis[];
+  weakAreas: WeakAreaItem[];
+  priorityTopics: { topic: string; subjectName: string; priority: string; reason: string }[];
+  recommendedRevisions: { subjectName: string; chapterOrTopic: string; reason: string }[];
+  recommendedPractices: { subjectName: string; action: string; reason: string }[];
+  nextBestAction: string;
+  latestTestPercentage: number | null;
+  lastCalculatedAt: number;
+}
+
 // GARIA OS v1.4.2 EXAM INTELLIGENCE TYPES
 // ==========================================
 

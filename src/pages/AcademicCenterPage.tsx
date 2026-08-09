@@ -26,6 +26,10 @@ import {
   AcademicSubject,
   AcademicChapter,
   AcademicTest,
+  AcademicVVITopic,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  AcademicRoadmapData,
   SmartStudyPlan,
   CareerProfile,
   CareerRoadmap,
@@ -37,6 +41,10 @@ import {
   DEFAULT_COMMERCE_SUBJECTS,
   DEFAULT_SCIENCE_SUBJECTS,
 } from "../utils/academicEngine";
+import { AcademicRoadmapSection } from "../components/AcademicRoadmapSection";
+import { AcademicVVITopicSection } from "../components/AcademicVVITopicSection";
+import { AcademicRevisionPlannerSection } from "../components/AcademicRevisionPlannerSection";
+import { AcademicPracticeTrackerSection } from "../components/AcademicPracticeTrackerSection";
 
 interface AcademicCenterPageProps {
   careerProfile: CareerProfile;
@@ -45,10 +53,18 @@ interface AcademicCenterPageProps {
   chapters: AcademicChapter[];
   tests: AcademicTest[];
   smartPlan: SmartStudyPlan | null;
+  roadmap: AcademicRoadmapData;
+  vviTopics: AcademicVVITopic[];
+  revisions: AcademicRevisionItem[];
+  practiceSessions: AcademicPracticeSession[];
   onUpdateSubjects: (subs: AcademicSubject[]) => void;
   onUpdateChapters: (chaps: AcademicChapter[]) => void;
   onUpdateTests: (tests: AcademicTest[]) => void;
   onUpdatePlan: (plan: SmartStudyPlan | null) => void;
+  onUpdateVVITopics: (topics: AcademicVVITopic[]) => void;
+  onUpdateRevisions: (revisions: AcademicRevisionItem[]) => void;
+  onUpdatePracticeSessions: (sessions: AcademicPracticeSession[]) => void;
+  onUpdateRoadmap: (roadmap: AcademicRoadmapData) => void;
   onAskAbyaWithContext: (text: string) => void;
 }
 
@@ -59,15 +75,23 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   chapters,
   tests,
   smartPlan,
+  roadmap,
+  vviTopics,
+  revisions,
+  practiceSessions,
   onUpdateSubjects,
   onUpdateChapters,
   onUpdateTests,
   onUpdatePlan,
+  onUpdateVVITopics,
+  onUpdateRevisions,
+  onUpdatePracticeSessions,
+  onUpdateRoadmap,
   onAskAbyaWithContext,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "chapters" | "priority" | "revision" | "tests" | "plan"
-  >("dashboard");
+    "roadmap" | "dashboard" | "chapters" | "priority" | "vvi" | "revision" | "practice" | "tests" | "plan"
+  >("roadmap");
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
     subjects[0]?.id || "all"
@@ -258,6 +282,70 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
     onUpdatePlan(plan);
   };
 
+  // VVI Handlers
+  const handleAddVVITopic = (topic: Omit<AcademicVVITopic, "id" | "createdAt">) => {
+    const newTopic: AcademicVVITopic = {
+      ...topic,
+      id: `vvi-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    onUpdateVVITopics([newTopic, ...vviTopics]);
+  };
+
+  const handleUpdateVVITopic = (id: string, updates: Partial<AcademicVVITopic>) => {
+    onUpdateVVITopics(
+      vviTopics.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+  };
+
+  const handleDeleteVVITopic = (id: string) => {
+    onUpdateVVITopics(vviTopics.filter((t) => t.id !== id));
+  };
+
+  // Revision Handlers
+  const handleAddRevision = (revision: Omit<AcademicRevisionItem, "id" | "createdAt">) => {
+    const newRev: AcademicRevisionItem = {
+      ...revision,
+      id: `rev-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    onUpdateRevisions([newRev, ...revisions]);
+  };
+
+  const handleToggleRevisionComplete = (id: string) => {
+    onUpdateRevisions(
+      revisions.map((r) => {
+        if (r.id === id) {
+          const nextCompleted = !r.completed;
+          return {
+            ...r,
+            completed: nextCompleted,
+            completedAt: nextCompleted ? Date.now() : undefined,
+          };
+        }
+        return r;
+      })
+    );
+  };
+
+  const handleDeleteRevision = (id: string) => {
+    onUpdateRevisions(revisions.filter((r) => r.id !== id));
+  };
+
+  // Practice Session Handlers
+  const handleAddPracticeSession = (session: Omit<AcademicPracticeSession, "id" | "createdAt">) => {
+    const newSess: AcademicPracticeSession = {
+      ...session,
+      id: `prac-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    onUpdatePracticeSessions([newSess, ...practiceSessions]);
+  };
+
+  const handleDeletePracticeSession = (id: string) => {
+    onUpdatePracticeSessions(practiceSessions.filter((p) => p.id !== id));
+  };
+
   // Filtered chapter list
   const filteredChapters = chapters.filter((c) => {
     if (selectedSubjectId !== "all" && c.subjectId !== selectedSubjectId) return false;
@@ -359,10 +447,12 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
       {/* Primary Academic Center Sub-Navigation Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-white/10 scrollbar-none">
         {[
+          { id: "roadmap", label: "Academic Roadmap", icon: GraduationCap },
           { id: "dashboard", label: "Subject Dashboard", icon: Layers },
           { id: "chapters", label: "Chapter & Topics", icon: BookOpen },
-          { id: "priority", label: "🔥 Smart Priorities", icon: Flame },
-          { id: "revision", label: "Revision & PYQs", icon: RotateCcw },
+          { id: "vvi", label: "🔥 VVI Topics", icon: Flame },
+          { id: "revision", label: "Revision Planner", icon: RotateCcw },
+          { id: "practice", label: "PYQ & Practice", icon: Award },
           { id: "tests", label: "Test Performance", icon: TrendingUp },
           { id: "plan", label: "Daily Study Generator", icon: Clock },
         ].map((tab) => {
@@ -384,6 +474,49 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           );
         })}
       </div>
+
+      {/* TAB 0: ACADEMIC ROADMAP */}
+      {activeTab === "roadmap" && (
+        <AcademicRoadmapSection
+          roadmap={roadmap}
+          onNavigateToTab={(t) => setActiveTab(t as any)}
+        />
+      )}
+
+      {/* TAB: VVI TOPICS */}
+      {activeTab === "vvi" && (
+        <AcademicVVITopicSection
+          vviTopics={vviTopics}
+          subjects={subjects}
+          chapters={chapters}
+          onAddVVITopic={handleAddVVITopic}
+          onUpdateVVITopic={handleUpdateVVITopic}
+          onDeleteVVITopic={handleDeleteVVITopic}
+        />
+      )}
+
+      {/* TAB: REVISION PLANNER */}
+      {activeTab === "revision" && (
+        <AcademicRevisionPlannerSection
+          revisions={revisions}
+          subjects={subjects}
+          chapters={chapters}
+          onAddRevision={handleAddRevision}
+          onToggleRevisionComplete={handleToggleRevisionComplete}
+          onDeleteRevision={handleDeleteRevision}
+        />
+      )}
+
+      {/* TAB: PRACTICE TRACKER */}
+      {activeTab === "practice" && (
+        <AcademicPracticeTrackerSection
+          practiceSessions={practiceSessions}
+          subjects={subjects}
+          chapters={chapters}
+          onAddPracticeSession={handleAddPracticeSession}
+          onDeletePracticeSession={handleDeletePracticeSession}
+        />
+      )}
 
       {/* TAB 1: SUBJECT DASHBOARD */}
       {activeTab === "dashboard" && (
