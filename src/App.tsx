@@ -802,6 +802,8 @@ export default function App() {
             <HomeDashboard
               tasks={tasks}
               subjects={subjects}
+              studySessions={studySessions}
+              focusLogs={focusLogs}
               notes={notes}
               habits={habits}
               water={water}
@@ -820,6 +822,15 @@ export default function App() {
               onQuickAddNote={() => setActiveTab("notes")}
               onAddWaterGlass={() =>
                 handleUpdateWater({ ...water, glasses: water.glasses + 1 })
+              }
+              onRemoveWaterGlass={() =>
+                handleUpdateWater({ ...water, glasses: Math.max(0, water.glasses - 1) })
+              }
+              onToggleTask={(task) =>
+                handleUpdateTask({ ...task, completed: !task.completed })
+              }
+              onToggleHabit={(habitId, dateStr) =>
+                handleToggleHabitDate(habitId, dateStr)
               }
             />
           )}

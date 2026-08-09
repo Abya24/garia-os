@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import {
   Plus,
+  Minus,
   Timer,
   FilePlus,
   BookOpen,
   Droplet,
   CheckCircle2,
+  Circle,
   Sparkles,
   Flame,
   Clock,
@@ -14,10 +16,18 @@ import {
   Calendar,
   GraduationCap,
   ShieldAlert,
+  Users,
+  Check,
+  ListTodo,
+  Atom,
+  TrendingUp,
+  Compass,
 } from "lucide-react";
 import {
   Task,
   Subject,
+  StudySession,
+  FocusSessionLog,
   Note,
   Habit,
   WaterLog,
@@ -29,7 +39,6 @@ import {
   AcademicSubject,
   AcademicChapter,
 } from "../types";
-import { Users } from "lucide-react";
 import { getTodayString } from "../utils/storage";
 import { generateSmartSuggestions } from "../utils/suggestionsEngine";
 import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
@@ -37,6 +46,8 @@ import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
 interface HomeDashboardProps {
   tasks: Task[];
   subjects: Subject[];
+  studySessions?: StudySession[];
+  focusLogs?: FocusSessionLog[];
   notes: Note[];
   habits: Habit[];
   water: WaterLog;
@@ -50,12 +61,17 @@ interface HomeDashboardProps {
   onQuickAddTask: () => void;
   onQuickAddNote: () => void;
   onAddWaterGlass: () => void;
+  onRemoveWaterGlass?: () => void;
+  onToggleTask?: (task: Task) => void;
+  onToggleHabit?: (habitId: string, dateStr: string) => void;
   onOpenStudentModal?: () => void;
 }
 
 export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   tasks,
   subjects,
+  studySessions = [],
+  focusLogs = [],
   notes,
   habits,
   water,
@@ -69,6 +85,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onQuickAddTask,
   onQuickAddNote,
   onAddWaterGlass,
+  onRemoveWaterGlass,
+  onToggleTask,
+  onToggleHabit,
   onOpenStudentModal,
 }) => {
   const [greeting, setGreeting] = useState<string>("Good Morning");
@@ -102,23 +121,42 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   }, []);
 
   const todayStr = getTodayString();
+
+  // 1. Tasks Metrics for Today
   const todayTasks = tasks.filter((t) => t.date === todayStr);
   const completedTodayTasks = todayTasks.filter((t) => t.completed);
   const taskProgressPercent =
     todayTasks.length > 0
       ? Math.round((completedTodayTasks.length / todayTasks.length) * 100)
-      : 100;
+      : 0;
 
-  // Habits completed today
+  // 2. Habits Metrics for Today
   const habitsDoneToday = habits.filter((h) =>
     h.completedDates.includes(todayStr)
   );
   const habitProgressPercent =
     habits.length > 0
       ? Math.round((habitsDoneToday.length / habits.length) * 100)
-      : 100;
+      : 0;
 
-  // Study progress overall
+  // 3. Study Metrics (Today & Overall)
+  const todayStudySessions = studySessions.filter((s) => {
+    if (!s.timestamp) return false;
+    const d = new Date(s.timestamp);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}` === todayStr;
+  });
+
+  const todayStudySeconds = todayStudySessions.reduce(
+    (acc, s) => acc + (s.durationSeconds || 0),
+    0
+  );
+  const todayStudyMinutes = Math.round(todayStudySeconds / 60);
+  const todayStudyHours = Math.floor(todayStudyMinutes / 60);
+  const todayStudyMinsRem = todayStudyMinutes % 60;
+
   const totalTargetStudyMinutes = subjects.reduce(
     (acc, s) => acc + s.targetMinutesPerWeek,
     0
@@ -135,18 +173,77 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         )
       : 0;
 
-  // Water progress
-  const waterProgressPercent = Math.min(
-    100,
-    Math.round((water.glasses / water.goal) * 100)
-  );
+  // 4. Water Metrics
+  const waterProgressPercent =
+    water.goal > 0 ? Math.min(100, Math.round((water.glasses / water.goal) * 100)) : 0;
 
-  // Overall Daily Productivity Score
-  const overallPercent = Math.round(
-    (taskProgressPercent + habitProgressPercent + waterProgressPercent) / 3
-  );
+  // 5. Focus Logs Metrics Today
+  const todayFocusLogs = focusLogs.filter((f) => {
+    if (!f.timestamp) return false;
+    const d = new Date(f.timestamp);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}` === todayStr;
+  });
 
-  // Generate real dynamic data-driven suggestions for active student
+  // Overall Daily Productivity Score calculation (weighted active components)
+  let activeComponentsCount = 0;
+  let activeComponentsSum = 0;
+
+  if (todayTasks.length > 0) {
+    activeComponentsCount++;
+    activeComponentsSum += taskProgressPercent;
+  }
+  if (habits.length > 0) {
+    activeComponentsCount++;
+    activeComponentsSum += habitProgressPercent;
+  }
+  // Water metric is always active
+  activeComponentsCount++;
+  activeComponentsSum += waterProgressPercent;
+
+  if (totalTargetStudyMinutes > 0) {
+    activeComponentsCount++;
+    activeComponentsSum += studyProgressPercent;
+  }
+
+  const overallPercent =
+    activeComponentsCount > 0
+      ? Math.round(activeComponentsSum / activeComponentsCount)
+      : 0;
+
+  // Stream Meta Helper
+  const currentStream = activeStudent?.stream || "Commerce";
+  const getStreamMeta = (s: string) => {
+    if (s === "Science") {
+      return {
+        label: "Science Stream",
+        icon: Atom,
+        color: "text-cyan-400",
+        badge: "PCM / PCB",
+      };
+    }
+    if (s === "Arts / Humanities" || s === "Arts") {
+      return {
+        label: "Arts / Humanities",
+        icon: Compass,
+        color: "text-purple-400",
+        badge: "Law / UPSC",
+      };
+    }
+    return {
+      label: "Commerce Stream",
+      icon: TrendingUp,
+      color: "text-emerald-400",
+      badge: "CA / Finance",
+    };
+  };
+
+  const streamMeta = getStreamMeta(currentStream);
+  const StreamIcon = streamMeta.icon;
+
+  // Smart OS Suggestions
   const activeProfForSug: StudentProfile = activeStudent || {
     id: "default",
     name: settings.userName || "Student",
@@ -188,7 +285,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Garia OS Active</span>
               </div>
               {activeStudent && (
@@ -197,7 +294,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition-all"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>Student: {activeStudent.name} ({activeStudent.stream})</span>
+                  <span>
+                    Student: {activeStudent.name} ({activeStudent.stream})
+                  </span>
                   <span className="text-[10px] underline font-normal">Switch</span>
                 </button>
               )}
@@ -206,7 +305,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               {greeting}, {activeStudent?.name || settings.userName || "Student"} 👋
             </h1>
             <p className="text-slate-300 text-sm mt-1">
-              Your personal operating system is loaded for {activeStudent ? `${activeStudent.classLevel} (${activeStudent.stream} - ${activeStudent.board})` : "today's goals"}.
+              Your personal operating system is loaded for{" "}
+              {activeStudent
+                ? `${activeStudent.classLevel} (${activeStudent.stream} - ${activeStudent.board})`
+                : "today's goals"}
+              .
             </p>
           </div>
 
@@ -226,12 +329,12 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         studentName={activeStudent?.name}
       />
 
-      {/* Progress Ring / Overview Card */}
+      {/* Overview Top Section: Daily Progress Ring + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Overall Progress Ring */}
+        {/* 1. Daily Progress Ring (Dynamic Active User Data) */}
         <div className="glass-card rounded-3xl p-6 border border-white/10 flex flex-col items-center justify-center relative overflow-hidden text-center">
           <div className="absolute top-3 left-4 text-xs font-semibold text-slate-400 uppercase tracking-wider font-heading">
-            Daily Progress
+            Daily Progress Score
           </div>
 
           <div className="relative w-44 h-44 my-4 flex items-center justify-center">
@@ -255,7 +358,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 strokeDasharray={440}
                 strokeDashoffset={440 - (440 * overallPercent) / 100}
                 strokeLinecap="round"
-                className="transition-all duration-1000 ease-out"
+                className="transition-all duration-700 ease-out"
                 fill="transparent"
               />
               <defs>
@@ -321,9 +424,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 onClick={() => onNavigate("exam")}
                 className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/10 transition-all group relative overflow-hidden"
               >
-                <div className="absolute top-1 right-1 text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded">
-                  v1.4.2
-                </div>
                 <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
                   <ShieldAlert className="w-4 h-4" />
                 </div>
@@ -336,9 +436,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 onClick={() => onNavigate("academic")}
                 className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all group relative overflow-hidden"
               >
-                <div className="absolute top-1 right-1 text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded">
-                  v1.4.1
-                </div>
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
                   <GraduationCap className="w-4 h-4" />
                 </div>
@@ -418,30 +515,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   Study Tracker
                 </span>
               </button>
-
-              <button
-                onClick={onAddWaterGlass}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-blue-500/30 hover:border-blue-500/60 hover:bg-blue-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <Droplet className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Water +1
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("abya")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-emerald-400/40 bg-gradient-to-br from-emerald-500/15 to-cyan-500/15 hover:border-emerald-400 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-emerald-400 text-slate-900 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform shadow-md">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-bold text-emerald-300 font-heading">
-                  Abya AI
-                </span>
-              </button>
             </div>
           </div>
 
@@ -457,7 +530,96 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* Today's Overview Cards Grid */}
+      {/* 2. Stream-Specific Study Tracker Section */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 p-2.5 flex items-center justify-center shrink-0">
+              <StreamIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold font-heading text-white">
+                  {streamMeta.label} Study Tracker
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  {activeStudent?.classLevel || "Active Stream"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {todayStudyMinutes > 0
+                  ? `Logged ${todayStudyHours}h ${todayStudyMinsRem}m today across active stream subjects.`
+                  : "No study sessions logged yet today."}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigate("study")}
+            className="self-start sm:self-auto px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5 border border-cyan-500/30"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Open Study Tracker</span>
+          </button>
+        </div>
+
+        {/* Subjects Progress Cards for Active Student's Stream */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {subjects.map((sub) => {
+            const pct =
+              sub.targetMinutesPerWeek > 0
+                ? Math.min(
+                    100,
+                    Math.round((sub.completedMinutes / sub.targetMinutesPerWeek) * 100)
+                  )
+                : 0;
+
+            const hrsCompleted = (sub.completedMinutes / 60).toFixed(1);
+            const hrsTarget = Math.round(sub.targetMinutesPerWeek / 60);
+
+            return (
+              <div
+                key={sub.id}
+                className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between gap-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: sub.color || "#10b981" }}
+                    />
+                    <h4 className="font-bold text-white text-xs font-heading">
+                      {sub.name}
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-mono text-cyan-400 font-bold">
+                    {pct}%
+                  </span>
+                </div>
+
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden my-1">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: sub.color || "#10b981",
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>
+                    {hrsCompleted}h / {hrsTarget}h target
+                  </span>
+                  <span>{sub.totalSessions} sessions</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Today's Overview Grid (Tasks, Water, Habits, Focus) */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold font-heading text-white">
@@ -467,123 +629,227 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Today's Tasks */}
-          <div
-            onClick={() => onNavigate("tasks")}
-            className="glass-card rounded-2xl p-5 border border-white/10 hover:border-emerald-500/40 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400">
-                Today's Tasks
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <CheckCircle2 className="w-4 h-4" />
+          {/* Today's Tasks Summary Card */}
+          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-400">
+                  Today's Tasks
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold font-heading text-white">
+                {completedTodayTasks.length} / {todayTasks.length}
+              </div>
+              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${taskProgressPercent}%` }}
+                />
               </div>
             </div>
-            <div className="text-2xl font-bold font-heading text-white">
-              {completedTodayTasks.length} / {todayTasks.length}
+
+            <div className="space-y-1.5">
+              {todayTasks.slice(0, 3).map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => onToggleTask && onToggleTask(t)}
+                  className="flex items-start gap-2 text-xs cursor-pointer hover:text-white transition-colors p-1 rounded hover:bg-white/5"
+                >
+                  <button type="button" className="mt-0.5 shrink-0 text-emerald-400">
+                    {t.completed ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Circle className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                  </button>
+                  <span
+                    className={`line-clamp-1 ${
+                      t.completed ? "line-through text-slate-500" : "text-slate-200"
+                    }`}
+                  >
+                    {t.title}
+                  </span>
+                </div>
+              ))}
+
+              {todayTasks.length === 0 && (
+                <p className="text-[11px] text-slate-500 italic">
+                  No tasks scheduled for today.
+                </p>
+              )}
             </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div
-                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${taskProgressPercent}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2 flex justify-between">
-              <span>{taskProgressPercent}% done</span>
-              <span className="text-emerald-400 group-hover:underline">
-                View All
-              </span>
-            </div>
+
+            <button
+              onClick={() => onNavigate("tasks")}
+              className="text-[11px] text-emerald-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
+            >
+              Open Tasks →
+            </button>
           </div>
 
-          {/* Study Time */}
-          <div
-            onClick={() => onNavigate("study")}
-            className="glass-card rounded-2xl p-5 border border-white/10 hover:border-cyan-500/40 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400">
-                Study Progress
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <BookOpen className="w-4 h-4" />
+          {/* 4. Interactive Water Tracker Card */}
+          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-400">
+                  Water Tracker
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Droplet className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold font-heading text-white">
+                {water.glasses} / {water.goal} glasses
+              </div>
+              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="bg-blue-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${waterProgressPercent}%` }}
+                />
               </div>
             </div>
-            <div className="text-2xl font-bold font-heading text-white">
-              {Math.round(totalCompletedStudyMinutes / 60)}h /{" "}
-              {Math.round(totalTargetStudyMinutes / 60)}h
-            </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div
-                className="bg-cyan-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${studyProgressPercent}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2 flex justify-between">
-              <span>{subjects.length} Active Subjects</span>
-              <span className="text-cyan-400 group-hover:underline">
-                Start Session
+
+            <div className="flex items-center justify-between gap-2 bg-slate-900/60 p-2 rounded-xl border border-white/10">
+              <span className="text-xs text-slate-300 font-medium pl-1">
+                {waterProgressPercent}% Hydrated
               </span>
+              <div className="flex items-center gap-1.5">
+                {onRemoveWaterGlass && (
+                  <button
+                    type="button"
+                    onClick={onRemoveWaterGlass}
+                    disabled={water.glasses <= 0}
+                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white flex items-center justify-center transition-all border border-white/10"
+                    title="Remove 1 glass"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onAddWaterGlass}
+                  className="px-2.5 py-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition-all shadow-md"
+                  title="Add 1 glass"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>+1</span>
+                </button>
+              </div>
             </div>
+
+            <button
+              onClick={() => onNavigate("water")}
+              className="text-[11px] text-blue-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
+            >
+              Water Log →
+            </button>
           </div>
 
-          {/* Water Intake */}
-          <div
-            onClick={() => onNavigate("water")}
-            className="glass-card rounded-2xl p-5 border border-white/10 hover:border-blue-500/40 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400">
-                Water Intake
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Droplet className="w-4 h-4" />
+          {/* 5. Habits Tracker Card */}
+          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-400">
+                  Habits Tracker
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                  <Flame className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold font-heading text-white">
+                {habitsDoneToday.length} / {habits.length} Done
+              </div>
+              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="bg-rose-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${habitProgressPercent}%` }}
+                />
               </div>
             </div>
-            <div className="text-2xl font-bold font-heading text-white">
-              {water.glasses} / {water.goal} glasses
+
+            <div className="space-y-1.5">
+              {habits.slice(0, 3).map((h) => {
+                const isDone = h.completedDates.includes(todayStr);
+                return (
+                  <div
+                    key={h.id}
+                    onClick={() =>
+                      onToggleHabit && onToggleHabit(h.id, todayStr)
+                    }
+                    className="flex items-start gap-2 text-xs cursor-pointer hover:text-white transition-colors p-1 rounded hover:bg-white/5"
+                  >
+                    <button type="button" className="mt-0.5 shrink-0 text-rose-400">
+                      {isDone ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                    </button>
+                    <span
+                      className={`line-clamp-1 ${
+                        isDone ? "line-through text-slate-500" : "text-slate-200"
+                      }`}
+                    >
+                      {h.title}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {habits.length === 0 && (
+                <p className="text-[11px] text-slate-500 italic">
+                  No habits added yet.
+                </p>
+              )}
             </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div
-                className="bg-blue-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${waterProgressPercent}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2 flex justify-between">
-              <span>{waterProgressPercent}% Hydrated</span>
-              <span className="text-blue-400 group-hover:underline">+ Add</span>
-            </div>
+
+            <button
+              onClick={() => onNavigate("habits")}
+              className="text-[11px] text-rose-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
+            >
+              Habits Page →
+            </button>
           </div>
 
-          {/* Habit Progress */}
-          <div
-            onClick={() => onNavigate("habits")}
-            className="glass-card rounded-2xl p-5 border border-white/10 hover:border-rose-500/40 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400">
-                Habit Streaks
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Flame className="w-4 h-4" />
+          {/* Today's Study & Focus Card */}
+          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-400">
+                  Today's Focus & Study
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <Timer className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold font-heading text-white">
+                {todayStudyHours > 0 ? `${todayStudyHours}h ${todayStudyMinsRem}m` : `${todayStudyMinutes} mins`}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                {todayFocusLogs.length} focus session(s) completed today
               </div>
             </div>
-            <div className="text-2xl font-bold font-heading text-white">
-              {habitsDoneToday.length} / {habits.length} Done
+
+            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-300 space-y-1">
+              <div className="flex justify-between">
+                <span>Active Subjects:</span>
+                <span className="font-bold text-white">{subjects.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Weekly Target Progress:</span>
+                <span className="font-bold text-cyan-400">{studyProgressPercent}%</span>
+              </div>
             </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div
-                className="bg-rose-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${habitProgressPercent}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2 flex justify-between">
-              <span>Max Streak: {Math.max(0, ...habits.map((h) => h.streak))} days</span>
-              <span className="text-rose-400 group-hover:underline">
-                View Habits
-              </span>
-            </div>
+
+            <button
+              onClick={() => onNavigate("focus")}
+              className="text-[11px] text-cyan-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
+            >
+              Start Focus Session →
+            </button>
           </div>
         </div>
       </div>

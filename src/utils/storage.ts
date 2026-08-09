@@ -149,32 +149,116 @@ const defaultTasks: Task[] = [
   },
 ];
 
-const defaultSubjects: Subject[] = [
+export const DEFAULT_COMMERCE_STUDY_SUBJECTS: Subject[] = [
   {
-    id: "sub-1",
+    id: "sub-acc",
     name: "Accountancy",
     color: "#10b981", // Emerald
     targetMinutesPerWeek: 300,
-    completedMinutes: 240,
-    totalSessions: 8,
+    completedMinutes: 180,
+    totalSessions: 6,
   },
   {
-    id: "sub-2",
+    id: "sub-eco",
     name: "Economics",
+    color: "#06b6d4", // Cyan
+    targetMinutesPerWeek: 300,
+    completedMinutes: 120,
+    totalSessions: 4,
+  },
+  {
+    id: "sub-bst",
+    name: "Business Studies",
+    color: "#8b5cf6", // Purple
+    targetMinutesPerWeek: 240,
+    completedMinutes: 150,
+    totalSessions: 5,
+  },
+  {
+    id: "sub-math-comm",
+    name: "Mathematics",
+    color: "#3b82f6", // Blue
+    targetMinutesPerWeek: 240,
+    completedMinutes: 90,
+    totalSessions: 3,
+  },
+];
+
+export const DEFAULT_SCIENCE_STUDY_SUBJECTS: Subject[] = [
+  {
+    id: "sub-phy",
+    name: "Physics",
     color: "#06b6d4", // Cyan
     targetMinutesPerWeek: 300,
     completedMinutes: 180,
     totalSessions: 6,
   },
   {
-    id: "sub-3",
-    name: "Business Studies",
-    color: "#8b5cf6", // Purple
+    id: "sub-chem",
+    name: "Chemistry",
+    color: "#10b981", // Emerald
+    targetMinutesPerWeek: 300,
+    completedMinutes: 120,
+    totalSessions: 4,
+  },
+  {
+    id: "sub-math-sci",
+    name: "Mathematics",
+    color: "#3b82f6", // Blue
+    targetMinutesPerWeek: 300,
+    completedMinutes: 150,
+    totalSessions: 5,
+  },
+  {
+    id: "sub-bio",
+    name: "Biology",
+    color: "#f43f5e", // Rose
     targetMinutesPerWeek: 240,
-    completedMinutes: 216,
-    totalSessions: 7,
+    completedMinutes: 90,
+    totalSessions: 3,
   },
 ];
+
+export const DEFAULT_ARTS_STUDY_SUBJECTS: Subject[] = [
+  {
+    id: "sub-hist",
+    name: "History",
+    color: "#f59e0b", // Amber
+    targetMinutesPerWeek: 300,
+    completedMinutes: 180,
+    totalSessions: 6,
+  },
+  {
+    id: "sub-pol",
+    name: "Political Science",
+    color: "#8b5cf6", // Purple
+    targetMinutesPerWeek: 300,
+    completedMinutes: 120,
+    totalSessions: 4,
+  },
+  {
+    id: "sub-geo",
+    name: "Geography",
+    color: "#10b981", // Emerald
+    targetMinutesPerWeek: 240,
+    completedMinutes: 150,
+    totalSessions: 5,
+  },
+  {
+    id: "sub-soc",
+    name: "Sociology",
+    color: "#06b6d4", // Cyan
+    targetMinutesPerWeek: 240,
+    completedMinutes: 90,
+    totalSessions: 3,
+  },
+];
+
+export const getDefaultStudySubjectsForStream = (stream?: StreamType): Subject[] => {
+  if (stream === "Science") return DEFAULT_SCIENCE_STUDY_SUBJECTS;
+  if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_STUDY_SUBJECTS;
+  return DEFAULT_COMMERCE_STUDY_SUBJECTS;
+};
 
 const defaultNotes: Note[] = [
   {
@@ -711,7 +795,7 @@ function seedNewProfileData(profile: StudentProfile): void {
   saveTasks(tasks, profId);
 
   // Subjects
-  saveSubjects(defaultSubjects, profId);
+  saveSubjects(getDefaultStudySubjectsForStream(profile.stream), profId);
 
   // Notes
   const notes: Note[] = [
@@ -840,7 +924,26 @@ export const saveTasks = (tasks: Task[], profileId?: string): void => {
 
 export const loadSubjects = (profileId?: string): Subject[] => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.SUBJECTS), defaultSubjects);
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const stream = activeProf?.stream || "Commerce";
+  const defaultStreamSubs = getDefaultStudySubjectsForStream(stream);
+
+  const saved = getItem<Subject[] | null>(getProfileKey(pId, STORAGE_KEYS.SUBJECTS), null);
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    return defaultStreamSubs;
+  }
+
+  // Self-heal: If profile stream is Science or Arts but saved subjects still carry Commerce defaults
+  const isCommerceDefault =
+    saved.length === 3 &&
+    saved.some((s) => s.name === "Accountancy") &&
+    (stream === "Science" || stream === "Arts / Humanities" || stream === "Arts");
+
+  if (isCommerceDefault) {
+    return defaultStreamSubs;
+  }
+
+  return saved;
 };
 export const saveSubjects = (subs: Subject[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
