@@ -1,0 +1,26 @@
+{
+  "packageId": "com.gariaos.app",
+  "host": "ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app",
+  "name": "Garia OS",
+  "launcherName": "Garia OS",
+  "display": "standalone",
+  "themeColor": "#030712",
+  "navigationColor": "#030712",
+  "backgroundColor": "#030712",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app/icon-512.png",
+  "maskableIconUrl": "https://ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app/icon-512.png",
+  "appVersionName": "1.6.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 21,
+  "targetSdkVersion": 36,
+  "orientation": "portrait",
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  }
+}

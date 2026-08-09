@@ -1,0 +1,39 @@
+name: Build Garia OS Android App Bundle (AAB)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android-aab:
+    name: Build Unsigned Release AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x android/gradlew
+
+      - name: Build Unsigned Release App Bundle
+        working-directory: ./android
+        run: |
+          ./gradlew bundleRelease --stacktrace
+
+      - name: Upload Release AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: garia-os-v1.6.0-release-unsigned-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14

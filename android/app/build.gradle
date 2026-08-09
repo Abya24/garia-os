@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.gariaos.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.gariaos.app"
+        minSdk 21
+        targetSdk 36
+        versionCode 1
+        versionName "1.6.0"
+
+        manifestPlaceholders = [
+            hostName: "ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app",
+            defaultUrl: "https://ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app/",
+            launcherName: "Garia OS",
+            assetStatements: '[]'
+        ]
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.comtwaintegration:delegationauth:1.0.0'
+    implementation 'androidx.browser:browser:1.8.0'
+}

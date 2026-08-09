@@ -1,0 +1,464 @@
+import React, { useState, useRef } from "react";
+import {
+  X,
+  User,
+  UserPlus,
+  Edit2,
+  Trash2,
+  Check,
+  Download,
+  Upload,
+  Users,
+  Sparkles,
+  ShieldAlert,
+  GraduationCap,
+  ArrowRight,
+} from "lucide-react";
+import { StudentProfile, StreamType, ExamBoard } from "../types";
+
+interface StudentProfileModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  profiles: StudentProfile[];
+  activeProfile: StudentProfile;
+  onSwitchProfile: (profileId: string) => void;
+  onAddProfile: (profileData: Omit<StudentProfile, "id" | "createdAt" | "updatedAt">) => void;
+  onUpdateProfile: (profile: StudentProfile) => void;
+  onDeleteProfile: (profileId: string) => void;
+  onExportProfile: (profileId: string) => void;
+  onImportProfile: (jsonString: string) => void;
+}
+
+const AVATAR_GRADIENTS = [
+  { label: "Cyan Emerald", value: "from-cyan-500 to-emerald-500" },
+  { label: "Purple Indigo", value: "from-purple-500 to-indigo-500" },
+  { label: "Amber Orange", value: "from-amber-500 to-orange-500" },
+  { label: "Rose Pink", value: "from-rose-500 to-pink-500" },
+  { label: "Blue Cyan", value: "from-blue-500 to-cyan-500" },
+  { label: "Emerald Teal", value: "from-emerald-500 to-teal-500" },
+];
+
+export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
+  isOpen,
+  onClose,
+  profiles,
+  activeProfile,
+  onSwitchProfile,
+  onAddProfile,
+  onUpdateProfile,
+  onDeleteProfile,
+  onExportProfile,
+  onImportProfile,
+}) => {
+  const [activeTab, setActiveTab] = useState<"list" | "add" | "edit">("list");
+  const [editingProfile, setEditingProfile] = useState<StudentProfile | null>(null);
+
+  // Form states
+  const [name, setName] = useState("");
+  const [classLevel, setClassLevel] = useState("Class 12");
+  const [stream, setStream] = useState<StreamType>("Commerce");
+  const [board, setBoard] = useState<ExamBoard | string>("BSEB");
+  const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENTS[0].value);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!isOpen) return null;
+
+  const resetForm = () => {
+    setName("");
+    setClassLevel("Class 12");
+    setStream("Commerce");
+    setBoard("BSEB");
+    setAvatarColor(AVATAR_GRADIENTS[0].value);
+    setEditingProfile(null);
+  };
+
+  const handleStartAdd = () => {
+    resetForm();
+    setActiveTab("add");
+  };
+
+  const handleStartEdit = (p: StudentProfile) => {
+    setEditingProfile(p);
+    setName(p.name);
+    setClassLevel(p.classLevel);
+    setStream(p.stream);
+    setBoard(p.board);
+    setAvatarColor(p.avatarColor || AVATAR_GRADIENTS[0].value);
+    setActiveTab("edit");
+  };
+
+  const handleSaveAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onAddProfile({
+      name: name.trim(),
+      classLevel,
+      stream,
+      board,
+      avatarColor,
+    });
+    resetForm();
+    setActiveTab("list");
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile || !name.trim()) return;
+    onUpdateProfile({
+      ...editingProfile,
+      name: name.trim(),
+      classLevel,
+      stream,
+      board,
+      avatarColor,
+    });
+    resetForm();
+    setActiveTab("list");
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        if (content) {
+          onImportProfile(content);
+          setActiveTab("list");
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-emerald-400">
+                <Users className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white font-heading flex items-center gap-2">
+                Student Profiles
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                  Multi-Student v1.5
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Switch, manage, and isolate student intelligence environments
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Navigation */}
+        <div className="flex items-center gap-2 my-4 bg-slate-900/50 p-1.5 rounded-2xl border border-white/10 shrink-0">
+          <button
+            onClick={() => setActiveTab("list")}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === "list"
+                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md font-bold"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Profiles ({profiles.length})
+          </button>
+          <button
+            onClick={handleStartAdd}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === "add"
+                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md font-bold"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Add Student
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-white/10 transition-all flex items-center gap-1.5"
+          >
+            <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            Import JSON
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            accept=".json"
+            className="hidden"
+          />
+        </div>
+
+        {/* Tab Contents */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+          {/* LIST TAB */}
+          {activeTab === "list" && (
+            <div className="space-y-3">
+              {profiles.map((p) => {
+                const isActive = p.id === activeProfile.id;
+                const isDeleteConfirm = deleteConfirmId === p.id;
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      isActive
+                        ? "bg-gradient-to-r from-emerald-500/15 via-cyan-500/10 to-transparent border-emerald-500/40 shadow-lg shadow-emerald-500/5"
+                        : "bg-slate-900/40 border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${
+                          p.avatarColor || "from-cyan-500 to-emerald-500"
+                        } p-0.5 flex items-center justify-center shadow-md text-white font-bold text-lg font-heading shrink-0`}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-white text-base font-heading">
+                            {p.name}
+                          </h4>
+                          {isActive && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                              Active Environment
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-400 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
+                            {p.classLevel}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                            {p.stream}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                            {p.board}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                      {!isActive && (
+                        <button
+                          onClick={() => {
+                            onSwitchProfile(p.id);
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Switch
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleStartEdit(p)}
+                        title="Edit Profile"
+                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all text-xs flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => onExportProfile(p.id)}
+                        title="Export JSON Backup"
+                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 hover:text-cyan-300 border border-white/10 transition-all text-xs flex items-center gap-1"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+
+                      {profiles.length > 1 && (
+                        <>
+                          {isDeleteConfirm ? (
+                            <div className="flex items-center gap-1 bg-rose-500/20 p-1 rounded-xl border border-rose-500/40">
+                              <span className="text-[10px] text-rose-300 px-1 font-bold">
+                                Confirm?
+                              </span>
+                              <button
+                                onClick={() => {
+                                  onDeleteProfile(p.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="px-2 py-1 bg-rose-500 text-white rounded-lg text-[10px] font-bold"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="px-2 py-1 bg-slate-800 text-slate-300 rounded-lg text-[10px]"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirmId(p.id)}
+                              title="Delete Profile"
+                              className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all text-xs"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ADD OR EDIT TAB */}
+          {(activeTab === "add" || activeTab === "edit") && (
+            <form
+              onSubmit={activeTab === "add" ? handleSaveAdd : handleSaveEdit}
+              className="space-y-4 p-4 rounded-2xl bg-slate-900/60 border border-white/10"
+            >
+              <h4 className="font-bold text-white text-base font-heading flex items-center gap-2">
+                {activeTab === "add" ? (
+                  <>
+                    <UserPlus className="w-4 h-4 text-emerald-400" /> Add New Student
+                    Profile
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="w-4 h-4 text-cyan-400" /> Edit Student Profile
+                  </>
+                )}
+              </h4>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Student Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Class Level
+                    </label>
+                    <select
+                      value={classLevel}
+                      onChange={(e) => setClassLevel(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Class 12">Class 12</option>
+                      <option value="Class 11">Class 11</option>
+                      <option value="Class 10">Class 10</option>
+                      <option value="Dropper / Gap Year">Dropper / Gap Year</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Stream
+                    </label>
+                    <select
+                      value={stream}
+                      onChange={(e) => setStream(e.target.value as StreamType)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Commerce">Commerce</option>
+                      <option value="Science">Science</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Board
+                    </label>
+                    <select
+                      value={board}
+                      onChange={(e) => setBoard(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="BSEB">BSEB (Bihar Board)</option>
+                      <option value="CBSE">CBSE Board</option>
+                      <option value="ICSE">ICSE / ISC Board</option>
+                      <option value="Other">Other State Board</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">
+                    Avatar Theme Color
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATAR_GRADIENTS.map((g) => (
+                      <button
+                        type="button"
+                        key={g.value}
+                        onClick={() => setAvatarColor(g.value)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-2 transition-all ${
+                          avatarColor === g.value
+                            ? "border-emerald-400 bg-white/10 text-white shadow-md"
+                            : "border-white/10 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <span
+                          className={`w-3.5 h-3.5 rounded-full bg-gradient-to-tr ${g.value}`}
+                        />
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("list")}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:brightness-110 shadow-lg shadow-emerald-500/20 transition-all"
+                >
+                  {activeTab === "add" ? "Create Student Profile" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Modal Footer Info */}
+        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Active Profile ID: {activeProfile.id}</span>
+          <span>Per-student isolated storage active</span>
+        </div>
+      </div>
+    </div>
+  );
+};
