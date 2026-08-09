@@ -276,6 +276,63 @@ export const CAREER_CATALOG: CareerOption[] = [
     ],
     whyMatchTags: ["Scientific Research", "Medicine/Healthcare", "Project-Based", "Global Opportunities"],
   },
+  {
+    id: "pharmacy",
+    title: "Pharmacy & Pharmaceutical Sciences (B.Pharm)",
+    stream: "Science",
+    category: "Healthcare & Drug Research",
+    description: "Specializes in drug formulation, pharmacology, clinical trial analysis, quality assurance, and pharmaceutical sales/research.",
+    duration: "4 Years (B.Pharm) / 6 Years (Pharm.D)",
+    studyPathway: "Class 12 Science (PCB/PCM) -> State Entrance / NEET -> B.Pharm -> GPAT Exam -> M.Pharm / Drug Inspector.",
+    requiredSubjects: ["Chemistry", "Biology", "Physics", "Mathematics"],
+    keySkills: ["Medicinal Chemistry", "Lab Operations", "Quality Assurance", "Pharmacology"],
+    workAreas: ["Pharma R&D Labs", "Hospitals & Clinics", "Quality Control Units", "Retail Pharmacy"],
+    courseStages: [
+      "B.Pharm Foundation & Chemistry Labs",
+      "Industrial Pharmacy & Pharmacology",
+      "Hospital Internship & GPAT Prep",
+      "M.Pharm / Drug Inspector Qualification",
+    ],
+    whyMatchTags: ["Medicine/Healthcare", "Scientific Research", "Healthcare/Clinic", "Job Security"],
+  },
+  {
+    id: "nursing",
+    title: "Nursing & Allied Health Sciences (B.Sc Nursing)",
+    stream: "Science",
+    category: "Clinical Care & Patient Management",
+    description: "Provides direct clinical nursing care, patient recovery monitoring, critical care assistance, and health center management.",
+    duration: "4 Years (B.Sc Nursing)",
+    studyPathway: "Class 12 Science (PCB) -> Nursing Entrance Exam -> B.Sc Nursing -> Nursing Officer / Clinical Supervisor.",
+    requiredSubjects: ["Biology", "Chemistry", "Physics", "English"],
+    keySkills: ["Patient Care", "Clinical Emergency Handling", "Empathy", "Teamwork"],
+    workAreas: ["Hospitals & Clinics", "Healthcare/Clinic", "Community Health Centers"],
+    courseStages: [
+      "Anatomy, Physiology & Nursing Fundamentals",
+      "Clinical Rotations & Ward Practice",
+      "Specialty Nursing (ICU/Pediatric)",
+      "Nursing Officer Registration & Placement",
+    ],
+    whyMatchTags: ["Healthcare/Clinic", "Medicine/Healthcare", "Social Impact", "Job Security"],
+  },
+  {
+    id: "math_stats",
+    title: "Mathematics, Statistics & Actuarial Science",
+    stream: "Science",
+    category: "Quantitative Analytics & Risk Modeling",
+    description: "Applies mathematical theory, statistical algorithms, probability models, and risk analysis to finance, data science, and AI.",
+    duration: "3 - 4 Years (B.Sc Math/Stats) + Actuarial Papers",
+    studyPathway: "Class 12 Science/Math -> B.Sc Statistics/Math -> ACET Actuarial Papers / Master's -> Quantitative Analyst / Data Scientist.",
+    requiredSubjects: ["Mathematics", "Statistics", "Computer Science", "Physics"],
+    keySkills: ["Mathematical Proofs", "Statistical Modeling", "Probability Analysis", "Python/R"],
+    workAreas: ["Insurance Firms", "Corporate/Office", "Financial Institutions", "Research Institutes"],
+    courseStages: [
+      "Linear Algebra & Calculus Foundations",
+      "Probability & Inferential Statistics",
+      "Actuarial Core Examinations / Machine Learning",
+      "Senior Data Quantitative Analyst",
+    ],
+    whyMatchTags: ["Analytical Thinking", "Finance/Markets", "Coding/Tech", "High Earning Potential"],
+  },
 
   // Arts / Humanities Careers
   {
@@ -355,6 +412,25 @@ export const CAREER_CATALOG: CareerOption[] = [
     whyMatchTags: ["Creative Freedom", "Communication", "Practical & Hands-on", "Field Work"],
   },
   {
+    id: "teaching_edu",
+    title: "Academic Teaching, Pedagogy & Education (B.Ed / M.Ed)",
+    stream: "Arts / Humanities",
+    category: "Education & Pedagogy",
+    description: "Develops curriculum, delivers secondary/senior secondary education, conducts educational research, and manages academic institutions.",
+    duration: "3 Years (Bachelor's) + 2 Years (B.Ed)",
+    studyPathway: "Class 12 -> Bachelor's Degree in Core Subject -> B.Ed Degree -> CTET / State TET Exam -> PGT/TGT Teacher / Lecturer.",
+    requiredSubjects: ["English", "History", "Political Science", "Psychology", "Sociology"],
+    keySkills: ["Pedagogy & Teaching", "Communication", "Subject Expertise", "Classroom Leadership"],
+    workAreas: ["Schools & Colleges", "Educational Institutions", "Academic Publishing"],
+    courseStages: [
+      "Undergraduate Subject Mastery",
+      "B.Ed Pedagogy & Teaching Practice",
+      "CTET / TET Eligibility Exam",
+      "PGT School Lecturer Appointment",
+    ],
+    whyMatchTags: ["Social Impact", "Communication", "Job Security", "Management/Leadership"],
+  },
+  {
     id: "design_bdes",
     title: "Graphic, UI/UX & Industrial Design (B.Des / BFA)",
     stream: "Arts / Humanities",
@@ -396,38 +472,62 @@ export const CAREER_CATALOG: CareerOption[] = [
 
 export function calculateCareerMatches(
   assessment: CareerAssessment,
-  profile: CareerProfile
+  profile: CareerProfile,
+  quizAnswers?: any,
+  userSubjects?: any[]
 ): CareerMatchResult[] {
   const filterStream = profile.stream;
 
-  return CAREER_CATALOG.map((career) => {
+  const results = CAREER_CATALOG.map((career) => {
     let score = 50; // baseline score
     const whyMatches: string[] = [];
     const relevantStrengths: string[] = [];
     const areasToExplore: string[] = [];
 
     // Stream match boost
-    if (career.stream === filterStream) {
+    if (career.stream === filterStream || (filterStream === "Arts" && career.stream === "Arts / Humanities")) {
       score += 15;
     } else {
       score -= 10;
     }
 
     // Strong subject matches (+10 per subject)
-    const matchingSubjects = assessment.strongSubjects.filter((subj) =>
+    const strongList = [
+      ...(assessment.strongSubjects || []),
+      ...(quizAnswers?.strongSubjects || []),
+      ...(quizAnswers?.favoriteSubjects || []),
+    ];
+    const uniqueStrong = Array.from(new Set(strongList));
+
+    const matchingSubjects = uniqueStrong.filter((subj) =>
       career.requiredSubjects.some(
-        (req) => req.toLowerCase() === subj.toLowerCase()
+        (req) => req.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(req.toLowerCase())
       )
     );
-    score += matchingSubjects.length * 10;
+    score += matchingSubjects.length * 8;
     if (matchingSubjects.length > 0) {
       whyMatches.push(
-        `Strong match with your top subject(s): ${matchingSubjects.join(", ")}.`
+        `Strong alignment with core subject(s): ${matchingSubjects.slice(0, 3).join(", ")}.`
       );
     }
 
+    // Active Student Subjects progress check (+6)
+    if (userSubjects && userSubjects.length > 0) {
+      const activeMatch = userSubjects.filter((us) =>
+        career.requiredSubjects.some((req) => req.toLowerCase().includes(us.name.toLowerCase()))
+      );
+      if (activeMatch.length > 0) {
+        const totalMins = activeMatch.reduce((acc, s) => acc + (s.completedMinutes || 0), 0);
+        score += 6;
+        if (totalMins > 60) {
+          score += 4;
+          whyMatches.push(`Active study progress logged in ${activeMatch[0].name} (${totalMins} mins).`);
+        }
+      }
+    }
+
     // Interest matches (+8 per tag)
-    const matchingInterests = assessment.interests.filter((interest) =>
+    const matchingInterests = (assessment.interests || []).filter((interest) =>
       career.whyMatchTags.some(
         (tag) => tag.toLowerCase() === interest.toLowerCase()
       )
@@ -435,71 +535,90 @@ export function calculateCareerMatches(
     score += matchingInterests.length * 8;
     if (matchingInterests.length > 0) {
       whyMatches.push(
-        `Aligns with your key interest area(s): ${matchingInterests.join(", ")}.`
+        `Aligns with key interest: ${matchingInterests.join(", ")}.`
       );
     }
 
+    // Quiz Ratings integration (+8 each for high domain ratings)
+    if (quizAnswers) {
+      if (quizAnswers.numbersInterest >= 4 && career.whyMatchTags.some((t) => ["Finance/Markets", "Accounting", "Data"].includes(t))) {
+        score += 8;
+        whyMatches.push("High interest in Numbers, Data & Finance (Quiz score: " + quizAnswers.numbersInterest + "/5).");
+      }
+      if (quizAnswers.scienceTechInterest >= 4 && career.whyMatchTags.some((t) => ["Coding/Tech", "Scientific Research", "Medicine/Healthcare"].includes(t))) {
+        score += 8;
+        whyMatches.push("High aptitude for Science & Technology (Quiz score: " + quizAnswers.scienceTechInterest + "/5).");
+      }
+      if (quizAnswers.businessFinanceInterest >= 4 && career.whyMatchTags.some((t) => ["Management/Leadership", "Finance/Markets", "Business"].includes(t))) {
+        score += 8;
+        whyMatches.push("Strong orientation toward Business & Management (Quiz score: " + quizAnswers.businessFinanceInterest + "/5).");
+      }
+      if (quizAnswers.lawGovInterest >= 4 && (career.id === "law" || career.id === "civil_services" || career.id === "cs")) {
+        score += 10;
+        whyMatches.push("High interest in Law & Governance (Quiz score: " + quizAnswers.lawGovInterest + "/5).");
+      }
+      if (quizAnswers.peopleHelpingInterest >= 4 && career.whyMatchTags.some((t) => ["Social Impact", "Healthcare/Clinic", "Medicine/Healthcare"].includes(t))) {
+        score += 8;
+        whyMatches.push("Strong drive for Social Impact & People Helping (Quiz score: " + quizAnswers.peopleHelpingInterest + "/5).");
+      }
+      if (quizAnswers.researchInterest >= 4 && career.whyMatchTags.some((t) => ["Scientific Research", "Theoretical & Analytical"].includes(t))) {
+        score += 8;
+        whyMatches.push("High affinity for Scientific & Policy Research.");
+      }
+      if (quizAnswers.creativityLevel >= 4 && career.whyMatchTags.some((t) => ["Creative Freedom", "Design & Arts"].includes(t))) {
+        score += 8;
+        whyMatches.push("Creative & visual problem-solving preference.");
+      }
+    }
+
     // Skill matches (+8 per skill)
-    const matchingSkills = assessment.skills.filter((skill) =>
+    const matchingSkills = (assessment.skills || []).filter((skill) =>
       career.keySkills.some(
         (ks) => ks.toLowerCase().includes(skill.toLowerCase()) || skill.toLowerCase().includes(ks.toLowerCase())
       )
     );
-    score += matchingSkills.length * 8;
+    score += matchingSkills.length * 6;
     if (matchingSkills.length > 0) {
       relevantStrengths.push(...matchingSkills);
-      whyMatches.push(
-        `Utilizes your core skill(s): ${matchingSkills.join(", ")}.`
-      );
     }
 
     // Work area match (+6)
-    const matchingWorkArea = assessment.workAreas.filter((wa) =>
+    const matchingWorkArea = (assessment.workAreas || []).filter((wa) =>
       career.workAreas.some(
         (cwa) => cwa.toLowerCase().includes(wa.toLowerCase()) || wa.toLowerCase().includes(cwa.toLowerCase())
       )
     );
-    score += matchingWorkArea.length * 6;
-    if (matchingWorkArea.length > 0) {
-      whyMatches.push(
-        `Fits your preferred work environment: ${matchingWorkArea.join(", ")}.`
-      );
-    }
-
-    // Career goals match (+6)
-    const matchingGoals = assessment.careerGoals.filter((cg) =>
-      career.whyMatchTags.some((tag) => tag.toLowerCase() === cg.toLowerCase())
-    );
-    score += matchingGoals.length * 6;
+    score += matchingWorkArea.length * 5;
 
     // Study preference match (+8)
+    const pref = quizAnswers?.problemSolvingPref || assessment.studyPreference;
     if (
-      assessment.studyPreference === "Professional Certifications" &&
+      pref === "Professional Certifications" &&
       ["ca", "cs", "cma", "fin_analyst"].includes(career.id)
     ) {
-      score += 10;
-      whyMatches.push("Perfect match for professional certification study style.");
+      score += 8;
+      whyMatches.push("Matches professional certification learning style.");
     } else if (
-      assessment.studyPreference === "Practical & Hands-on" &&
-      ["cs_engineer", "ai_data", "core_eng", "bba_entrepreneur"].includes(career.id)
+      pref === "Practical & Hands-on" &&
+      ["cs_engineer", "ai_data", "core_eng", "bba_entrepreneur", "design_bdes"].includes(career.id)
     ) {
-      score += 10;
-      whyMatches.push("Matches your practical hands-on project learning style.");
+      score += 8;
+      whyMatches.push("Matches practical & hands-on project style.");
     } else if (
-      assessment.studyPreference === "Theoretical & Analytical" &&
-      ["pure_research", "economics", "mbbs", "biotech"].includes(career.id)
+      pref === "Theoretical & Analytical" &&
+      ["pure_research", "economics", "mbbs", "biotech", "math_stats"].includes(career.id)
     ) {
-      score += 10;
-      whyMatches.push("Complements your theoretical & analytical depth.");
+      score += 8;
+      whyMatches.push("Matches theoretical & analytical research preference.");
     }
 
-    // Clamp score between 40% and 98%
-    const finalScore = Math.min(98, Math.max(40, score));
+    // Clamp score between 42% and 98%
+    const finalScore = Math.min(98, Math.max(42, score));
 
     // Fallbacks if empty
     if (whyMatches.length === 0) {
       whyMatches.push(
-        `Structured pathway for ${career.stream} students seeking ${career.category}.`
+        `Structured pathway for ${career.stream} students in ${career.category}.`
       );
     }
     if (relevantStrengths.length === 0) {
@@ -512,7 +631,7 @@ export function calculateCareerMatches(
     // Areas to explore
     areasToExplore.push(
       `Course Stages: ${career.courseStages.slice(0, 2).join(" → ")}`,
-      `Key Exam / Entry: ${career.studyPathway.split("->")[1] || "University Entrance"}`
+      `Key Exam / Entry: ${career.studyPathway.split("->")[1] || "Entrance Exam"}`
     );
 
     return {
@@ -523,6 +642,18 @@ export function calculateCareerMatches(
       areasToExplore,
     };
   }).sort((a, b) => b.matchScore - a.matchScore);
+
+  // Attach alternative careers (top 2 other careers in same stream or category)
+  return results.map((res) => {
+    const alternatives = CAREER_CATALOG.filter(
+      (c) => c.id !== res.career.id && (c.stream === res.career.stream || c.category === res.career.category)
+    ).slice(0, 3);
+
+    return {
+      ...res,
+      alternativeCareers: alternatives,
+    };
+  });
 }
 
 export function generateDefaultRoadmap(

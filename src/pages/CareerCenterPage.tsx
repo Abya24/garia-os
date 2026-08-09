@@ -29,20 +29,27 @@ import {
   CareerMatchResult,
   ActiveTab,
   Milestone,
+  CareerQuizAnswers,
+  Subject,
 } from "../types";
 import {
   CAREER_CATALOG,
   calculateCareerMatches,
   generateDefaultRoadmap,
 } from "../utils/careerEngine";
+import { CareerQuizModal } from "../components/CareerQuizModal";
 
 interface CareerCenterPageProps {
   profile: CareerProfile;
   assessment: CareerAssessment;
   roadmap: CareerRoadmap;
+  quizAnswers?: CareerQuizAnswers;
+  activeStudentName?: string;
+  subjects?: Subject[];
   onUpdateProfile: (p: CareerProfile) => void;
   onUpdateAssessment: (a: CareerAssessment) => void;
   onUpdateRoadmap: (r: CareerRoadmap) => void;
+  onUpdateQuiz?: (q: CareerQuizAnswers) => void;
   onNavigateToAbya: () => void;
 }
 
@@ -114,14 +121,20 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   profile,
   assessment,
   roadmap,
+  quizAnswers,
+  activeStudentName = "Student",
+  subjects = [],
   onUpdateProfile,
   onUpdateAssessment,
   onUpdateRoadmap,
+  onUpdateQuiz,
   onNavigateToAbya,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
     "assessment" | "matches" | "compare" | "roadmap"
   >("matches");
+
+  const [showQuizModal, setShowQuizModal] = useState(false);
 
   const [stream, setStream] = useState<StreamType>(profile.stream || "Commerce");
   const [currentClass, setCurrentClass] = useState<string>(
@@ -193,7 +206,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     setActiveSubTab("matches");
   };
 
-  // Calculate live match results
+  // Calculate live match results with quiz answers & student subjects
   const currentAssessment: CareerAssessment = {
     strongSubjects,
     interests,
@@ -210,7 +223,9 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
 
   const matchResults: CareerMatchResult[] = calculateCareerMatches(
     currentAssessment,
-    currentProfile
+    currentProfile,
+    quizAnswers,
+    subjects
   );
 
   // Filter match results for catalog view
@@ -314,7 +329,15 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={() => setShowQuizModal(true)}
+              className="px-4 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-2 border border-emerald-500/40 shadow-lg transition-all"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>Take Career Quiz</span>
+            </button>
+
             <button
               onClick={onNavigateToAbya}
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg hover:brightness-110 transition-all"
@@ -325,6 +348,33 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
           </div>
         </div>
       </div>
+
+      {showQuizModal && (
+        <CareerQuizModal
+          stream={profile.stream}
+          studentName={activeStudentName}
+          initialAnswers={
+            quizAnswers || {
+              favoriteSubjects: [],
+              strongSubjects: [],
+              problemSolvingPref: "Practical & Hands-on",
+              creativityLevel: 3,
+              communicationLevel: 3,
+              numbersInterest: 3,
+              scienceTechInterest: 3,
+              businessFinanceInterest: 3,
+              lawGovInterest: 3,
+              peopleHelpingInterest: 3,
+              researchInterest: 3,
+            }
+          }
+          onSaveQuiz={(updatedQuiz) => {
+            if (onUpdateQuiz) onUpdateQuiz(updatedQuiz);
+            setShowQuizModal(false);
+          }}
+          onClose={() => setShowQuizModal(false)}
+        />
+      )}
 
       {/* Stream & Target Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -520,21 +570,53 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
                       </div>
                     </div>
 
+                    {/* Match Score Bar */}
+                    <div className="w-full bg-slate-800 rounded-full h-1.5 mb-3 overflow-hidden border border-white/5">
+                      <div
+                        className={`h-full transition-all duration-500 rounded-full ${
+                          matchScore >= 80
+                            ? "bg-gradient-to-r from-emerald-400 to-cyan-400"
+                            : matchScore >= 65
+                            ? "bg-gradient-to-r from-cyan-400 to-amber-400"
+                            : "bg-gradient-to-r from-amber-400 to-rose-400"
+                        }`}
+                        style={{ width: `${matchScore}%` }}
+                      />
+                    </div>
+
                     <p className="text-xs text-slate-300 leading-relaxed mb-4">
                       {career.description}
                     </p>
 
                     {/* Key Specs Pills */}
-                    <div className="space-y-2 mb-4 text-xs font-mono">
+                    <div className="space-y-2 mb-4 text-xs">
                       <div className="p-2.5 rounded-xl glass-pill border border-white/5 flex items-center justify-between">
-                        <span className="text-slate-400">Duration:</span>
+                        <span className="text-slate-400 font-mono">Duration:</span>
                         <span className="text-white font-semibold">{career.duration}</span>
                       </div>
-                      <div className="p-2.5 rounded-xl glass-pill border border-white/5 flex items-center justify-between">
-                        <span className="text-slate-400">Required Subjects:</span>
-                        <span className="text-emerald-300 font-semibold truncate max-w-[200px]">
-                          {career.requiredSubjects.join(", ")}
-                        </span>
+                      <div className="p-2.5 rounded-xl glass-pill border border-white/5 flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 font-mono">Suggested Pathway:</span>
+                          <span className="text-emerald-300 font-semibold">{career.requiredSubjects.join(", ")}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 font-sans leading-tight mt-0.5">
+                          {career.studyPathway}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Required Skills */}
+                    <div className="mb-4">
+                      <div className="text-[11px] font-semibold text-slate-400 mb-1.5 font-mono">Required Core Skills:</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {career.keySkills.map((sk) => (
+                          <span
+                            key={sk}
+                            className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300 text-[10px]"
+                          >
+                            {sk}
+                          </span>
+                        ))}
                       </div>
                     </div>
 
@@ -558,27 +640,39 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
                       </button>
 
                       {isExpanded && (
-                        <div className="p-3 rounded-2xl glass-pill border border-emerald-500/20 space-y-2 animate-in fade-in duration-200 text-xs">
-                          <div className="font-semibold text-slate-200">Compatibility Factors:</div>
-                          <ul className="space-y-1 text-slate-300 list-disc list-inside text-[11px]">
-                            {whyMatches.map((reason, idx) => (
-                              <li key={idx}>{reason}</li>
-                            ))}
-                          </ul>
+                        <div className="p-3 rounded-2xl glass-pill border border-emerald-500/20 space-y-3 animate-in fade-in duration-200 text-xs">
+                          <div>
+                            <div className="font-semibold text-slate-200 mb-1">Compatibility Factors:</div>
+                            <ul className="space-y-1 text-slate-300 list-disc list-inside text-[11px]">
+                              {whyMatches.map((reason, idx) => (
+                                <li key={idx}>{reason}</li>
+                              ))}
+                            </ul>
+                          </div>
 
-                          <div className="pt-2 border-t border-white/10 font-semibold text-slate-200">
-                            Relevant Strengths:
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {relevantStrengths.map((str, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]"
-                              >
-                                {str}
-                              </span>
-                            ))}
-                          </div>
+                          {res.alternativeCareers && res.alternativeCareers.length > 0 && (
+                            <div className="pt-2 border-t border-white/10">
+                              <div className="font-semibold text-slate-200 mb-1.5 text-[11px]">
+                                Alternative Careers in Same Domain:
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {res.alternativeCareers.map((alt) => (
+                                  <button
+                                    key={alt.id}
+                                    onClick={() => {
+                                      setCompareIdA(career.id);
+                                      setCompareIdB(alt.id);
+                                      setActiveSubTab("compare");
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold transition-all flex items-center gap-1"
+                                  >
+                                    <span>{alt.title}</span>
+                                    <span className="text-[9px] text-slate-400">⚡ Compare</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

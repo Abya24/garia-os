@@ -16,6 +16,7 @@ import {
   CareerProfile,
   CareerAssessment,
   CareerRoadmap,
+  CareerQuizAnswers,
   AcademicSubject,
   AcademicChapter,
   AcademicTest,
@@ -54,6 +55,8 @@ import {
   saveCareerAssessment,
   loadCareerRoadmap,
   saveCareerRoadmap,
+  loadCareerQuiz,
+  saveCareerQuiz,
   loadAcademicSubjects,
   saveAcademicSubjects,
   loadAcademicChapters,
@@ -146,6 +149,7 @@ export default function App() {
   const [careerProfile, setCareerProfile] = useState<CareerProfile>(() => loadCareerProfile());
   const [careerAssessment, setCareerAssessment] = useState<CareerAssessment>(() => loadCareerAssessment());
   const [careerRoadmap, setCareerRoadmap] = useState<CareerRoadmap>(() => loadCareerRoadmap());
+  const [careerQuiz, setCareerQuiz] = useState<CareerQuizAnswers>(() => loadCareerQuiz());
 
   // Academic Center States
   const [academicSubjects, setAcademicSubjects] = useState<AcademicSubject[]>(() =>
@@ -193,6 +197,7 @@ export default function App() {
     setCareerProfile(loadCareerProfile(profileId));
     setCareerAssessment(loadCareerAssessment(profileId));
     setCareerRoadmap(loadCareerRoadmap(profileId));
+    setCareerQuiz(loadCareerQuiz(profileId));
     setAcademicSubjects(loadAcademicSubjects(stream, profileId));
     setAcademicChapters(loadAcademicChapters(profileId));
     setAcademicTests(loadAcademicTests(profileId));
@@ -272,6 +277,11 @@ export default function App() {
   const handleUpdateCareerRoadmap = (r: CareerRoadmap) => {
     setCareerRoadmap(r);
     saveCareerRoadmap(r, activeProfileId);
+  };
+
+  const handleUpdateCareerQuiz = (quiz: CareerQuizAnswers) => {
+    setCareerQuiz(quiz);
+    saveCareerQuiz(quiz, activeProfileId);
   };
 
   const handleUpdateAcademicSubjects = (subs: AcademicSubject[]) => {
@@ -945,10 +955,14 @@ export default function App() {
               profile={careerProfile}
               assessment={careerAssessment}
               roadmap={careerRoadmap}
+              quizAnswers={careerQuiz}
+              activeStudentName={activeStudent.name}
+              subjects={subjects}
               onUpdateProfile={handleUpdateCareerProfile}
               onUpdateAssessment={handleUpdateCareerAssessment}
               onUpdateRoadmap={handleUpdateCareerRoadmap}
-              onAskAbyaWithContext={handleAskAbyaWithContext}
+              onUpdateQuiz={handleUpdateCareerQuiz}
+              onNavigateToAbya={() => setActiveTab("abya")}
             />
           )}
 

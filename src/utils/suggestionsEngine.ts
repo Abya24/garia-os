@@ -28,12 +28,27 @@ export function generateSmartSuggestions(
   chapters: AcademicChapter[],
   goals: Goal[],
   water: WaterLog,
-  habits: Habit[]
+  habits: Habit[],
+  dismissedIds: string[] = []
 ): SmartSuggestion[] {
-  const suggestions: SmartSuggestion[] = [];
+  const rawSuggestions: SmartSuggestion[] = [];
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // 1. Pending Tasks Today
+  // 1. Overdue Tasks Check (High priority)
+  const overdueTasks = tasks.filter((t) => !t.completed && t.date && t.date < todayStr);
+  if (overdueTasks.length > 0) {
+    rawSuggestions.push({
+      id: "sug-overdue-tasks",
+      type: "task",
+      title: `${overdueTasks.length} Overdue Task(s)`,
+      description: `You have overdue tasks from previous days. Catch up now to clear your schedule!`,
+      priority: "high",
+      actionText: "Review Tasks",
+      targetTab: "tasks",
+    });
+  }
+
+  // 2. Pending Tasks Today
   const todayTasks = tasks.filter((t) => t.date === todayStr);
   const unfinishedTasks = todayTasks.filter((t) => !t.completed);
 
@@ -44,7 +59,7 @@ export function generateSmartSuggestions(
     );
 
     if (matchedSubject) {
-      suggestions.push({
+      rawSuggestions.push({
         id: "sug-task-subject",
         type: "task",
         title: `Unfinished ${matchedSubject.name} Tasks`,
@@ -55,7 +70,7 @@ export function generateSmartSuggestions(
         subjectName: matchedSubject.name,
       });
     } else {
-      suggestions.push({
+      rawSuggestions.push({
         id: "sug-task-today",
         type: "task",
         title: "Today's Unfinished Tasks",
@@ -66,7 +81,7 @@ export function generateSmartSuggestions(
       });
     }
   } else if (todayTasks.length > 0) {
-    suggestions.push({
+    rawSuggestions.push({
       id: "sug-task-completed",
       type: "task",
       title: "All Tasks Completed!",
@@ -77,75 +92,75 @@ export function generateSmartSuggestions(
     });
   }
 
-  // 2. Low Study Hours check
+  // 3. Low Study Hours check for active subjects
   const lowStudySubjects = subjects.filter(
     (s) => s.targetMinutesPerWeek > 0 && s.completedMinutes < s.targetMinutesPerWeek * 0.3
   );
   if (lowStudySubjects.length > 0) {
     const lowest = lowStudySubjects[0];
     const loggedHrs = (lowest.completedMinutes / 60).toFixed(1);
-    suggestions.push({
+    rawSuggestions.push({
       id: `sug-study-low-${lowest.id}`,
       type: "study",
       title: `Low Study Hours in ${lowest.name}`,
-      description: `Your ${lowest.name} study log is low (${loggedHrs} hrs logged this week vs ${Math.round(lowest.targetMinutesPerWeek / 60)} hrs target).`,
+      description: `Your ${lowest.name} study log is low (${loggedHrs} hrs logged vs ${Math.round(lowest.targetMinutesPerWeek / 60)} hrs target).`,
       priority: "high",
-      actionText: "Start Study Timer",
+      actionText: "Start Timer",
       targetTab: "study",
       subjectName: lowest.name,
     });
   }
 
-  // 3. Weak Chapters in Active Stream
-  const weakChapters = chapters.filter((c) => c.isWeak || c.priority === "VVI");
+  // 4. Weak / VVI Chapters in Active Stream
+  const weakChapters = chapters.filter((c) => (c.isWeak || c.priority === "VVI") && c.status !== "Completed");
   if (weakChapters.length > 0) {
     const targetCh = weakChapters[0];
     const sub = academicSubjects.find((s) => s.id === targetCh.subjectId);
-    suggestions.push({
+    rawSuggestions.push({
       id: `sug-weak-ch-${targetCh.id}`,
       type: "chapter",
       title: `Revise Weak Chapter: ${targetCh.title}`,
       description: `Flagged as ${targetCh.isWeak ? "a weak concept" : "VVI"} in ${sub?.name || profile.stream}. High exam weightage!`,
       priority: "medium",
-      actionText: "Review Syllabus",
+      actionText: "Review Chapter",
       targetTab: "academic",
       subjectName: sub?.name,
     });
   }
 
-  // 4. Goal Progress Check
+  // 5. Goal Progress Check
   const pendingGoals = goals.filter((g) => !g.completed && g.progress < 100);
   if (pendingGoals.length > 0) {
     const nearGoal = pendingGoals[0];
-    suggestions.push({
+    rawSuggestions.push({
       id: `sug-goal-${nearGoal.id}`,
       type: "goal",
       title: `Goal Progress: ${nearGoal.title}`,
-      description: `Currently at ${nearGoal.progress}% completion. Focus on reaching 100%!`,
+      description: `Currently at ${nearGoal.progress}% completion. Keep pushing to reach 100%!`,
       priority: "medium",
       actionText: "View Goals",
       targetTab: "home",
     });
   }
 
-  // 5. Hydration Check
+  // 6. Hydration Check
   if (water.glasses < water.goal) {
     const remaining = water.goal - water.glasses;
-    suggestions.push({
+    rawSuggestions.push({
       id: "sug-water",
       type: "hydration",
       title: "Hydration Reminder",
-      description: `You have logged ${water.glasses}/${water.goal} glasses today (${remaining} remaining). Hydrate for peak cognitive performance!`,
+      description: `You have logged ${water.glasses}/${water.goal} glasses today (${remaining} remaining). Hydrate for peak performance!`,
       priority: "low",
       actionText: "+1 Glass Water",
       targetTab: "home",
     });
   }
 
-  // 6. Habit Check
+  // 7. Habit Check
   const pendingHabits = habits.filter((h) => !h.completedDates.includes(todayStr));
   if (pendingHabits.length > 0) {
-    suggestions.push({
+    rawSuggestions.push({
       id: "sug-habit",
       type: "habit",
       title: `Daily Habit Check: ${pendingHabits[0].title}`,
@@ -156,5 +171,10 @@ export function generateSmartSuggestions(
     });
   }
 
-  return suggestions;
+  // Filter out dismissed suggestions
+  const filtered = rawSuggestions.filter((s) => !dismissedIds.includes(s.id));
+
+  // Sort by priority: high -> medium -> low
+  const priorityMap: Record<string, number> = { high: 1, medium: 2, low: 3 };
+  return filtered.sort((a, b) => priorityMap[a.priority] - priorityMap[b.priority]);
 }

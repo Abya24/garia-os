@@ -39,7 +39,7 @@ import {
   AcademicSubject,
   AcademicChapter,
 } from "../types";
-import { getTodayString } from "../utils/storage";
+import { getTodayString, loadSmartSuggestionsState, saveSmartSuggestionsState } from "../utils/storage";
 import { generateSmartSuggestions } from "../utils/suggestionsEngine";
 import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
 
@@ -254,6 +254,22 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     updatedAt: Date.now(),
   };
 
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    return loadSmartSuggestionsState(activeStudent?.id).dismissedIds || [];
+  });
+
+  // Re-sync dismissedIds whenever active student changes
+  useEffect(() => {
+    const loaded = loadSmartSuggestionsState(activeStudent?.id);
+    setDismissedIds(loaded.dismissedIds || []);
+  }, [activeStudent?.id]);
+
+  const handleDismissSuggestion = (sugId: string) => {
+    const updated = [...dismissedIds, sugId];
+    setDismissedIds(updated);
+    saveSmartSuggestionsState({ dismissedIds: updated, lastUpdated: Date.now() }, activeStudent?.id);
+  };
+
   const smartSuggestions = generateSmartSuggestions(
     activeProfForSug,
     tasks,
@@ -262,7 +278,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     chapters,
     goals,
     water,
-    habits
+    habits,
+    dismissedIds
   );
 
   const handleSuggestionAction = (targetTab?: string) => {
@@ -326,6 +343,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       <SmartSuggestionsWidget
         suggestions={smartSuggestions}
         onAction={handleSuggestionAction}
+        onDismiss={handleDismissSuggestion}
         studentName={activeStudent?.name}
       />
 

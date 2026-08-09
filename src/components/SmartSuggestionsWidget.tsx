@@ -9,18 +9,21 @@ import {
   Clock,
   ArrowRight,
   ListTodo,
+  X,
 } from "lucide-react";
 import { SmartSuggestion } from "../utils/suggestionsEngine";
 
 interface SmartSuggestionsWidgetProps {
   suggestions: SmartSuggestion[];
   onAction?: (targetTab?: string, subjectName?: string) => void;
+  onDismiss?: (suggestionId: string) => void;
   studentName?: string;
 }
 
 export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
   suggestions,
   onAction,
+  onDismiss,
   studentName,
 }) => {
   if (suggestions.length === 0) {
@@ -87,7 +90,7 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
           return (
             <div
               key={sug.id}
-              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 relative group ${
                 isHigh
                   ? "bg-rose-500/10 border-rose-500/30 text-rose-200"
                   : sug.priority === "medium"
@@ -95,26 +98,54 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
                   : "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
               }`}
             >
-              <div className="flex items-start gap-3">
-                <div
-                  className={`w-8 h-8 rounded-xl p-1.5 flex items-center justify-center shrink-0 ${
-                    isHigh
-                      ? "bg-rose-500/20 text-rose-300"
-                      : sug.priority === "medium"
-                      ? "bg-cyan-500/20 text-cyan-300"
-                      : "bg-emerald-500/20 text-emerald-300"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-xl p-1.5 flex items-center justify-center shrink-0 ${
+                      isHigh
+                        ? "bg-rose-500/20 text-rose-300"
+                        : sug.priority === "medium"
+                        ? "bg-cyan-500/20 text-cyan-300"
+                        : "bg-emerald-500/20 text-emerald-300"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-white text-sm font-heading leading-tight">
+                        {sug.title}
+                      </h4>
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold ${
+                          isHigh
+                            ? "bg-rose-500/30 text-rose-200 border border-rose-500/40"
+                            : sug.priority === "medium"
+                            ? "bg-cyan-500/30 text-cyan-200 border border-cyan-500/40"
+                            : "bg-emerald-500/30 text-emerald-200 border border-emerald-500/40"
+                        }`}
+                      >
+                        {sug.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      {sug.description}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-white text-sm font-heading leading-tight">
-                    {sug.title}
-                  </h4>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    {sug.description}
-                  </p>
-                </div>
+
+                {onDismiss && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDismiss(sug.id);
+                    }}
+                    title="Dismiss suggestion"
+                    className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               {sug.actionText && onAction && (

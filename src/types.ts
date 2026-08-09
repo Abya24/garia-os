@@ -171,12 +171,29 @@ export interface CareerOption {
   whyMatchTags: string[];
 }
 
+export interface CareerQuizAnswers {
+  favoriteSubjects: string[];
+  strongSubjects: string[];
+  problemSolvingPref: string;
+  creativityLevel: number;
+  communicationLevel: number;
+  numbersInterest: number;
+  scienceTechInterest: number;
+  businessFinanceInterest: number;
+  lawGovInterest: number;
+  peopleHelpingInterest: number;
+  researchInterest: number;
+  preferredWorkAreas?: string[];
+  updatedAt?: number;
+}
+
 export interface CareerMatchResult {
   career: CareerOption;
   matchScore: number;
   whyMatches: string[];
   relevantStrengths: string[];
   areasToExplore: string[];
+  alternativeCareers?: CareerOption[];
 }
 
 export interface Milestone {

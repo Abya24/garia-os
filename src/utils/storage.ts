@@ -15,6 +15,7 @@ import {
   CareerProfile,
   CareerAssessment,
   CareerRoadmap,
+  CareerQuizAnswers,
   AcademicSubject,
   AcademicChapter,
   AcademicTest,
@@ -50,6 +51,8 @@ const STORAGE_KEYS = {
   CAREER_PROFILE: "garia_career_profile_v1",
   CAREER_ASSESSMENT: "garia_career_assessment_v1",
   CAREER_ROADMAP: "garia_career_roadmap_v1",
+  CAREER_QUIZ: "career_quiz_v1",
+  SMART_SUGGESTIONS: "smart_suggestions_v1",
   ACADEMIC_SUBJECTS: "garia_academic_subjects_v1",
   ACADEMIC_CHAPTERS: "garia_academic_chapters_v1",
   ACADEMIC_TESTS: "garia_academic_tests_v1",
@@ -1177,6 +1180,50 @@ export const loadCareerRoadmap = (profileId?: string): CareerRoadmap => {
 export const saveCareerRoadmap = (roadmap: CareerRoadmap, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
   setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ROADMAP), roadmap);
+};
+
+export const loadCareerQuiz = (profileId?: string): CareerQuizAnswers => {
+  const pId = profileId || loadActiveProfileId();
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const stream = activeProf?.stream || "Commerce";
+
+  const defaultQuiz: CareerQuizAnswers = {
+    favoriteSubjects: stream === "Commerce" ? ["Accountancy", "Economics"] : stream === "Science" ? ["Physics", "Mathematics"] : ["History", "Political Science"],
+    strongSubjects: stream === "Commerce" ? ["Accountancy"] : stream === "Science" ? ["Physics"] : ["History"],
+    problemSolvingPref: "Practical & Hands-on",
+    creativityLevel: 3,
+    communicationLevel: 4,
+    numbersInterest: stream === "Commerce" ? 5 : stream === "Science" ? 4 : 2,
+    scienceTechInterest: stream === "Science" ? 5 : 2,
+    businessFinanceInterest: stream === "Commerce" ? 5 : 2,
+    lawGovInterest: stream === "Arts / Humanities" || stream === "Arts" ? 5 : 2,
+    peopleHelpingInterest: 4,
+    researchInterest: 3,
+    preferredWorkAreas: ["Corporate/Office", "Tech/Lab"],
+    updatedAt: Date.now(),
+  };
+
+  return getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_QUIZ), defaultQuiz);
+};
+
+export const saveCareerQuiz = (quiz: CareerQuizAnswers, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_QUIZ), quiz);
+};
+
+export interface SmartSuggestionsState {
+  dismissedIds: string[];
+  lastUpdated?: number;
+}
+
+export const loadSmartSuggestionsState = (profileId?: string): SmartSuggestionsState => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem(getProfileKey(pId, STORAGE_KEYS.SMART_SUGGESTIONS), { dismissedIds: [] });
+};
+
+export const saveSmartSuggestionsState = (state: SmartSuggestionsState, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  setItem(getProfileKey(pId, STORAGE_KEYS.SMART_SUGGESTIONS), state);
 };
 
 // Academic Loaders & Savers
