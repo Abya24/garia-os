@@ -21,32 +21,32 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Sanitize and Make Gradle Wrapper Executable
-        run: |
-          sed -i 's/\r$//' android/gradlew
-          chmod +x android/gradlew
+      - name: Setup Gradle 8.2
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
 
-      - name: Gradle Wrapper Diagnostic
+      - name: Verify Gradle Installation
+        run: gradle --version
+
+      - name: Generate Fresh Gradle Wrapper
+        working-directory: ./android
         run: |
-          pwd
-          git rev-parse HEAD
-          git ls-files android/gradle/wrapper/
-          ls -lah android/gradle/wrapper/
-          file android/gradle/wrapper/gradle-wrapper.jar
-          unzip -t android/gradle/wrapper/gradle-wrapper.jar
-          unzip -l android/gradle/wrapper/gradle-wrapper.jar | grep 'org/gradle/wrapper/GradleWrapperMain.class'
-          sha256sum android/gradle/wrapper/gradle-wrapper.jar
-          cat android/gradle/wrapper/gradle-wrapper.properties
+          gradle wrapper --gradle-version 8.2
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          unzip -t gradle/wrapper/gradle-wrapper.jar
+          unzip -l gradle/wrapper/gradle-wrapper.jar | grep 'GradleWrapperMain.class'
+          sha256sum gradle/wrapper/gradle-wrapper.jar
 
       - name: Build Debug APK
         working-directory: ./android
         run: |
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -55,3 +55,4 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
