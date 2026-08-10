@@ -34,18 +34,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   };
 
   const handleTriggerDownload = () => {
-    setIsDownloading(true);
-    setTimeout(() => {
-      setIsDownloading(false);
-      setDownloadSuccess(true);
-      // Trigger browser download or PWA install / manifest trigger
-      const link = document.createElement("a");
-      link.href = "/icon-512.png"; // Fallback download artifact
-      link.download = "Garia_OS_v2.4_Release.apk";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 1200);
+    // Since native .apk binary is built via external Gradle pipeline, inform user and launch PWA / Web App
+    alert("Garia OS is fully ready as a PWA! The source code is configured for Android (com.gariaos.app v2.4.0). Native APK binary requires external Gradle build.");
   };
 
   return (
@@ -101,39 +91,40 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
           </p>
 
           {/* Download CTA Card */}
-          <div className="max-w-md mx-auto p-6 rounded-2xl bg-gradient-to-b from-[#121929] to-[#0d1322] border border-slate-800 shadow-2xl space-y-5">
+          <div className="max-w-md mx-auto p-6 rounded-2xl bg-gradient-to-b from-[#121929] to-[#0d1322] border border-slate-800 shadow-2xl space-y-4">
             <button
-              onClick={handleTriggerDownload}
-              disabled={isDownloading}
-              className="w-full py-4 px-6 rounded-xl font-bold text-base bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] disabled:opacity-75"
+              onClick={() => {
+                if (onBackToApp) {
+                  onBackToApp();
+                } else {
+                  window.location.href = "/";
+                }
+              }}
+              className="w-full py-4 px-6 rounded-xl font-bold text-base bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2.5 transition-all active:scale-[0.99]"
             >
-              {isDownloading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Preparing Download...</span>
-                </>
-              ) : downloadSuccess ? (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Downloading Garia OS APK...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  <span>Download Garia OS APK</span>
-                </>
-              )}
+              <Smartphone className="w-5 h-5" />
+              <span>Launch Web App / Install PWA</span>
             </button>
+
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-left text-xs text-amber-200/90 space-y-1">
+              <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>APK Release Build Status</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                Source code & Android TWA manifest (<code className="text-emerald-400">com.gariaos.app</code> v2.4.0) are fully prepared. Compiled <code className="text-amber-300">.apk</code> binary build pending external Gradle execution.
+              </p>
+            </div>
 
             {/* Release Meta */}
             <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
               <div>
                 <span className="text-slate-500 block">Version:</span>
-                <span className="font-semibold text-slate-200">v2.4.0 Release</span>
+                <span className="font-semibold text-slate-200">v2.4.0 (Code 7)</span>
               </div>
               <div>
-                <span className="text-slate-500 block">File Size:</span>
-                <span className="font-semibold text-slate-200">18.4 MB</span>
+                <span className="text-slate-500 block">Status:</span>
+                <span className="font-semibold text-emerald-400">Source Ready</span>
               </div>
               <div>
                 <span className="text-slate-500 block">Package ID:</span>
