@@ -23,34 +23,32 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
-
-      - name: Ensure Gradle Wrapper JAR
-        run: |
-          cd android
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Gradle wrapper JAR missing. Regenerating with system Gradle..."
-            gradle wrapper --gradle-version 8.2
-          fi
+      - name: Setup Gradle 8.2
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
 
       - name: Build Android Release APK
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon
+          gradle assembleRelease --no-daemon
 
       - name: Verify APK Output
         run: |
           RELEASE_APK_DIR="android/app/build/outputs/apk/release"
           echo "Checking APK directory: $RELEASE_APK_DIR"
           if [ -d "$RELEASE_APK_DIR" ]; then
-            ls -la "$RELEASE_APK_DIR"
+            ls -lh "$RELEASE_APK_DIR"
             APK_FILE=$(find "$RELEASE_APK_DIR" -name "*.apk" | head -n 1)
             if [ -n "$APK_FILE" ]; then
+              FILE_SIZE_BYTES=$(stat -c%s "$APK_FILE")
               echo "✅ Release APK generated: $APK_FILE"
-              echo "File size: $(du -h "$APK_FILE" | cut -f1)"
+              echo "File size: $(du -h "$APK_FILE" | cut -f1) ($FILE_SIZE_BYTES bytes)"
+              if [ "$FILE_SIZE_BYTES" -lt 1048576 ]; then
+                echo "❌ APK size is less than 1 MB ($FILE_SIZE_BYTES bytes). Invalid build."
+                exit 1
+              fi
             else
               echo "❌ No APK binary found in $RELEASE_APK_DIR"
               exit 1
