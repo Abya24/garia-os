@@ -117,14 +117,36 @@ export interface AbyaInsightCard {
   actionTab?: ActiveTab;
 }
 
+export interface NotificationSettings {
+  master: boolean;
+  study: boolean;
+  tasks: boolean;
+  revision: boolean;
+  habits: boolean;
+  water: boolean;
+  exam: boolean;
+  suggestions: boolean;
+}
+
+export interface UserAccount {
+  email: string;
+  passwordHash: string;
+  name: string;
+  isPrivateMode: boolean;
+  createdAt: number;
+}
+
 export interface UserSettings {
   userName: string;
   theme: "dark" | "light" | "system";
   customApiKey: string;
   notificationsEnabled: boolean;
+  notifications?: NotificationSettings;
+  account?: UserAccount;
   waterGoal: number;
   defaultFocusDuration: number;
   defaultBreakDuration: number;
+  language?: "English" | "Hindi" | "Hinglish";
 }
 
 export interface StudentProfile {

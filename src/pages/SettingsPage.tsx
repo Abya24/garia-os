@@ -24,6 +24,7 @@ interface SettingsPageProps {
   activeStudent?: StudentProfile;
   profiles?: StudentProfile[];
   onOpenStudentModal?: () => void;
+  onOpenAuthModal?: () => void;
   onUpdateSettings: (s: UserSettings) => void;
   onClearChatHistory: () => void;
   onClearAllOSData: () => void;
@@ -35,6 +36,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   activeStudent,
   profiles = [],
   onOpenStudentModal,
+  onOpenAuthModal,
   onUpdateSettings,
   onClearChatHistory,
   onClearAllOSData,
@@ -46,6 +48,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const notifs = settings.notifications || {
+    master: true,
+    study: true,
+    tasks: true,
+    revision: true,
+    habits: true,
+    water: true,
+    exam: true,
+    suggestions: true,
+  };
+
+  const isPrivateMode = settings.account?.isPrivateMode !== false;
+
+  const handleToggleNotifKey = (key: keyof typeof notifs) => {
+    const updatedNotifs = { ...notifs, [key]: !notifs[key] };
+    onUpdateSettings({
+      ...settings,
+      notificationsEnabled: updatedNotifs.master,
+      notifications: updatedNotifs,
+    });
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,34 +178,94 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         )}
       </div>
 
-      {/* 1. User Profile */}
-      <form
-        onSubmit={handleSaveProfile}
-        className="glass-card p-6 rounded-3xl border border-white/10 space-y-4"
-      >
-        <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-          <span>User Profile</span>
-        </h3>
+      {/* 1. Account & Private Mode */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-400" />
+              <span>Authentication & Private Mode</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isPrivateMode
+                ? "Private Mode Active — Using local browser isolation"
+                : `Logged in as ${settings.account?.email || settings.userName}`}
+            </p>
+          </div>
+          {onOpenAuthModal && (
+            <button
+              onClick={onOpenAuthModal}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs shadow-md hover:brightness-110 transition-all"
+            >
+              {isPrivateMode ? "Log In / Register" : "Manage Account"}
+            </button>
+          )}
+        </div>
+      </div>
 
-        <div>
-          <label className="block text-slate-300 text-xs font-medium mb-1">
-            Display Name
-          </label>
-          <input
-            type="text"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-2xl glass-pill text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm"
-          />
+      {/* 2. Notifications Center */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <span>Notifications & Reminders</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Profile-isolated notification preferences and alert triggers
+            </p>
+          </div>
+          <button
+            onClick={() => handleToggleNotifKey("master")}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+              notifs.master
+                ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                : "glass-pill text-slate-400 border border-white/10"
+            }`}
+          >
+            {notifs.master ? "Master ON" : "Master OFF"}
+          </button>
         </div>
 
-        <button
-          type="submit"
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-900 font-bold text-xs"
-        >
-          Update Profile Name
-        </button>
-      </form>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          {[
+            { key: "study", label: "Study Reminders", desc: "Alerts for study sessions" },
+            { key: "tasks", label: "Task Deadlines", desc: "Alerts for pending tasks" },
+            { key: "revision", label: "Revision Schedule", desc: "Spaced repetition alerts" },
+            { key: "habits", label: "Habit Tracker", desc: "Daily streak reminders" },
+            { key: "water", label: "Water Reminders", desc: "Hydration goal alerts" },
+            { key: "exam", label: "Exam Countdown", desc: "Exam readiness updates" },
+            { key: "suggestions", label: "Smart Suggestions", desc: "OS intelligence insights" },
+          ].map((item) => {
+            const isChecked = notifs[item.key as keyof typeof notifs];
+            return (
+              <div
+                key={item.key}
+                onClick={() => handleToggleNotifKey(item.key as keyof typeof notifs)}
+                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                  isChecked
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-white"
+                    : "glass-pill border-white/5 text-slate-400 hover:text-white"
+                }`}
+              >
+                <div>
+                  <h4 className="text-xs font-bold font-heading text-white">{item.label}</h4>
+                  <p className="text-[10px] text-slate-400">{item.desc}</p>
+                </div>
+                <div
+                  className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold ${
+                    isChecked
+                      ? "bg-emerald-500 border-emerald-400 text-slate-950"
+                      : "border-slate-600 bg-slate-900"
+                  }`}
+                >
+                  {isChecked && "✓"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 2. Appearance Section */}
       <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">

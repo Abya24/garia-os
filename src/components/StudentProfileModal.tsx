@@ -140,16 +140,18 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-emerald-400">
-                <Users className="w-5 h-5" />
-              </div>
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 border border-white/10 p-1 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <img
+                src="/icon.svg"
+                alt="Garia OS Logo"
+                className="w-full h-full object-contain rounded-[12px]"
+              />
             </div>
             <div>
               <h3 className="text-xl font-bold text-white font-heading flex items-center gap-2">
                 Student Profiles
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                  Multi-Student v1.5
+                  Multi-Student v2.1
                 </span>
               </h3>
               <p className="text-xs text-slate-400">

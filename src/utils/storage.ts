@@ -112,10 +112,28 @@ const defaultSettings: UserSettings = {
   userName: "Gani",
   theme: "dark",
   customApiKey: "",
-  notificationsEnabled: false,
+  notificationsEnabled: true,
+  notifications: {
+    master: true,
+    study: true,
+    tasks: true,
+    revision: true,
+    habits: true,
+    water: true,
+    exam: true,
+    suggestions: true,
+  },
+  account: {
+    email: "private@gariaos.local",
+    passwordHash: "",
+    name: "Private User",
+    isPrivateMode: true,
+    createdAt: Date.now(),
+  },
   waterGoal: 8,
   defaultFocusDuration: 25,
   defaultBreakDuration: 5,
+  language: "English",
 };
 
 const defaultTasks: Task[] = [
@@ -1161,7 +1179,19 @@ export const loadSettings = (profileId?: string): UserSettings => {
   const fallback = activeProf
     ? { ...defaultSettings, userName: activeProf.name }
     : defaultSettings;
-  return getItem(getProfileKey(pId, STORAGE_KEYS.SETTINGS), fallback);
+  const stored = getItem(getProfileKey(pId, STORAGE_KEYS.SETTINGS), fallback);
+  return {
+    ...fallback,
+    ...stored,
+    notifications: {
+      ...defaultSettings.notifications!,
+      ...(stored.notifications || {}),
+    },
+    account: {
+      ...defaultSettings.account!,
+      ...(stored.account || {}),
+    },
+  };
 };
 export const saveSettings = (settings: UserSettings, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();

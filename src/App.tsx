@@ -120,6 +120,7 @@ import { BottomNav } from "./components/BottomNav";
 import { DesktopSidebar } from "./components/DesktopSidebar";
 import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
+import { AuthModal } from "./components/AuthModal";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -145,8 +146,68 @@ import {
 export default function App() {
   // Navigation & Profile Modal States
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
+  const [tabHistory, setTabHistory] = useState<ActiveTab[]>(["home"]);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  const handleNavigate = (tab: ActiveTab) => {
+    if (tab !== activeTab) {
+      setTabHistory((prev) => [...prev, tab]);
+      setActiveTab(tab);
+      window.history.pushState({ tab }, "", `#${tab}`);
+    }
+  };
+
+  const handleGoBack = () => {
+    if (isAuthModalOpen) {
+      setIsAuthModalOpen(false);
+      return;
+    }
+    if (isStudentModalOpen) {
+      setIsStudentModalOpen(false);
+      return;
+    }
+    if (isMoreMenuOpen) {
+      setIsMoreMenuOpen(false);
+      return;
+    }
+    if (tabHistory.length > 1) {
+      const newStack = [...tabHistory];
+      newStack.pop();
+      const prev = newStack[newStack.length - 1] || "home";
+      setTabHistory(newStack);
+      setActiveTab(prev);
+    } else if (activeTab !== "home") {
+      setActiveTab("home");
+      setTabHistory(["home"]);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (isAuthModalOpen) {
+        setIsAuthModalOpen(false);
+        return;
+      }
+      if (isStudentModalOpen) {
+        setIsStudentModalOpen(false);
+        return;
+      }
+      if (isMoreMenuOpen) {
+        setIsMoreMenuOpen(false);
+        return;
+      }
+      if (e.state && e.state.tab) {
+        setActiveTab(e.state.tab);
+      } else {
+        handleGoBack();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isAuthModalOpen, isStudentModalOpen, isMoreMenuOpen, tabHistory, activeTab]);
 
   // Multi-Student Profiles State (v1.5)
   const [profiles, setProfiles] = useState<StudentProfile[]>(loadProfiles);
@@ -918,9 +979,12 @@ export default function App() {
         settings={settings}
         activeStudent={activeStudent}
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onGoBack={handleGoBack}
+        canGoBack={activeTab !== "home" || tabHistory.length > 1}
         onUpdateSettings={handleUpdateSettings}
         onNavigate={(tab) => {
-          setActiveTab(tab);
+          handleNavigate(tab);
           setIsMoreMenuOpen(false);
         }}
         activeTab={activeTab}
@@ -933,7 +997,7 @@ export default function App() {
           activeStudent={activeStudent}
           onOpenStudentModal={() => setIsStudentModalOpen(true)}
           onNavigate={(tab) => {
-            setActiveTab(tab);
+            handleNavigate(tab);
             setIsMoreMenuOpen(false);
           }}
           settings={settings}
@@ -1192,6 +1256,7 @@ export default function App() {
               activeStudent={activeStudent}
               profiles={profiles}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onUpdateSettings={handleUpdateSettings}
               onClearChatHistory={handleClearChatHistory}
               onClearAllOSData={handleClearAllOSData}
@@ -1205,7 +1270,7 @@ export default function App() {
       <BottomNav
         activeTab={activeTab}
         onNavigate={(tab) => {
-          setActiveTab(tab);
+          handleNavigate(tab);
           setIsMoreMenuOpen(false);
         }}
         onOpenMore={() => setIsMoreMenuOpen(true)}
@@ -1218,7 +1283,7 @@ export default function App() {
         onClose={() => setIsMoreMenuOpen(false)}
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
         onNavigate={(tab) => {
-          setActiveTab(tab);
+          handleNavigate(tab);
           setIsMoreMenuOpen(false);
         }}
         activeTab={activeTab}
@@ -1239,6 +1304,14 @@ export default function App() {
         onDeleteProfile={handleDeleteStudentProfile}
         onExportProfile={handleExportStudentProfile}
         onImportProfile={handleImportStudentProfile}
+      />
+
+      {/* Authentication & Private Mode Modal (v2.1) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
       />
     </div>
   );
