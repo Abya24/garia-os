@@ -15,14 +15,17 @@ import {
   Users,
   UserPlus,
   Check,
+  Globe,
 } from "lucide-react";
-import { UserSettings, StudentProfile } from "../types";
+import { UserSettings, StudentProfile, AbyaLanguageSetting } from "../types";
 import { exportStudentProfileJSON, importStudentProfileJSON } from "../utils/storage";
 
 interface SettingsPageProps {
   settings: UserSettings;
   activeStudent?: StudentProfile;
   profiles?: StudentProfile[];
+  abyaLanguage?: AbyaLanguageSetting;
+  onUpdateAbyaLanguage?: (lang: AbyaLanguageSetting) => void;
   onOpenStudentModal?: () => void;
   onOpenAuthModal?: () => void;
   onUpdateSettings: (s: UserSettings) => void;
@@ -35,6 +38,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   settings,
   activeStudent,
   profiles = [],
+  abyaLanguage = "WhatsApp Language",
+  onUpdateAbyaLanguage,
   onOpenStudentModal,
   onOpenAuthModal,
   onUpdateSettings,
@@ -331,7 +336,46 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        <div className="pt-2 flex items-center justify-between">
+        {/* Language Selection */}
+        <div className="pt-3 border-t border-white/10 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Globe className="w-4 h-4 text-emerald-400" />
+                <span>Abya AI Language Mode</span>
+              </h4>
+              <p className="text-xs text-slate-400">
+                Isolated setting for <strong className="text-emerald-300">{activeStudent?.name || "Active Student"}</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            {[
+              { id: "WhatsApp Language" as AbyaLanguageSetting, label: "WhatsApp Language", icon: "💬" },
+              { id: "English" as AbyaLanguageSetting, label: "English", icon: "🇬🇧" },
+              { id: "Hindi" as AbyaLanguageSetting, label: "Hindi", icon: "🇮🇳" },
+              { id: "Hinglish" as AbyaLanguageSetting, label: "Hinglish", icon: "🗣️" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(item.id);
+                }}
+                className={`px-3 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  abyaLanguage === item.id
+                    ? "bg-emerald-500 text-slate-900 border-emerald-400 shadow-md shadow-emerald-500/20"
+                    : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span className="truncate">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-2 flex items-center justify-between border-t border-white/10">
           <div>
             <h4 className="text-sm font-semibold text-white">Clear AI Chat</h4>
             <p className="text-xs text-slate-400">

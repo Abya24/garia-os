@@ -22,6 +22,9 @@ import {
   ArrowRight,
   Zap,
   RotateCw,
+  Globe,
+  X,
+  MessageCircle,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -30,6 +33,7 @@ import {
   AbyaInsightCard,
   AbyaQuickActionType,
   ActiveTab,
+  AbyaLanguageSetting,
 } from "../types";
 
 interface AbyaAIPageProps {
@@ -37,6 +41,8 @@ interface AbyaAIPageProps {
   settings: UserSettings;
   activeStudent: StudentProfile;
   insightCards: AbyaInsightCard[];
+  abyaLanguage?: AbyaLanguageSetting;
+  onUpdateAbyaLanguage?: (lang: AbyaLanguageSetting) => void;
   onSendMessage: (
     prompt: string,
     contextNote?: string,
@@ -56,6 +62,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   settings,
   activeStudent,
   insightCards,
+  abyaLanguage = "WhatsApp Language",
+  onUpdateAbyaLanguage,
   onSendMessage,
   onClearChat,
   onUpdateSettings,
@@ -69,6 +77,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(settings.customApiKey || "");
   const [activeTabFilter, setActiveTabFilter] = useState<"chat" | "cards">("chat");
 
@@ -224,6 +233,15 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-center">
+          <button
+            onClick={() => setShowLanguageModal(true)}
+            className="p-2 px-3 rounded-xl glass-pill text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors text-xs flex items-center gap-1.5 font-bold"
+            title="Abya AI Language Setting"
+          >
+            <Globe className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs">{abyaLanguage}</span>
+          </button>
+
           <button
             onClick={() => setShowApiKeyModal(true)}
             className="p-2 rounded-xl glass-pill text-slate-300 hover:text-emerald-300 transition-colors text-xs flex items-center gap-1.5"
@@ -523,6 +541,88 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
               >
                 Save Key
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Language Selector Modal */}
+      {showLanguageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div
+            className="w-full max-w-md glass-card rounded-3xl border border-emerald-500/30 p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold font-heading text-white">Abya AI Language Mode</h3>
+              </div>
+              <button
+                onClick={() => setShowLanguageModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Select response language for active student profile <strong className="text-emerald-300">{activeStudent.name}</strong>. Settings are isolated per profile.
+            </p>
+
+            <div className="space-y-2">
+              {[
+                {
+                  id: "WhatsApp Language" as AbyaLanguageSetting,
+                  label: "WhatsApp Language",
+                  badge: "Default & Natural",
+                  desc: "Casual, friendly & adaptive. Automatically matches your style (Roman Hindi, Hinglish, English)."
+                },
+                {
+                  id: "English" as AbyaLanguageSetting,
+                  label: "English",
+                  badge: "Formal",
+                  desc: "Clear, structured English explanations and academic guidance."
+                },
+                {
+                  id: "Hindi" as AbyaLanguageSetting,
+                  label: "Hindi",
+                  badge: "Devanagari / Hindi",
+                  desc: "Conversational Hindi explanations for concepts and questions."
+                },
+                {
+                  id: "Hinglish" as AbyaLanguageSetting,
+                  label: "Hinglish",
+                  badge: "Mix",
+                  desc: "Natural combination of Hindi & English written in Roman script."
+                }
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(item.id);
+                    setShowLanguageModal(false);
+                  }}
+                  className={`w-full p-3.5 rounded-2xl text-left border transition-all flex items-start justify-between gap-3 ${
+                    abyaLanguage === item.id
+                      ? "bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
+                      : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold font-heading text-white">{item.label}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-white/10 font-mono">
+                        {item.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">{item.desc}</p>
+                  </div>
+                  {abyaLanguage === item.id && (
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-1" />
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         </div>

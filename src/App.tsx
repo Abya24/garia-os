@@ -11,6 +11,7 @@ import {
   CalendarEvent,
   AbyaMessage,
   UserSettings,
+  AbyaLanguageSetting,
   ActiveTab,
   StudentProfile,
   CareerProfile,
@@ -52,6 +53,8 @@ import {
   saveCalendarEvents,
   loadAbyaChat,
   saveAbyaChat,
+  loadAbyaLanguage,
+  saveAbyaLanguage,
   loadSettings,
   saveSettings,
   loadCareerProfile,
@@ -228,6 +231,7 @@ export default function App() {
   const [goals, setGoals] = useState<Goal[]>(() => loadGoals());
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => loadCalendarEvents());
   const [abyaChat, setAbyaChat] = useState<AbyaMessage[]>(() => loadAbyaChat());
+  const [abyaLanguage, setAbyaLanguage] = useState<AbyaLanguageSetting>(() => loadAbyaLanguage());
   const [careerProfile, setCareerProfile] = useState<CareerProfile>(() => loadCareerProfile());
   const [careerAssessment, setCareerAssessment] = useState<CareerAssessment>(() => loadCareerAssessment());
   const [careerRoadmap, setCareerRoadmap] = useState<CareerRoadmap>(() => loadCareerRoadmap());
@@ -324,6 +328,7 @@ export default function App() {
     setGoals(loadGoals(profileId));
     setCalendarEvents(loadCalendarEvents(profileId));
     setAbyaChat(loadAbyaChat(profileId));
+    setAbyaLanguage(loadAbyaLanguage(profileId));
     setCareerProfile(loadCareerProfile(profileId));
     setCareerAssessment(loadCareerAssessment(profileId));
     setCareerRoadmap(loadCareerRoadmap(profileId));
@@ -677,6 +682,11 @@ export default function App() {
   // Last User Prompt for Abya AI Retry
   const [lastUserPrompt, setLastUserPrompt] = useState<string>("");
 
+  const handleUpdateAbyaLanguage = (lang: AbyaLanguageSetting) => {
+    setAbyaLanguage(lang);
+    saveAbyaLanguage(lang, activeStudent.id);
+  };
+
   // Abya AI Chat Messaging Handler
   const handleSendAbyaMessage = async (
     prompt: string,
@@ -707,6 +717,7 @@ export default function App() {
           history: recentHistory,
           customApiKey: settings.customApiKey,
           contextNote,
+          abyaLanguage,
           studentProfileContext: {
             id: activeStudent.id,
             name: activeStudent.name,
@@ -1225,6 +1236,8 @@ export default function App() {
                 ).overallScore,
               })}
               onSendMessage={handleSendAbyaMessage}
+              abyaLanguage={abyaLanguage}
+              onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
               onClearChat={handleClearChatHistory}
               onUpdateSettings={handleUpdateSettings}
               attachedContextNote={attachedContextNote}
@@ -1255,6 +1268,8 @@ export default function App() {
               settings={settings}
               activeStudent={activeStudent}
               profiles={profiles}
+              abyaLanguage={abyaLanguage}
+              onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onUpdateSettings={handleUpdateSettings}

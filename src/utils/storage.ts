@@ -10,6 +10,7 @@ import {
   CalendarEvent,
   AbyaMessage,
   UserSettings,
+  AbyaLanguageSetting,
   StudentProfile,
   StreamType,
   CareerProfile,
@@ -133,7 +134,7 @@ const defaultSettings: UserSettings = {
   waterGoal: 8,
   defaultFocusDuration: 25,
   defaultBreakDuration: 5,
-  language: "English",
+  language: "WhatsApp Language",
 };
 
 const defaultTasks: Task[] = [
@@ -1173,6 +1174,22 @@ export const saveAbyaChat = (messages: AbyaMessage[], profileId?: string): void 
   setItem(getProfileKey(pId, STORAGE_KEYS.ABYA_CHAT), messages);
 };
 
+export const loadAbyaLanguage = (profileId?: string): AbyaLanguageSetting => {
+  const pId = profileId || loadActiveProfileId();
+  const key = `garia_p_${pId}_abya_language_v1`;
+  const val = localStorage.getItem(key);
+  if (val && ["English", "Hindi", "Hinglish", "WhatsApp Language"].includes(val)) {
+    return val as AbyaLanguageSetting;
+  }
+  return "WhatsApp Language";
+};
+
+export const saveAbyaLanguage = (lang: AbyaLanguageSetting, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  const key = `garia_p_${pId}_abya_language_v1`;
+  localStorage.setItem(key, lang);
+};
+
 export const loadSettings = (profileId?: string): UserSettings => {
   const pId = profileId || loadActiveProfileId();
   const activeProf = loadProfiles().find((p) => p.id === pId);
@@ -1473,6 +1490,7 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     goals: loadGoals(pId),
     calendarEvents: loadCalendarEvents(pId),
     abyaChat: loadAbyaChat(pId),
+    abyaLanguage: loadAbyaLanguage(pId),
     settings: loadSettings(pId),
     careerProfile: loadCareerProfile(pId),
     careerAssessment: loadCareerAssessment(pId),
@@ -1545,6 +1563,7 @@ export const importStudentProfileJSON = (
     if (data.goals) saveGoals(data.goals, newProfileId);
     if (data.calendarEvents) saveCalendarEvents(data.calendarEvents, newProfileId);
     if (data.abyaChat) saveAbyaChat(data.abyaChat, newProfileId);
+    if (data.abyaLanguage) saveAbyaLanguage(data.abyaLanguage, newProfileId);
     if (data.settings) saveSettings({ ...data.settings, userName: newStudentProfile.name }, newProfileId);
     if (data.careerProfile) saveCareerProfile(data.careerProfile, newProfileId);
     if (data.careerAssessment) saveCareerAssessment(data.careerAssessment, newProfileId);

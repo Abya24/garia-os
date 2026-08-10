@@ -136,6 +136,12 @@ export interface UserAccount {
   createdAt: number;
 }
 
+export type AbyaLanguageSetting =
+  | "English"
+  | "Hindi"
+  | "Hinglish"
+  | "WhatsApp Language";
+
 export interface UserSettings {
   userName: string;
   theme: "dark" | "light" | "system";
@@ -146,7 +152,7 @@ export interface UserSettings {
   waterGoal: number;
   defaultFocusDuration: number;
   defaultBreakDuration: number;
-  language?: "English" | "Hindi" | "Hinglish";
+  language?: AbyaLanguageSetting;
 }
 
 export interface StudentProfile {
