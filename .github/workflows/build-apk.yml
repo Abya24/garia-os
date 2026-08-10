@@ -28,6 +28,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
+      - name: Ensure Gradle Wrapper JAR
+        run: |
+          cd android
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Gradle wrapper JAR missing. Regenerating with system Gradle..."
+            gradle wrapper --gradle-version 8.2
+          fi
+
       - name: Build Android Release APK
         run: |
           cd android
