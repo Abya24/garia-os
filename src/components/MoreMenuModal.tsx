@@ -116,10 +116,10 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     {
       id: "download" as ActiveTab,
       label: "Download Official APK",
-      desc: "Get Garia OS Android app v2.3",
+      desc: "Get Garia OS Android app v2.4",
       icon: Download,
       color: "from-emerald-500 to-teal-400",
-      badge: "APK v2.3",
+      badge: "APK v2.4",
     },
     {
       id: "settings" as ActiveTab,

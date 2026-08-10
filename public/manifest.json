@@ -1,5 +1,5 @@
 {
-  "short_name": "Garia",
+  "short_name": "Garia OS",
   "name": "Garia OS",
   "icons": [
     {
@@ -47,9 +47,9 @@
   ],
   "start_url": "/",
   "scope": "/",
-  "background_color": "#090d16",
-  "theme_color": "#10b981",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "description": "Premium AI Productivity & Student Operating System featuring Abya AI"
+  "orientation": "portrait",
+  "description": "Garia OS is a student productivity and AI study companion with study tracking, academic planning, career guidance, smart suggestions and Abya AI."
 }

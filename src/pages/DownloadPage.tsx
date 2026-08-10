@@ -41,7 +41,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       // Trigger browser download or PWA install / manifest trigger
       const link = document.createElement("a");
       link.href = "/icon-512.png"; // Fallback download artifact
-      link.download = "Garia_OS_v2.3_Release.apk";
+      link.download = "Garia_OS_v2.4_Release.apk";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -66,7 +66,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 Garia OS
               </h1>
               <p className="text-xs text-emerald-400 font-medium">
-                Official Android APK v2.3
+                Official Android APK v2.4
               </p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
             <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
               <div>
                 <span className="text-slate-500 block">Version:</span>
-                <span className="font-semibold text-slate-200">v2.3.0 Release</span>
+                <span className="font-semibold text-slate-200">v2.4.0 Release</span>
               </div>
               <div>
                 <span className="text-slate-500 block">File Size:</span>
@@ -290,7 +290,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       <footer className="border-t border-slate-800/80 bg-[#0d1322] py-6 text-center text-xs text-slate-500 space-y-2">
         <p>© 2026 Garia OS. Official Android APK Distribution.</p>
         <p className="text-[11px] text-slate-600">
-          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version 2.3.0
+          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version 2.4.0
         </p>
       </footer>
     </div>
