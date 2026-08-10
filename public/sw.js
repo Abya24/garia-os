@@ -1,11 +1,16 @@
-const CACHE_NAME = "garia-os-v1.6.0";
+const CACHE_NAME = "garia-os-v2.2.0";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
   "/manifest.json",
   "/icon.svg",
+  "/icon-48.png",
+  "/icon-72.png",
+  "/icon-96.png",
+  "/icon-144.png",
   "/icon-192.png",
   "/icon-512.png",
+  "/icon.png",
   "/apple-touch-icon.png",
   "/src/main.tsx",
   "/src/index.css"
