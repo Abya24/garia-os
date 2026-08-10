@@ -1,0 +1,12 @@
+* text=auto
+
+# Explicitly declare binary files to prevent UTF-8 text conversion corruption during export/build
+*.png binary -text
+*.jpg binary -text
+*.jpeg binary -text
+*.gif binary -text
+*.ico binary -text
+*.webp binary -text
+*.apk binary -text
+*.jar binary -text
+*.aar binary -text
