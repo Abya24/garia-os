@@ -1,3 +1,5 @@
+import { UserSettings } from "../types";
+
 export const isNotificationSupported = (): boolean => {
   return typeof window !== "undefined" && "Notification" in window;
 };
@@ -20,8 +22,17 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 
 export const sendNotification = (
   title: string,
-  options?: { body?: string; icon?: string; tag?: string }
+  options?: { body?: string; icon?: string; tag?: string },
+  settings?: UserSettings,
+  category?: keyof UserSettings["notifications"]
 ): boolean => {
+  if (settings) {
+    if (settings.notifications?.master === false) return false;
+    if (category && settings.notifications && settings.notifications[category] === false) {
+      return false;
+    }
+  }
+
   if (!isNotificationSupported() || Notification.permission !== "granted") {
     return false;
   }

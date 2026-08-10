@@ -1219,8 +1219,20 @@ export const saveSettings = (settings: UserSettings, profileId?: string): void =
 export const loadCareerProfile = (profileId?: string): CareerProfile => {
   const pId = profileId || loadActiveProfileId();
   const activeProf = loadProfiles().find((p) => p.id === pId);
-  const fallback = activeProf
-    ? { ...defaultCareerProfile, stream: activeProf.stream, currentClass: activeProf.classLevel }
+  const defaultCareerId =
+    activeProf?.stream === "Science"
+      ? "cs_engineer"
+      : activeProf?.stream === "Arts / Humanities" || activeProf?.stream === "Arts"
+      ? "law"
+      : "ca";
+
+  const fallback: CareerProfile = activeProf
+    ? {
+        ...defaultCareerProfile,
+        stream: activeProf.stream,
+        currentClass: activeProf.classLevel,
+        selectedCareerId: defaultCareerId,
+      }
     : defaultCareerProfile;
   return getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_PROFILE), fallback);
 };
@@ -1231,7 +1243,37 @@ export const saveCareerProfile = (profile: CareerProfile, profileId?: string): v
 
 export const loadCareerAssessment = (profileId?: string): CareerAssessment => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ASSESSMENT), defaultCareerAssessment);
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const stream = activeProf?.stream || "Commerce";
+  const streamAssessment: CareerAssessment = {
+    strongSubjects:
+      stream === "Science"
+        ? ["Physics", "Mathematics", "Chemistry"]
+        : stream === "Arts / Humanities" || stream === "Arts"
+        ? ["History", "Political Science", "English"]
+        : ["Accountancy", "Economics", "Business Studies"],
+    interests:
+      stream === "Science"
+        ? ["Technology/R&D", "Problem Solving", "Engineering"]
+        : stream === "Arts / Humanities" || stream === "Arts"
+        ? ["Law/Governance", "Public Policy", "Social Research"]
+        : ["Finance/Markets", "Problem Solving", "Management/Leadership"],
+    skills:
+      stream === "Science"
+        ? ["Analytical Thinking", "Mathematical Reasoning", "Technical Skills"]
+        : stream === "Arts / Humanities" || stream === "Arts"
+        ? ["Critical Thinking", "Writing", "Communication"]
+        : ["Analytical Thinking", "Numerical Ability", "Communication"],
+    workAreas: ["Corporate/Office"],
+    careerGoals: ["High Earning Potential", "Job Security"],
+    studyPreference:
+      stream === "Science"
+        ? "Degree / Technical College"
+        : stream === "Arts / Humanities" || stream === "Arts"
+        ? "University / Law School"
+        : "Professional Certifications",
+  };
+  return getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ASSESSMENT), streamAssessment);
 };
 export const saveCareerAssessment = (assessment: CareerAssessment, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
@@ -1495,7 +1537,7 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     careerProfile: loadCareerProfile(pId),
     careerAssessment: loadCareerAssessment(pId),
     careerRoadmap: loadCareerRoadmap(pId),
-    academicSubjects: loadAcademicSubjects("Commerce", pId),
+    academicSubjects: loadAcademicSubjects(student.stream, pId),
     academicChapters: loadAcademicChapters(pId),
     academicTests: loadAcademicTests(pId),
     academicPlan: loadAcademicPlan(pId),

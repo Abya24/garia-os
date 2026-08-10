@@ -32,7 +32,8 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
     onUpdateWater({ ...water, goal: newGoal });
   };
 
-  const percent = Math.min(100, Math.round((water.glasses / water.goal) * 100));
+  const effectiveGoal = water.goal || 8;
+  const percent = Math.min(100, Math.round((water.glasses / effectiveGoal) * 100));
 
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">

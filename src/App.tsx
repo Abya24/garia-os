@@ -730,8 +730,8 @@ export default function App() {
             completedTasksCount: tasks.filter((t) => t.completed).length,
           },
           careerContext: {
-            stream: careerProfile.stream,
-            currentClass: careerProfile.currentClass,
+            stream: activeStudent.stream,
+            currentClass: activeStudent.classLevel,
             targetCareer: careerRoadmap.careerTitle || careerProfile.selectedCareerId || "General",
             strongSubjects: careerAssessment.strongSubjects,
             roadmapProgress: Math.round(
@@ -741,7 +741,7 @@ export default function App() {
             ),
           },
           academicContext: {
-            stream: careerProfile.stream,
+            stream: activeStudent.stream,
             overallProgress: Math.round(
               (academicChapters.filter((c) => c.status === "Completed").length /
                 (academicChapters.length || 1)) *
@@ -764,9 +764,9 @@ export default function App() {
                 : 0,
           },
           examContext: {
-            board: examProfile.board,
-            classLevel: examProfile.classLevel,
-            stream: examProfile.stream,
+            board: activeStudent.board || examProfile.board,
+            classLevel: activeStudent.classLevel || examProfile.classLevel,
+            stream: activeStudent.stream,
             examName: examProfile.examName,
             daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
             readinessScore: calculateExamReadiness(

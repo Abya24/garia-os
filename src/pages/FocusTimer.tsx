@@ -101,9 +101,10 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
   const totalModeSeconds =
     (mode === "focus" ? focusDurationMinutes : breakDurationMinutes) * 60;
-  const progressPercent = Math.round(
-    ((totalModeSeconds - timeLeftSeconds) / totalModeSeconds) * 100
-  );
+  const progressPercent =
+    totalModeSeconds > 0
+      ? Math.round(((totalModeSeconds - timeLeftSeconds) / totalModeSeconds) * 100)
+      : 0;
 
   const formatMinutesSeconds = (sec: number) => {
     const m = Math.floor(sec / 60);
