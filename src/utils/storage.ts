@@ -38,6 +38,7 @@ import {
   DEFAULT_INITIAL_CHAPTERS,
   getDefaultSubjectsForStream,
 } from "./academicEngine";
+import { CAREER_CATALOG, generateDefaultRoadmap } from "./careerEngine";
 
 export const PROFILES_KEY = "garia_profiles_v1";
 export const ACTIVE_PROFILE_KEY = "garia_active_profile_v1";
@@ -885,10 +886,17 @@ Use this space to write formulas, key terms, or daily notes.`,
   saveAbyaChat(createDefaultAbyaMessages(profile.name), profId);
 
   // Career Profile & Assessment & Roadmap
+  const defaultCareerId =
+    profile.stream === "Science"
+      ? "cs_engineer"
+      : profile.stream === "Arts / Humanities" || profile.stream === "Arts"
+      ? "law"
+      : "ca";
+
   const careerProf: CareerProfile = {
     stream: profile.stream,
     currentClass: profile.classLevel,
-    selectedCareerId: profile.stream === "Commerce" ? "ca" : "eng",
+    selectedCareerId: defaultCareerId,
     updatedAt: Date.now(),
   };
   saveCareerProfile(careerProf, profId);
@@ -904,11 +912,9 @@ Use this space to write formulas, key terms, or daily notes.`,
   };
   saveCareerAssessment(careerAssess, profId);
 
-  const careerRoadmap: CareerRoadmap = {
-    ...defaultCareerRoadmap,
-    stream: profile.stream,
-    currentClass: profile.classLevel,
-  };
+  const careerOpt =
+    CAREER_CATALOG.find((c) => c.id === defaultCareerId) || CAREER_CATALOG[0];
+  const careerRoadmap = generateDefaultRoadmap(careerOpt, careerProf);
   saveCareerRoadmap(careerRoadmap, profId);
 
   // Academic Subjects & Chapters
@@ -1187,7 +1193,40 @@ export const saveCareerAssessment = (assessment: CareerAssessment, profileId?: s
 
 export const loadCareerRoadmap = (profileId?: string): CareerRoadmap => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ROADMAP), defaultCareerRoadmap);
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const stream = activeProf?.stream || "Commerce";
+
+  const defaultCareerId =
+    stream === "Science"
+      ? "cs_engineer"
+      : stream === "Arts / Humanities" || stream === "Arts"
+      ? "law"
+      : "ca";
+
+  const careerOpt =
+    CAREER_CATALOG.find((c) => c.id === defaultCareerId) || CAREER_CATALOG[0];
+  const dynamicDefaultRoadmap = generateDefaultRoadmap(careerOpt, {
+    stream,
+    currentClass: activeProf?.classLevel || "Class 12",
+    selectedCareerId: defaultCareerId,
+    updatedAt: Date.now(),
+  });
+
+  const stored = getItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ROADMAP), dynamicDefaultRoadmap);
+
+  // If stored roadmap stream mismatches active profile stream, update it to align
+  if (activeProf && stored.stream && stored.stream !== activeProf.stream) {
+    const matchedOpt =
+      CAREER_CATALOG.find((c) => c.stream === activeProf.stream) || careerOpt;
+    return generateDefaultRoadmap(matchedOpt, {
+      stream: activeProf.stream,
+      currentClass: activeProf.classLevel,
+      selectedCareerId: matchedOpt.id,
+      updatedAt: Date.now(),
+    });
+  }
+
+  return stored;
 };
 export const saveCareerRoadmap = (roadmap: CareerRoadmap, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();

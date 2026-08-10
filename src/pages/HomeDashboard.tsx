@@ -345,598 +345,398 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
-      {/* Top Banner Greeting & Time */}
-      <div className="relative overflow-hidden rounded-3xl p-6 md:p-8 bg-gradient-to-r from-emerald-900/40 via-slate-900/80 to-cyan-950/50 border border-emerald-500/20 shadow-2xl">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Garia OS Active</span>
-              </div>
+    <div className="space-y-4 pb-20 md:pb-6 animate-in fade-in duration-200 max-w-7xl mx-auto">
+      {/* 1. HEADER — Compact Greeting & Active Profile Bar */}
+      <div className="glass-card rounded-2xl p-4 sm:p-5 border border-white/10 relative overflow-hidden card-press">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full glass-pill border border-emerald-500/30 text-emerald-400 text-[11px] font-medium">
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                <span>Garia OS V2.0</span>
+              </span>
               {activeStudent && (
                 <button
                   onClick={onOpenStudentModal}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition-all"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-300 text-[11px] font-medium transition-all"
                 >
-                  <Users className="w-3.5 h-3.5" />
+                  <Users className="w-3 h-3" />
                   <span>
-                    Student: {activeStudent.name} ({activeStudent.stream})
+                    {activeStudent.name} • {activeStudent.stream}
                   </span>
-                  <span className="text-[10px] underline font-normal">Switch</span>
+                  <span className="text-[10px] text-cyan-400 font-normal underline ml-0.5">Switch</span>
                 </button>
               )}
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold font-heading text-white tracking-tight">
-              {greeting}, {activeStudent?.name || settings.userName || "Student"} 👋
+            <h1 className="text-lg sm:text-2xl font-bold font-heading text-white tracking-tight">
+              {greeting}, {activeStudent?.name || settings.userName || "Student"}
             </h1>
-            <p className="text-slate-300 text-sm mt-1">
-              Your personal operating system is loaded for{" "}
+            <p className="text-slate-400 text-xs">
               {activeStudent
                 ? `${activeStudent.classLevel} (${activeStudent.stream} - ${activeStudent.board})`
-                : "today's goals"}
-              .
+                : "Your daily dashboard is loaded."}
             </p>
           </div>
 
-          <div className="text-left sm:text-right glass-card p-3.5 rounded-2xl border border-white/10 shrink-0">
-            <div className="text-2xl font-bold font-mono text-emerald-400">
-              {liveTime}
+          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+            <div className="text-left sm:text-right">
+              <div className="text-lg font-bold font-mono text-emerald-400 leading-none">
+                {liveTime}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">{liveDate}</div>
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">{liveDate}</div>
           </div>
         </div>
       </div>
 
-      {/* Smart OS Suggestions Widget */}
-      <SmartSuggestionsWidget
-        suggestions={smartSuggestions}
-        onAction={handleSuggestionAction}
-        onDismiss={handleDismissSuggestion}
-        studentName={activeStudent?.name}
-      />
-
-      {/* Exam Intelligence V1.9 Summary Widget */}
-      <ExamIntelligenceWidget
-        report={examReport}
-        onNavigate={(tab) => onNavigate(tab as ActiveTab)}
-      />
-
-      {/* Academic Roadmap Widget */}
-      {roadmap && (
-        <AcademicRoadmapWidget
-          roadmap={roadmap}
-          vviTopics={vviTopics}
-          revisions={revisions}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* Overview Top Section: Daily Progress Ring + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 1. Daily Progress Ring (Dynamic Active User Data) */}
-        <div className="glass-card rounded-3xl p-6 border border-white/10 flex flex-col items-center justify-center relative overflow-hidden text-center">
-          <div className="absolute top-3 left-4 text-xs font-semibold text-slate-400 uppercase tracking-wider font-heading">
-            Daily Progress Score
-          </div>
-
-          <div className="relative w-44 h-44 my-4 flex items-center justify-center">
-            {/* SVG Progress Ring */}
-            <svg className="w-full h-full transform -rotate-90">
-              <circle
-                cx="88"
-                cy="88"
-                r="70"
-                stroke="currentColor"
-                strokeWidth="12"
-                className="text-slate-800"
-                fill="transparent"
-              />
-              <circle
-                cx="88"
-                cy="88"
-                r="70"
-                stroke="url(#emeraldGradient)"
-                strokeWidth="12"
-                strokeDasharray={440}
-                strokeDashoffset={440 - (440 * overallPercent) / 100}
-                strokeLinecap="round"
-                className="transition-all duration-700 ease-out"
-                fill="transparent"
-              />
-              <defs>
-                <linearGradient
-                  id="emeraldGradient"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="100%" stopColor="#06b6d4" />
-                </linearGradient>
-              </defs>
-            </svg>
-
-            <div className="absolute flex flex-col items-center justify-center">
-              <span className="text-3xl font-extrabold font-heading text-white">
-                {overallPercent}%
-              </span>
-              <span className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider">
-                Completed
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-xs">
-            <div>
-              <div className="text-slate-400">Tasks</div>
-              <div className="font-bold text-white mt-0.5">
-                {completedTodayTasks.length}/{todayTasks.length}
-              </div>
+      {/* 2. PRIMARY SUMMARY — Compact Daily Progress Card */}
+      <div className="glass-card rounded-2xl p-4 border border-white/10 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+              <Target className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-slate-400">Study</div>
-              <div className="font-bold text-cyan-400 mt-0.5">
-                {studyProgressPercent}%
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-400">Habits</div>
-              <div className="font-bold text-rose-400 mt-0.5">
-                {habitsDoneToday.length}/{habits.length}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Panel */}
-        <div className="lg:col-span-2 glass-card rounded-3xl p-6 border border-white/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-                <span>Quick Actions</span>
-                <span className="text-xs font-normal text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  Instant Shortcuts
-                </span>
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button
-                onClick={() => onNavigate("exam")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/10 transition-all group relative overflow-hidden"
-              >
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <ShieldAlert className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Exam Center
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("academic")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all group relative overflow-hidden"
-              >
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <GraduationCap className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Academic Center
-                </span>
-              </button>
-
-              <button
-                onClick={onQuickAddTask}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <Plus className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Add Task
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("goals")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <Target className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Track Goals
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("calendar")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Calendar
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("focus")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <Timer className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Start Focus
-                </span>
-              </button>
-
-              <button
-                onClick={onQuickAddNote}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <FilePlus className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Add Note
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("study")}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-                  <BookOpen className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-white font-heading">
-                  Study Tracker
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
-            <span>Abya AI Assistant Ready</span>
-            <button
-              onClick={() => onNavigate("abya")}
-              className="text-emerald-400 hover:underline flex items-center gap-1 font-medium"
-            >
-              Start Chat <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Stream-Specific Study Tracker Section */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 p-2.5 flex items-center justify-center shrink-0">
-              <StreamIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold font-heading text-white">
-                  {streamMeta.label} Study Tracker
-                </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                  {activeStudent?.classLevel || "Active Stream"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                {todayStudyMinutes > 0
-                  ? `Logged ${todayStudyHours}h ${todayStudyMinsRem}m today across active stream subjects.`
-                  : "No study sessions logged yet today."}
+              <h2 className="text-sm font-bold font-heading text-white">
+                Daily Productivity Score
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                {overallPercent >= 80
+                  ? "Outstanding progress today!"
+                  : overallPercent >= 50
+                  ? "Solid steady momentum"
+                  : "Keep pushing towards daily targets"}
               </p>
             </div>
           </div>
-
-          <button
-            onClick={() => onNavigate("study")}
-            className="self-start sm:self-auto px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5 border border-cyan-500/30"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Open Study Tracker</span>
-          </button>
+          <div className="flex items-baseline gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
+            <span className="text-lg font-extrabold font-heading text-emerald-400">
+              {overallPercent}%
+            </span>
+          </div>
         </div>
 
-        {/* Subjects Progress Cards for Active Student's Stream */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {subjects.map((sub) => {
-            const pct =
-              sub.targetMinutesPerWeek > 0
-                ? Math.min(
-                    100,
-                    Math.round((sub.completedMinutes / sub.targetMinutesPerWeek) * 100)
-                  )
-                : 0;
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 rounded-full transition-all duration-500"
+            style={{ width: `${Math.max(3, overallPercent)}%` }}
+          />
+        </div>
 
-            const hrsCompleted = (sub.completedMinutes / 60).toFixed(1);
-            const hrsTarget = Math.round(sub.targetMinutesPerWeek / 60);
-
-            return (
-              <div
-                key={sub.id}
-                className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between gap-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: sub.color || "#10b981" }}
-                    />
-                    <h4 className="font-bold text-white text-xs font-heading">
-                      {sub.name}
-                    </h4>
-                  </div>
-                  <span className="text-[11px] font-mono text-cyan-400 font-bold">
-                    {pct}%
-                  </span>
-                </div>
-
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden my-1">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: sub.color || "#10b981",
-                    }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>
-                    {hrsCompleted}h / {hrsTarget}h target
-                  </span>
-                  <span>{sub.totalSessions} sessions</span>
-                </div>
-              </div>
-            );
-          })}
+        {/* Quick Action Shortcuts */}
+        <div className="pt-2 border-t border-white/5">
+          <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">
+            Quick Actions
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+            <button
+              onClick={() => onNavigate("exam")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-cyan-500/30 transition-all text-center group"
+            >
+              <ShieldAlert className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Exam</span>
+            </button>
+            <button
+              onClick={() => onNavigate("academic")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all text-center group"
+            >
+              <GraduationCap className="w-4 h-4 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Academic</span>
+            </button>
+            <button
+              onClick={onQuickAddTask}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all text-center group"
+            >
+              <Plus className="w-4 h-4 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">+ Task</span>
+            </button>
+            <button
+              onClick={() => onNavigate("goals")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-purple-500/30 transition-all text-center group"
+            >
+              <Target className="w-4 h-4 text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Goals</span>
+            </button>
+            <button
+              onClick={() => onNavigate("calendar")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-amber-500/30 transition-all text-center group"
+            >
+              <Calendar className="w-4 h-4 text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Calendar</span>
+            </button>
+            <button
+              onClick={() => onNavigate("focus")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-amber-500/30 transition-all text-center group"
+            >
+              <Timer className="w-4 h-4 text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Focus</span>
+            </button>
+            <button
+              onClick={onQuickAddNote}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-cyan-500/30 transition-all text-center group"
+            >
+              <FilePlus className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">+ Note</span>
+            </button>
+            <button
+              onClick={() => onNavigate("study")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-cyan-500/30 transition-all text-center group"
+            >
+              <BookOpen className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Study</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 3. Today's Overview Grid (Tasks, Water, Habits, Focus) */}
+      {/* 3. QUICK METRICS — 2-Column Compact Grid */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold font-heading text-white">
-            Today's Overview
-          </h3>
-          <span className="text-xs text-slate-400 font-mono">{todayStr}</span>
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
+          Quick Metrics
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Today's Tasks Summary Card */}
-          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Metric 1: Study Time */}
+          <div
+            onClick={() => onNavigate("study")}
+            className="glass-card rounded-xl p-3 border border-white/10 hover:border-cyan-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-400 truncate">
+                Study Time
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
+                <BookOpen className="w-3.5 h-3.5" />
+              </div>
+            </div>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-400">
-                  Today's Tasks
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
+              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
+                {todayStudyHours > 0
+                  ? `${todayStudyHours}h ${todayStudyMinsRem}m`
+                  : `${todayStudyMinutes} mins`}
               </div>
-              <div className="text-2xl font-bold font-heading text-white">
-                {completedTodayTasks.length} / {todayTasks.length}
-              </div>
-              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="bg-emerald-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${taskProgressPercent}%` }}
-                />
+              <div className="text-[10px] text-cyan-400 font-medium mt-0.5">
+                {studyProgressPercent}% of weekly target
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              {todayTasks.slice(0, 3).map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => onToggleTask && onToggleTask(t)}
-                  className="flex items-start gap-2 text-xs cursor-pointer hover:text-white transition-colors p-1 rounded hover:bg-white/5"
-                >
-                  <button type="button" className="mt-0.5 shrink-0 text-emerald-400">
-                    {t.completed ? (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    ) : (
-                      <Circle className="w-3.5 h-3.5 text-slate-500" />
-                    )}
-                  </button>
-                  <span
-                    className={`line-clamp-1 ${
-                      t.completed ? "line-through text-slate-500" : "text-slate-200"
-                    }`}
-                  >
-                    {t.title}
-                  </span>
-                </div>
-              ))}
-
-              {todayTasks.length === 0 && (
-                <p className="text-[11px] text-slate-500 italic">
-                  No tasks scheduled for today.
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={() => onNavigate("tasks")}
-              className="text-[11px] text-emerald-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
-            >
-              Open Tasks →
-            </button>
           </div>
 
-          {/* 4. Interactive Water Tracker Card */}
-          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-400">
-                  Water Tracker
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                  <Droplet className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold font-heading text-white">
-                {water.glasses} / {water.goal} glasses
-              </div>
-              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="bg-blue-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${waterProgressPercent}%` }}
-                />
+          {/* Metric 2: Water Tracker */}
+          <div className="glass-card rounded-xl p-3 border border-white/10 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-1.5 card-press">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-400 truncate">
+                Water
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                <Droplet className="w-3.5 h-3.5" />
               </div>
             </div>
+            <div className="flex items-center justify-between gap-1">
+              <div>
+                <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
+                  {water.glasses}/{water.goal} <span className="text-xs text-slate-400 font-normal">g</span>
+                </div>
+                <div className="text-[10px] text-blue-400 font-medium mt-0.5">
+                  {waterProgressPercent}% hydrated
+                </div>
+              </div>
 
-            <div className="flex items-center justify-between gap-2 bg-slate-900/60 p-2 rounded-xl border border-white/10">
-              <span className="text-xs text-slate-300 font-medium pl-1">
-                {waterProgressPercent}% Hydrated
-              </span>
-              <div className="flex items-center gap-1.5">
+              {/* Interactive +1 / -1 Buttons */}
+              <div className="flex items-center gap-1 shrink-0">
                 {onRemoveWaterGlass && (
                   <button
                     type="button"
-                    onClick={onRemoveWaterGlass}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveWaterGlass();
+                    }}
                     disabled={water.glasses <= 0}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white flex items-center justify-center transition-all border border-white/10"
+                    className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white flex items-center justify-center transition-all border border-white/10"
                     title="Remove 1 glass"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Minus className="w-3 h-3" />
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={onAddWaterGlass}
-                  className="px-2.5 py-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition-all shadow-md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddWaterGlass();
+                  }}
+                  className="px-1.5 py-1 rounded bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-[10px] flex items-center gap-0.5 transition-all shadow-sm"
                   title="Add 1 glass"
                 >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>+1</span>
+                  <Plus className="w-3 h-3 stroke-[3]" />
+                  <span>1</span>
                 </button>
               </div>
             </div>
-
-            <button
-              onClick={() => onNavigate("water")}
-              className="text-[11px] text-blue-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
-            >
-              Water Log →
-            </button>
           </div>
 
-          {/* 5. Habits Tracker Card */}
-          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between gap-3">
+          {/* Metric 3: Tasks */}
+          <div
+            onClick={() => onNavigate("tasks")}
+            className="glass-card rounded-xl p-3 border border-white/10 hover:border-emerald-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-400 truncate">
+                Tasks Today
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                <ListTodo className="w-3.5 h-3.5" />
+              </div>
+            </div>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-400">
-                  Habits Tracker
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                  <Flame className="w-4 h-4" />
-                </div>
+              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
+                {completedTodayTasks.length} / {todayTasks.length}
               </div>
-              <div className="text-2xl font-bold font-heading text-white">
-                {habitsDoneToday.length} / {habits.length} Done
-              </div>
-              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="bg-rose-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${habitProgressPercent}%` }}
-                />
+              <div className="text-[10px] text-emerald-400 font-medium mt-0.5">
+                {taskProgressPercent}% tasks complete
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              {habits.slice(0, 3).map((h) => {
-                const isDone = h.completedDates.includes(todayStr);
-                return (
-                  <div
-                    key={h.id}
-                    onClick={() =>
-                      onToggleHabit && onToggleHabit(h.id, todayStr)
-                    }
-                    className="flex items-start gap-2 text-xs cursor-pointer hover:text-white transition-colors p-1 rounded hover:bg-white/5"
-                  >
-                    <button type="button" className="mt-0.5 shrink-0 text-rose-400">
-                      {isDone ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : (
-                        <Circle className="w-3.5 h-3.5 text-slate-500" />
-                      )}
-                    </button>
-                    <span
-                      className={`line-clamp-1 ${
-                        isDone ? "line-through text-slate-500" : "text-slate-200"
-                      }`}
-                    >
-                      {h.title}
-                    </span>
-                  </div>
-                );
-              })}
-
-              {habits.length === 0 && (
-                <p className="text-[11px] text-slate-500 italic">
-                  No habits added yet.
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={() => onNavigate("habits")}
-              className="text-[11px] text-rose-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
-            >
-              Habits Page →
-            </button>
           </div>
 
-          {/* Today's Study & Focus Card */}
-          <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-3">
+          {/* Metric 4: Habits */}
+          <div
+            onClick={() => onNavigate("habits")}
+            className="glass-card rounded-xl p-3 border border-white/10 hover:border-rose-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-400 truncate">
+                Habits Today
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
+                <Flame className="w-3.5 h-3.5" />
+              </div>
+            </div>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-400">
-                  Today's Focus & Study
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                  <Timer className="w-4 h-4" />
-                </div>
+              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
+                {habitsDoneToday.length} / {habits.length}
               </div>
-              <div className="text-2xl font-bold font-heading text-white">
-                {todayStudyHours > 0 ? `${todayStudyHours}h ${todayStudyMinsRem}m` : `${todayStudyMinutes} mins`}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                {todayFocusLogs.length} focus session(s) completed today
+              <div className="text-[10px] text-rose-400 font-medium mt-0.5">
+                {habitProgressPercent}% habits done
               </div>
             </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-300 space-y-1">
-              <div className="flex justify-between">
-                <span>Active Subjects:</span>
-                <span className="font-bold text-white">{subjects.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Weekly Target Progress:</span>
-                <span className="font-bold text-cyan-400">{studyProgressPercent}%</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => onNavigate("focus")}
-              className="text-[11px] text-cyan-400 hover:underline text-right font-semibold pt-1 border-t border-white/5"
-            >
-              Start Focus Session →
-            </button>
           </div>
         </div>
+      </div>
+
+      {/* 4. ACADEMIC SECTION — Stream Study Tracker + Academic Roadmap */}
+      <div className="space-y-3">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+          Academic Overview
+        </div>
+
+        {/* Stream Study Tracker */}
+        <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
+                <StreamIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold font-heading text-white">
+                  {streamMeta.label} Subjects
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {todayStudyMinutes > 0
+                    ? `Logged ${todayStudyHours}h ${todayStudyMinsRem}m today.`
+                    : "No study logged yet today."}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate("study")}
+              className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 text-[11px] font-semibold transition-all flex items-center gap-1 border border-cyan-500/25"
+            >
+              <BookOpen className="w-3 h-3" />
+              <span>Study</span>
+            </button>
+          </div>
+
+          {/* Subjects Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {subjects.map((sub) => {
+              const pct =
+                sub.targetMinutesPerWeek > 0
+                  ? Math.min(
+                      100,
+                      Math.round((sub.completedMinutes / sub.targetMinutesPerWeek) * 100)
+                    )
+                  : 0;
+              const hrsCompleted = (sub.completedMinutes / 60).toFixed(1);
+
+              return (
+                <div
+                  key={sub.id}
+                  className="p-2.5 rounded-xl bg-slate-900/50 border border-white/5 flex flex-col justify-between gap-1.5"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: sub.color || "#10b981" }}
+                      />
+                      <h4 className="font-bold text-white text-xs truncate">
+                        {sub.name}
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono text-cyan-400 font-bold shrink-0">
+                      {pct}%
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: sub.color || "#10b981",
+                      }}
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 flex justify-between">
+                    <span>{hrsCompleted}h logged</span>
+                    <span>{sub.totalSessions} sess</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Academic Roadmap Widget */}
+        {roadmap && (
+          <AcademicRoadmapWidget
+            roadmap={roadmap}
+            vviTopics={vviTopics}
+            revisions={revisions}
+            onNavigate={onNavigate}
+          />
+        )}
+      </div>
+
+      {/* 5. INTELLIGENCE SECTION — Smart OS Suggestions + Exam Intelligence */}
+      <div className="space-y-3">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+          Exam Intelligence & OS Suggestions
+        </div>
+
+        {/* Smart OS Suggestions Widget */}
+        <SmartSuggestionsWidget
+          suggestions={smartSuggestions}
+          onAction={handleSuggestionAction}
+          onDismiss={handleDismissSuggestion}
+          studentName={activeStudent?.name}
+        />
+
+        {/* Exam Intelligence Summary Widget */}
+        <ExamIntelligenceWidget
+          report={examReport}
+          onNavigate={(tab) => onNavigate(tab as ActiveTab)}
+        />
       </div>
     </div>
   );

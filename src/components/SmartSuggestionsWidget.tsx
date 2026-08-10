@@ -62,27 +62,27 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
   };
 
   return (
-    <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4 bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-emerald-950/20">
+    <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3 bg-slate-900/60">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-500 p-2 flex items-center justify-center text-slate-950 font-bold shadow-md">
-            <Sparkles className="w-4 h-4 text-slate-950" />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 p-1.5 flex items-center justify-center text-slate-950 font-bold shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
           </div>
           <div>
-            <h3 className="text-base font-bold font-heading text-white flex items-center gap-2">
+            <h3 className="text-sm font-bold font-heading text-white flex items-center gap-1.5">
               Smart OS Suggestions
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Data-Driven
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                AI Driven
               </span>
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-[11px] text-slate-400">
               Personalized for {studentName || "your active session"}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {suggestions.map((sug) => {
           const Icon = getIcon(sug.type);
           const isHigh = sug.priority === "high";
@@ -90,18 +90,18 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
           return (
             <div
               key={sug.id}
-              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 relative group ${
+              className={`p-3 rounded-xl border transition-all flex flex-col justify-between gap-2 relative group ${
                 isHigh
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-200"
+                  ? "bg-rose-500/10 border-rose-500/25 text-rose-200"
                   : sug.priority === "medium"
-                  ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-200"
-                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                  ? "bg-cyan-500/10 border-cyan-500/25 text-cyan-200"
+                  : "bg-emerald-500/10 border-emerald-500/25 text-emerald-200"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className={`w-8 h-8 rounded-xl p-1.5 flex items-center justify-center shrink-0 ${
+                    className={`w-7 h-7 rounded-lg p-1 flex items-center justify-center shrink-0 ${
                       isHigh
                         ? "bg-rose-500/20 text-rose-300"
                         : sug.priority === "medium"
@@ -109,15 +109,15 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
                         : "bg-emerald-500/20 text-emerald-300"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-white text-sm font-heading leading-tight">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="font-bold text-white text-xs font-heading leading-tight">
                         {sug.title}
                       </h4>
                       <span
-                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold ${
+                        className={`text-[8px] font-mono px-1 py-0.2 rounded uppercase font-bold ${
                           isHigh
                             ? "bg-rose-500/30 text-rose-200 border border-rose-500/40"
                             : sug.priority === "medium"
@@ -128,7 +128,7 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
                         {sug.priority}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    <p className="text-[11px] text-slate-300 mt-0.5 leading-normal">
                       {sug.description}
                     </p>
                   </div>
@@ -141,9 +141,9 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
                       onDismiss(sug.id);
                     }}
                     title="Dismiss suggestion"
-                    className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                    className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 )}
               </div>
@@ -151,10 +151,10 @@ export const SmartSuggestionsWidget: React.FC<SmartSuggestionsWidgetProps> = ({
               {sug.actionText && onAction && (
                 <button
                   onClick={() => onAction(sug.targetTab, sug.subjectName)}
-                  className="self-end px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-all flex items-center gap-1 border border-white/10"
+                  className="self-end px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-[11px] transition-all flex items-center gap-1 border border-white/10"
                 >
                   <span>{sug.actionText}</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+                  <ArrowRight className="w-3 h-3 text-emerald-400" />
                 </button>
               )}
             </div>
