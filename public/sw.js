@@ -1,4 +1,4 @@
-const CACHE_NAME = "garia-os-v2.2.0";
+const CACHE_NAME = "garia-os-v2.2.3";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",

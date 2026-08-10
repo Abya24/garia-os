@@ -50,7 +50,6 @@
   <circle cx="256" cy="240" r="180" fill="#7c3aed" opacity="0.12" filter="blur(30px)" />
 
   <!-- Orbital Arch Ring -->
-  <!-- Sweeps from bottom-left (~210 deg), over top, towards top-right (~30 deg) -->
   <path 
     d="M 125 330 A 185 185 0 1 1 405 165" 
     fill="none" 
@@ -59,7 +58,7 @@
     stroke-linecap="round" 
   />
 
-  <!-- 4-Pointed Sparkle Star at Top-Right of Orbital Arch (approx 412, 160) -->
+  <!-- 4-Pointed Sparkle Star at Top-Right of Orbital Arch -->
   <g transform="translate(415, 160)" filter="url(#starGlow)">
     <path 
       d="M 0 -22 Q 0 0 -22 0 Q 0 0 0 22 Q 0 0 22 0 Q 0 0 0 -22 Z" 
