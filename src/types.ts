@@ -553,4 +553,5 @@ export type ActiveTab =
   | "water"
   | "habits"
   | "stats"
-  | "settings";
+  | "settings"
+  | "download";

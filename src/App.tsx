@@ -140,6 +140,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { CareerCenterPage } from "./pages/CareerCenterPage";
 import { AcademicCenterPage } from "./pages/AcademicCenterPage";
 import { ExamCenterPage } from "./pages/ExamCenterPage";
+import { DownloadPage } from "./pages/DownloadPage";
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -148,8 +149,26 @@ import {
 
 export default function App() {
   // Navigation & Profile Modal States
-  const [activeTab, setActiveTab] = useState<ActiveTab>("home");
-  const [tabHistory, setTabHistory] = useState<ActiveTab[]>(["home"]);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
+        return "download";
+      }
+    }
+    return "home";
+  });
+  const [tabHistory, setTabHistory] = useState<ActiveTab[]>(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
+        return ["home", "download"];
+      }
+    }
+    return ["home"];
+  });
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -1263,6 +1282,12 @@ export default function App() {
             />
           )}
 
+          {activeTab === "download" && (
+            <DownloadPage
+              onBackToApp={() => setActiveTab("home")}
+            />
+          )}
+
           {activeTab === "settings" && (
             <SettingsPage
               settings={settings}
@@ -1272,6 +1297,7 @@ export default function App() {
               onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              onNavigate={(tab) => handleNavigate(tab)}
               onUpdateSettings={handleUpdateSettings}
               onClearChatHistory={handleClearChatHistory}
               onClearAllOSData={handleClearAllOSData}

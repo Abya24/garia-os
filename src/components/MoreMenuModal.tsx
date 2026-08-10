@@ -17,6 +17,7 @@ import {
   GraduationCap,
   ShieldAlert,
   Users,
+  Download,
 } from "lucide-react";
 import { ActiveTab } from "../types";
 
@@ -111,6 +112,14 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       desc: "Productivity score & study trends",
       icon: BarChart2,
       color: "from-purple-500 to-indigo-500",
+    },
+    {
+      id: "download" as ActiveTab,
+      label: "Download Official APK",
+      desc: "Get Garia OS Android app v2.3",
+      icon: Download,
+      color: "from-emerald-500 to-teal-400",
+      badge: "APK v2.3",
     },
     {
       id: "settings" as ActiveTab,

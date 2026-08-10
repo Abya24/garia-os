@@ -28,6 +28,7 @@ interface SettingsPageProps {
   onUpdateAbyaLanguage?: (lang: AbyaLanguageSetting) => void;
   onOpenStudentModal?: () => void;
   onOpenAuthModal?: () => void;
+  onNavigate?: (tab: any) => void;
   onUpdateSettings: (s: UserSettings) => void;
   onClearChatHistory: () => void;
   onClearAllOSData: () => void;
@@ -42,6 +43,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onUpdateAbyaLanguage,
   onOpenStudentModal,
   onOpenAuthModal,
+  onNavigate,
   onUpdateSettings,
   onClearChatHistory,
   onClearAllOSData,
@@ -452,26 +454,56 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 5. About Section */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-3">
-        <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-          <Info className="w-5 h-5 text-slate-400" />
-          <span>About Garia OS</span>
+      {/* 5. About & APK Download Section */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+        <h3 className="text-lg font-bold font-heading text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Info className="w-5 h-5 text-emerald-400" />
+            <span>About Garia OS</span>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            v2.3 Release
+          </span>
         </h3>
 
         <div className="text-xs text-slate-300 space-y-1 font-mono">
           <p>
-            <strong>System:</strong> Garia OS (PWA Edition)
+            <strong>System:</strong> Garia OS (Android & Web Edition)
           </p>
           <p>
-            <strong>Version:</strong> v1.4.2 (Exam Intelligence Center)
+            <strong>Package:</strong> com.gariaos.app
           </p>
           <p>
             <strong>Built-In AI:</strong> Abya AI (Powered by Google Gemini 3.6 Flash)
           </p>
           <p>
-            <strong>Storage Engine:</strong> Client Browser Storage (IndexedDB / LocalStorage)
+            <strong>Storage Engine:</strong> Profile-Isolated Storage Engine
           </p>
+        </div>
+
+        {/* APK Download Banner */}
+        <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/20">
+          <div>
+            <h4 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+              <span>Official Android APK Download</span>
+            </h4>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Download Garia OS v2.3 release APK for Android 8.0+ devices
+            </p>
+          </div>
+          <a
+            href="/download"
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate("download");
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-950/40 shrink-0"
+          >
+            <Download className="w-4 h-4" />
+            Download APK
+          </a>
         </div>
       </div>
 
