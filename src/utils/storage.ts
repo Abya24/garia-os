@@ -110,7 +110,7 @@ function setItem<T>(key: string, value: T): void {
 
 // Seed Defaults
 const defaultSettings: UserSettings = {
-  userName: "Gani",
+  userName: "Student",
   theme: "dark",
   customApiKey: "",
   notificationsEnabled: true,
@@ -642,8 +642,10 @@ export const loadActiveProfileId = (): string => {
   let activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
   const profiles = loadProfiles();
   if (!activeId || !profiles.some((p) => p.id === activeId)) {
-    activeId = profiles[0]?.id || "student-default";
-    saveActiveProfileId(activeId);
+    activeId = profiles[0]?.id || "";
+    if (activeId) {
+      saveActiveProfileId(activeId);
+    }
   }
   return activeId;
 };
@@ -657,26 +659,38 @@ export const loadActiveProfile = (): StudentProfile => {
   const activeId = loadActiveProfileId();
   const active = profiles.find((p) => p.id === activeId);
   if (active) return active;
-  return profiles[0] || {
-    id: "student-default",
-    name: "Gani",
-    classLevel: "Class 12",
-    stream: "Commerce",
-    board: "BSEB",
-    avatarColor: "from-cyan-500 to-emerald-500",
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
+  return (
+    profiles[0] || {
+      id: "student-default",
+      name: "Student",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "CBSE",
+      avatarColor: "from-cyan-500 to-emerald-500",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+  );
 };
 
 function migrateAndInitDefaultProfile(): StudentProfile[] {
-  const legacySettings = getItem<UserSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
+  // Check if any legacy data exists in localStorage for this browser instance
+  const hasLegacySettings = localStorage.getItem(STORAGE_KEYS.SETTINGS) !== null;
+  const hasLegacyTasks = localStorage.getItem(STORAGE_KEYS.TASKS) !== null;
+  const hasLegacySubjects = localStorage.getItem(STORAGE_KEYS.SUBJECTS) !== null;
+
+  if (!hasLegacySettings && !hasLegacyTasks && !hasLegacySubjects) {
+    // New device/browser: return empty array so WelcomeScreen is displayed
+    return [];
+  }
+
+  const legacySettings = getItem<UserSettings | null>(STORAGE_KEYS.SETTINGS, null);
   const legacyCareer = getItem<CareerProfile | null>(STORAGE_KEYS.CAREER_PROFILE, null);
   const legacyExam = getItem<ExamProfile | null>(STORAGE_KEYS.EXAM_PROFILE, null);
 
   const defaultProfile: StudentProfile = {
     id: "student-default",
-    name: legacySettings?.userName || "Gani",
+    name: legacySettings?.userName || "Student",
     classLevel: legacyExam?.classLevel || "Class 12",
     stream: legacyCareer?.stream || legacyExam?.stream || "Commerce",
     board: legacyExam?.board || "BSEB",

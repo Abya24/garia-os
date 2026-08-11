@@ -49,7 +49,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onClearAllOSData,
   onReloadData,
 }) => {
-  const [userName, setUserName] = useState(settings.userName || "Gani");
+  const [userName, setUserName] = useState(settings.userName || activeStudent?.name || "Student");
   const [apiKey, setApiKey] = useState(settings.customApiKey || "");
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
@@ -82,7 +82,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     e.preventDefault();
     onUpdateSettings({
       ...settings,
-      userName: userName.trim() || "Gani",
+      userName: userName.trim() || activeStudent?.name || "Student",
       customApiKey: apiKey.trim(),
     });
     alert("Settings saved successfully!");

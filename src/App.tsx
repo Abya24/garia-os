@@ -117,6 +117,8 @@ import {
   generateAbyaFallbackResponse,
 } from "./utils/abyaFallbackEngine";
 
+import { hashPassword } from "./utils/auth";
+
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
 import { BottomNav } from "./components/BottomNav";
@@ -124,6 +126,7 @@ import { DesktopSidebar } from "./components/DesktopSidebar";
 import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
+import { WelcomeScreen } from "./components/WelcomeScreen";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -1094,6 +1097,95 @@ export default function App() {
     setAttachedContextNote(contextText);
     setActiveTab("abya");
   };
+
+  const handleWelcomeCreateAccount = async (data: {
+    name: string;
+    email: string;
+    pass: string;
+    stream: StreamType;
+    classLevel: string;
+    board: string;
+  }) => {
+    const newProf = addStudentProfile({
+      name: data.name,
+      stream: data.stream,
+      classLevel: data.classLevel,
+      board: data.board,
+    });
+
+    const hashed = await hashPassword(data.pass);
+    const profSettings = loadSettings(newProf.id);
+    const updatedSettings: UserSettings = {
+      ...profSettings,
+      userName: data.name,
+      account: {
+        email: data.email,
+        passwordHash: hashed,
+        name: data.name,
+        isPrivateMode: false,
+        createdAt: Date.now(),
+      },
+    };
+    saveSettings(updatedSettings, newProf.id);
+    reloadAllDataForProfile(newProf.id);
+  };
+
+  const handleWelcomeLogin = async (email: string, pass: string): Promise<boolean> => {
+    const hashed = await hashPassword(pass);
+    const allProfs = loadProfiles();
+    for (const prof of allProfs) {
+      const profSettings = loadSettings(prof.id);
+      if (
+        profSettings.account &&
+        profSettings.account.email.toLowerCase() === email.toLowerCase() &&
+        (!profSettings.account.passwordHash || profSettings.account.passwordHash === hashed)
+      ) {
+        reloadAllDataForProfile(prof.id);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleWelcomeContinuePrivately = (data: {
+    name?: string;
+    stream: StreamType;
+    classLevel: string;
+    board: string;
+  }) => {
+    const name = data.name && data.name.trim() ? data.name.trim() : "Student";
+    const newProf = addStudentProfile({
+      name,
+      stream: data.stream,
+      classLevel: data.classLevel,
+      board: data.board,
+    });
+
+    const profSettings = loadSettings(newProf.id);
+    const updatedSettings: UserSettings = {
+      ...profSettings,
+      userName: name,
+      account: {
+        email: `${newProf.id}@gariaos.local`,
+        passwordHash: "",
+        name,
+        isPrivateMode: true,
+        createdAt: Date.now(),
+      },
+    };
+    saveSettings(updatedSettings, newProf.id);
+    reloadAllDataForProfile(newProf.id);
+  };
+
+  if (profiles.length === 0) {
+    return (
+      <WelcomeScreen
+        onCreateAccount={handleWelcomeCreateAccount}
+        onLogin={handleWelcomeLogin}
+        onContinuePrivately={handleWelcomeContinuePrivately}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)]">
