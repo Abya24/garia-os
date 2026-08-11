@@ -605,24 +605,34 @@ export const loadProfiles = (): StudentProfile[] => {
     return migrateAndInitDefaultProfile();
   }
 
-  // Filter out temporary test profiles if present
-  const cleanedProfiles = profiles.filter(
-    (p) =>
-      p.id !== "student-test-1" &&
-      p.id !== "student-test-2" &&
-      p.name !== "Ananya Verma" &&
-      p.name !== "Vikram Patel"
-  );
+  // Filter out temporary test profiles and sanitize any profile names containing "gani"
+  let modified = false;
+  const cleanedProfiles = profiles
+    .filter(
+      (p) =>
+        p.id !== "student-test-1" &&
+        p.id !== "student-test-2" &&
+        p.name !== "Ananya Verma" &&
+        p.name !== "Vikram Patel"
+    )
+    .map((p) => {
+      let updatedName = p.name || "Student";
+      if (updatedName.toLowerCase().includes("gani")) {
+        updatedName = "Student";
+        modified = true;
+      }
+      let updatedStream = p.stream;
+      if (updatedName.trim().toLowerCase().includes("chulbuli") && updatedStream !== "Science") {
+        updatedStream = "Science";
+        modified = true;
+      }
+      if (updatedName !== p.name || updatedStream !== p.stream) {
+        return { ...p, name: updatedName, stream: updatedStream };
+      }
+      return p;
+    });
 
-  let profileStreamFixed = false;
-  cleanedProfiles.forEach((p) => {
-    if (p.name && p.name.trim().toLowerCase().includes("chulbuli") && p.stream !== "Science") {
-      p.stream = "Science";
-      profileStreamFixed = true;
-    }
-  });
-
-  if (profileStreamFixed || cleanedProfiles.length !== profiles.length) {
+  if (modified || cleanedProfiles.length !== profiles.length) {
     profiles = cleanedProfiles;
     saveProfiles(profiles);
 
@@ -664,6 +674,10 @@ export const loadActiveProfileId = (): string => {
 };
 
 export const saveActiveProfileId = (id: string): void => {
+  if (!id) {
+    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    return;
+  }
   setItem(ACTIVE_PROFILE_KEY, id);
 };
 
@@ -692,7 +706,10 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
   const legacyExam = getItem<ExamProfile | null>(STORAGE_KEYS.EXAM_PROFILE, null);
 
   const rawName = legacySettings?.userName;
-  const sanitizedName = rawName && rawName.trim() && rawName !== "Gani" ? rawName.trim() : "Student";
+  const sanitizedName =
+    rawName && rawName.trim() && !rawName.toLowerCase().includes("gani")
+      ? rawName.trim()
+      : "Student";
 
   const defaultProfile: StudentProfile = {
     id: "student-default",
@@ -736,10 +753,15 @@ export const addStudentProfile = (
 ): StudentProfile => {
   const profiles = loadProfiles();
   const avatarIndex = profiles.length % AVATAR_GRADIENTS.length;
-  const isChulbuli = data.name.trim().toLowerCase().includes("chulbuli");
+  const rawName = data.name.trim();
+  const sanitizedName =
+    rawName && !rawName.toLowerCase().includes("gani") ? rawName : "Student";
+
+  const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
   const finalStream = isChulbuli ? "Science" : data.stream;
   const newProfile: StudentProfile = {
     ...data,
+    name: sanitizedName,
     stream: finalStream,
     id: `student-${Date.now()}`,
     avatarColor: data.avatarColor || AVATAR_GRADIENTS[avatarIndex],
@@ -763,17 +785,25 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
   const profiles = loadProfiles();
   const index = profiles.findIndex((p) => p.id === updated.id);
   if (index !== -1) {
-    const isChulbuli = updated.name.trim().toLowerCase().includes("chulbuli");
+    const rawName = updated.name.trim();
+    const sanitizedName =
+      rawName && !rawName.toLowerCase().includes("gani") ? rawName : "Student";
+    const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
     const finalStream = isChulbuli ? "Science" : updated.stream;
-    const finalUpdated = { ...updated, stream: finalStream, updatedAt: Date.now() };
+    const finalUpdated = {
+      ...updated,
+      name: sanitizedName,
+      stream: finalStream,
+      updatedAt: Date.now(),
+    };
     profiles[index] = finalUpdated;
     saveProfiles(profiles);
 
     const profId = updated.id;
     // Sync settings userName
     const settings = loadSettings(profId);
-    if (settings.userName !== updated.name) {
-      saveSettings({ ...settings, userName: updated.name }, profId);
+    if (settings.userName !== sanitizedName) {
+      saveSettings({ ...settings, userName: sanitizedName }, profId);
     }
     // Sync career profile stream & class
     const career = loadCareerProfile(profId);
@@ -995,6 +1025,7 @@ export const loadTasks = (profileId?: string): Task[] => {
 };
 export const saveTasks = (tasks: Task[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.TASKS), tasks);
 };
 
@@ -1025,7 +1056,9 @@ export const loadSubjects = (profileId?: string): Subject[] => {
   const saved = getItem<Subject[] | null>(key, null);
 
   if (!saved || !Array.isArray(saved) || saved.length === 0) {
-    saveSubjects(defaultStreamSubs, pId);
+    if (pId) {
+      saveSubjects(defaultStreamSubs, pId);
+    }
     return defaultStreamSubs;
   }
 
@@ -1104,6 +1137,7 @@ export const loadSubjects = (profileId?: string): Subject[] => {
 };
 export const saveSubjects = (subs: Subject[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.SUBJECTS), subs);
 };
 
@@ -1113,6 +1147,7 @@ export const loadStudySessions = (profileId?: string): StudySession[] => {
 };
 export const saveStudySessions = (sessions: StudySession[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.STUDY_SESSIONS), sessions);
 };
 
@@ -1122,6 +1157,7 @@ export const loadNotes = (profileId?: string): Note[] => {
 };
 export const saveNotes = (notes: Note[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.NOTES), notes);
 };
 
@@ -1131,6 +1167,7 @@ export const loadHabits = (profileId?: string): Habit[] => {
 };
 export const saveHabits = (habits: Habit[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.HABITS), habits);
 };
 
@@ -1152,6 +1189,7 @@ export const loadWater = (profileId?: string): WaterLog => {
 };
 export const saveWater = (water: WaterLog, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.WATER), water);
 };
 
@@ -1161,6 +1199,7 @@ export const loadFocusSessions = (profileId?: string): FocusSessionLog[] => {
 };
 export const saveFocusSessions = (focus: FocusSessionLog[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), focus);
 };
 
@@ -1170,6 +1209,7 @@ export const loadGoals = (profileId?: string): Goal[] => {
 };
 export const saveGoals = (goals: Goal[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.GOALS), goals);
 };
 
@@ -1179,6 +1219,7 @@ export const loadCalendarEvents = (profileId?: string): CalendarEvent[] => {
 };
 export const saveCalendarEvents = (events: CalendarEvent[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.CALENDAR_EVENTS), events);
 };
 
@@ -1192,6 +1233,7 @@ export const loadAbyaChat = (profileId?: string): AbyaMessage[] => {
 };
 export const saveAbyaChat = (messages: AbyaMessage[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ABYA_CHAT), messages);
 };
 
@@ -1207,6 +1249,7 @@ export const loadAbyaLanguage = (profileId?: string): AbyaLanguageSetting => {
 
 export const saveAbyaLanguage = (lang: AbyaLanguageSetting, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   const key = `garia_p_${pId}_abya_language_v1`;
   localStorage.setItem(key, lang);
 };
@@ -1218,21 +1261,34 @@ export const loadSettings = (profileId?: string): UserSettings => {
     ? { ...defaultSettings, userName: activeProf.name }
     : defaultSettings;
   const stored = getItem(getProfileKey(pId, STORAGE_KEYS.SETTINGS), fallback);
+  let userName = stored?.userName || fallback.userName || "Student";
+  if (userName.toLowerCase().includes("gani")) {
+    userName = "Student";
+  }
+  const accountName = stored?.account?.name;
+  const sanitizedAccountName =
+    accountName && !accountName.toLowerCase().includes("gani")
+      ? accountName
+      : userName;
+
   return {
     ...fallback,
     ...stored,
+    userName,
     notifications: {
       ...defaultSettings.notifications!,
-      ...(stored.notifications || {}),
+      ...(stored?.notifications || {}),
     },
     account: {
       ...defaultSettings.account!,
-      ...(stored.account || {}),
+      ...(stored?.account || {}),
+      name: sanitizedAccountName,
     },
   };
 };
 export const saveSettings = (settings: UserSettings, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.SETTINGS), settings);
 };
 
@@ -1259,6 +1315,7 @@ export const loadCareerProfile = (profileId?: string): CareerProfile => {
 };
 export const saveCareerProfile = (profile: CareerProfile, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_PROFILE), profile);
 };
 
@@ -1298,6 +1355,7 @@ export const loadCareerAssessment = (profileId?: string): CareerAssessment => {
 };
 export const saveCareerAssessment = (assessment: CareerAssessment, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ASSESSMENT), assessment);
 };
 
@@ -1340,6 +1398,7 @@ export const loadCareerRoadmap = (profileId?: string): CareerRoadmap => {
 };
 export const saveCareerRoadmap = (roadmap: CareerRoadmap, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_ROADMAP), roadmap);
 };
 
@@ -1369,6 +1428,7 @@ export const loadCareerQuiz = (profileId?: string): CareerQuizAnswers => {
 
 export const saveCareerQuiz = (quiz: CareerQuizAnswers, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.CAREER_QUIZ), quiz);
 };
 
@@ -1384,6 +1444,7 @@ export const loadSmartSuggestionsState = (profileId?: string): SmartSuggestionsS
 
 export const saveSmartSuggestionsState = (state: SmartSuggestionsState, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.SMART_SUGGESTIONS), state);
 };
 
@@ -1398,6 +1459,7 @@ export const loadAcademicSubjects = (
 };
 export const saveAcademicSubjects = (subs: AcademicSubject[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_SUBJECTS), subs);
 };
 
@@ -1407,6 +1469,7 @@ export const loadAcademicChapters = (profileId?: string): AcademicChapter[] => {
 };
 export const saveAcademicChapters = (chaps: AcademicChapter[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_CHAPTERS), chaps);
 };
 
@@ -1416,6 +1479,7 @@ export const loadAcademicTests = (profileId?: string): AcademicTest[] => {
 };
 export const saveAcademicTests = (tests: AcademicTest[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_TESTS), tests);
 };
 
@@ -1425,6 +1489,7 @@ export const loadAcademicPlan = (profileId?: string): SmartStudyPlan | null => {
 };
 export const saveAcademicPlan = (plan: SmartStudyPlan | null, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_PLAN), plan);
 };
 
@@ -1434,6 +1499,7 @@ export const loadVVITopics = (profileId?: string): AcademicVVITopic[] => {
 };
 export const saveVVITopics = (topics: AcademicVVITopic[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.VVI_TOPICS), topics);
 };
 
@@ -1443,6 +1509,7 @@ export const loadAcademicRevisions = (profileId?: string): AcademicRevisionItem[
 };
 export const saveAcademicRevisions = (revisions: AcademicRevisionItem[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.REVISIONS), revisions);
 };
 
@@ -1452,6 +1519,7 @@ export const loadAcademicPractice = (profileId?: string): AcademicPracticeSessio
 };
 export const saveAcademicPractice = (practice: AcademicPracticeSession[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.PRACTICE), practice);
 };
 
@@ -1461,6 +1529,7 @@ export const loadAcademicRoadmapData = (profileId?: string): AcademicRoadmapData
 };
 export const saveAcademicRoadmapData = (roadmap: AcademicRoadmapData | null, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_ROADMAP), roadmap);
 };
 
@@ -1481,6 +1550,7 @@ export const loadExamProfile = (profileId?: string): ExamProfile => {
 };
 export const saveExamProfile = (prof: ExamProfile, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_PROFILE), prof);
 };
 
@@ -1490,6 +1560,7 @@ export const loadExamMilestones = (profileId?: string): ExamMilestone[] => {
 };
 export const saveExamMilestones = (milestones: ExamMilestone[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_MILESTONES), milestones);
 };
 
@@ -1499,6 +1570,7 @@ export const loadExamMockTests = (profileId?: string): ExamMockTest[] => {
 };
 export const saveExamMockTests = (tests: ExamMockTest[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_TESTS), tests);
 };
 
@@ -1508,6 +1580,7 @@ export const loadExamDailyPlan = (profileId?: string): ExamDailyPlan | null => {
 };
 export const saveExamDailyPlan = (plan: ExamDailyPlan | null, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_PLAN), plan);
 };
 
@@ -1519,6 +1592,7 @@ export const loadExamTestRecords = (profileId?: string): ExamTestRecord[] => {
 
 export const saveExamTestRecords = (tests: ExamTestRecord[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_TESTS_V19), tests);
 };
 
@@ -1529,6 +1603,7 @@ export const loadExamAnalysis = (profileId?: string): ExamIntelligenceReport | n
 
 export const saveExamAnalysis = (analysis: ExamIntelligenceReport | null, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_ANALYSIS_V19), analysis);
 };
 

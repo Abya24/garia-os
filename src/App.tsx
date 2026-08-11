@@ -419,6 +419,15 @@ export default function App() {
     }
   };
 
+  // Diagnostic Session Isolation Log
+  useEffect(() => {
+    console.log("[GARIA SESSION]", {
+      profilesCount: profiles.length,
+      activeProfileId,
+      activeStudentName: activeStudent?.name || null,
+    });
+  }, [profiles, activeProfileId, activeStudent]);
+
   // Sync Theme with DOM
   useEffect(() => {
     const root = document.documentElement;
@@ -427,8 +436,10 @@ export default function App() {
     } else {
       root.classList.remove("light");
     }
-    saveSettings(settings, activeProfileId);
-  }, [settings, activeProfileId]);
+    if (activeProfileId && activeStudent) {
+      saveSettings(settings, activeProfileId);
+    }
+  }, [settings, activeProfileId, activeStudent]);
 
   // Sync Data Save Handlers
   const handleUpdateSettings = (newSettings: UserSettings) => {
