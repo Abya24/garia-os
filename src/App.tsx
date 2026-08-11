@@ -14,6 +14,7 @@ import {
   AbyaLanguageSetting,
   ActiveTab,
   StudentProfile,
+  StreamType,
   CareerProfile,
   CareerAssessment,
   CareerRoadmap,
@@ -239,7 +240,8 @@ export default function App() {
   const [activeProfileId, setActiveProfileId] = useState<string>(loadActiveProfileId);
 
   const activeStudent =
-    profiles.find((p) => p.id === activeProfileId) || profiles[0] || loadActiveProfile();
+    profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
+
 
   // App Data States
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings());
@@ -1177,7 +1179,8 @@ export default function App() {
     reloadAllDataForProfile(newProf.id);
   };
 
-  if (profiles.length === 0) {
+  if (profiles.length === 0 || !activeStudent) {
+
     return (
       <WelcomeScreen
         onCreateAccount={handleWelcomeCreateAccount}

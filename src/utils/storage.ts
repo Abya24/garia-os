@@ -587,13 +587,25 @@ export const DEFAULT_EXAM_MILESTONES: ExamMilestone[] = [
 // MULTI-STUDENT PROFILE ENGINE (v1.5)
 // =========================================================================
 
+export const INSTALLATION_KEY = "garia_installation_id_v2";
+
+export const getInstallationId = (): string => {
+  let instId = localStorage.getItem(INSTALLATION_KEY);
+  if (!instId) {
+    instId = `inst_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem(INSTALLATION_KEY, instId);
+  }
+  return instId;
+};
+
 export const loadProfiles = (): StudentProfile[] => {
+  getInstallationId(); // ensure installation ID is initialized
   let profiles = getItem<StudentProfile[]>(PROFILES_KEY, []);
   if (!profiles || profiles.length === 0) {
     return migrateAndInitDefaultProfile();
   }
 
-  // Filter out temporary test profiles (Ananya Verma & Vikram Patel)
+  // Filter out temporary test profiles if present
   const cleanedProfiles = profiles.filter(
     (p) =>
       p.id !== "student-test-1" &&
@@ -604,16 +616,13 @@ export const loadProfiles = (): StudentProfile[] => {
 
   let profileStreamFixed = false;
   cleanedProfiles.forEach((p) => {
-    if (p.name.trim().toLowerCase().includes("chulbuli") && p.stream !== "Science") {
+    if (p.name && p.name.trim().toLowerCase().includes("chulbuli") && p.stream !== "Science") {
       p.stream = "Science";
       profileStreamFixed = true;
     }
   });
 
   if (profileStreamFixed || cleanedProfiles.length !== profiles.length) {
-    if (cleanedProfiles.length === 0) {
-      return migrateAndInitDefaultProfile();
-    }
     profiles = cleanedProfiles;
     saveProfiles(profiles);
 
@@ -625,9 +634,13 @@ export const loadProfiles = (): StudentProfile[] => {
       });
     });
 
-    const activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
-    if (activeId === "student-test-1" || activeId === "student-test-2") {
-      saveActiveProfileId(profiles[0].id);
+    if (profiles.length > 0) {
+      const activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
+      if (activeId === "student-test-1" || activeId === "student-test-2") {
+        saveActiveProfileId(profiles[0].id);
+      }
+    } else {
+      localStorage.removeItem(ACTIVE_PROFILE_KEY);
     }
   }
 
@@ -639,13 +652,13 @@ export const saveProfiles = (profiles: StudentProfile[]): void => {
 };
 
 export const loadActiveProfileId = (): string => {
-  let activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
   const profiles = loadProfiles();
+  if (!profiles || profiles.length === 0) return "";
+
+  let activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
   if (!activeId || !profiles.some((p) => p.id === activeId)) {
-    activeId = profiles[0]?.id || "";
-    if (activeId) {
-      saveActiveProfileId(activeId);
-    }
+    activeId = profiles[0].id;
+    saveActiveProfileId(activeId);
   }
   return activeId;
 };
@@ -654,23 +667,13 @@ export const saveActiveProfileId = (id: string): void => {
   setItem(ACTIVE_PROFILE_KEY, id);
 };
 
-export const loadActiveProfile = (): StudentProfile => {
+export const loadActiveProfile = (): StudentProfile | null => {
   const profiles = loadProfiles();
+  if (!profiles || profiles.length === 0) return null;
+
   const activeId = loadActiveProfileId();
   const active = profiles.find((p) => p.id === activeId);
-  if (active) return active;
-  return (
-    profiles[0] || {
-      id: "student-default",
-      name: "Student",
-      classLevel: "Class 12",
-      stream: "Commerce",
-      board: "CBSE",
-      avatarColor: "from-cyan-500 to-emerald-500",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
-  );
+  return active || profiles[0] || null;
 };
 
 function migrateAndInitDefaultProfile(): StudentProfile[] {
@@ -688,9 +691,12 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
   const legacyCareer = getItem<CareerProfile | null>(STORAGE_KEYS.CAREER_PROFILE, null);
   const legacyExam = getItem<ExamProfile | null>(STORAGE_KEYS.EXAM_PROFILE, null);
 
+  const rawName = legacySettings?.userName;
+  const sanitizedName = rawName && rawName.trim() && rawName !== "Gani" ? rawName.trim() : "Student";
+
   const defaultProfile: StudentProfile = {
     id: "student-default",
-    name: legacySettings?.userName || "Student",
+    name: sanitizedName,
     classLevel: legacyExam?.classLevel || "Class 12",
     stream: legacyCareer?.stream || legacyExam?.stream || "Commerce",
     board: legacyExam?.board || "BSEB",
@@ -714,6 +720,7 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
 
   return profiles;
 }
+
 
 const AVATAR_GRADIENTS = [
   "from-cyan-500 to-emerald-500",
