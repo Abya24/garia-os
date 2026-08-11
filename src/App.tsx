@@ -1214,6 +1214,14 @@ export default function App() {
     reloadAllDataForProfile(newProf.id);
   };
 
+  if (activeTab === "download") {
+    return (
+      <DownloadPage
+        onBackToApp={() => setActiveTab("home")}
+      />
+    );
+  }
+
   if (profiles.length === 0 || !activeStudent) {
     return (
       <WelcomeScreen

@@ -590,6 +590,7 @@ export const DEFAULT_EXAM_MILESTONES: ExamMilestone[] = [
 export const INSTALLATION_KEY = "garia_installation_id_v2";
 
 export const getInstallationId = (): string => {
+  if (typeof localStorage === "undefined") return "inst_default";
   let instId = localStorage.getItem(INSTALLATION_KEY);
   if (!instId) {
     instId = `inst_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -598,11 +599,34 @@ export const getInstallationId = (): string => {
   return instId;
 };
 
+export const getProfilesKey = (): string => {
+  return `garia_profiles_${getInstallationId()}`;
+};
+
+export const getActiveProfileKey = (): string => {
+  return `garia_active_profile_${getInstallationId()}`;
+};
+
 export const loadProfiles = (): StudentProfile[] => {
   getInstallationId(); // ensure installation ID is initialized
-  let profiles = getItem<StudentProfile[]>(PROFILES_KEY, []);
+  const pKey = getProfilesKey();
+  let profiles = getItem<StudentProfile[]>(pKey, []);
+
+  // Backward-compatible migration if this specific browser instance had v1 profiles
+  if ((!profiles || profiles.length === 0) && typeof localStorage !== "undefined") {
+    const legacyV1Profiles = getItem<StudentProfile[]>(PROFILES_KEY, []);
+    if (legacyV1Profiles && legacyV1Profiles.length > 0) {
+      profiles = legacyV1Profiles;
+      saveProfiles(profiles);
+      const legacyActive = getItem<string>(ACTIVE_PROFILE_KEY, profiles[0]?.id || "");
+      if (legacyActive) {
+        saveActiveProfileId(legacyActive);
+      }
+    }
+  }
+
   if (!profiles || profiles.length === 0) {
-    return migrateAndInitDefaultProfile();
+    return [];
   }
 
   // Filter out temporary test profiles if present
@@ -631,21 +655,13 @@ export const loadProfiles = (): StudentProfile[] => {
     profiles = cleanedProfiles;
     saveProfiles(profiles);
 
-    // Clean up test keys from localStorage
-    ["student-test-1", "student-test-2"].forEach((testId) => {
-      Object.values(STORAGE_KEYS).forEach((baseKey) => {
-        const profKey = getProfileKey(testId, baseKey);
-        localStorage.removeItem(profKey);
-      });
-    });
-
     if (profiles.length > 0) {
-      const activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
+      const activeId = getItem<string>(getActiveProfileKey(), "");
       if (activeId === "student-test-1" || activeId === "student-test-2") {
         saveActiveProfileId(profiles[0].id);
       }
     } else {
-      localStorage.removeItem(ACTIVE_PROFILE_KEY);
+      localStorage.removeItem(getActiveProfileKey());
     }
   }
 
@@ -653,27 +669,29 @@ export const loadProfiles = (): StudentProfile[] => {
 };
 
 export const saveProfiles = (profiles: StudentProfile[]): void => {
-  setItem(PROFILES_KEY, profiles);
+  setItem(getProfilesKey(), profiles);
 };
 
 export const loadActiveProfileId = (): string => {
   const profiles = loadProfiles();
   if (!profiles || profiles.length === 0) return "";
 
-  let activeId = getItem<string>(ACTIVE_PROFILE_KEY, "");
+  let activeId = getItem<string>(getActiveProfileKey(), "");
   if (!activeId || !profiles.some((p) => p.id === activeId)) {
-    activeId = profiles[0].id;
-    saveActiveProfileId(activeId);
+    activeId = profiles[0]?.id || "";
+    if (activeId) {
+      saveActiveProfileId(activeId);
+    }
   }
   return activeId;
 };
 
 export const saveActiveProfileId = (id: string): void => {
   if (!id) {
-    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    localStorage.removeItem(getActiveProfileKey());
     return;
   }
-  setItem(ACTIVE_PROFILE_KEY, id);
+  setItem(getActiveProfileKey(), id);
 };
 
 export const loadActiveProfile = (): StudentProfile | null => {

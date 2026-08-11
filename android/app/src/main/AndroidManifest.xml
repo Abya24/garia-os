@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.gariaos.app"
+    android:versionCode="7"
+    android:versionName="2.4.0">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -7,24 +10,24 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="${launcherName}"
+        android:label="Garia OS"
         android:supportsRtl="true"
         android:theme="@style/Theme.GariaOS"
         android:usesCleartextTraffic="true">
 
         <meta-data
             android:name="asset_statements"
-            android:value="${assetStatements}" />
+            android:value="[{&#34;relation&#34;:[&#34;delegate_permission/common.handle_all_urls&#34;],&#34;target&#34;:{&#34;namespace&#34;:&#34;web&#34;,&#34;site&#34;:&#34;https://garia-os.ai.studio&#34;}}]" />
 
         <activity
             android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
             android:exported="true"
-            android:label="${launcherName}"
+            android:label="Garia OS"
             android:screenOrientation="portrait">
 
             <meta-data
                 android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="${defaultUrl}" />
+                android:value="https://garia-os.ai.studio" />
 
             <meta-data
                 android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
@@ -61,14 +64,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="${hostName}" />
+                    android:host="garia-os.ai.studio" />
             </intent-filter>
         </activity>
 
         <activity
             android:name="com.google.androidbrowserhelper.trusted.FocusActivity"
             android:exported="true" />
-
     </application>
-
 </manifest>

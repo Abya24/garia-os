@@ -19,7 +19,7 @@ async function startServer() {
   });
 
   // Direct APK Download Endpoint
-  app.get(["/Garia_OS_v2.4.0_Release_APK.apk", "/Garia_OS.apk"], (req, res) => {
+  app.get(["/Garia_OS_v2.4.0_Release_APK.apk", "/Garia_OS.apk", "/garia-os-release.apk"], (req, res) => {
     const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
     const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.4.0_Release_APK.apk");
     const targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
