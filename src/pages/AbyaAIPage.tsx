@@ -83,7 +83,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // 7 Quick Action Chips for v1.6
+  // 6 Core Abya AI Modes & Quick Action Chips
   const quickActions: {
     type: AbyaQuickActionType;
     label: string;
@@ -93,52 +93,45 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   }[] = [
     {
       type: "plan_day",
-      label: "Plan My Day",
+      label: "Study Coach",
       icon: Calendar,
-      prompt: "Plan my day with realistic study blocks, revision, PYQ practice, and breaks based on today's tasks and exam countdown.",
-      bgHover: "hover:bg-blue-500/10 hover:border-blue-500/40 text-blue-400",
+      prompt: "Act as my Study Coach: help me structure my daily study routine, break down my syllabus into manageable daily goals, and optimize my study schedule.",
+      bgHover: "hover:bg-emerald-500/10 hover:border-emerald-500/40 text-emerald-300",
     },
     {
       type: "explain_topic",
-      label: "Explain a Topic",
+      label: "Doubt Solver",
       icon: GraduationCap,
-      prompt: "I need help understanding a concept. Explain it with a simple breakdown, real-world analogy, key points, solved example, and quick check question.",
-      bgHover: "hover:bg-purple-500/10 hover:border-purple-500/40 text-purple-400",
-    },
-    {
-      type: "weak_topics",
-      label: "My Weak Topics",
-      icon: Flame,
-      prompt: "Analyze my weak topics and give me a supportive action plan on what to study, practice advice, and revision timing.",
-      bgHover: "hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-400",
+      prompt: "I have a concept doubt. Please explain it clearly with step-by-step breakdown, simple analogies, key formulas/points, and a quick check question.",
+      bgHover: "hover:bg-purple-500/10 hover:border-purple-500/40 text-purple-300",
     },
     {
       type: "revise",
-      label: "What Should I Revise?",
+      label: "Revision Planner",
       icon: RotateCw,
-      prompt: "Check my revision status and give me a prioritized revision queue for my academic subjects.",
-      bgHover: "hover:bg-emerald-500/10 hover:border-emerald-500/40 text-emerald-400",
+      prompt: "Act as my Revision Planner: analyze my weak topics and chapter statuses, and create a prioritized revision queue for my subjects.",
+      bgHover: "hover:bg-blue-500/10 hover:border-blue-500/40 text-blue-300",
     },
     {
-      type: "analyze_tests",
-      label: "Analyze My Tests",
-      icon: BarChart3,
-      prompt: "Analyze my test history, score average, strong areas, and recommended next actions for my board prep.",
-      bgHover: "hover:bg-amber-500/10 hover:border-amber-500/40 text-amber-400",
+      type: "exam_coach",
+      label: "Exam Preparation",
+      icon: Trophy,
+      prompt: "Act as my Exam Coach: evaluate my countdown status, mock test scores, PYQ coverage, and give me actionable exam prep strategies.",
+      bgHover: "hover:bg-amber-500/10 hover:border-amber-500/40 text-amber-300",
     },
     {
       type: "career_guidance",
       label: "Career Guidance",
       icon: Target,
-      prompt: "Give me career guidance aligned with my target career goal and board exam preparation.",
-      bgHover: "hover:bg-cyan-500/10 hover:border-cyan-500/40 text-cyan-400",
+      prompt: "Give me tailored career guidance based on my stream (Commerce/Science/Arts), my target career pathways, and recommended course stages.",
+      bgHover: "hover:bg-cyan-500/10 hover:border-cyan-500/40 text-cyan-300",
     },
     {
-      type: "exam_coach",
-      label: "Exam Coach",
-      icon: Trophy,
-      prompt: "Act as my Exam Coach: give me my countdown focus, readiness insights, and what to study today for board success.",
-      bgHover: "hover:bg-yellow-500/10 hover:border-yellow-500/40 text-yellow-400",
+      type: "weak_topics",
+      label: "Smart Suggestions",
+      icon: Sparkles,
+      prompt: "Provide smart OS suggestions based on my current study progress, tasks pending, and board exam readiness.",
+      bgHover: "hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-300",
     },
   ];
 

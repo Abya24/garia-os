@@ -104,8 +104,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (selectedFilter === "today") return task.date === todayStr;
-    if (selectedFilter === "upcoming") return task.date > todayStr;
+    if (selectedFilter === "today") return task.date === todayStr && !task.completed;
+    if (selectedFilter === "upcoming") return task.date > todayStr && !task.completed;
+    if (selectedFilter === "completed") return task.completed;
     if (selectedFilter === "high") return task.priority === "high";
     if (selectedFilter === "study") return task.category === "study";
     if (selectedFilter === "personal") return task.category === "personal";
@@ -178,9 +179,10 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
           {/* Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
             {[
-              { id: "all", label: "All Tasks" },
               { id: "today", label: "Today" },
               { id: "upcoming", label: "Upcoming" },
+              { id: "completed", label: "Completed" },
+              { id: "all", label: "All Tasks" },
               { id: "high", label: "High Priority" },
               { id: "study", label: "Study" },
               { id: "personal", label: "Personal" },

@@ -33,21 +33,41 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   activeStudent,
   onOpenStudentModal,
 }) => {
-  const navItems = [
-    { id: "home" as ActiveTab, label: "Dashboard", icon: Home },
-    { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
-    { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
-    { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles, badge: "AI" },
-    { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v1.4.2" },
-    { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v1.4.1" },
-    { id: "career" as ActiveTab, label: "Career Center", icon: Compass, badge: "v1.4" },
-    { id: "notes" as ActiveTab, label: "Notes System", icon: FileText },
-    { id: "focus" as ActiveTab, label: "Focus Timer", icon: Timer },
-    { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
-    { id: "habits" as ActiveTab, label: "Habits Tracker", icon: Flame },
-    { id: "stats" as ActiveTab, label: "Analytics", icon: BarChart2 },
-    { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.4" },
-    { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
+  const navCategories = [
+    {
+      title: "Core Navigation",
+      items: [
+        { id: "home" as ActiveTab, label: "Dashboard", icon: Home },
+        { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
+        { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
+        { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles, badge: "AI" },
+      ],
+    },
+    {
+      title: "Academic & Exam",
+      items: [
+        { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v1.4.2" },
+        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v1.4.1" },
+        { id: "career" as ActiveTab, label: "Career Center", icon: Compass, badge: "v1.4" },
+      ],
+    },
+    {
+      title: "Tools & Utilities",
+      items: [
+        { id: "notes" as ActiveTab, label: "Notes System", icon: FileText },
+        { id: "focus" as ActiveTab, label: "Focus Timer", icon: Timer },
+        { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
+        { id: "habits" as ActiveTab, label: "Habits Tracker", icon: Flame },
+        { id: "stats" as ActiveTab, label: "Analytics", icon: BarChart2 },
+      ],
+    },
+    {
+      title: "Platform",
+      items: [
+        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.5" },
+        { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
+      ],
+    },
   ];
 
   const studentName = activeStudent?.name || settings.userName;
@@ -86,37 +106,46 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       </div>
 
       {/* Nav links */}
-      <div className="flex-1 space-y-1 overflow-y-auto pr-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
+      <div className="flex-1 space-y-4 overflow-y-auto pr-1 scrollbar-none">
+        {navCategories.map((cat, idx) => (
+          <div key={idx} className="space-y-1">
+            <h5 className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
+              {cat.title}
+            </h5>
+            <div className="space-y-0.5">
+              {cat.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/10 text-emerald-300 border border-emerald-500/30 font-semibold shadow-sm"
-                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon
-                  className={`w-4 h-4 ${
-                    isActive ? "text-emerald-400" : "text-slate-400"
-                  }`}
-                />
-                <span>{item.label}</span>
-              </div>
-              {item.badge && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/10 text-emerald-300 border border-emerald-500/30 font-semibold shadow-sm"
+                        : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className={`w-3.5 h-3.5 ${
+                          isActive ? "text-emerald-400" : "text-slate-400"
+                        }`}
+                      />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Footer info */}

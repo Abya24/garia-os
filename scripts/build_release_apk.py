@@ -157,12 +157,14 @@ public class MainActivity extends Activity {
 
 if __name__ == '__main__':
     targets = [
+        'public/Garia_OS_v2.5.0_Release_APK.apk',
         'public/Garia_OS_v2.4.0_Release_APK.apk',
         'public/Garia_OS.apk',
         'public/garia-os-release.apk',
     ]
     if os.path.exists('dist'):
         targets.extend([
+            'dist/Garia_OS_v2.5.0_Release_APK.apk',
             'dist/Garia_OS_v2.4.0_Release_APK.apk',
             'dist/Garia_OS.apk',
             'dist/garia-os-release.apk',

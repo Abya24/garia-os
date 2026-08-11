@@ -15,24 +15,32 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "2.4.0" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.5.0" });
   });
 
   // Direct APK Download Endpoint
   app.get([
+    "/Garia_OS_v2.5.0_Release_APK.apk",
     "/Garia_OS_v2.4.0_Release_APK.apk",
     "/Garia_OS.apk",
     "/garia-os-release.apk",
     "/download.apk",
+    "/download",
     "/api/download/apk"
   ], (req, res) => {
-    const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
-    const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.4.0_Release_APK.apk");
-    const targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
+    const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.5.0_Release_APK.apk");
+    const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.5.0_Release_APK.apk");
+    const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
+    
+    let targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
+    if (!fs.existsSync(targetFile)) {
+      targetFile = fallbackPublic;
+    }
+
     if (fs.existsSync(targetFile)) {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
-      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.4.0_Release_APK.apk"');
+      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.5.0_Release_APK.apk"');
       return res.sendFile(targetFile);
     }
     res.status(404).send("APK file not found");

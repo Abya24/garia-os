@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
   Timer,
@@ -18,6 +18,9 @@ import {
   ShieldAlert,
   Users,
   Download,
+  Info,
+  ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { ActiveTab } from "../types";
 
@@ -36,6 +39,8 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
   activeTab,
   onOpenStudentModal,
 }) => {
+  const [showAbout, setShowAbout] = useState(false);
+
   if (!isOpen) return null;
 
   const moreItems = [
@@ -104,7 +109,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       desc: "Get Garia OS Android app v2.4",
       icon: Download,
       color: "from-emerald-500 to-teal-400",
-      badge: "APK v2.4",
+      badge: "v2.4",
     },
     {
       id: "settings" as ActiveTab,
@@ -215,10 +220,87 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
 
         {/* Quick Footer Links */}
         <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 font-mono">
-          <span>Garia OS v1.4.2</span>
-          <span>Abya AI Powered</span>
+          <button
+            onClick={() => setShowAbout(true)}
+            className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>About Garia OS</span>
+          </button>
+          <span>Garia OS v2.5.0</span>
         </div>
       </div>
+
+      {/* About Garia OS Modal */}
+      {showAbout && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  G
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base font-heading">
+                    Garia OS v2.5.0
+                  </h3>
+                  <p className="text-xs text-emerald-400 font-medium">
+                    Smart Student Productivity & Study Platform
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAbout(false)}
+                className="p-1.5 rounded-full glass-pill text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-slate-300 leading-relaxed">
+              <p>
+                <strong className="text-white">Garia OS</strong> is an offline-first academic operating system designed specifically for students across Commerce, Science, and Arts streams.
+              </p>
+              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1.5">
+                <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Privacy & Session Isolation Architecture</span>
+                </div>
+                <p className="text-slate-400 text-[11px]">
+                  All student profiles, study logs, task matrices, and notes remain isolated strictly inside your browser installation context. No profile data is ever shared or uploaded.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-[11px] text-slate-300">
+                <div className="font-bold text-cyan-300 flex items-center gap-1.5 mb-1">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Core V2.5 Modules</span>
+                </div>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-400">
+                  <li>Subject-Based Study Tracker & High-Precision Timer</li>
+                  <li>Task Manager with Today, Upcoming & Completed tabs</li>
+                  <li>Abya AI Academic Coach (6 Specialized Modes)</li>
+                  <li>Exam Center, Academic Chapter Manager & Career Pathways</li>
+                  <li>Official Signed Android Release APK v2.4.0</li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAbout(false)}
+              className="w-full py-2.5 rounded-xl font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs transition-colors"
+            >
+              Close Overview
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

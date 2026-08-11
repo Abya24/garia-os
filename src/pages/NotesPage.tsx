@@ -28,6 +28,7 @@ export const NotesPage: React.FC<NotesPageProps> = ({
   onAskAbyaWithContext,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState<"all" | "pinned" | "recent">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
 
@@ -74,11 +75,16 @@ export const NotesPage: React.FC<NotesPageProps> = ({
     setIsModalOpen(false);
   };
 
-  const filteredNotes = notes.filter(
-    (n) =>
+  const filteredNotes = notes.filter((n) => {
+    const matchesSearch =
       n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      n.content.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (selectedFilter === "pinned") return n.pinned;
+    if (selectedFilter === "recent") return Date.now() - n.createdAt <= 86400000 * 7;
+    return true;
+  });
 
   const pinnedNotes = filteredNotes.filter((n) => n.pinned);
   const unpinnedNotes = filteredNotes.filter((n) => !n.pinned);
@@ -105,8 +111,8 @@ export const NotesPage: React.FC<NotesPageProps> = ({
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="glass-card p-3 rounded-2xl border border-white/10">
+      {/* Search Bar & Category Filters */}
+      <div className="glass-card p-3 rounded-2xl border border-white/10 space-y-2.5">
         <div className="relative w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -116,6 +122,26 @@ export const NotesPage: React.FC<NotesPageProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl glass-pill text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
           />
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+          {[
+            { id: "all", label: "All Notes" },
+            { id: "pinned", label: "Pinned Only" },
+            { id: "recent", label: "Recent (7 Days)" },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedFilter(cat.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all border ${
+                selectedFilter === cat.id
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                  : "glass-pill text-slate-400 hover:text-white border-white/5"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
       </div>
 
