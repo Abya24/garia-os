@@ -173,7 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <h2 className="text-xl font-extrabold font-heading text-white tracking-tight flex items-center justify-center gap-2">
               Garia OS Account
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                v2.1
+                v2.4.0
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-1">

@@ -14,11 +14,12 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "1.6.0" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.4.0" });
   });
 
   // Abya AI Endpoint
   app.post("/api/ai/chat", async (req, res) => {
+    const startTime = Date.now();
     try {
       const {
         prompt,
@@ -41,9 +42,10 @@ async function startServer() {
       const apiKey = customApiKey || process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        console.warn("[Abya AI] GEMINI_API_KEY is not configured.");
+        console.warn("[Abya AI Server] GEMINI_API_KEY is missing/unconfigured.");
         return res.status(401).json({
           error: "Abya AI is not configured. Please configure GEMINI_API_KEY in the deployment environment.",
+          code: "MISSING_API_KEY",
         });
       }
 
@@ -78,7 +80,7 @@ async function startServer() {
   * Keep tone warm, encouraging, conversational, and structured with friendly emojis when appropriate.`;
       }
 
-      const systemInstruction = `You are Abya AI, the intelligent built-in academic, career, and exam AI coach for Garia OS v2.2.
+      const systemInstruction = `You are Abya AI, the intelligent built-in academic, career, and exam AI coach for Garia OS v2.4.0.
 Your purpose is to empower the ACTIVE student with profile-aware intelligence:
 
 Core Capabilities:
@@ -161,25 +163,47 @@ ${
         });
       }
 
-      console.log(`[Abya AI] Sending request with ${contents.length} turn(s)...`);
+      console.log(`[Abya AI Server] Dispatching request with ${contents.length} turn(s) for student "${studentProfileContext?.name || "Student"}"...`);
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: contents,
-        config: {
-          systemInstruction: systemInstruction,
-        },
-      });
+      // Attempt AI request with 1 internal server retry for transient cold-start glitches
+      let response;
+      let lastErr: any;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: contents,
+            config: {
+              systemInstruction: systemInstruction,
+            },
+          });
+          if (response) break;
+        } catch (err: any) {
+          lastErr = err;
+          console.warn(`[Abya AI Server] Attempt ${attempt}/2 failed (${err?.message || err}).`);
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastErr || new Error("Failed to receive response from Gemini model.");
+      }
 
       const replyText =
         response.text || "I'm sorry, I couldn't generate a response. Please try again.";
 
-      console.log("[Abya AI] Response generated successfully.");
-      return res.json({ text: replyText });
+      const duration = Date.now() - startTime;
+      console.log(`[Abya AI Server] Response generated successfully in ${duration}ms.`);
+      return res.json({ text: replyText, durationMs: duration });
     } catch (error: any) {
-      console.error("[Abya AI] Error in /api/ai/chat:", error?.message || error);
-      return res.status(500).json({
+      const duration = Date.now() - startTime;
+      console.error(`[Abya AI Server] Error in /api/ai/chat after ${duration}ms:`, error?.message || error);
+      const isRateLimit = error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED");
+      return res.status(isRateLimit ? 429 : 500).json({
         error: error.message || "Failed to communicate with Abya AI service.",
+        code: isRateLimit ? "RATE_LIMITED" : "AI_SERVICE_ERROR",
       });
     }
   });

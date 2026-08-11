@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Task,
   Subject,
@@ -251,6 +251,7 @@ export default function App() {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => loadCalendarEvents());
   const [abyaChat, setAbyaChat] = useState<AbyaMessage[]>(() => loadAbyaChat());
   const [abyaLanguage, setAbyaLanguage] = useState<AbyaLanguageSetting>(() => loadAbyaLanguage());
+  const isAbyaSubmittingRef = useRef<boolean>(false);
   const [careerProfile, setCareerProfile] = useState<CareerProfile>(() => loadCareerProfile());
   const [careerAssessment, setCareerAssessment] = useState<CareerAssessment>(() => loadCareerAssessment());
   const [careerRoadmap, setCareerRoadmap] = useState<CareerRoadmap>(() => loadCareerRoadmap());
@@ -712,6 +713,12 @@ export default function App() {
     contextNote?: string,
     actionType?: any
   ) => {
+    if (isAbyaSubmittingRef.current) {
+      console.warn("[Abya AI Client] Request already in progress. Ignoring duplicate submission.");
+      return;
+    }
+    isAbyaSubmittingRef.current = true;
+
     setLastUserPrompt(prompt);
     const userMsg: AbyaMessage = {
       id: "user-" + Date.now(),
@@ -724,117 +731,199 @@ export default function App() {
     setAbyaChat(newChatWithUser);
     saveAbyaChat(newChatWithUser);
 
+    // Recent context window (last 10 messages prior to prompt)
+    const recentHistory = abyaChat.slice(-10).map((m) => ({ role: m.role, content: m.content }));
+
+    const requestPayload = {
+      prompt,
+      history: recentHistory,
+      customApiKey: settings.customApiKey,
+      contextNote,
+      abyaLanguage,
+      studentProfileContext: {
+        id: activeStudent.id,
+        name: activeStudent.name,
+        classLevel: activeStudent.classLevel,
+        stream: activeStudent.stream,
+        board: activeStudent.board,
+      },
+      todayContext: {
+        pendingTasksCount: tasks.filter((t) => !t.completed).length,
+        completedTasksCount: tasks.filter((t) => t.completed).length,
+      },
+      careerContext: {
+        stream: activeStudent.stream,
+        currentClass: activeStudent.classLevel,
+        targetCareer: careerRoadmap.careerTitle || careerProfile.selectedCareerId || "General",
+        strongSubjects: careerAssessment.strongSubjects,
+        roadmapProgress: Math.round(
+          (careerRoadmap.milestones.filter((m) => m.completed).length /
+            (careerRoadmap.milestones.length || 1)) *
+            100
+        ),
+      },
+      academicContext: {
+        stream: activeStudent.stream,
+        overallProgress: Math.round(
+          (academicChapters.filter((c) => c.status === "Completed").length /
+            (academicChapters.length || 1)) *
+            100
+        ),
+        activeSubjectsCount: academicSubjects.length,
+        weakTopicsCount: academicChapters.filter((c) => c.isWeak).length,
+        weakChapterTitles: academicChapters
+          .filter((c) => c.isWeak)
+          .map((c) => c.title)
+          .join(", "),
+        testAverage:
+          academicTests.length > 0
+            ? Math.round(
+                academicTests.reduce(
+                  (acc, t) => acc + (t.score / (t.maxMarks || 1)) * 100,
+                  0
+                ) / academicTests.length
+              )
+            : 0,
+      },
+      examContext: {
+        board: activeStudent.board || examProfile.board,
+        classLevel: activeStudent.classLevel || examProfile.classLevel,
+        stream: activeStudent.stream,
+        examName: examProfile.examName,
+        daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
+        readinessScore: calculateExamReadiness(
+          examProfile,
+          academicSubjects,
+          academicChapters,
+          [...academicTests, ...examMockTests]
+        ).overallScore,
+        readinessStatus: calculateExamReadiness(
+          examProfile,
+          academicSubjects,
+          academicChapters,
+          [...academicTests, ...examMockTests]
+        ).status,
+        urgentChapters: academicChapters
+          .filter((c) => c.priority === "VVI" || c.isWeak)
+          .map((c) => c.title)
+          .slice(0, 5)
+          .join(", "),
+        weakTopics: detectWeaknessTopics(
+          academicSubjects,
+          academicChapters,
+          [...academicTests, ...examMockTests]
+        )
+          .map((w) => `${w.subjectName}: ${w.chapterTitle}`)
+          .join(", "),
+        targetCareer: careerProfile.targetCareer,
+      },
+    };
+
+    let aiReplyText: string | null = null;
+    let isUnauthorizedKey = false;
+    const maxAttempts = 3;
+
     try {
-      // Recent context window (last 10 messages)
-      const recentHistory = abyaChat.slice(-10).map((m) => ({ role: m.role, content: m.content }));
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          history: recentHistory,
-          customApiKey: settings.customApiKey,
-          contextNote,
-          abyaLanguage,
-          studentProfileContext: {
-            id: activeStudent.id,
-            name: activeStudent.name,
-            classLevel: activeStudent.classLevel,
-            stream: activeStudent.stream,
-            board: activeStudent.board,
-          },
-          todayContext: {
-            pendingTasksCount: tasks.filter((t) => !t.completed).length,
-            completedTasksCount: tasks.filter((t) => t.completed).length,
-          },
-          careerContext: {
-            stream: activeStudent.stream,
-            currentClass: activeStudent.classLevel,
-            targetCareer: careerRoadmap.careerTitle || careerProfile.selectedCareerId || "General",
-            strongSubjects: careerAssessment.strongSubjects,
-            roadmapProgress: Math.round(
-              (careerRoadmap.milestones.filter((m) => m.completed).length /
-                (careerRoadmap.milestones.length || 1)) *
-                100
-            ),
-          },
-          academicContext: {
-            stream: activeStudent.stream,
-            overallProgress: Math.round(
-              (academicChapters.filter((c) => c.status === "Completed").length /
-                (academicChapters.length || 1)) *
-                100
-            ),
-            activeSubjectsCount: academicSubjects.length,
-            weakTopicsCount: academicChapters.filter((c) => c.isWeak).length,
-            weakChapterTitles: academicChapters
-              .filter((c) => c.isWeak)
-              .map((c) => c.title)
-              .join(", "),
-            testAverage:
-              academicTests.length > 0
-                ? Math.round(
-                    academicTests.reduce(
-                      (acc, t) => acc + (t.score / (t.maxMarks || 1)) * 100,
-                      0
-                    ) / academicTests.length
-                  )
-                : 0,
-          },
-          examContext: {
-            board: activeStudent.board || examProfile.board,
-            classLevel: activeStudent.classLevel || examProfile.classLevel,
-            stream: activeStudent.stream,
-            examName: examProfile.examName,
-            daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
-            readinessScore: calculateExamReadiness(
-              examProfile,
-              academicSubjects,
-              academicChapters,
-              [...academicTests, ...examMockTests]
-            ).overallScore,
-            readinessStatus: calculateExamReadiness(
-              examProfile,
-              academicSubjects,
-              academicChapters,
-              [...academicTests, ...examMockTests]
-            ).status,
-            urgentChapters: academicChapters
-              .filter((c) => c.priority === "VVI" || c.isWeak)
-              .map((c) => c.title)
-              .slice(0, 5)
-              .join(", "),
-            weakTopics: detectWeaknessTopics(
-              academicSubjects,
-              academicChapters,
-              [...academicTests, ...examMockTests]
-            )
-              .map((w) => `${w.subjectName}: ${w.chapterTitle}`)
-              .join(", "),
-            targetCareer: careerProfile.targetCareer,
-          },
-        }),
-      });
+        try {
+          console.log(`[Abya AI Client] Request attempt ${attempt}/${maxAttempts} for prompt: "${prompt.slice(0, 35)}..."`);
+          const res = await fetch("/api/ai/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestPayload),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
 
-      const data = await res.json();
+          const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch response from Abya AI");
+          if (res.ok && data.text) {
+            aiReplyText = data.text;
+            console.log(`[Abya AI Client] Attempt ${attempt} succeeded in ${data.durationMs || "N/A"}ms.`);
+            break;
+          }
+
+          if (res.status === 401 || data.code === "MISSING_API_KEY") {
+            console.warn("[Abya AI Client] 401 Unauthorized / Missing API key. Triggering Local Intelligence fallback directly.");
+            isUnauthorizedKey = true;
+            break;
+          }
+
+          throw new Error(data.error || `Server responded with status ${res.status}`);
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          const isAbort = err.name === "AbortError";
+          const errMsg = isAbort ? "Request timed out after 25s" : err?.message || "Network error";
+          console.warn(`[Abya AI Client] Attempt ${attempt}/${maxAttempts} failed: ${errMsg}`);
+
+          if (attempt < maxAttempts) {
+            const delay = attempt === 1 ? 1000 : 2000;
+            console.log(`[Abya AI Client] Waiting ${delay}ms before retry...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
       }
 
-      const modelMsg: AbyaMessage = {
-        id: "model-" + Date.now(),
-        role: "model",
-        content: data.text,
-        timestamp: Date.now(),
-      };
+      if (aiReplyText) {
+        const modelMsg: AbyaMessage = {
+          id: "model-" + Date.now(),
+          role: "model",
+          content: aiReplyText,
+          timestamp: Date.now(),
+        };
 
-      const finalChat = [...newChatWithUser, modelMsg];
-      setAbyaChat(finalChat);
-      saveAbyaChat(finalChat);
+        setAbyaChat((prev) => {
+          const updated = [...prev, modelMsg];
+          saveAbyaChat(updated);
+          return updated;
+        });
+      } else {
+        // Automatic Local Intelligence Fallback
+        console.log(`[Abya AI Client] External AI service unavailable (unauthorizedKey=${isUnauthorizedKey}). Using Local Intelligence.`);
+        const activeStudentData = {
+          profile: activeStudent,
+          tasks,
+          subjects: academicSubjects,
+          chapters: academicChapters,
+          tests: academicTests,
+          mockTests: examMockTests,
+          examProfile,
+          careerProfile,
+          careerRoadmap,
+          daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
+          readinessScore: calculateExamReadiness(
+            examProfile,
+            academicSubjects,
+            academicChapters,
+            [...academicTests, ...examMockTests]
+          ).overallScore,
+        };
+
+        const fallbackContent = generateAbyaFallbackResponse(
+          actionType || "general",
+          prompt,
+          activeStudentData
+        );
+
+        const modelMsg: AbyaMessage = {
+          id: "model-" + Date.now(),
+          role: "model",
+          content: fallbackContent,
+          timestamp: Date.now(),
+          isFallback: true,
+        };
+
+        setAbyaChat((prev) => {
+          const updated = [...prev, modelMsg];
+          saveAbyaChat(updated);
+          return updated;
+        });
+      }
     } catch (e: any) {
-      console.error("Abya AI chat error", e);
+      console.error("[Abya AI Client] Unexpected error in chat flow:", e);
       const errorMsg: AbyaMessage = {
         id: "error-" + Date.now(),
         role: "model",
@@ -842,9 +931,13 @@ export default function App() {
         timestamp: Date.now(),
         isError: true,
       };
-      const finalChat = [...newChatWithUser, errorMsg];
-      setAbyaChat(finalChat);
-      saveAbyaChat(finalChat);
+      setAbyaChat((prev) => {
+        const updated = [...prev, errorMsg];
+        saveAbyaChat(updated);
+        return updated;
+      });
+    } finally {
+      isAbyaSubmittingRef.current = false;
     }
   };
 
@@ -1347,7 +1440,7 @@ export default function App() {
         onImportProfile={handleImportStudentProfile}
       />
 
-      {/* Authentication & Private Mode Modal (v2.1) */}
+      {/* Authentication & Private Mode Modal (v2.4.0) */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
