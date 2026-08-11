@@ -4,8 +4,6 @@ import {
   CheckSquare,
   BookOpen,
   FileText,
-  Target,
-  Calendar,
   Compass,
   GraduationCap,
   ShieldAlert,
@@ -16,6 +14,7 @@ import {
   BarChart2,
   Settings,
   Users,
+  Download,
 } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 
@@ -36,17 +35,18 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const navItems = [
     { id: "home" as ActiveTab, label: "Dashboard", icon: Home },
+    { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
+    { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
+    { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles, badge: "AI" },
     { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v1.4.2" },
     { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v1.4.1" },
     { id: "career" as ActiveTab, label: "Career Center", icon: Compass, badge: "v1.4" },
-    { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
-    { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
     { id: "notes" as ActiveTab, label: "Notes System", icon: FileText },
-    { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles, badge: "AI" },
     { id: "focus" as ActiveTab, label: "Focus Timer", icon: Timer },
     { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
     { id: "habits" as ActiveTab, label: "Habits Tracker", icon: Flame },
     { id: "stats" as ActiveTab, label: "Analytics", icon: BarChart2 },
+    { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.4" },
     { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
   ];
 

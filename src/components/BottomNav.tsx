@@ -1,9 +1,9 @@
 import React from "react";
 import {
   Home,
-  CheckSquare,
   BookOpen,
-  FileText,
+  CheckSquare,
+  Sparkles,
   MoreHorizontal,
 } from "lucide-react";
 import { ActiveTab } from "../types";
@@ -23,9 +23,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   const mainNavItems = [
     { id: "home" as ActiveTab, label: "Home", icon: Home },
-    { id: "tasks" as ActiveTab, label: "Tasks", icon: CheckSquare },
     { id: "study" as ActiveTab, label: "Study", icon: BookOpen },
-    { id: "notes" as ActiveTab, label: "Notes", icon: FileText },
+    { id: "tasks" as ActiveTab, label: "Tasks", icon: CheckSquare },
+    { id: "abya" as ActiveTab, label: "AI", icon: Sparkles },
   ];
 
   return (
@@ -59,13 +59,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           onClick={onOpenMore}
           className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 relative ${
             isMoreOpen ||
-            ["exam", "academic", "career", "abya", "focus", "water", "habits", "stats", "settings"].includes(activeTab)
+            ["notes", "exam", "academic", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(activeTab)
               ? "text-cyan-400 font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
           {(isMoreOpen ||
-            ["exam", "academic", "career", "abya", "focus", "water", "habits", "stats", "settings"].includes(
+            ["notes", "exam", "academic", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(
               activeTab
             )) && (
             <div className="absolute inset-0 bg-cyan-500/15 rounded-xl border border-cyan-500/30" />

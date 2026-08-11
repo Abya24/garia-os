@@ -19,11 +19,18 @@ async function startServer() {
   });
 
   // Direct APK Download Endpoint
-  app.get(["/Garia_OS_v2.4.0_Release_APK.apk", "/Garia_OS.apk", "/garia-os-release.apk"], (req, res) => {
+  app.get([
+    "/Garia_OS_v2.4.0_Release_APK.apk",
+    "/Garia_OS.apk",
+    "/garia-os-release.apk",
+    "/download.apk",
+    "/api/download/apk"
+  ], (req, res) => {
     const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
     const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.4.0_Release_APK.apk");
     const targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
     if (fs.existsSync(targetFile)) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
       res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.4.0_Release_APK.apk"');
       return res.sendFile(targetFile);

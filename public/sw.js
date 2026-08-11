@@ -1,4 +1,4 @@
-const CACHE_NAME = "garia-os-v3.2.0-session-isolated";
+const CACHE_NAME = "garia-os-v3.4.0-clean";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -44,8 +44,14 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Do not cache API requests or non-GET requests
-  if (url.pathname.startsWith("/api") || event.request.method !== "GET") {
+  // Do not cache API requests, APK downloads, or non-GET requests
+  if (
+    url.pathname.startsWith("/api") ||
+    url.pathname.endsWith(".apk") ||
+    url.pathname.includes("Garia_OS") ||
+    url.pathname === "/download.apk" ||
+    event.request.method !== "GET"
+  ) {
     return;
   }
 

@@ -129,37 +129,21 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
           <div>
             <div className="flex items-center justify-center gap-2">
-              <h1 className="text-2xl font-extrabold font-heading text-white tracking-tight">
-                Welcome to Garia OS
+              <h1 className="text-3xl font-extrabold font-heading text-white tracking-tight">
+                Garia OS
               </h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 v2.4.0
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              Student Productivity &amp; AI Academic Operating System
+            <p className="text-xs text-emerald-400 font-medium mt-1 max-w-sm">
+              Smart Student Productivity &amp; Study Platform
             </p>
           </div>
         </div>
 
-        {/* Top Option Selector Tabs (Requirement #6) */}
+        {/* Top Option Selector Tabs */}
         <div className="grid grid-cols-3 p-1 rounded-2xl bg-slate-900/80 border border-white/10 text-xs gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("private");
-              setErrorMessage(null);
-            }}
-            className={`py-2 px-2 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === "private"
-                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>Private</span>
-          </button>
-
           <button
             type="button"
             onClick={() => {
@@ -168,12 +152,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             }}
             className={`py-2 px-2 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === "signup"
-                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md"
                 : "text-slate-400 hover:text-white"
             }`}
           >
             <UserPlus className="w-3.5 h-3.5 shrink-0" />
-            <span>Create</span>
+            <span>Create Account</span>
           </button>
 
           <button
@@ -190,6 +174,22 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           >
             <LogIn className="w-3.5 h-3.5 shrink-0" />
             <span>Log In</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("private");
+              setErrorMessage(null);
+            }}
+            className={`py-2 px-2 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "private"
+                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            <span>Continue Privately</span>
           </button>
         </div>
 

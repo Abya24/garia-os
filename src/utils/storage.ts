@@ -629,42 +629,6 @@ export const loadProfiles = (): StudentProfile[] => {
     return [];
   }
 
-  // Filter out temporary test profiles if present
-  let modified = false;
-  const cleanedProfiles = profiles
-    .filter(
-      (p) =>
-        p.id !== "student-test-1" &&
-        p.id !== "student-test-2" &&
-        p.name !== "Ananya Verma" &&
-        p.name !== "Vikram Patel"
-    )
-    .map((p) => {
-      let updatedStream = p.stream;
-      if (p.name && p.name.trim().toLowerCase().includes("chulbuli") && updatedStream !== "Science") {
-        updatedStream = "Science";
-        modified = true;
-      }
-      if (updatedStream !== p.stream) {
-        return { ...p, stream: updatedStream };
-      }
-      return p;
-    });
-
-  if (modified || cleanedProfiles.length !== profiles.length) {
-    profiles = cleanedProfiles;
-    saveProfiles(profiles);
-
-    if (profiles.length > 0) {
-      const activeId = getItem<string>(getActiveProfileKey(), "");
-      if (activeId === "student-test-1" || activeId === "student-test-2") {
-        saveActiveProfileId(profiles[0].id);
-      }
-    } else {
-      localStorage.removeItem(getActiveProfileKey());
-    }
-  }
-
   return profiles;
 };
 
@@ -763,15 +727,12 @@ export const addStudentProfile = (
 ): StudentProfile => {
   const profiles = loadProfiles();
   const avatarIndex = profiles.length % AVATAR_GRADIENTS.length;
-  const rawName = data.name.trim();
+  const rawName = data.name ? data.name.trim() : "";
   const sanitizedName = rawName || "Student";
 
-  const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
-  const finalStream = isChulbuli ? "Science" : data.stream;
   const newProfile: StudentProfile = {
     ...data,
     name: sanitizedName,
-    stream: finalStream,
     id: `student-${Date.now()}`,
     avatarColor: data.avatarColor || AVATAR_GRADIENTS[avatarIndex],
     createdAt: Date.now(),
@@ -794,14 +755,11 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
   const profiles = loadProfiles();
   const index = profiles.findIndex((p) => p.id === updated.id);
   if (index !== -1) {
-    const rawName = updated.name.trim();
+    const rawName = updated.name ? updated.name.trim() : "";
     const sanitizedName = rawName || "Student";
-    const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
-    const finalStream = isChulbuli ? "Science" : updated.stream;
     const finalUpdated = {
       ...updated,
       name: sanitizedName,
-      stream: finalStream,
       updatedAt: Date.now(),
     };
     profiles[index] = finalUpdated;
@@ -1055,9 +1013,6 @@ export const loadSubjects = (profileId?: string): Subject[] => {
   const activeProf = loadProfiles().find((p) => p.id === pId);
 
   let stream: string = activeProf?.stream || "Commerce";
-  if (activeProf?.name?.trim().toLowerCase().includes("chulbuli")) {
-    stream = "Science";
-  }
 
   const defaultStreamSubs = getDefaultStudySubjectsForStream(stream as StreamType);
   const key = getProfileKey(pId, STORAGE_KEYS.SUBJECTS);

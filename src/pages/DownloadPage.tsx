@@ -111,6 +111,16 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               <span>{isDownloading ? "Downloading APK..." : downloadSuccess ? "Downloaded Successfully!" : "Download Garia OS v2.4.0 Release APK"}</span>
             </button>
 
+            {/* Direct fallback link for mobile browsers */}
+            <a
+              href="/Garia_OS_v2.4.0_Release_APK.apk"
+              download="Garia_OS_v2.4.0_Release_APK.apk"
+              className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Direct Link: Download APK (v2.4.0)</span>
+            </a>
+
             <button
               onClick={() => {
                 if (onBackToApp) {

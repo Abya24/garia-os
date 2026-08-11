@@ -40,6 +40,13 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
 
   const moreItems = [
     {
+      id: "notes" as ActiveTab,
+      label: "Notes & Docs",
+      desc: "Rich markdown notes, tags & PDF attachments",
+      icon: FileText,
+      color: "from-blue-500 to-indigo-500",
+    },
+    {
       id: "exam" as ActiveTab,
       label: "Exam Intelligence",
       desc: "Board profile, readiness score, queue & mock tests",
@@ -58,32 +65,10 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     {
       id: "career" as ActiveTab,
       label: "Career Center",
-      desc: "Commerce & Science pathways & roadmaps",
+      desc: "Commerce, Science & Arts pathways & roadmaps",
       icon: Compass,
       color: "from-emerald-400 to-cyan-500",
       badge: "V1.4",
-    },
-    {
-      id: "goals" as ActiveTab,
-      label: "Goals Tracker",
-      desc: "Milestones, categories & target dates",
-      icon: Target,
-      color: "from-emerald-500 to-teal-500",
-    },
-    {
-      id: "calendar" as ActiveTab,
-      label: "Academic Calendar",
-      desc: "Exams, tasks & monthly planner",
-      icon: Calendar,
-      color: "from-amber-500 to-orange-500",
-    },
-    {
-      id: "abya" as ActiveTab,
-      label: "Abya AI Assistant",
-      desc: "Smart study planning & revision AI",
-      icon: Sparkles,
-      color: "from-emerald-500 to-cyan-500",
-      badge: "AI Powered",
     },
     {
       id: "focus" as ActiveTab,
