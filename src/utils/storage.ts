@@ -605,7 +605,7 @@ export const loadProfiles = (): StudentProfile[] => {
     return migrateAndInitDefaultProfile();
   }
 
-  // Filter out temporary test profiles and sanitize any profile names containing "gani"
+  // Filter out temporary test profiles if present
   let modified = false;
   const cleanedProfiles = profiles
     .filter(
@@ -616,18 +616,13 @@ export const loadProfiles = (): StudentProfile[] => {
         p.name !== "Vikram Patel"
     )
     .map((p) => {
-      let updatedName = p.name || "Student";
-      if (updatedName.toLowerCase().includes("gani")) {
-        updatedName = "Student";
-        modified = true;
-      }
       let updatedStream = p.stream;
-      if (updatedName.trim().toLowerCase().includes("chulbuli") && updatedStream !== "Science") {
+      if (p.name && p.name.trim().toLowerCase().includes("chulbuli") && updatedStream !== "Science") {
         updatedStream = "Science";
         modified = true;
       }
-      if (updatedName !== p.name || updatedStream !== p.stream) {
-        return { ...p, name: updatedName, stream: updatedStream };
+      if (updatedStream !== p.stream) {
+        return { ...p, stream: updatedStream };
       }
       return p;
     });
@@ -706,10 +701,7 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
   const legacyExam = getItem<ExamProfile | null>(STORAGE_KEYS.EXAM_PROFILE, null);
 
   const rawName = legacySettings?.userName;
-  const sanitizedName =
-    rawName && rawName.trim() && !rawName.toLowerCase().includes("gani")
-      ? rawName.trim()
-      : "Student";
+  const sanitizedName = rawName && rawName.trim() ? rawName.trim() : "Student";
 
   const defaultProfile: StudentProfile = {
     id: "student-default",
@@ -754,8 +746,7 @@ export const addStudentProfile = (
   const profiles = loadProfiles();
   const avatarIndex = profiles.length % AVATAR_GRADIENTS.length;
   const rawName = data.name.trim();
-  const sanitizedName =
-    rawName && !rawName.toLowerCase().includes("gani") ? rawName : "Student";
+  const sanitizedName = rawName || "Student";
 
   const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
   const finalStream = isChulbuli ? "Science" : data.stream;
@@ -786,8 +777,7 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
   const index = profiles.findIndex((p) => p.id === updated.id);
   if (index !== -1) {
     const rawName = updated.name.trim();
-    const sanitizedName =
-      rawName && !rawName.toLowerCase().includes("gani") ? rawName : "Student";
+    const sanitizedName = rawName || "Student";
     const isChulbuli = sanitizedName.toLowerCase().includes("chulbuli");
     const finalStream = isChulbuli ? "Science" : updated.stream;
     const finalUpdated = {
@@ -1261,15 +1251,8 @@ export const loadSettings = (profileId?: string): UserSettings => {
     ? { ...defaultSettings, userName: activeProf.name }
     : defaultSettings;
   const stored = getItem(getProfileKey(pId, STORAGE_KEYS.SETTINGS), fallback);
-  let userName = stored?.userName || fallback.userName || "Student";
-  if (userName.toLowerCase().includes("gani")) {
-    userName = "Student";
-  }
-  const accountName = stored?.account?.name;
-  const sanitizedAccountName =
-    accountName && !accountName.toLowerCase().includes("gani")
-      ? accountName
-      : userName;
+  const userName = stored?.userName || fallback.userName || "Student";
+  const accountName = stored?.account?.name || userName;
 
   return {
     ...fallback,
@@ -1282,7 +1265,7 @@ export const loadSettings = (profileId?: string): UserSettings => {
     account: {
       ...defaultSettings.account!,
       ...(stored?.account || {}),
-      name: sanitizedAccountName,
+      name: accountName,
     },
   };
 };

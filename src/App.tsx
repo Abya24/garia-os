@@ -419,8 +419,32 @@ export default function App() {
     }
   };
 
-  // Diagnostic Session Isolation Log
+  // Diagnostic Session Isolation Log & GARIA DEBUG Initialization Path
   useEffect(() => {
+    let lsKeys: string[] = [];
+    let ssKeys: string[] = [];
+    let cookiesPresent = false;
+    try {
+      lsKeys = Object.keys(localStorage);
+    } catch (e) {}
+    try {
+      ssKeys = Object.keys(sessionStorage);
+    } catch (e) {}
+    try {
+      cookiesPresent = !!document.cookie;
+    } catch (e) {}
+
+    console.log("[GARIA DEBUG]", {
+      localStorageKeys: lsKeys,
+      sessionStorageKeys: ssKeys,
+      cookiesPresent,
+      initialProfiles: profiles,
+      initialActiveProfileId: activeProfileId,
+      initialActiveStudent: activeStudent,
+      sourceOfActiveStudent: profiles.length === 0 ? "None (Fresh Context)" : (activeStudent ? "Loaded from profiles" : "None"),
+      sourceOfProfileName: activeStudent ? activeStudent.name : "None (Welcome Screen Active)",
+    });
+
     console.log("[GARIA SESSION]", {
       profilesCount: profiles.length,
       activeProfileId,
@@ -1191,7 +1215,6 @@ export default function App() {
   };
 
   if (profiles.length === 0 || !activeStudent) {
-
     return (
       <WelcomeScreen
         onCreateAccount={handleWelcomeCreateAccount}

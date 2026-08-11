@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -15,6 +16,19 @@ async function startServer() {
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", app: "Garia OS", version: "2.4.0" });
+  });
+
+  // Direct APK Download Endpoint
+  app.get(["/Garia_OS_v2.4.0_Release_APK.apk", "/Garia_OS.apk"], (req, res) => {
+    const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
+    const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.4.0_Release_APK.apk");
+    const targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
+    if (fs.existsSync(targetFile)) {
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.4.0_Release_APK.apk"');
+      return res.sendFile(targetFile);
+    }
+    res.status(404).send("APK file not found");
   });
 
   // Abya AI Endpoint

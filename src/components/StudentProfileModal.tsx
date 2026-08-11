@@ -356,10 +356,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <input
                     type="text"
                     required
+                    dir="ltr"
+                    style={{ direction: "ltr", textAlign: "left" }}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm text-left"
                   />
                 </div>
 

@@ -286,10 +286,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="text"
                       required
+                      dir="ltr"
+                      style={{ direction: "ltr", textAlign: "left" }}
                       placeholder="e.g. Alex Sharma"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                     />
                   </div>
                 </div>
@@ -304,10 +306,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="email"
                     required
+                    dir="ltr"
+                    style={{ direction: "ltr", textAlign: "left" }}
                     placeholder="student@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                   />
                 </div>
               </div>
@@ -321,10 +325,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type={showPassword ? "text" : "password"}
                     required
+                    dir="ltr"
+                    style={{ direction: "ltr", textAlign: "left" }}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                   />
                   <button
                     type="button"

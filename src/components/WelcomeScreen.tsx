@@ -223,10 +223,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
                     type="text"
+                    dir="ltr"
+                    style={{ direction: "ltr", textAlign: "left" }}
                     placeholder="e.g. Alex Sharma"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                   />
                 </div>
               </div>
@@ -302,10 +304,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type="text"
                   required
+                  dir="ltr"
+                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="e.g. Alex Sharma"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
               </div>
             </div>
@@ -319,10 +323,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type="email"
                   required
+                  dir="ltr"
+                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="student@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
               </div>
             </div>
@@ -336,10 +342,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  dir="ltr"
+                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
                 <button
                   type="button"
@@ -405,10 +413,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type="email"
                   required
+                  dir="ltr"
+                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="student@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
               </div>
             </div>
@@ -422,10 +432,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  dir="ltr"
+                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
                 <button
                   type="button"
