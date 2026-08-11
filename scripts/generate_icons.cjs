@@ -85,9 +85,10 @@ for (const target of targets) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  const buffer = renderPng(target.svg, target.width);
+  const rawBuffer = renderPng(target.svg, target.width);
+  const buffer = Buffer.from(rawBuffer);
   fs.writeFileSync(fullPath, buffer);
-  console.log(`Saved ${target.path} (${target.width}x${target.width}, ${buffer.length} bytes)`);
+  console.log(`Saved ${target.path} (${target.width}x${target.width}, ${buffer.length} bytes, header=${buffer.subarray(0, 8).toString('hex')})`);
 }
 
 console.log('All PNG icons generated successfully!');
