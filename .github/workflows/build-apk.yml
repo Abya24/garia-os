@@ -49,38 +49,111 @@ jobs:
           python -m pip install pillow
           python3 scripts/verify_pngs.py
 
+      - name: Setup Keystore for Release Signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          KEYSTORE_DIR="android/app"
+          KEYSTORE_FILE="$KEYSTORE_DIR/release.keystore"
+          
+          STORE_PASS="${RELEASE_KEYSTORE_PASSWORD:-gariaos123}"
+          KEY_ALIAS="${RELEASE_KEY_ALIAS:-gariaos}"
+          KEY_PASS="${RELEASE_KEY_PASSWORD:-gariaos123}"
+
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "🔐 Decoding release keystore from secrets..."
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+          else
+            echo "🔑 Generating dedicated release keystore..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_FILE" \
+              -storepass "$STORE_PASS" \
+              -alias "$KEY_ALIAS" \
+              -keypass "$KEY_PASS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Garia OS, OU=Engineering, O=Garia OS, L=City, S=State, C=US"
+          fi
+
+          echo "RELEASE_KEYSTORE_PATH=release.keystore" >> $GITHUB_ENV
+          echo "RELEASE_KEYSTORE_PASSWORD=$STORE_PASS" >> $GITHUB_ENV
+          echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+          echo "RELEASE_KEY_PASSWORD=$KEY_PASS" >> $GITHUB_ENV
+          echo "✅ Keystore configured at $KEYSTORE_FILE"
+
       - name: Build Android Release APK
         run: |
           cd android
           gradle assembleRelease --no-daemon
 
-      - name: Verify APK Output
+      - name: Verify APK Signature & Package Integrity
         run: |
-          RELEASE_APK_DIR="android/app/build/outputs/apk/release"
-          echo "Checking APK directory: $RELEASE_APK_DIR"
-          if [ -d "$RELEASE_APK_DIR" ]; then
-            ls -lh "$RELEASE_APK_DIR"
-            APK_FILE=$(find "$RELEASE_APK_DIR" -name "*.apk" | head -n 1)
-            if [ -n "$APK_FILE" ]; then
-              FILE_SIZE_BYTES=$(stat -c%s "$APK_FILE")
-              echo "✅ Release APK generated: $APK_FILE"
-              echo "File size: $(du -h "$APK_FILE" | cut -f1) ($FILE_SIZE_BYTES bytes)"
-              if [ "$FILE_SIZE_BYTES" -lt 1048576 ]; then
-                echo "❌ APK size is less than 1 MB ($FILE_SIZE_BYTES bytes). Invalid build."
-                exit 1
-              fi
-            else
-              echo "❌ No APK binary found in $RELEASE_APK_DIR"
-              exit 1
-            fi
-          else
-            echo "❌ Output directory $RELEASE_APK_DIR does not exist."
+          RELEASE_DIR="android/app/build/outputs/apk/release"
+          TARGET_APK="$RELEASE_DIR/Garia_OS_v2.4.0_Release_APK.apk"
+
+          echo "Checking release APK directory..."
+          ls -lh "$RELEASE_DIR"
+
+          BUILT_APK=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.apk" ! -name "*unsigned*" ! -name "Garia_OS_v2.4.0_Release_APK.apk" | head -n 1)
+          if [ -z "$BUILT_APK" ]; then
+            BUILT_APK=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.apk" | head -n 1)
+          fi
+
+          if [ -z "$BUILT_APK" ]; then
+            echo "❌ ERROR: No APK file generated in $RELEASE_DIR"
             exit 1
           fi
 
-      - name: Upload APK Artifact
+          FILE_SIZE=$(stat -c%s "$BUILT_APK")
+          echo "Found built APK: $BUILT_APK ($FILE_SIZE bytes)"
+
+          if [ "$FILE_SIZE" -lt 1048576 ]; then
+            echo "❌ ERROR: APK file size is too small ($FILE_SIZE bytes)."
+            exit 1
+          fi
+
+          # 1. Zip Integrity Check
+          echo "🔍 Verifying ZIP container integrity..."
+          unzip -t "$BUILT_APK" > /dev/null
+          echo "✅ ZIP container structure is valid."
+
+          # 2. Locate apksigner
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "❌ ERROR: apksigner tool not found in $ANDROID_HOME/build-tools"
+            exit 1
+          fi
+
+          echo "Using apksigner: $APKSIGNER"
+
+          # 3. Verify APK signature
+          echo "🔐 Verifying APK signature..."
+          VERIFY_OUTPUT=$($APKSIGNER verify --verbose --print-certs "$BUILT_APK")
+          echo "$VERIFY_OUTPUT"
+
+          if echo "$VERIFY_OUTPUT" | grep -q "DOES NOT VERIFY"; then
+            echo "❌ ERROR: APK signature verification failed!"
+            exit 1
+          fi
+
+          if ! echo "$VERIFY_OUTPUT" | grep -q "Verified"; then
+            echo "❌ ERROR: APK is not signed or verification failed."
+            exit 1
+          fi
+
+          echo "✅ APK signature verified successfully!"
+
+          # 4. Copy/rename APK to final artifact name
+          cp "$BUILT_APK" "$TARGET_APK"
+          echo "✅ Prepared final signed artifact: $TARGET_APK ($(stat -c%s "$TARGET_APK") bytes)"
+
+      - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Garia_OS_v2.4.0_Release_APK
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/release/Garia_OS_v2.4.0_Release_APK.apk
           retention-days: 30

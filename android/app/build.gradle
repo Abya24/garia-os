@@ -21,12 +21,37 @@ android {
         ]
     }
 
+    signingConfigs {
+        release {
+            def storeFilePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            if (storeFilePath != null && file(storeFilePath).exists()) {
+                storeFile file(storeFilePath)
+                storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "gariaos123"
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "gariaos"
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "gariaos123"
+            } else if (file("release.keystore").exists()) {
+                storeFile file("release.keystore")
+                storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "gariaos123"
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "gariaos"
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "gariaos123"
+            } else if (file("../release.keystore").exists()) {
+                storeFile file("../release.keystore")
+                storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "gariaos123"
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "gariaos"
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "gariaos123"
+            } else {
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
             minifyEnabled false
         }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
