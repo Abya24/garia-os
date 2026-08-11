@@ -3,4 +3,4 @@ Allow: /
 Allow: /download
 Allow: /apk
 
-Sitemap: https://gariaos.app/sitemap.xml
+Sitemap: https://garia-os.ai.studio/sitemap.xml
