@@ -51,7 +51,7 @@ jobs:
       - name: Upload Release AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: garia-os-v1.6.0-release-unsigned-aab
+          name: garia-os-v2.8.3-release-unsigned-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14

@@ -15,7 +15,36 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "2.8.2" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.8.3" });
+  });
+
+  // APK Version & Metadata Endpoint
+  app.get("/api/apk/version", (req, res) => {
+    const v283Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.3_Release_APK.apk");
+    const v283Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.3_Release_APK.apk");
+    const targetFile = fs.existsSync(v283Dist) ? v283Dist : v283Public;
+
+    let size = 0;
+    let sha256 = "";
+
+    if (fs.existsSync(targetFile)) {
+      const stats = fs.statSync(targetFile);
+      size = stats.size;
+      const fileBuffer = fs.readFileSync(targetFile);
+      sha256 = require("crypto").createHash("sha256").update(fileBuffer).digest("hex");
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.json({
+      version: "2.8.3",
+      versionCode: 13,
+      packageName: "com.gariaos.app",
+      fileName: "Garia_OS_v2.8.3_Release_APK.apk",
+      sizeBytes: size,
+      sha256: sha256,
+      releaseDate: new Date().toISOString()
+    });
   });
 
   // Digital Asset Links Endpoint
@@ -46,8 +75,8 @@ async function startServer() {
 
   // Direct APK Download Endpoint
   app.get([
-    "/Garia_OS_v2.8.2_Release_APK.apk",
     "/Garia_OS_v2.8.3_Release_APK.apk",
+    "/Garia_OS_v2.8.2_Release_APK.apk",
     "/Garia_OS_v2.8.1_Release_APK.apk",
     "/Garia_OS_v2.8.0_Release_APK.apk",
     "/Garia_OS_v2.7_Release_APK.apk",
@@ -60,15 +89,15 @@ async function startServer() {
     "/download",
     "/api/download/apk"
   ], (req, res) => {
-    const v282Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.2_Release_APK.apk");
-    const v282Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.2_Release_APK.apk");
+    const v283Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.3_Release_APK.apk");
+    const v283Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.3_Release_APK.apk");
     const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS.apk");
     
-    let targetFile = fs.existsSync(v282Dist) ? v282Dist : (fs.existsSync(v282Public) ? v282Public : fallbackPublic);
+    let targetFile = fs.existsSync(v283Dist) ? v283Dist : (fs.existsSync(v283Public) ? v283Public : fallbackPublic);
 
     if (fs.existsSync(targetFile)) {
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
-      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.8.2_Release_APK.apk"');
+      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.8.3_Release_APK.apk"');
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       return res.sendFile(targetFile);
     }
@@ -138,7 +167,7 @@ async function startServer() {
   * Keep tone warm, encouraging, conversational, and structured with friendly emojis when appropriate.`;
       }
 
-      const systemInstruction = `You are Abya AI, the intelligent built-in academic, career, and exam AI coach for Garia OS v2.8.2.
+      const systemInstruction = `You are Abya AI, the intelligent built-in academic, career, and exam AI coach for Garia OS v2.8.3.
 Your purpose is to empower the ACTIVE student with profile-aware intelligence:
 
 Core Capabilities:

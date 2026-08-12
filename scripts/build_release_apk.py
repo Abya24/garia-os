@@ -4,8 +4,23 @@ import shutil
 import glob
 import hashlib
 import subprocess
+import urllib.request
 
-def build_real_android_apk(output_path, package="com.gariaos.app", version_name="2.8.2", version_code=12):
+def ensure_toolchain_jars():
+    if not os.path.exists("/tmp/android.jar") or os.path.getsize("/tmp/android.jar") < 1000000:
+        print("📥 Downloading android.jar (SDK platform)...")
+        android_jar_url = "https://github.com/Sable/android-platforms/raw/master/android-33/android.jar"
+        urllib.request.urlretrieve(android_jar_url, "/tmp/android.jar")
+        print("✅ Downloaded /tmp/android.jar:", os.path.getsize("/tmp/android.jar"), "bytes")
+
+    if not os.path.exists("/tmp/r8.jar") or os.path.getsize("/tmp/r8.jar") < 1000000:
+        print("📥 Downloading r8.jar (Google D8 compiler)...")
+        r8_jar_url = "https://storage.googleapis.com/r8-releases/raw/8.2.33/r8.jar"
+        urllib.request.urlretrieve(r8_jar_url, "/tmp/r8.jar")
+        print("✅ Downloaded /tmp/r8.jar:", os.path.getsize("/tmp/r8.jar"), "bytes")
+
+def build_real_android_apk(output_path, package="com.gariaos.app", version_name="2.8.3", version_code=13):
+    ensure_toolchain_jars()
     build_dir = "/tmp/garia_android_build"
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
@@ -267,6 +282,9 @@ public class MainActivity extends Activity {
 
     # 7. Generate PKCS12 keystore with keytool & sign with apksigner (v1, v2, v3)
     keystore_path = os.path.join(build_dir, "release.p12")
+    if os.path.exists(keystore_path):
+        os.remove(keystore_path)
+
     subprocess.run([
         "keytool", "-genkeypair", "-v",
         "-keystore", keystore_path,
@@ -278,7 +296,7 @@ public class MainActivity extends Activity {
         "-storepass", "gariaos123",
         "-keypass", "gariaos123",
         "-dname", "CN=Garia OS, OU=Engineering, O=Garia OS, L=Kolkata, ST=WB, C=IN"
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ], check=True)
 
     subprocess.run([
         "apksigner", "sign",
@@ -304,12 +322,12 @@ public class MainActivity extends Activity {
     return aligned_apk, sha256
 
 if __name__ == "__main__":
-    primary_apk_path = "public/Garia_OS_v2.8.2_Release_APK.apk"
+    primary_apk_path = "public/Garia_OS_v2.8.3_Release_APK.apk"
     primary_aligned, primary_sha = build_real_android_apk(primary_apk_path)
 
     # Copy to all target fallback paths
     targets = [
-        "public/Garia_OS_v2.8.3_Release_APK.apk",
+        "public/Garia_OS_v2.8.2_Release_APK.apk",
         "public/Garia_OS_v2.8.1_Release_APK.apk",
         "public/Garia_OS_v2.8.0_Release_APK.apk",
         "public/Garia_OS_v2.7_Release_APK.apk",
@@ -356,4 +374,4 @@ if __name__ == "__main__":
     res_unzip = subprocess.run(["unzip", "-t", primary_aligned], capture_output=True, text=True)
     print("Unzip Exit Code:", res_unzip.returncode)
 
-    print(f"\nSUCCESS: Real Android Release APK v2.8.2 Built ({os.path.getsize(primary_apk_path)} bytes) | SHA256: {primary_sha}")
+    print(f"\nSUCCESS: Real Android Release APK v2.8.3 Built ({os.path.getsize(primary_apk_path)} bytes) | SHA256: {primary_sha}")

@@ -24,12 +24,36 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [apkInfo, setApkInfo] = useState<{
+    version: string;
+    versionCode: number;
+    sha256: string;
+    sizeBytes: number;
+  }>({
+    version: "2.8.3",
+    versionCode: 13,
+    sha256: "435e6833b5061f053244752f3d5958a288ecc014e825a688fc99fb89860a3b6f",
+    sizeBytes: 22506
+  });
 
-  const sha256 =
-    "17538bfcab9c82f6ce20f72af48b4818c07700b01377a72d11964eb456ff3745";
+  React.useEffect(() => {
+    fetch("/api/apk/version")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.sha256) {
+          setApkInfo({
+            version: data.version || "2.8.3",
+            versionCode: data.versionCode || 13,
+            sha256: data.sha256,
+            sizeBytes: data.sizeBytes || 22506
+          });
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch APK version metadata:", err));
+  }, []);
 
   const handleCopySha = () => {
-    navigator.clipboard.writeText(sha256);
+    navigator.clipboard.writeText(apkInfo.sha256);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -37,8 +61,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const handleTriggerDownload = () => {
     setIsDownloading(true);
     const link = document.createElement("a");
-    link.href = "/Garia_OS_v2.8.2_Release_APK.apk";
-    link.download = "Garia_OS_v2.8.2_Release_APK.apk";
+    link.href = "/Garia_OS_v2.8.3_Release_APK.apk";
+    link.download = "Garia_OS_v2.8.3_Release_APK.apk";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -67,7 +91,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 Garia OS
               </h1>
               <p className="text-xs text-emerald-400 font-medium">
-                Official Android Release APK (v2.8.2)
+                Official Android Release APK (v{apkInfo.version})
               </p>
             </div>
           </div>
@@ -109,7 +133,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </h3>
               <div className="flex items-center justify-center gap-2 text-xs font-mono text-emerald-400">
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
-                  v2.8.2 • Code 12
+                  v{apkInfo.version} • Code {apkInfo.versionCode}
                 </span>
                 <span className="text-slate-400">•</span>
                 <span className="text-slate-300 font-sans">Official signed Android release</span>
@@ -122,17 +146,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               className="w-full py-4 px-6 rounded-xl font-bold text-base bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] disabled:opacity-75"
             >
               <Download className="w-5 h-5" />
-              <span>{isDownloading ? "Downloading APK..." : downloadSuccess ? "Downloaded Successfully!" : "Download Garia OS v2.8.2 APK"}</span>
+              <span>{isDownloading ? "Downloading APK..." : downloadSuccess ? "Downloaded Successfully!" : `Download Garia OS v${apkInfo.version} APK`}</span>
             </button>
 
             {/* Direct Link */}
             <a
-              href="/Garia_OS_v2.8.2_Release_APK.apk"
-              download="Garia_OS_v2.8.2_Release_APK.apk"
+              href="/Garia_OS_v2.8.3_Release_APK.apk"
+              download="Garia_OS_v2.8.3_Release_APK.apk"
               className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all"
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Download Garia OS v2.8.2 APK (Direct File)</span>
+              <span>Download Garia OS v{apkInfo.version} APK (Direct File)</span>
             </a>
 
             <button
@@ -160,7 +184,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 <span>APK Release Verified</span>
               </div>
               <p className="text-[11px] leading-relaxed text-slate-300">
-                Official Android Release APK (<code className="text-emerald-400">com.gariaos.app</code> v2.8.2, Code 12). Target SDK 34, Android 14/15 ready, compiled with D8 & aapt, v1+v2+v3 apksigner signed.
+                Official Android Release APK (<code className="text-emerald-400">com.gariaos.app</code> v{apkInfo.version}, Code {apkInfo.versionCode}). Target SDK 34, Android 14/15 ready, compiled with D8 & aapt, v1+v2+v3 apksigner signed.
               </p>
             </div>
 
@@ -168,7 +192,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
             <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
               <div>
                 <span className="text-slate-500 block">Version:</span>
-                <span className="font-semibold text-slate-200">v2.8.2 (Code 12)</span>
+                <span className="font-semibold text-slate-200">v{apkInfo.version} (Code {apkInfo.versionCode})</span>
               </div>
               <div>
                 <span className="text-slate-500 block">Status:</span>
@@ -207,7 +231,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 </button>
               </div>
               <p className="font-mono text-[10px] text-slate-400 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 break-all select-all">
-                {sha256}
+                {apkInfo.sha256}
               </p>
             </div>
           </div>
@@ -343,7 +367,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       <footer className="border-t border-slate-800/80 bg-[#0d1322] py-6 text-center text-xs text-slate-500 space-y-2">
         <p>© 2026 Garia OS. Official Android APK Distribution.</p>
         <p className="text-[11px] text-slate-600">
-          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version 2.8.2 (Code 12)
+          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version {apkInfo.version} (Code {apkInfo.versionCode})
         </p>
       </footer>
     </div>

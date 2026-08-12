@@ -10,8 +10,8 @@ android {
         applicationId "com.gariaos.app"
         minSdk 21
         targetSdk 34
-        versionCode 12
-        versionName "2.8.2"
+        versionCode 13
+        versionName "2.8.3"
 
         manifestPlaceholders = [
             hostName: "ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app",
@@ -40,7 +40,7 @@ android {
                 keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "gariaos"
                 keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "gariaos123"
             } else {
-                signingConfig signingConfigs.debug
+                initWith(signingConfigs.debug)
             }
         }
     }
@@ -51,7 +51,11 @@ android {
             minifyEnabled false
         }
         release {
-            signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile != null && signingConfigs.release.storeFile.exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
