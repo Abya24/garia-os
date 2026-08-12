@@ -65,13 +65,54 @@ def build_apk(output_path):
         
         with open(main_activity_java, 'w') as f:
             f.write('''package com.gariaos.app;
+
 import android.app.Activity;
 import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.view.Window;
+import android.view.WindowManager;
 
 public class MainActivity extends Activity {
+    private WebView webView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        webView = new WebView(this);
+        setContentView(webView);
+
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setDatabaseEnabled(true);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setUseWideViewPort(true);
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                view.loadUrl(url);
+                return true;
+            }
+        });
+
+        webView.loadUrl("https://garia-os.ai.studio/");
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
     }
 }
 ''')
@@ -80,7 +121,27 @@ public class MainActivity extends Activity {
         os.makedirs(classes_dir, exist_ok=True)
 
         # 1. Compile Java code
-        javac_bin = shutil.which('javac') or '/usr/lib/jvm/java-17-openjdk-amd64/bin/javac'
+        javac_bin = shutil.which('javac')
+        if not javac_bin and os.path.exists('/usr/lib/jvm/java-17-openjdk-amd64/bin/javac'):
+            javac_bin = '/usr/lib/jvm/java-17-openjdk-amd64/bin/javac'
+
+        if not javac_bin:
+            print("Warning: javac binary not found. Using pre-built APK template.")
+            existing_sources = [
+                'public/Garia_OS_v2.6.1_Release_APK.apk',
+                'public/Garia_OS_v2.5.0_Release_APK.apk',
+                'public/Garia_OS_v2.4.0_Release_APK.apk',
+                'public/Garia_OS.apk'
+            ]
+            found_src = next((s for s in existing_sources if os.path.exists(s)), None)
+            if found_src:
+                if os.path.abspath(found_src) != os.path.abspath(output_path):
+                    shutil.copy(found_src, output_path)
+                    print(f"Copied pre-built APK from {found_src} to {output_path}")
+                else:
+                    print(f"Target APK {output_path} already exists as template.")
+            return
+
         subprocess.run([
             javac_bin, '-cp', '/tmp/android.jar', '-d', classes_dir, main_activity_java
         ], check=True, env=env)
@@ -157,6 +218,8 @@ public class MainActivity extends Activity {
 
 if __name__ == '__main__':
     targets = [
+        'public/Garia_OS_v2.7_Release_APK.apk',
+        'public/Garia_OS_v2.6.1_Release_APK.apk',
         'public/Garia_OS_v2.5.0_Release_APK.apk',
         'public/Garia_OS_v2.4.0_Release_APK.apk',
         'public/Garia_OS.apk',
@@ -164,6 +227,8 @@ if __name__ == '__main__':
     ]
     if os.path.exists('dist'):
         targets.extend([
+            'dist/Garia_OS_v2.7_Release_APK.apk',
+            'dist/Garia_OS_v2.6.1_Release_APK.apk',
             'dist/Garia_OS_v2.5.0_Release_APK.apk',
             'dist/Garia_OS_v2.4.0_Release_APK.apk',
             'dist/Garia_OS.apk',

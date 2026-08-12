@@ -106,10 +106,10 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     {
       id: "download" as ActiveTab,
       label: "Download Official APK",
-      desc: "Get Garia OS Android app v2.4",
+      desc: "Get Garia OS Android app v2.7",
       icon: Download,
       color: "from-emerald-500 to-teal-400",
-      badge: "v2.4",
+      badge: "v2.7",
     },
     {
       id: "settings" as ActiveTab,
@@ -227,7 +227,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
             <Info className="w-3.5 h-3.5" />
             <span>About Garia OS</span>
           </button>
-          <span>Garia OS v2.5.0</span>
+          <span>Garia OS v2.7.0</span>
         </div>
       </div>
 
@@ -248,7 +248,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base font-heading">
-                    Garia OS v2.5.0
+                    Garia OS v2.7.0
                   </h3>
                   <p className="text-xs text-emerald-400 font-medium">
                     Smart Student Productivity & Study Platform
@@ -280,14 +280,14 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
               <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-[11px] text-slate-300">
                 <div className="font-bold text-cyan-300 flex items-center gap-1.5 mb-1">
                   <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Core V2.5 Modules</span>
+                  <span>Core V2.7 Modules</span>
                 </div>
                 <ul className="list-disc list-inside space-y-0.5 text-slate-400">
                   <li>Subject-Based Study Tracker & High-Precision Timer</li>
                   <li>Task Manager with Today, Upcoming & Completed tabs</li>
                   <li>Abya AI Academic Coach (6 Specialized Modes)</li>
-                  <li>Exam Center, Academic Chapter Manager & Career Pathways</li>
-                  <li>Official Signed Android Release APK v2.4.0</li>
+                  <li>Academic Question Bank Architecture (Class 10, 11, 12 MCQs & PYQs)</li>
+                  <li>Official Signed Android Release APK v2.7.0</li>
                 </ul>
               </div>
             </div>

@@ -308,6 +308,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             );
           })}
         </div>
+
+        <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 text-xs text-slate-300 leading-relaxed">
+          <p className="flex items-center gap-1.5 font-semibold text-emerald-300 mb-1">
+            <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Theme Controls vs Hardware Screen Brightness</span>
+          </p>
+          <p className="text-slate-400 text-[11px]">
+            Interface appearance modes (Light, Dark, or System) adjust visual colors, contrast, and element readability across Garia OS. Physical display backlight brightness is controlled via your device hardware controls or OS control center.
+          </p>
+        </div>
       </div>
 
       {/* 3. AI Section */}
@@ -488,7 +498,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span>Official Android APK Download</span>
             </h4>
             <p className="text-xs text-slate-400 mt-0.5">
-              Download Garia OS v2.4 release APK for Android 8.0+ devices
+              Download Garia OS v2.7 release APK for Android 8.0+ devices
             </p>
           </div>
           <a

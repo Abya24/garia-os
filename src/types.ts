@@ -538,6 +538,75 @@ export interface PreparationQueueItem {
   explanations: string[];
 }
 
+export type QuestionDifficulty = "Easy" | "Medium" | "Hard";
+export type QuestionType = "MCQ" | "Short Answer" | "Long Answer" | "Conceptual" | "Numerical";
+export type QuestionSourceType = "VERIFIED PYQ" | "SAMPLE PRACTICE" | "AI-GENERATED PRACTICE";
+
+export interface TopicMCQ {
+  id: string;
+  classLevel: string; // "Class 10" | "Class 11" | "Class 12"
+  subjectName: string;
+  chapterTitle: string;
+  topicName: string;
+  questionText: string;
+  options: [string, string, string, string];
+  correctOptionIndex: number;
+  explanation: string;
+  difficulty: QuestionDifficulty;
+  sourceType: QuestionSourceType;
+  tags?: string[];
+}
+
+export interface ChapterPYQ {
+  id: string;
+  classLevel: string; // "Class 10" | "Class 11" | "Class 12"
+  subjectName: string;
+  chapterTitle: string;
+  year: number; // e.g. 2024, 2023, 2022
+  board?: string; // "CBSE" | "BSEB" | "All Boards"
+  questionText: string;
+  questionType: QuestionType;
+  marks: number;
+  answerSolution?: string;
+  difficulty: QuestionDifficulty;
+  sourceType: QuestionSourceType; // "VERIFIED PYQ"
+}
+
+export interface PracticeQuestion {
+  id: string;
+  classLevel: string;
+  subjectName: string;
+  chapterTitle: string;
+  topicName?: string;
+  questionText: string;
+  questionType: QuestionType;
+  marks: number;
+  options?: [string, string, string, string];
+  correctOptionIndex?: number;
+  answerSolution?: string;
+  difficulty: QuestionDifficulty;
+  sourceType: QuestionSourceType;
+  tags?: string[];
+}
+
+export interface MCQAttemptRecord {
+  mcqId: string;
+  selectedOption: number;
+  isCorrect: boolean;
+  attemptedAt: number;
+}
+
+export interface QuestionBankProfileProgress {
+  profileId: string;
+  mcqAttempts: Record<string, MCQAttemptRecord>;
+  mcqBookmarks: string[];
+  practiceCompleted: string[];
+  practiceBookmarks: string[];
+  pyqCompleted: string[];
+  pyqBookmarks: string[];
+  updatedAt: number;
+}
+
 export type ActiveTab =
   | "home"
   | "exam"

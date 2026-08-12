@@ -133,7 +133,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 Garia OS
               </h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                v2.5.0
+                v2.7
               </span>
             </div>
             <p className="text-xs text-emerald-400 font-medium mt-1 max-w-sm">

@@ -15,11 +15,39 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "2.5.0" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.7" });
+  });
+
+  // Digital Asset Links Endpoint
+  app.get("/.well-known/assetlinks.json", (req, res) => {
+    const assetlinksPublic = path.join(process.cwd(), "public", ".well-known", "assetlinks.json");
+    const assetlinksDist = path.join(process.cwd(), "dist", ".well-known", "assetlinks.json");
+    const targetFile = fs.existsSync(assetlinksDist) ? assetlinksDist : assetlinksPublic;
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+
+    if (fs.existsSync(targetFile)) {
+      return res.sendFile(targetFile);
+    }
+    return res.json([
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: {
+          namespace: "android_app",
+          package_name: "com.gariaos.app",
+          sha256_cert_fingerprints: [
+            "10:6C:54:1B:1A:1D:9B:45:9C:1F:B1:D4:53:ED:17:F8:78:E2:BB:88:80:61:98:C1:BB:06:56:06:FE:DC:A7:0E"
+          ]
+        }
+      }
+    ]);
   });
 
   // Direct APK Download Endpoint
   app.get([
+    "/Garia_OS_v2.7_Release_APK.apk",
+    "/Garia_OS_v2.6.1_Release_APK.apk",
     "/Garia_OS_v2.5.0_Release_APK.apk",
     "/Garia_OS_v2.4.0_Release_APK.apk",
     "/Garia_OS.apk",
@@ -28,19 +56,20 @@ async function startServer() {
     "/download",
     "/api/download/apk"
   ], (req, res) => {
-    const apkPublicPath = path.join(process.cwd(), "public", "Garia_OS_v2.5.0_Release_APK.apk");
-    const apkDistPath = path.join(process.cwd(), "dist", "Garia_OS_v2.5.0_Release_APK.apk");
-    const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS_v2.4.0_Release_APK.apk");
+    const v270Public = path.join(process.cwd(), "public", "Garia_OS_v2.7_Release_APK.apk");
+    const v270Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.7_Release_APK.apk");
+    const v261Public = path.join(process.cwd(), "public", "Garia_OS_v2.6.1_Release_APK.apk");
+    const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS.apk");
     
-    let targetFile = fs.existsSync(apkDistPath) ? apkDistPath : apkPublicPath;
+    let targetFile = fs.existsSync(v270Dist) ? v270Dist : v270Public;
     if (!fs.existsSync(targetFile)) {
-      targetFile = fallbackPublic;
+      targetFile = fs.existsSync(v261Public) ? v261Public : fallbackPublic;
     }
 
     if (fs.existsSync(targetFile)) {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
-      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.5.0_Release_APK.apk"');
+      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.7_Release_APK.apk"');
       return res.sendFile(targetFile);
     }
     res.status(404).send("APK file not found");

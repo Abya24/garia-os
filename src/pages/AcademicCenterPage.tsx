@@ -21,6 +21,8 @@ import {
   Briefcase,
   Target,
   Edit3,
+  CheckSquare,
+  FileText,
 } from "lucide-react";
 import {
   AcademicSubject,
@@ -45,6 +47,8 @@ import { AcademicRoadmapSection } from "../components/AcademicRoadmapSection";
 import { AcademicVVITopicSection } from "../components/AcademicVVITopicSection";
 import { AcademicRevisionPlannerSection } from "../components/AcademicRevisionPlannerSection";
 import { AcademicPracticeTrackerSection } from "../components/AcademicPracticeTrackerSection";
+import { QuestionBankSection } from "../components/QuestionBankSection";
+import { StudentProfile } from "../types";
 
 interface AcademicCenterPageProps {
   careerProfile: CareerProfile;
@@ -57,6 +61,7 @@ interface AcademicCenterPageProps {
   vviTopics: AcademicVVITopic[];
   revisions: AcademicRevisionItem[];
   practiceSessions: AcademicPracticeSession[];
+  activeStudent?: StudentProfile;
   onUpdateSubjects: (subs: AcademicSubject[]) => void;
   onUpdateChapters: (chaps: AcademicChapter[]) => void;
   onUpdateTests: (tests: AcademicTest[]) => void;
@@ -79,6 +84,7 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   vviTopics,
   revisions,
   practiceSessions,
+  activeStudent,
   onUpdateSubjects,
   onUpdateChapters,
   onUpdateTests,
@@ -90,8 +96,20 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   onAskAbyaWithContext,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "roadmap" | "dashboard" | "chapters" | "priority" | "vvi" | "revision" | "practice" | "tests" | "plan"
-  >("roadmap");
+    | "roadmap"
+    | "qbank"
+    | "mcq_practice"
+    | "practice_qs"
+    | "pyqs"
+    | "dashboard"
+    | "chapters"
+    | "priority"
+    | "vvi"
+    | "revision"
+    | "practice"
+    | "tests"
+    | "plan"
+  >("qbank");
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
     subjects[0]?.id || "all"
@@ -447,12 +465,15 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
       {/* Primary Academic Center Sub-Navigation Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-white/10 scrollbar-none">
         {[
+          { id: "qbank", label: "📚 Question Bank (V2.6)", icon: GraduationCap },
+          { id: "mcq_practice", label: "MCQ Practice", icon: CheckSquare },
+          { id: "practice_qs", label: "Practice Questions", icon: FileText },
+          { id: "pyqs", label: "Chapter PYQs", icon: Award },
           { id: "roadmap", label: "Academic Roadmap", icon: GraduationCap },
           { id: "dashboard", label: "Subject Dashboard", icon: Layers },
           { id: "chapters", label: "Chapter & Topics", icon: BookOpen },
           { id: "vvi", label: "🔥 VVI Topics", icon: Flame },
           { id: "revision", label: "Revision Planner", icon: RotateCcw },
-          { id: "practice", label: "PYQ & Practice", icon: Award },
           { id: "tests", label: "Test Performance", icon: TrendingUp },
           { id: "plan", label: "Daily Study Generator", icon: Clock },
         ].map((tab) => {
@@ -474,6 +495,39 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           );
         })}
       </div>
+
+      {/* QUESTION BANK SECTION */}
+      {(activeTab === "qbank" ||
+        activeTab === "mcq_practice" ||
+        activeTab === "practice_qs" ||
+        activeTab === "pyqs") && (
+        <QuestionBankSection
+          activeStudent={
+            activeStudent || {
+              id: "profile-1",
+              name: "Student",
+              avatar: "👨‍🎓",
+              classLevel: "Class 10",
+              targetExam: "Board Exam",
+              strengths: [],
+              weaknesses: [],
+              createdAt: Date.now(),
+            }
+          }
+          subjects={subjects}
+          chapters={chapters}
+          initialSubTab={
+            activeTab === "mcq_practice"
+              ? "mcq"
+              : activeTab === "practice_qs"
+              ? "practice"
+              : activeTab === "pyqs"
+              ? "pyq"
+              : "home"
+          }
+          onAskAbyaWithContext={onAskAbyaWithContext}
+        />
+      )}
 
       {/* TAB 0: ACADEMIC ROADMAP */}
       {activeTab === "roadmap" && (

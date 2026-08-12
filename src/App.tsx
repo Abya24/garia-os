@@ -455,11 +455,31 @@ export default function App() {
   // Sync Theme with DOM
   useEffect(() => {
     const root = document.documentElement;
-    if (settings.theme === "light") {
-      root.classList.add("light");
-    } else {
-      root.classList.remove("light");
+
+    const applyTheme = () => {
+      let isLight = false;
+      if (settings.theme === "light") {
+        isLight = true;
+      } else if (settings.theme === "system") {
+        isLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+      }
+
+      if (isLight) {
+        root.classList.add("light");
+      } else {
+        root.classList.remove("light");
+      }
+    };
+
+    applyTheme();
+
+    if (settings.theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: light)");
+      const listener = () => applyTheme();
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
     }
+
     if (activeProfileId && activeStudent) {
       saveSettings(settings, activeProfileId);
     }
@@ -1373,6 +1393,7 @@ export default function App() {
 
           {activeTab === "academic" && (
             <AcademicCenterPage
+              activeStudent={activeStudent}
               careerProfile={careerProfile}
               careerRoadmap={careerRoadmap}
               subjects={academicSubjects}

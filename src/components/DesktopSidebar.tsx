@@ -46,8 +46,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     {
       title: "Academic & Exam",
       items: [
-        { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v1.4.2" },
-        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v1.4.1" },
+        { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v2.7" },
+        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v2.7" },
         { id: "career" as ActiveTab, label: "Career Center", icon: Compass, badge: "v1.4" },
       ],
     },
@@ -64,7 +64,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     {
       title: "Platform",
       items: [
-        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.5" },
+        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.7" },
         { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
       ],
     },

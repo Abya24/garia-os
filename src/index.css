@@ -11,13 +11,77 @@
   }
 
   .light {
-    --bg-main: #f8fafc;
+    --bg-main: #f1f5f9;
     --card-bg: #ffffff;
-    --card-border: #e2e8f0;
+    --card-border: #cbd5e1;
     --text-primary: #0f172a;
-    --text-secondary: #64748b;
+    --text-secondary: #334155;
     --accent-glow: rgba(16, 185, 129, 0.08);
   }
+}
+
+.light body {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Light mode text contrast overrides */
+.light .text-white,
+.light .text-slate-100,
+.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.light .text-slate-300,
+.light .text-slate-400 {
+  color: #334155 !important;
+}
+
+.light .text-slate-500 {
+  color: #475569 !important;
+}
+
+/* Inputs, Textareas, Selects in Light mode */
+.light input,
+.light textarea,
+.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Light mode backgrounds for dark containers */
+.light .bg-slate-950,
+.light .bg-slate-900,
+.light .bg-slate-900\/90,
+.light .bg-slate-900\/80,
+.light .bg-slate-900\/60,
+.light .bg-slate-900\/50,
+.light .bg-slate-900\/40,
+.light .bg-slate-900\/30 {
+  background-color: #ffffff !important;
+}
+
+.light .bg-slate-800,
+.light .bg-slate-800\/90,
+.light .bg-slate-800\/80,
+.light .bg-slate-800\/60,
+.light .bg-slate-800\/50,
+.light .bg-slate-800\/40,
+.light .bg-slate-800\/30 {
+  background-color: #f8fafc !important;
+}
+
+.light .border-slate-800,
+.light .border-slate-800\/80,
+.light .border-slate-800\/50,
+.light .border-slate-700 {
+  border-color: #cbd5e1 !important;
 }
 
 body {
