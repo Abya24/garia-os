@@ -26,7 +26,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const sha256 =
-    "3627c600c47d69af4eee2838d8e164c5237ebf8d6e6ef5a92411fb3f86ba4bde";
+    "17538bfcab9c82f6ce20f72af48b4818c07700b01377a72d11964eb456ff3745";
 
   const handleCopySha = () => {
     navigator.clipboard.writeText(sha256);

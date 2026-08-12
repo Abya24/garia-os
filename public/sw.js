@@ -1,4 +1,4 @@
-const CACHE_NAME = "garia-os-v2.8.3-cache-v1";
+const CACHE_NAME = "garia-os-v2.8.2-cache-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -49,6 +49,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/api") ||
     url.pathname.endsWith(".apk") ||
     url.pathname.includes("Garia_OS") ||
+    url.pathname === "/download" ||
     url.pathname === "/download.apk" ||
     event.request.method !== "GET"
   ) {

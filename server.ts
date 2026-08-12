@@ -15,7 +15,7 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "2.8.3" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.8.2" });
   });
 
   // Digital Asset Links Endpoint
