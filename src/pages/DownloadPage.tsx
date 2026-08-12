@@ -3,7 +3,6 @@ import {
   Download,
   ShieldCheck,
   Smartphone,
-  CheckCircle2,
   Sparkles,
   ArrowLeft,
   Copy,
@@ -13,6 +12,8 @@ import {
   BarChart3,
   BookOpen,
   Zap,
+  AlertCircle,
+  HelpCircle,
 } from "lucide-react";
 
 interface DownloadPageProps {
@@ -25,7 +26,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const sha256 =
-    "8a3e791b4c6820ef914210a56bdc39d01249b5c87e0123f45a6b890123456789";
+    "3627c600c47d69af4eee2838d8e164c5237ebf8d6e6ef5a92411fb3f86ba4bde";
 
   const handleCopySha = () => {
     navigator.clipboard.writeText(sha256);
@@ -66,7 +67,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 Garia OS
               </h1>
               <p className="text-xs text-emerald-400 font-medium">
-                Official Android APK v2.8.2
+                Official Android Release APK (v2.8.2)
               </p>
             </div>
           </div>
@@ -77,7 +78,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors border border-slate-700/60"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Open App
+              Open Web App
             </button>
           )}
         </div>
@@ -89,7 +90,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
         <div className="text-center space-y-6 pt-2">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" />
-            Official Android Release • Android 8.0+
+            Official Signed Android Release • Android 8.0+ / 14 / 15
           </div>
 
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white max-w-2xl mx-auto leading-tight">
@@ -97,28 +98,41 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
           </h2>
 
           <p className="text-slate-300 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            The ultimate AI-powered student operating system. Featuring Academic Question Bank (Class 10, 11, 12 MCQs, PYQs), Abya AI study coach, and offline privacy.
+            The ultimate AI-powered student operating system. Genuine Android APK compiled with official Android SDK toolchain.
           </p>
 
-          {/* Download CTA Card */}
+          {/* Redesigned Download CTA Card */}
           <div className="max-w-md mx-auto p-6 rounded-2xl bg-gradient-to-b from-[#121929] to-[#0d1322] border border-slate-800 shadow-2xl space-y-4">
+            <div className="text-center space-y-1 pb-2 border-b border-slate-800/80">
+              <h3 className="text-xl font-bold text-white font-heading">
+                Garia OS Android APK
+              </h3>
+              <div className="flex items-center justify-center gap-2 text-xs font-mono text-emerald-400">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                  v2.8.2 • Code 12
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="text-slate-300 font-sans">Official signed Android release</span>
+              </div>
+            </div>
+
             <button
               onClick={handleTriggerDownload}
               disabled={isDownloading}
               className="w-full py-4 px-6 rounded-xl font-bold text-base bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] disabled:opacity-75"
             >
               <Download className="w-5 h-5" />
-              <span>{isDownloading ? "Downloading APK..." : downloadSuccess ? "Downloaded Successfully!" : "Download Garia OS v2.8.2 Release APK"}</span>
+              <span>{isDownloading ? "Downloading APK..." : downloadSuccess ? "Downloaded Successfully!" : "Download Garia OS v2.8.2 APK"}</span>
             </button>
 
-            {/* Direct fallback link for mobile browsers */}
+            {/* Direct Link */}
             <a
               href="/Garia_OS_v2.8.2_Release_APK.apk"
               download="Garia_OS_v2.8.2_Release_APK.apk"
               className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all"
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Direct Link: Download APK (v2.8.2)</span>
+              <span>Download Garia OS v2.8.2 APK (Direct File)</span>
             </a>
 
             <button
@@ -132,8 +146,13 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/60 flex items-center justify-center gap-2 transition-all"
             >
               <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>Launch Web App / Install PWA Instead</span>
+              <span>Open Web App / Install PWA</span>
             </button>
+
+            <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg text-center flex items-center justify-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>Android may require permission to install apps from this browser.</span>
+            </p>
 
             <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-left text-xs text-emerald-200/90 space-y-1">
               <div className="font-semibold text-emerald-300 flex items-center gap-1.5">
@@ -141,7 +160,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 <span>APK Release Verified</span>
               </div>
               <p className="text-[11px] leading-relaxed text-slate-300">
-                Official Android Release APK (<code className="text-emerald-400">com.gariaos.app</code> v2.8.2, Code 12). Signed, apksigner verified, target SDK 34.
+                Official Android Release APK (<code className="text-emerald-400">com.gariaos.app</code> v2.8.2, Code 12). Target SDK 34, Android 14/15 ready, compiled with D8 & aapt, v1+v2+v3 apksigner signed.
               </p>
             </div>
 
@@ -153,15 +172,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </div>
               <div>
                 <span className="text-slate-500 block">Status:</span>
-                <span className="font-semibold text-emerald-400">Source Ready</span>
+                <span className="font-semibold text-emerald-400">SDK Verified</span>
               </div>
               <div>
                 <span className="text-slate-500 block">Package ID:</span>
                 <span className="font-semibold text-emerald-400 font-mono text-[11px]">com.gariaos.app</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Updated:</span>
-                <span className="font-semibold text-slate-200">August 2026</span>
+                <span className="text-slate-500 block">Target SDK:</span>
+                <span className="font-semibold text-slate-200">API 34 (Android 14/15)</span>
               </div>
             </div>
 
@@ -191,6 +210,20 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 {sha256}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Can't install the APK? Help Section */}
+        <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 space-y-3 shadow-lg">
+          <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-amber-300">
+            <HelpCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>Can&apos;t install the APK?</span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            If Android displays <span className="font-semibold text-amber-200">&quot;Unknown apps can&apos;t be installed by this user&quot;</span> or blocks the installation:
+          </p>
+          <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-200 font-medium leading-relaxed">
+            On Android, allow this browser to install apps from this source in <span className="text-emerald-400 font-bold">Settings → Install unknown apps</span>, then retry opening the downloaded APK file.
           </div>
         </div>
 
@@ -310,7 +343,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       <footer className="border-t border-slate-800/80 bg-[#0d1322] py-6 text-center text-xs text-slate-500 space-y-2">
         <p>© 2026 Garia OS. Official Android APK Distribution.</p>
         <p className="text-[11px] text-slate-600">
-          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version 2.7.0
+          Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version 2.8.2 (Code 12)
         </p>
       </footer>
     </div>

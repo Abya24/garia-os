@@ -151,7 +151,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <h3 className="text-xl font-bold text-white font-heading flex items-center gap-2">
                 Student Profiles
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                  Multi-Student v2.4.0
+                  Multi-Student v2.8.2
                 </span>
               </h3>
               <p className="text-xs text-slate-400">

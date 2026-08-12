@@ -106,10 +106,10 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     {
       id: "download" as ActiveTab,
       label: "Download Official APK",
-      desc: "Get Garia OS Android app v2.8.1",
+      desc: "Get Garia OS Android app v2.8.2",
       icon: Download,
       color: "from-emerald-500 to-teal-400",
-      badge: "v2.8.1",
+      badge: "v2.8.2",
     },
     {
       id: "settings" as ActiveTab,
@@ -287,7 +287,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                   <li>Task Manager with Today, Upcoming & Completed tabs</li>
                   <li>Abya AI Academic Coach (6 Specialized Modes)</li>
                   <li>Academic Question Bank Architecture (Class 10, 11, 12 MCQs & PYQs)</li>
-                  <li>Official Signed Android Release APK v2.7.0</li>
+                  <li>Official Signed Android Release APK v2.8.2</li>
                 </ul>
               </div>
             </div>

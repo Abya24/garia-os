@@ -1598,7 +1598,7 @@ export default function App() {
         onImportProfile={handleImportStudentProfile}
       />
 
-      {/* Authentication & Private Mode Modal (v2.4.0) */}
+      {/* Authentication & Private Mode Modal (v2.8.2) */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
