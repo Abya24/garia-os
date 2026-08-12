@@ -232,7 +232,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   <h3 className="font-bold text-white text-base font-heading flex items-center gap-2">
                     <span>Garia OS Platform</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-                      v2.8.1
+                      v2.8.2
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -252,7 +252,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-emerald-500/20 space-y-2">
                 <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
                   <GraduationCap className="w-4 h-4 text-emerald-400" />
-                  <span>Academic Question Bank Architecture (V2.8.1)</span>
+                  <span>Academic Question Bank Architecture (V2.8.2)</span>
                 </div>
                 <p className="text-slate-300 text-xs leading-relaxed">
                   Supports Class 10, Class 11, and Class 12 across Topic-wise MCQs, Chapter-wise Verified PYQs, and Practice Questions with isolated progress per student profile.
@@ -269,9 +269,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                 >
                   <div className="flex items-center gap-2.5">
                     <Download className="w-4 h-4 text-emerald-400" />
-                    <span>Download Official Android APK (v2.8.1)</span>
+                    <span>Download Official Android APK (v2.8.2)</span>
                   </div>
-                  <span className="text-[10px] font-mono bg-emerald-400/20 px-2 py-0.5 rounded-full">Code 11</span>
+                  <span className="text-[10px] font-mono bg-emerald-400/20 px-2 py-0.5 rounded-full">Code 12</span>
                 </button>
 
                 <button

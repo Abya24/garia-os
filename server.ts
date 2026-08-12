@@ -15,7 +15,7 @@ async function startServer() {
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", app: "Garia OS", version: "2.8.1" });
+    res.json({ status: "ok", app: "Garia OS", version: "2.8.2" });
   });
 
   // Digital Asset Links Endpoint
@@ -46,6 +46,7 @@ async function startServer() {
 
   // Direct APK Download Endpoint
   app.get([
+    "/Garia_OS_v2.8.2_Release_APK.apk",
     "/Garia_OS_v2.8.1_Release_APK.apk",
     "/Garia_OS_v2.8.0_Release_APK.apk",
     "/Garia_OS_v2.7_Release_APK.apk",
@@ -58,18 +59,18 @@ async function startServer() {
     "/download",
     "/api/download/apk"
   ], (req, res) => {
+    const v282Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.2_Release_APK.apk");
+    const v282Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.2_Release_APK.apk");
     const v281Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.1_Release_APK.apk");
     const v281Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.1_Release_APK.apk");
-    const v280Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.0_Release_APK.apk");
-    const v280Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.0_Release_APK.apk");
     const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS.apk");
     
-    let targetFile = fs.existsSync(v281Dist) ? v281Dist : (fs.existsSync(v281Public) ? v281Public : (fs.existsSync(v280Dist) ? v280Dist : (fs.existsSync(v280Public) ? v280Public : fallbackPublic)));
+    let targetFile = fs.existsSync(v282Dist) ? v282Dist : (fs.existsSync(v282Public) ? v282Public : (fs.existsSync(v281Dist) ? v281Dist : (fs.existsSync(v281Public) ? v281Public : fallbackPublic)));
 
     if (fs.existsSync(targetFile)) {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
-      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.8.1_Release_APK.apk"');
+      res.setHeader("Content-Disposition", 'attachment; filename="Garia_OS_v2.8.2_Release_APK.apk"');
       return res.sendFile(targetFile);
     }
     res.status(404).send("APK file not found");

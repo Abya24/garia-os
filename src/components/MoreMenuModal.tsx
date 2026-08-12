@@ -227,7 +227,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
             <Info className="w-3.5 h-3.5" />
             <span>About Garia OS</span>
           </button>
-          <span>Garia OS v2.7.0</span>
+          <span>Garia OS v2.8.2</span>
         </div>
       </div>
 
@@ -248,7 +248,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base font-heading">
-                    Garia OS v2.7.0
+                    Garia OS v2.8.2
                   </h3>
                   <p className="text-xs text-emerald-400 font-medium">
                     Smart Student Productivity & Study Platform

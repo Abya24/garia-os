@@ -1,220 +1,188 @@
 import os
 import sys
 import shutil
-import zipfile
-import io
-import struct
+import glob
 import hashlib
-import zlib
-import base64
-import tempfile
 import subprocess
 
-def make_png(width=192, height=192, color=(16, 185, 129)):
-    raw_data = b''
-    for y in range(height):
-        raw_data += b'\x00'
-        for x in range(width):
-            raw_data += bytes(color)
-    def chunk(tag, data):
-        return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
-    header = b'\x89PNG\r\n\x1a\n'
-    ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
-    idat = chunk(b'IDAT', zlib.compress(raw_data))
-    iend = chunk(b'IEND', b'')
-    return header + ihdr + idat + iend
-
-def build_classes_dex():
-    strings = [
-        'Lcom/gariaos/app/MainActivity;',
-        'Landroid/app/Activity;',
-        'onCreate',
-        '(Landroid/os/Bundle;)V',
-        'onBackPressed',
-        '()V',
-        'MainActivity.java'
-    ]
-    header_size = 112
-    str_data = bytearray()
-    str_offsets = []
-    for s in strings:
-        str_offsets.append(len(str_data))
-        str_data.append(len(s))
-        str_data.extend(s.encode('utf-8'))
-        str_data.append(0)
-        
-    string_ids_off = header_size
-    string_ids_size = len(strings)
+def build_real_android_apk(output_path, package="com.gariaos.app", version_name="2.8.2", version_code=12):
+    build_dir = "/tmp/garia_android_build"
+    if os.path.exists(build_dir):
+        shutil.rmtree(build_dir)
     
-    str_ids_bin = bytearray()
-    str_data_off_base = string_ids_off + string_ids_size * 4
-    for off in str_offsets:
-        str_ids_bin.extend(struct.pack('<I', str_data_off_base + off))
-        
-    body = str_ids_bin + str_data
-    file_size = header_size + len(body)
-    
-    header = bytearray(header_size)
-    header[0:8] = b'dex\n035\x00'
-    struct.pack_into('<I', header, 32, file_size)
-    struct.pack_into('<I', header, 36, header_size)
-    struct.pack_into('<I', header, 40, 0x12345678)
-    struct.pack_into('<I', header, 56, string_ids_size)
-    struct.pack_into('<I', header, 60, string_ids_off)
-    
-    dex_full = header + body
-    sha1 = hashlib.sha1(dex_full[32:]).digest()
-    dex_full[12:32] = sha1
-    
-    adler = zlib.adler32(dex_full[12:]) & 0xffffffff
-    struct.pack_into('<I', dex_full, 8, adler)
-    
-    return bytes(dex_full)
+    src_dir = os.path.join(build_dir, "src", "com", "gariaos", "app")
+    classes_dir = os.path.join(build_dir, "classes")
+    dex_dir = os.path.join(build_dir, "dex")
 
-def generate_signed_meta(files_dict):
-    manifest_mf = ['Manifest-Version: 1.0', 'Created-By: 1.0 (Garia OS APKSigner)', '']
-    cert_sf = ['Signature-Version: 1.0', 'Created-By: 1.0 (Garia OS APKSigner)', '']
-    
-    for filename, content in sorted(files_dict.items()):
-        digest = base64.b64encode(hashlib.sha256(content).digest()).decode('ascii')
-        manifest_mf.extend([f'Name: {filename}', f'SHA-256-Digest: {digest}', ''])
-        
-        sec_bytes = f'Name: {filename}\r\nSHA-256-Digest: {digest}\r\n\r\n'.encode('utf-8')
-        sec_digest = base64.b64encode(hashlib.sha256(sec_bytes).digest()).decode('ascii')
-        cert_sf.extend([f'Name: {filename}', f'SHA-256-Digest: {sec_digest}', ''])
+    os.makedirs(src_dir, exist_ok=True)
+    os.makedirs(classes_dir, exist_ok=True)
+    os.makedirs(dex_dir, exist_ok=True)
 
-    mf_bytes = '\r\n'.join(manifest_mf).encode('utf-8')
-    sf_bytes = '\r\n'.join(cert_sf).encode('utf-8')
+    # 1. Write MainActivity.java
+    java_code = '''package com.gariaos.app;
 
-    rsa_bytes = b''
-    if shutil.which('openssl'):
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                key_pem = os.path.join(tmpdir, 'key.pem')
-                cert_pem = os.path.join(tmpdir, 'cert.pem')
-                sf_file = os.path.join(tmpdir, 'CERT.SF')
-                rsa_file = os.path.join(tmpdir, 'CERT.RSA')
+import android.app.Activity;
+import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
+import android.webkit.SslErrorHandler;
+import android.net.http.SslError;
+import android.view.Window;
+import android.view.WindowManager;
 
-                with open(sf_file, 'wb') as f:
-                    f.write(sf_bytes)
+public class MainActivity extends Activity {
+    private WebView webView;
 
-                subprocess.run([
-                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
-                    '-keyout', key_pem, '-out', cert_pem,
-                    '-days', '3650', '-nodes', '-subj', '/CN=com.gariaos.app'
-                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-                subprocess.run([
-                    'openssl', 'smime', '-sign', '-in', sf_file, '-out', rsa_file,
-                    '-signer', cert_pem, '-inkey', key_pem,
-                    '-outform', 'DER', '-binary'
-                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        webView = new WebView(this);
+        setContentView(webView);
 
-                with open(rsa_file, 'rb') as f:
-                    rsa_bytes = f.read()
-        except Exception as e:
-            print("OpenSSL signing fallback:", e)
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setDatabaseEnabled(true);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setUseWideViewPort(true);
+        webSettings.setBuiltInZoomControls(false);
+        webSettings.setSupportZoom(false);
+        webSettings.setMediaPlaybackRequiresUserGesture(false);
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-    return mf_bytes, sf_bytes, rsa_bytes
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                view.loadUrl(url);
+                return true;
+            }
 
-def create_standalone_apk(output_path, package='com.gariaos.app', version_name='2.8.1', version_code=11):
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    
-    manifest_xml = f'''<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="{package}"
-    android:versionCode="{version_code}"
-    android:versionName="{version_name}">
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                handler.proceed();
+            }
+        });
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        webView.setWebChromeClient(new WebChromeClient());
 
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="Garia OS"
-        android:supportsRtl="true"
-        android:hardwareAccelerated="true"
-        android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:configChanges="orientation|keyboardHidden|screenSize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>'''.encode('utf-8')
-
-    classes_dex = build_classes_dex()
-    png_data = make_png(192, 192)
-
-    files = {
-        'AndroidManifest.xml': manifest_xml,
-        'classes.dex': classes_dex,
-        'res/mipmap-hdpi/ic_launcher.png': png_data,
-        'res/mipmap-xhdpi/ic_launcher.png': png_data,
-        'res/mipmap-xxhdpi/ic_launcher.png': png_data,
-        'res/drawable/ic_launcher.png': png_data,
+        webView.loadUrl("https://garia-os.ai.studio/");
     }
 
-    mf_bytes, sf_bytes, rsa_bytes = generate_signed_meta(files)
-    files['META-INF/MANIFEST.MF'] = mf_bytes
-    files['META-INF/CERT.SF'] = sf_bytes
-    if rsa_bytes:
-        files['META-INF/CERT.RSA'] = rsa_bytes
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+}
+'''
+    java_file = os.path.join(src_dir, "MainActivity.java")
+    with open(java_file, "w") as f:
+        f.write(java_code)
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-        for fname, content in files.items():
-            zf.writestr(fname, content)
+    # 2. Compile Java to class files
+    subprocess.run(["javac", "-cp", "/tmp/android.jar", "-d", classes_dir, java_file], check=True)
 
-    apk_bytes = buf.getvalue()
-    with open(output_path, 'wb') as f:
-        f.write(apk_bytes)
+    # 3. Dex class files with Google D8
+    class_files = glob.glob(f"{classes_dir}/**/*.class", recursive=True)
+    d8_cmd = ["java", "-cp", "/tmp/r8.jar", "com.android.tools.r8.D8", "--lib", "/tmp/android.jar", "--output", dex_dir] + class_files
+    subprocess.run(d8_cmd, check=True)
 
-    # Verify output zip
-    with zipfile.ZipFile(output_path, 'r') as zf:
-        test_res = zf.testzip()
-        if test_res is not None:
-            raise RuntimeError(f"Zip test failed for {output_path} on file {test_res}")
+    # 4. Package resources & AndroidManifest with aapt
+    unaligned_apk = os.path.join(build_dir, "unaligned.apk")
+    subprocess.run([
+        "aapt", "package", "-f", "-m",
+        "-F", unaligned_apk,
+        "-M", "android/app/src/main/AndroidManifest.xml",
+        "-S", "android/app/src/main/res",
+        "-I", "/tmp/android.jar"
+    ], check=True)
 
-    sha256 = hashlib.sha256(apk_bytes).hexdigest()
-    print(f"Generated APK {output_path}: {len(apk_bytes)} bytes | SHA256: {sha256}")
-    return sha256
+    # 5. Add classes.dex into unaligned.apk
+    subprocess.run(["aapt", "add", unaligned_apk, "classes.dex"], cwd=dex_dir, check=True)
 
-if __name__ == '__main__':
+    # 6. Zipalign unaligned.apk to 4-byte alignment
+    aligned_apk = os.path.join(build_dir, "aligned.apk")
+    subprocess.run(["zipalign", "-f", "-p", "4", unaligned_apk, aligned_apk], check=True)
+
+    # 7. Generate RSA key & certificate if needed, then sign with apksigner
+    key_pem = os.path.join(build_dir, "key.pem")
+    cert_pem = os.path.join(build_dir, "cert.pem")
+    key_pk8 = os.path.join(build_dir, "key.pk8")
+
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:2048",
+        "-keyout", key_pem, "-out", cert_pem,
+        "-days", "3650", "-nodes", "-subj", "/CN=com.gariaos.app"
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    subprocess.run([
+        "openssl", "pkcs8", "-topk8", "-outform", "DER",
+        "-in", key_pem, "-out", key_pk8, "-nocrypt"
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    subprocess.run(["apksigner", "sign", "--key", key_pk8, "--cert", cert_pem, aligned_apk], check=True)
+
+    # 8. Copy to output_path
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    shutil.copyfile(aligned_apk, output_path)
+
+    apk_size = os.path.getsize(output_path)
+    with open(output_path, "rb") as f:
+        sha256 = hashlib.sha256(f.read()).hexdigest()
+
+    print(f"Generated Genuine Android APK {output_path}: {apk_size} bytes | SHA256: {sha256}")
+    return aligned_apk, sha256
+
+if __name__ == "__main__":
+    primary_apk_path = "public/Garia_OS_v2.8.2_Release_APK.apk"
+    primary_aligned, primary_sha = build_real_android_apk(primary_apk_path)
+
+    # Copy to all target fallback paths
     targets = [
-        'public/Garia_OS_v2.8.1_Release_APK.apk',
-        'public/Garia_OS_v2.8.0_Release_APK.apk',
-        'public/Garia_OS_v2.7_Release_APK.apk',
-        'public/Garia_OS_v2.6.1_Release_APK.apk',
-        'public/Garia_OS_v2.5.0_Release_APK.apk',
-        'public/Garia_OS_v2.4.0_Release_APK.apk',
-        'public/Garia_OS.apk',
-        'public/garia-os-release.apk',
+        "public/Garia_OS_v2.8.1_Release_APK.apk",
+        "public/Garia_OS_v2.8.0_Release_APK.apk",
+        "public/Garia_OS_v2.7_Release_APK.apk",
+        "public/Garia_OS_v2.6.1_Release_APK.apk",
+        "public/Garia_OS_v2.5.0_Release_APK.apk",
+        "public/Garia_OS_v2.4.0_Release_APK.apk",
+        "public/Garia_OS.apk",
+        "public/garia-os-release.apk",
     ]
-    if os.path.exists('dist'):
+    if os.path.exists("dist"):
         targets.extend([
-            'dist/Garia_OS_v2.8.1_Release_APK.apk',
-            'dist/Garia_OS_v2.8.0_Release_APK.apk',
-            'dist/Garia_OS_v2.7_Release_APK.apk',
-            'dist/Garia_OS_v2.6.1_Release_APK.apk',
-            'dist/Garia_OS_v2.5.0_Release_APK.apk',
-            'dist/Garia_OS_v2.4.0_Release_APK.apk',
-            'dist/Garia_OS.apk',
-            'dist/garia-os-release.apk',
+            "dist/Garia_OS_v2.8.2_Release_APK.apk",
+            "dist/Garia_OS_v2.8.1_Release_APK.apk",
+            "dist/Garia_OS_v2.8.0_Release_APK.apk",
+            "dist/Garia_OS_v2.7_Release_APK.apk",
+            "dist/Garia_OS_v2.6.1_Release_APK.apk",
+            "dist/Garia_OS_v2.5.0_Release_APK.apk",
+            "dist/Garia_OS_v2.4.0_Release_APK.apk",
+            "dist/Garia_OS.apk",
+            "dist/garia-os-release.apk",
         ])
-    
-    primary_sha = None
-    for target in targets:
-        sha = create_standalone_apk(target)
-        if 'Garia_OS_v2.8.1_Release_APK.apk' in target:
-            primary_sha = sha
 
-    print("All release APK targets built, validated, and signed successfully.")
-    if primary_sha:
-        print(f"PRIMARY APK SHA-256: {primary_sha}")
+    for target in targets:
+        os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
+        shutil.copyfile(primary_aligned, target)
+
+    print("\n=== Android SDK Verification Log ===")
+    res_verify = subprocess.run(["apksigner", "verify", "--verbose", "--print-certs", primary_aligned], capture_output=True, text=True)
+    print(res_verify.stdout)
+
+    res_zipalign = subprocess.run(["zipalign", "-c", "-v", "4", primary_aligned], capture_output=True, text=True)
+    print(res_zipalign.stdout)
+
+    res_badging = subprocess.run(["aapt", "dump", "badging", primary_aligned], capture_output=True, text=True)
+    print(res_badging.stdout)
+
+    print(f"SUCCESS: Real Android Release APK v2.8.2 Built ({os.path.getsize(primary_apk_path)} bytes) | SHA256: {primary_sha}")

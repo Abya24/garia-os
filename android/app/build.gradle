@@ -10,8 +10,8 @@ android {
         applicationId "com.gariaos.app"
         minSdk 21
         targetSdk 34
-        versionCode 7
-        versionName "2.4.0"
+        versionCode 12
+        versionName "2.8.2"
 
         manifestPlaceholders = [
             hostName: "ais-pre-v7vcv6eevdr5eg5w3uyx6h-727347822999.asia-southeast1.run.app",
