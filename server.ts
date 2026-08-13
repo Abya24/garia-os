@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -31,7 +32,7 @@ async function startServer() {
       const stats = fs.statSync(targetFile);
       size = stats.size;
       const fileBuffer = fs.readFileSync(targetFile);
-      sha256 = require("crypto").createHash("sha256").update(fileBuffer).digest("hex");
+      sha256 = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     }
 
     res.setHeader("Content-Type", "application/json");

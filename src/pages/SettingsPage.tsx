@@ -498,7 +498,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span>Official Android APK Download</span>
             </h4>
             <p className="text-xs text-slate-400 mt-0.5">
-              Download Garia OS v2.8.2 release APK for Android 8.0+ / 14 / 15 devices
+              Download Garia OS v2.8.3 release APK for Android 8.0+ / 14 / 15 devices
             </p>
           </div>
           <a

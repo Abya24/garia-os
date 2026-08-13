@@ -353,7 +353,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full glass-pill border border-emerald-500/30 text-emerald-400 text-[11px] font-medium">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Garia OS v2.8.2</span>
+                <span>Garia OS v2.8.3</span>
               </span>
               {activeStudent && (
                 <button

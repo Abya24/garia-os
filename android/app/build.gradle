@@ -40,7 +40,10 @@ android {
                 keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "gariaos"
                 keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "gariaos123"
             } else {
-                initWith(signingConfigs.debug)
+                storeFile signingConfigs.debug.storeFile
+                storePassword signingConfigs.debug.storePassword
+                keyAlias signingConfigs.debug.keyAlias
+                keyPassword signingConfigs.debug.keyPassword
             }
         }
     }
@@ -51,11 +54,7 @@ android {
             minifyEnabled false
         }
         release {
-            if (signingConfigs.release.storeFile != null && signingConfigs.release.storeFile.exists()) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-            }
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

@@ -1,6 +1,6 @@
 {
   "name": "Garia OS",
-  "description": "Premium Multi-Student Productivity & AI Operating System with Exam, Academic & Career Intelligence Centers v2.4.0",
+  "description": "Premium Multi-Student Productivity & AI Operating System with Exam, Academic & Career Intelligence Centers v2.8.3",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
