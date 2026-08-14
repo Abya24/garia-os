@@ -143,6 +143,7 @@ import { StatisticsPage } from "./pages/StatisticsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CareerCenterPage } from "./pages/CareerCenterPage";
 import { AcademicCenterPage } from "./pages/AcademicCenterPage";
+import { QuestionBankPage } from "./pages/QuestionBankPage";
 import { ExamCenterPage } from "./pages/ExamCenterPage";
 import { DownloadPage } from "./pages/DownloadPage";
 import {
@@ -160,6 +161,15 @@ export default function App() {
       if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
         return "download";
       }
+      if (path === "/questionbank" || hash === "#questionbank" || hash === "#mcq" || hash === "#pyq") {
+        return "questionbank";
+      }
+      if (path === "/academic" || hash === "#academic") {
+        return "academic";
+      }
+      if (path === "/career" || hash === "#career") {
+        return "career";
+      }
     }
     return "home";
   });
@@ -169,6 +179,9 @@ export default function App() {
       const hash = window.location.hash.toLowerCase();
       if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
         return ["home", "download"];
+      }
+      if (path === "/questionbank" || hash === "#questionbank") {
+        return ["home", "questionbank"];
       }
     }
     return ["home"];
@@ -1413,6 +1426,17 @@ export default function App() {
               onUpdatePracticeSessions={handleUpdateAcademicPractice}
               onUpdateRoadmap={handleUpdateAcademicRoadmap}
               onAskAbyaWithContext={handleAskAbyaWithContext}
+            />
+          )}
+
+          {activeTab === "questionbank" && (
+            <QuestionBankPage
+              activeStudent={activeStudent}
+              onAskAbyaWithContext={handleAskAbyaWithContext}
+              onNavigate={(tab) => {
+                handleNavigate(tab);
+                setIsMoreMenuOpen(false);
+              }}
             />
           )}
 

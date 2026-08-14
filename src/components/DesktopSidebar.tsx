@@ -15,8 +15,10 @@ import {
   Settings,
   Users,
   Download,
+  HelpCircle,
 } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
+import { APP_VERSION } from "../constants/version";
 
 interface DesktopSidebarProps {
   activeTab: ActiveTab;
@@ -37,34 +39,35 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     {
       title: "Core Navigation",
       items: [
-        { id: "home" as ActiveTab, label: "Dashboard", icon: Home },
+        { id: "home" as ActiveTab, label: "Home Dashboard", icon: Home },
+        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "V3" },
+        { id: "questionbank" as ActiveTab, label: "Question Bank", icon: HelpCircle, badge: "New" },
+        { id: "abya" as ActiveTab, label: "Abya AI Coach", icon: Sparkles, badge: "AI" },
+      ],
+    },
+    {
+      title: "Academic & Career",
+      items: [
+        { id: "career" as ActiveTab, label: "Career Center V3", icon: Compass, badge: "V3" },
+        { id: "exam" as ActiveTab, label: "Exam Intelligence", icon: ShieldAlert },
         { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
         { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
-        { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles, badge: "AI" },
       ],
     },
     {
-      title: "Academic & Exam",
+      title: "Tools & Wellness",
       items: [
-        { id: "exam" as ActiveTab, label: "Exam Center", icon: ShieldAlert, badge: "v2.8" },
-        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "v2.8" },
-        { id: "career" as ActiveTab, label: "Career Center", icon: Compass, badge: "v1.4" },
-      ],
-    },
-    {
-      title: "Tools & Utilities",
-      items: [
-        { id: "notes" as ActiveTab, label: "Notes System", icon: FileText },
+        { id: "notes" as ActiveTab, label: "Notes & Docs", icon: FileText },
         { id: "focus" as ActiveTab, label: "Focus Timer", icon: Timer },
-        { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
         { id: "habits" as ActiveTab, label: "Habits Tracker", icon: Flame },
+        { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
         { id: "stats" as ActiveTab, label: "Analytics", icon: BarChart2 },
       ],
     },
     {
       title: "Platform",
       items: [
-        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: "v2.8" },
+        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: `v${APP_VERSION}` },
         { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
       ],
     },
@@ -88,8 +91,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <h4 className="font-bold text-sm text-white font-heading truncate">
               {studentName}
             </h4>
-            <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
-              {activeStudent ? `${activeStudent.stream} • ${activeStudent.board}` : "Online OS"}
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono truncate">
+              {activeStudent ? `${activeStudent.currentClass || "Class 12"} • ${activeStudent.stream || "General"}` : "Online OS"}
             </span>
           </div>
         </div>
@@ -150,8 +153,9 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Footer info */}
       <div className="pt-3 border-t border-white/10 text-center">
-        <p className="text-xs text-slate-500 font-mono">Garia OS • Abya AI</p>
+        <p className="text-xs text-slate-500 font-mono">Garia OS v{APP_VERSION}</p>
       </div>
     </aside>
   );
 };
+

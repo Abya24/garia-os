@@ -1,6 +1,6 @@
 {
   "name": "Garia OS",
-  "description": "Premium Multi-Student Productivity & AI Operating System with Exam, Academic & Career Intelligence Centers v2.8.3",
+  "description": "Comprehensive Multi-Student Academic OS featuring Question Bank Center, Academic Center (Class 10/11/12), Career Center V3, Exam Intelligence, and Abya AI Coach.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

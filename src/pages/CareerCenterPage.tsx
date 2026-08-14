@@ -19,6 +19,13 @@ import {
   Check,
   ShieldCheck,
   GraduationCap,
+  Globe,
+  Landmark,
+  FileCheck,
+  Bot,
+  ExternalLink,
+  HelpCircle,
+  Send,
 } from "lucide-react";
 import {
   CareerProfile,
@@ -31,9 +38,15 @@ import {
   Milestone,
   CareerQuizAnswers,
   Subject,
+  GovtJobOption,
+  ScholarshipOption,
+  StudyAbroadOption,
 } from "../types";
 import {
   CAREER_CATALOG,
+  GOVT_JOBS_CATALOG,
+  SCHOLARSHIPS_CATALOG,
+  STUDY_ABROAD_CATALOG,
   calculateCareerMatches,
   generateDefaultRoadmap,
 } from "../utils/careerEngine";
@@ -131,7 +144,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   onNavigateToAbya,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
-    "assessment" | "matches" | "compare" | "roadmap"
+    "matches" | "govt_jobs" | "scholarships" | "study_abroad" | "ai_advisor" | "assessment" | "compare" | "roadmap"
   >("matches");
 
   const [showQuizModal, setShowQuizModal] = useState(false);
@@ -165,8 +178,25 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     "All" | "Commerce" | "Science" | "Arts / Humanities" | "Arts"
   >(profile.stream);
 
+  // Filters for other tabs
+  const [govtJobSearch, setGovtJobSearch] = useState("");
+  const [scholarshipSearch, setScholarshipSearch] = useState("");
+  const [studyAbroadCountry, setStudyAbroadCountry] = useState<string>("all");
+  const [aiAdvisorPrompt, setAiAdvisorPrompt] = useState("");
+  const [aiAdvisorHistory, setAiAdvisorHistory] = useState<
+    { role: "user" | "advisor"; text: string; time: string }[]
+  >([
+    {
+      role: "advisor",
+      text: `Hello ${activeStudentName}! I am your Garia OS Career & Stream AI Advisor. I can analyze your aptitude, compare Science vs Commerce vs Arts roadmaps, guide you on competitive exams (JEE, NEET, CUET, UPSC, CA, NDA), and provide scholarship/abroad admission strategies. How can I help your career planning today?`,
+      time: "Just now",
+    },
+  ]);
+
   // Expanded card IDs
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [expandedGovtJobId, setExpandedGovtJobId] = useState<string | null>(null);
+  const [expandedScholarshipId, setExpandedScholarshipId] = useState<string | null>(null);
 
   // Custom milestone input
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
@@ -436,25 +466,49 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
         {[
           {
             id: "matches",
-            label: "Career Catalog & Matches",
+            label: "Stream Careers",
             icon: Compass,
-            badge: `${filteredMatches.length} Pathways`,
+            badge: `${filteredMatches.length} Careers`,
           },
           {
-            id: "assessment",
-            label: "Know Yourself Assessment",
-            icon: Sliders,
+            id: "govt_jobs",
+            label: "Govt Jobs & UPSC",
+            icon: Landmark,
+            badge: "6 Sectors",
           },
           {
-            id: "compare",
-            label: "Career Comparison",
-            icon: Layers,
+            id: "scholarships",
+            label: "Scholarships Hub",
+            icon: Award,
+            badge: "Top 6",
+          },
+          {
+            id: "study_abroad",
+            label: "Study Abroad",
+            icon: Globe,
+            badge: "5 Countries",
+          },
+          {
+            id: "ai_advisor",
+            label: "Career AI Advisor",
+            icon: Bot,
+            badge: "AI Powered",
           },
           {
             id: "roadmap",
             label: "Personal Roadmap",
-            icon: Award,
-            badge: `${roadmapProgress}% Done`,
+            icon: FileCheck,
+            badge: `${roadmapProgress}%`,
+          },
+          {
+            id: "assessment",
+            label: "Know Yourself",
+            icon: Sliders,
+          },
+          {
+            id: "compare",
+            label: "Compare Careers",
+            icon: Layers,
           },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -464,7 +518,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                 isActive
                   ? "bg-gradient-to-r from-emerald-500/20 via-cyan-500/20 to-transparent text-emerald-300 border border-emerald-500/40 shadow-md font-bold"
                   : "text-slate-400 hover:text-white hover:bg-white/5"
@@ -1204,6 +1258,521 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Milestone</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: GOVT JOBS & UPSC SECTORS */}
+      {activeSubTab === "govt_jobs" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header & Search */}
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold mb-1.5">
+                <Landmark className="w-3.5 h-3.5" />
+                <span>Public Sector & Defense Pathways</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white font-heading">
+                Government Jobs & Civil Services Intelligence
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Comprehensive eligibility, exam patterns, pay scales, and strategic prep timelines for national competitive exams.
+              </p>
+            </div>
+
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search UPSC, NDA, SSC, Bank PO..."
+                value={govtJobSearch}
+                onChange={(e) => setGovtJobSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-2xl glass-pill text-xs text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              />
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {GOVT_JOBS_CATALOG.filter((job) => {
+              const q = govtJobSearch.toLowerCase();
+              return (
+                job.title.toLowerCase().includes(q) ||
+                job.organization.toLowerCase().includes(q) ||
+                job.keySubjects.some((s) => s.toLowerCase().includes(q))
+              );
+            }).map((job) => {
+              const isExpanded = expandedGovtJobId === job.id;
+              return (
+                <div
+                  key={job.id}
+                  className="glass-card rounded-3xl p-5 border border-white/10 hover:border-amber-500/30 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[11px] font-mono text-amber-400 uppercase font-semibold">
+                          {job.organization}
+                        </span>
+                        <h3 className="text-base font-bold text-white font-heading mt-0.5">
+                          {job.title}
+                        </h3>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-500/30 shrink-0">
+                        {job.minAge}
+                      </span>
+                    </div>
+
+                    {/* Quick Specs */}
+                    <div className="mt-3.5 space-y-2 text-xs">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <GraduationCap className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="truncate"><strong>Eligibility:</strong> {job.eligibility}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Briefcase className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span><strong>Pay Scale:</strong> {job.salaryTier}</span>
+                      </div>
+                    </div>
+
+                    {/* Key Subject Tags */}
+                    <div className="flex flex-wrap gap-1.5 mt-3.5">
+                      {job.keySubjects.map((sub, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-lg bg-slate-800/80 text-slate-300 text-[10px] border border-white/5 font-medium"
+                        >
+                          {sub}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Expandable Details */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-white/10 space-y-3.5 text-xs animate-in fade-in">
+                        <div>
+                          <div className="font-bold text-amber-300 mb-1">Exam Structure & Stages:</div>
+                          <ul className="space-y-1 text-slate-300 list-disc list-inside">
+                            {job.examPattern.map((p, idx) => (
+                              <li key={idx}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <div className="font-bold text-emerald-300 mb-1">Recommended Strategy:</div>
+                          <p className="text-slate-300 leading-relaxed bg-black/20 p-2.5 rounded-xl border border-white/5">
+                            {job.preparationStrategy}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-white/5">
+                    <button
+                      onClick={() => setExpandedGovtJobId(isExpanded ? null : job.id)}
+                      className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <span>{isExpanded ? "Less Details" : "View Exam Pattern & Prep"}</span>
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <a
+                      href={job.officialPortal}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/30 transition-all"
+                    >
+                      <span>Official Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: SCHOLARSHIPS HUB */}
+      {activeSubTab === "scholarships" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header & Search */}
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-1.5">
+                <Award className="w-3.5 h-3.5" />
+                <span>Financial Aid & Grants</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white font-heading">
+                National & Corporate Scholarships Hub
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Verified scholarships for Class 10/11/12 students and college undergraduates with full eligibility requirements.
+              </p>
+            </div>
+
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search NSP, INSPIRE, Tata, Reliance..."
+                value={scholarshipSearch}
+                onChange={(e) => setScholarshipSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-2xl glass-pill text-xs text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
+            </div>
+          </div>
+
+          {/* Scholarship Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {SCHOLARSHIPS_CATALOG.filter((s) => {
+              const q = scholarshipSearch.toLowerCase();
+              return (
+                s.title.toLowerCase().includes(q) ||
+                s.provider.toLowerCase().includes(q) ||
+                s.eligibility.toLowerCase().includes(q)
+              );
+            }).map((sch) => {
+              const isExpanded = expandedScholarshipId === sch.id;
+              return (
+                <div
+                  key={sch.id}
+                  className="glass-card rounded-3xl p-5 border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[11px] font-mono text-emerald-400 uppercase font-semibold">
+                          {sch.provider}
+                        </span>
+                        <h3 className="text-base font-bold text-white font-heading mt-0.5">
+                          {sch.title}
+                        </h3>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 shrink-0">
+                        {sch.applicationPeriod}
+                      </span>
+                    </div>
+
+                    <div className="mt-3.5 p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/20">
+                      <div className="text-[11px] text-emerald-400 uppercase font-mono font-bold">Grant Amount</div>
+                      <div className="text-sm font-extrabold text-white mt-0.5">{sch.awardAmount}</div>
+                    </div>
+
+                    <div className="mt-3 space-y-1.5 text-xs text-slate-300">
+                      <div><strong>Target Level:</strong> {sch.targetClass}</div>
+                      <div><strong>Eligibility:</strong> {sch.eligibility}</div>
+                      <div><strong>Selection:</strong> {sch.selectionBasis}</div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-white/10 space-y-3 text-xs animate-in fade-in">
+                        <div>
+                          <div className="font-bold text-cyan-300 mb-1">Required Documents Checklist:</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {sch.requiredDocuments.map((doc, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] border border-white/5"
+                              >
+                                ✓ {doc}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-white/5">
+                    <button
+                      onClick={() => setExpandedScholarshipId(isExpanded ? null : sch.id)}
+                      className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                    >
+                      <span>{isExpanded ? "Less Details" : "Document Checklist"}</span>
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <a
+                      href={sch.applyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 border border-emerald-500/30 transition-all"
+                    >
+                      <span>Apply on Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: STUDY ABROAD NAVIGATOR */}
+      {activeSubTab === "study_abroad" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header */}
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Global University Admissions</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white font-heading">
+                Study Abroad Country & Visa Navigator
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Cost of living, key entrance exams (SAT, IELTS, GRE), intake cycles, and admission timelines for top global destinations.
+              </p>
+            </div>
+
+            {/* Country Selector Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {[
+                { id: "all", label: "All Countries" },
+                { id: "usa", label: "🇺🇸 USA" },
+                { id: "uk", label: "🇬🇧 UK" },
+                { id: "germany", label: "🇩🇪 Germany" },
+                { id: "canada", label: "🇨🇦 Canada" },
+                { id: "australia", label: "🇦🇺 Australia" },
+              ].map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setStudyAbroadCountry(c.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                    studyAbroadCountry === c.id
+                      ? "bg-cyan-500 text-slate-950 shadow-md"
+                      : "glass-pill text-slate-400 hover:text-white border border-white/5"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Country Cards */}
+          <div className="space-y-5">
+            {STUDY_ABROAD_CATALOG.filter((c) => studyAbroadCountry === "all" || c.id === studyAbroadCountry).map((country) => (
+              <div
+                key={country.id}
+                className="glass-card rounded-3xl p-6 border border-white/10 hover:border-cyan-500/30 transition-all space-y-4"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{country.flag}</span>
+                    <div>
+                      <h3 className="text-xl font-bold text-white font-heading">{country.country}</h3>
+                      <div className="text-xs text-cyan-400 font-mono mt-0.5">
+                        {country.intakes.join(" • ")}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/20 text-right">
+                    <div className="text-[10px] text-cyan-300 uppercase font-mono font-bold">Estimated Cost / Year</div>
+                    <div className="text-sm font-extrabold text-white">{country.avgCostPerYear}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* Exams & Courses */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-black/20 border border-white/5">
+                    <div className="font-bold text-cyan-300 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Required Entrance Exams</span>
+                    </div>
+                    <ul className="space-y-1 text-slate-300">
+                      {country.keyEntranceExams.map((e, idx) => (
+                        <li key={idx}>• {e}</li>
+                      ))}
+                    </ul>
+
+                    <div className="font-bold text-cyan-300 pt-2 flex items-center gap-1.5">
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      <span>Popular Fields</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {country.popularCourses.map((crs, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300">
+                          {crs}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Visa & Scholarships */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-black/20 border border-white/5">
+                    <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Visa & Financial Criteria</span>
+                    </div>
+                    <ul className="space-y-1 text-slate-300">
+                      {country.visaRequirements.map((v, idx) => (
+                        <li key={idx}>• {v}</li>
+                      ))}
+                    </ul>
+
+                    <div className="font-bold text-emerald-300 pt-2 flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Scholarship Opportunities</span>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed text-[11px]">
+                      {country.scholarshipAvailable}
+                    </p>
+                  </div>
+
+                  {/* Timeline Roadmap */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-black/20 border border-white/5">
+                    <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5" />
+                      <span>Standard Application Timeline</span>
+                    </div>
+                    <div className="space-y-1.5 text-[11px] text-slate-300">
+                      {country.admissionTimeline.map((t, idx) => (
+                        <div key={idx} className="p-1.5 rounded-lg bg-purple-950/30 border border-purple-500/10">
+                          {t}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: CAREER AI ADVISOR */}
+      {activeSubTab === "ai_advisor" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header */}
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-semibold mb-1.5">
+                <Bot className="w-3.5 h-3.5" />
+                <span>Abya AI Career Intelligence</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white font-heading">
+                Interactive Career & Stream AI Advisor
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Get intelligent advice on subject combinations, entrance exam roadmaps, CA vs Engineering vs Civil Services, and abroad strategies.
+              </p>
+            </div>
+
+            <button
+              onClick={onNavigateToAbya}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg hover:brightness-110 transition-all shrink-0"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Open Full Abya AI Screen</span>
+            </button>
+          </div>
+
+          {/* Quick Consultation Chips */}
+          <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+            <div className="text-xs font-bold text-slate-300 font-heading">Popular Career Advice Prompts:</div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Should I choose Science (PCM/PCB) or Commerce after Class 10?",
+                "What is the step-by-step roadmap to become a Chartered Accountant (CA)?",
+                "How to prepare for UPSC Civil Services along with college graduation?",
+                "Which engineering branches have the highest AI and future demand?",
+                "How can I secure full tuition scholarships for studying in Germany or USA?",
+                "What are the best high-paying career options for Arts / Humanities students?",
+              ].map((p, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setAiAdvisorHistory((prev) => [
+                      ...prev,
+                      { role: "user", text: p, time: "Just now" },
+                      {
+                        role: "advisor",
+                        text: `Analyzing "${p}" for ${profile.stream} (${profile.currentClass})...\n\nStrategic Advice:\n1. Foundation: Ensure strong mastery in core prerequisites during ${profile.currentClass}.\n2. Timeline: Register for key entrance tests early and solve 5 years of past papers.\n3. Skill Stack: Build practical digital proficiencies alongside academic scores.\n\nTip: You can chat directly with Abya AI for real-time deep answers!`,
+                        time: "Just now",
+                      },
+                    ]);
+                  }}
+                  className="px-3 py-1.5 rounded-xl glass-pill text-slate-300 hover:text-white hover:bg-purple-500/20 text-xs text-left border border-white/10 transition-all"
+                >
+                  💬 {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Chat / Advice Stream */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {aiAdvisorHistory.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`flex gap-3 text-xs leading-relaxed ${
+                    item.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {item.role === "advisor" && (
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`p-4 rounded-2xl max-w-xl ${
+                      item.role === "user"
+                        ? "bg-emerald-500 text-slate-950 font-medium rounded-tr-none shadow-md"
+                        : "bg-slate-900/90 text-slate-200 border border-white/10 rounded-tl-none whitespace-pre-line shadow-inner"
+                    }`}
+                  >
+                    <div className="text-[10px] opacity-70 mb-1 font-mono">
+                      {item.role === "user" ? activeStudentName : "Garia OS Career AI Advisor"} • {item.time}
+                    </div>
+                    {item.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Input Bar */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!aiAdvisorPrompt.trim()) return;
+                const prompt = aiAdvisorPrompt.trim();
+                setAiAdvisorHistory((prev) => [
+                  ...prev,
+                  { role: "user", text: prompt, time: "Just now" },
+                  {
+                    role: "advisor",
+                    text: `Regarding your query "${prompt}":\n\nBased on your ${profile.stream} profile in ${profile.currentClass}, our academic recommendation is to align your weekly study blocks with key entrance syllabi. Click 'Open Full Abya AI Screen' above for interactive live conversation with continuous memory.`,
+                    time: "Just now",
+                  },
+                ]);
+                setAiAdvisorPrompt("");
+              }}
+              className="flex items-center gap-2 pt-3 border-t border-white/10"
+            >
+              <input
+                type="text"
+                placeholder="Ask Career Advisor anything (e.g. Is CA better than MBA for finance?)..."
+                value={aiAdvisorPrompt}
+                onChange={(e) => setAiAdvisorPrompt(e.target.value)}
+                className="flex-1 px-4 py-2.5 rounded-2xl glass-pill text-xs text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-md"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Ask Advisor</span>
               </button>
             </form>
           </div>

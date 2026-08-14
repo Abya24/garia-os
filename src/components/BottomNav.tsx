@@ -1,8 +1,8 @@
 import React from "react";
 import {
   Home,
-  BookOpen,
-  CheckSquare,
+  GraduationCap,
+  HelpCircle,
   Sparkles,
   MoreHorizontal,
 } from "lucide-react";
@@ -23,9 +23,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   const mainNavItems = [
     { id: "home" as ActiveTab, label: "Home", icon: Home },
-    { id: "study" as ActiveTab, label: "Study", icon: BookOpen },
-    { id: "tasks" as ActiveTab, label: "Tasks", icon: CheckSquare },
-    { id: "abya" as ActiveTab, label: "AI", icon: Sparkles },
+    { id: "academic" as ActiveTab, label: "Academics", icon: GraduationCap },
+    { id: "questionbank" as ActiveTab, label: "Question Bank", icon: HelpCircle },
+    { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles },
   ];
 
   return (
@@ -39,7 +39,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 relative ${
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 relative ${
                 isActive
                   ? "text-emerald-400 font-bold"
                   : "text-slate-400 hover:text-slate-200"
@@ -49,7 +49,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <div className="absolute inset-0 bg-emerald-500/15 rounded-xl border border-emerald-500/30" />
               )}
               <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-105" : ""}`} />
-              <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight">{item.label}</span>
+              <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight whitespace-nowrap">{item.label}</span>
             </button>
           );
         })}
@@ -57,15 +57,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* More Button */}
         <button
           onClick={onOpenMore}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 relative ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 relative ${
             isMoreOpen ||
-            ["notes", "exam", "academic", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(activeTab)
+            ["study", "tasks", "notes", "exam", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(activeTab)
               ? "text-cyan-400 font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
           {(isMoreOpen ||
-            ["notes", "exam", "academic", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(
+            ["study", "tasks", "notes", "exam", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(
               activeTab
             )) && (
             <div className="absolute inset-0 bg-cyan-500/15 rounded-xl border border-cyan-500/30" />
@@ -77,3 +77,4 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     </nav>
   );
 };
+

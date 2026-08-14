@@ -21,8 +21,10 @@ import {
   Info,
   ShieldCheck,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 import { ActiveTab } from "../types";
+import { APP_VERSION } from "../constants/version";
 
 interface MoreMenuModalProps {
   isOpen: boolean;
@@ -45,6 +47,44 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
 
   const moreItems = [
     {
+      id: "questionbank" as ActiveTab,
+      label: "Question Bank Center",
+      desc: "MCQ, Quiz, PYQs, Practice, VVI, Revision & Tests",
+      icon: HelpCircle,
+      color: "from-emerald-400 to-teal-500",
+      badge: "V3 Center",
+    },
+    {
+      id: "academic" as ActiveTab,
+      label: "Academic Center",
+      desc: "Class 10, 11 & 12 curriculum, VVI topics & roadmap",
+      icon: GraduationCap,
+      color: "from-emerald-400 to-cyan-400",
+      badge: `v${APP_VERSION}`,
+    },
+    {
+      id: "career" as ActiveTab,
+      label: "Career Center V3",
+      desc: "Science, Commerce, Arts, Govt Jobs, Scholarships & Study Abroad",
+      icon: Compass,
+      color: "from-cyan-500 to-blue-500",
+      badge: "V3 Suite",
+    },
+    {
+      id: "study" as ActiveTab,
+      label: "Study Tracker",
+      desc: "Subject study logs, chapters & active study session timer",
+      icon: BookOpen,
+      color: "from-teal-500 to-emerald-500",
+    },
+    {
+      id: "tasks" as ActiveTab,
+      label: "Task Manager",
+      desc: "Todo matrix, deadlines, priority tags & categories",
+      icon: CheckSquare,
+      color: "from-indigo-500 to-purple-500",
+    },
+    {
       id: "notes" as ActiveTab,
       label: "Notes & Docs",
       desc: "Rich markdown notes, tags & PDF attachments",
@@ -57,23 +97,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       desc: "Board profile, readiness score, queue & mock tests",
       icon: ShieldAlert,
       color: "from-cyan-400 to-emerald-400",
-      badge: "V1.4.2",
-    },
-    {
-      id: "academic" as ActiveTab,
-      label: "Academic Center",
-      desc: "Class 12 stream subjects, VVI topics & revision",
-      icon: GraduationCap,
-      color: "from-emerald-400 to-cyan-400",
-      badge: "V1.4.1",
-    },
-    {
-      id: "career" as ActiveTab,
-      label: "Career Center",
-      desc: "Commerce, Science & Arts pathways & roadmaps",
-      icon: Compass,
-      color: "from-emerald-400 to-cyan-500",
-      badge: "V1.4",
+      badge: `v${APP_VERSION}`,
     },
     {
       id: "focus" as ActiveTab,
@@ -106,15 +130,15 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     {
       id: "download" as ActiveTab,
       label: "Download Official APK",
-      desc: "Get Garia OS Android app v2.8.3",
+      desc: `Get Garia OS Android app v${APP_VERSION}`,
       icon: Download,
       color: "from-emerald-500 to-teal-400",
-      badge: "v2.8.3",
+      badge: `v${APP_VERSION}`,
     },
     {
       id: "settings" as ActiveTab,
       label: "Settings",
-      desc: "Theme, API config, data backup",
+      desc: "Theme, Language, API config & data backup",
       icon: Settings,
       color: "from-slate-500 to-slate-400",
     },
@@ -171,7 +195,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                 </div>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                v1.5 Multi-User
+                Multi-Student v{APP_VERSION}
               </span>
             </button>
           )}
@@ -227,7 +251,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
             <Info className="w-3.5 h-3.5" />
             <span>About Garia OS</span>
           </button>
-          <span>Garia OS v2.8.3</span>
+          <span>Garia OS v{APP_VERSION}</span>
         </div>
       </div>
 
@@ -248,7 +272,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base font-heading">
-                    Garia OS v2.8.3
+                    Garia OS v{APP_VERSION}
                   </h3>
                   <p className="text-xs text-emerald-400 font-medium">
                     Smart Student Productivity & Study Platform
@@ -265,7 +289,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
 
             <div className="space-y-2.5 text-xs text-slate-300 leading-relaxed">
               <p>
-                <strong className="text-white">Garia OS</strong> is an offline-first academic operating system designed specifically for students across Commerce, Science, and Arts streams.
+                <strong className="text-white">Garia OS</strong> is an offline-first academic operating system designed specifically for students across Class 10, 11, and 12 (Science, Commerce, Arts).
               </p>
               <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1.5">
                 <div className="font-bold text-emerald-300 flex items-center gap-1.5">
@@ -273,21 +297,21 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                   <span>Privacy & Session Isolation Architecture</span>
                 </div>
                 <p className="text-slate-400 text-[11px]">
-                  All student profiles, study logs, task matrices, and notes remain isolated strictly inside your browser installation context. No profile data is ever shared or uploaded.
+                  All student profiles, study logs, task matrices, notes, and question bank progress remain isolated strictly inside your browser installation context.
                 </p>
               </div>
 
               <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-[11px] text-slate-300">
                 <div className="font-bold text-cyan-300 flex items-center gap-1.5 mb-1">
                   <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Core V2.8 Modules</span>
+                  <span>Core V3 Modules</span>
                 </div>
                 <ul className="list-disc list-inside space-y-0.5 text-slate-400">
-                  <li>Subject-Based Study Tracker & High-Precision Timer</li>
-                  <li>Task Manager with Today, Upcoming & Completed tabs</li>
-                  <li>Abya AI Academic Coach (6 Specialized Modes)</li>
-                  <li>Academic Question Bank Architecture (Class 10, 11, 12 MCQs & PYQs)</li>
-                  <li>Official Signed Android Release APK v2.8.3</li>
+                  <li>Unified Class 10 &amp; Stream-Separated Class 11/12 Academics</li>
+                  <li>Question Bank Center (MCQ, Quiz, PYQ, Practice, VVI, Revision, Chapter Test)</li>
+                  <li>Career Center V3 (Science, Commerce, Arts, Govt Jobs, Scholarships, Study Abroad)</li>
+                  <li>Bilingual Interface Engine (English &amp; हिन्दी)</li>
+                  <li>Official Signed Android Release APK v{APP_VERSION}</li>
                 </ul>
               </div>
             </div>
@@ -304,3 +328,4 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     </div>
   );
 };
+
