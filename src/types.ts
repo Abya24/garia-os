@@ -89,6 +89,13 @@ export interface CalendarEvent {
   createdAt: number;
 }
 
+export type AbyaAIMode = "standard" | "high_thinking" | "fast_lite" | "search_grounded";
+
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 export interface AbyaMessage {
   id: string;
   role: "user" | "model";
@@ -96,6 +103,11 @@ export interface AbyaMessage {
   timestamp: number;
   isError?: boolean;
   isFallback?: boolean;
+  mode?: AbyaAIMode;
+  imageUrl?: string;
+  imageMimeType?: string;
+  groundingSources?: GroundingSource[];
+  thinkingDurationMs?: number;
 }
 
 export type AbyaQuickActionType =
@@ -105,7 +117,12 @@ export type AbyaQuickActionType =
   | "revise"
   | "analyze_tests"
   | "career_guidance"
-  | "exam_coach";
+  | "exam_coach"
+  | "high_thinking"
+  | "image_doubt"
+  | "fast_mode"
+  | "search_grounding"
+  | "live_voice";
 
 export interface AbyaInsightCard {
   id: string;

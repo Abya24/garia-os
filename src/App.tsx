@@ -10,6 +10,7 @@ import {
   Goal,
   CalendarEvent,
   AbyaMessage,
+  AbyaAIMode,
   UserSettings,
   AbyaLanguageSetting,
   ActiveTab,
@@ -820,11 +821,21 @@ export default function App() {
     saveAbyaLanguage(lang, activeStudent.id);
   };
 
-  // Abya AI Chat Messaging Handler
+  // Abya AI Chat Messaging Handler with Multimodal & Model Selection Support
   const handleSendAbyaMessage = async (
     prompt: string,
     contextNote?: string,
-    actionType?: any
+    actionType?: any,
+    mode: AbyaAIMode = "standard",
+    image?: { data: string; mimeType: string },
+    curriculumContext?: {
+      classLevel?: string;
+      stream?: string;
+      subject?: string;
+      chapter?: string;
+      topic?: string;
+      modeType?: string;
+    }
   ) => {
     if (isAbyaSubmittingRef.current) {
       console.warn("[Abya AI Client] Request already in progress. Ignoring duplicate submission.");
@@ -838,6 +849,9 @@ export default function App() {
       role: "user",
       content: prompt,
       timestamp: Date.now(),
+      mode,
+      imageUrl: image ? `data:${image.mimeType};base64,${image.data}` : undefined,
+      imageMimeType: image?.mimeType,
     };
 
     const newChatWithUser = [...abyaChat, userMsg];
@@ -850,8 +864,11 @@ export default function App() {
     const requestPayload = {
       prompt,
       history: recentHistory,
+      mode,
+      image,
       customApiKey: settings.customApiKey,
       contextNote,
+      curriculumContext,
       abyaLanguage,
       studentProfileContext: {
         id: activeStudent.id,
@@ -933,16 +950,17 @@ export default function App() {
     };
 
     let aiReplyText: string | null = null;
+    let responseData: any = null;
     let isUnauthorizedKey = false;
     const maxAttempts = 3;
 
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
 
         try {
-          console.log(`[Abya AI Client] Request attempt ${attempt}/${maxAttempts} for prompt: "${prompt.slice(0, 35)}..."`);
+          console.log(`[Abya AI Client] Request attempt ${attempt}/${maxAttempts} (mode=${mode}, hasImage=${!!image}) for prompt: "${prompt.slice(0, 35)}..."`);
           const res = await fetch("/api/ai/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -955,7 +973,8 @@ export default function App() {
 
           if (res.ok && data.text) {
             aiReplyText = data.text;
-            console.log(`[Abya AI Client] Attempt ${attempt} succeeded in ${data.durationMs || "N/A"}ms.`);
+            responseData = data;
+            console.log(`[Abya AI Client] Attempt ${attempt} succeeded with ${data.modelUsed || "model"} in ${data.durationMs || "N/A"}ms.`);
             break;
           }
 
@@ -969,7 +988,7 @@ export default function App() {
         } catch (err: any) {
           clearTimeout(timeoutId);
           const isAbort = err.name === "AbortError";
-          const errMsg = isAbort ? "Request timed out after 25s" : err?.message || "Network error";
+          const errMsg = isAbort ? "Request timed out after 35s" : err?.message || "Network error";
           console.warn(`[Abya AI Client] Attempt ${attempt}/${maxAttempts} failed: ${errMsg}`);
 
           if (attempt < maxAttempts) {
@@ -986,6 +1005,9 @@ export default function App() {
           role: "model",
           content: aiReplyText,
           timestamp: Date.now(),
+          mode: responseData?.modeUsed || mode,
+          groundingSources: responseData?.groundingSources,
+          thinkingDurationMs: responseData?.durationMs,
         };
 
         setAbyaChat((prev) => {
@@ -1486,6 +1508,7 @@ export default function App() {
                 handleNavigate(tab);
                 setIsMoreMenuOpen(false);
               }}
+              onSaveExamTestRecord={handleSaveExamTestRecord}
             />
           )}
 
@@ -1603,6 +1626,17 @@ export default function App() {
               focusLogs={focusLogs}
               water={water}
               goals={goals}
+              activeStudent={activeStudent}
+              academicSubjects={academicSubjects}
+              academicChapters={academicChapters}
+              vviTopics={vviTopics}
+              academicRevisions={academicRevisions}
+              academicPractice={academicPractice}
+              examTestRecords={examTestRecords}
+              onNavigate={(tab) => {
+                handleNavigate(tab);
+                setIsMoreMenuOpen(false);
+              }}
             />
           )}
 

@@ -34,12 +34,14 @@ import {
   SEED_MCQS,
   SEED_PYQS,
   SEED_PRACTICE_QUESTIONS,
+  getQuestionsForCurriculum,
   recordMCQAttempt,
   toggleQuestionBookmark,
   toggleItemCompleted,
 } from "../utils/questionBankEngine";
 import { AppLanguage, translations } from "../utils/i18n";
 import { APP_VERSION } from "../constants/version";
+import { MockTestEngine } from "../components/MockTestEngine";
 
 interface QuestionBankPageProps {
   activeStudent?: StudentProfile;
@@ -47,6 +49,7 @@ interface QuestionBankPageProps {
   onAskAbyaAI?: (prompt: string) => void;
   onAskAbyaWithContext?: (prompt: string, context?: any) => void;
   onNavigate?: (tab: string) => void;
+  onSaveExamTestRecord?: (record: any) => void;
 }
 
 type QuestionBankTab =
@@ -64,6 +67,7 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
   onAskAbyaAI,
   onAskAbyaWithContext,
   onNavigate,
+  onSaveExamTestRecord,
 }) => {
   const langKey: AppLanguage =
     currentLanguage === "hi"
@@ -176,35 +180,34 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
   const [selectedYear, setSelectedYear] = useState<string>("ALL");
   const [selectedBoard, setSelectedBoard] = useState<string>("ALL");
 
+  // Dynamic Curriculum Question pool
+  const curriculumPool = useMemo(() => {
+    return getQuestionsForCurriculum(selectedClass, selectedSubject);
+  }, [selectedClass, selectedSubject]);
+
   // Filtered Question lists
   const filteredMCQs = useMemo(() => {
-    return SEED_MCQS.filter((q) => {
-      const matchClass = selectedClass === "ALL" || q.classLevel.toLowerCase() === selectedClass.toLowerCase();
-      const matchSub = selectedSubject === "ALL" || q.subjectName.toLowerCase().includes(selectedSubject.toLowerCase());
+    return curriculumPool.mcqs.filter((q) => {
       const matchSearch = !searchQuery || q.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || q.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchClass && matchSub && matchSearch;
+      return matchSearch;
     });
-  }, [selectedClass, selectedSubject, searchQuery]);
+  }, [curriculumPool, searchQuery]);
 
   const filteredPYQs = useMemo(() => {
-    return SEED_PYQS.filter((p) => {
-      const matchClass = selectedClass === "ALL" || p.classLevel.toLowerCase() === selectedClass.toLowerCase();
-      const matchSub = selectedSubject === "ALL" || p.subjectName.toLowerCase().includes(selectedSubject.toLowerCase());
+    return curriculumPool.pyqs.filter((p) => {
       const matchYear = selectedYear === "ALL" || p.year.toString() === selectedYear;
       const matchBoard = selectedBoard === "ALL" || (p.board && p.board.toLowerCase() === selectedBoard.toLowerCase());
       const matchSearch = !searchQuery || p.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || p.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchClass && matchSub && matchYear && matchBoard && matchSearch;
+      return matchYear && matchBoard && matchSearch;
     });
-  }, [selectedClass, selectedSubject, selectedYear, selectedBoard, searchQuery]);
+  }, [curriculumPool, selectedYear, selectedBoard, searchQuery]);
 
   const filteredPractice = useMemo(() => {
-    return SEED_PRACTICE_QUESTIONS.filter((pr) => {
-      const matchClass = selectedClass === "ALL" || pr.classLevel.toLowerCase() === selectedClass.toLowerCase();
-      const matchSub = selectedSubject === "ALL" || pr.subjectName.toLowerCase().includes(selectedSubject.toLowerCase());
+    return curriculumPool.practice.filter((pr) => {
       const matchSearch = !searchQuery || pr.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || pr.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchClass && matchSub && matchSearch;
+      return matchSearch;
     });
-  }, [selectedClass, selectedSubject, searchQuery]);
+  }, [curriculumPool, searchQuery]);
 
   // Handle MCQ Answer Submission
   const handleAnswerSelect = (optionIdx: number, mcq: TopicMCQ) => {
@@ -996,26 +999,36 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         </div>
       )}
 
-      {/* Mode 7: Chapter Test Simulator */}
+      {/* Mode 7: Comprehensive Examination Environment (Mock Test System) */}
       {activeTab === "test" && (
-        <div className="p-6 rounded-3xl bg-slate-900/80 border border-white/10 space-y-5 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/30">
-            <Award className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-white font-heading">Full Chapter Test Assessment</h2>
-          <p className="text-sm text-slate-300 max-w-lg mx-auto">
-            Simulate realistic exam conditions with timed section-by-section questions, instant grading, and automated weakness detection.
-          </p>
-          <div className="pt-2">
-            <button
-              onClick={() => startQuiz(10)}
-              className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm inline-flex items-center gap-2 shadow-lg shadow-indigo-600/30"
-            >
-              <Play className="w-4 h-4" />
-              Launch Chapter Test (10 Questions)
-            </button>
-          </div>
-        </div>
+        <MockTestEngine
+          activeStudent={activeStudent}
+          availableMCQs={filteredMCQs.length > 0 ? filteredMCQs : curriculumPool.mcqs}
+          onSaveToExamCenter={(rec) => {
+            if (onSaveExamTestRecord) {
+              onSaveExamTestRecord({
+                id: `mock-rec-${Date.now()}`,
+                subjectId: `sub-${rec.subjectName.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+                subjectName: rec.subjectName,
+                testName: rec.testName,
+                date: new Date().toISOString().split("T")[0],
+                maxMarks: rec.maxMarks,
+                marksObtained: rec.score,
+                totalQuestions: rec.correct + rec.incorrect,
+                correctAnswers: rec.correct,
+                incorrectAnswers: rec.incorrect,
+                unattemptedAnswers: 0,
+                timeTakenMinutes: rec.timeMinutes,
+                notes: "Recorded from Garia OS Comprehensive Mock Test Engine",
+                createdAt: Date.now(),
+              });
+            }
+          }}
+          onNavigateToAbya={(topicName) => {
+            handleAskTutor(`Explain core concepts, formulas, and common exam questions for: ${topicName}`);
+            if (onNavigate) onNavigate("abya");
+          }}
+        />
       )}
     </div>
   );

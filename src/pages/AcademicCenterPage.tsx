@@ -1083,13 +1083,43 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
       {/* TAB 4: REVISION & PYQ HUB */}
       {activeTab === "revision" && (
         <div className="space-y-6">
+          <AcademicRevisionPlannerSection
+            revisions={revisions}
+            subjects={subjects}
+            chapters={chapters}
+            vviTopics={vviTopics}
+            examTests={[]}
+            activeStudent={activeStudent}
+            onAddRevision={(rev) => {
+              const newRev: AcademicRevisionItem = {
+                ...rev,
+                id: `rev-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                createdAt: Date.now(),
+              };
+              onUpdateRevisions([...revisions, newRev]);
+            }}
+            onToggleRevisionComplete={(id) => {
+              onUpdateRevisions(
+                revisions.map((r) =>
+                  r.id === id ? { ...r, completed: !r.completed } : r
+                )
+              );
+            }}
+            onDeleteRevision={(id) => {
+              onUpdateRevisions(revisions.filter((r) => r.id !== id));
+            }}
+            onAskAbya={(topic) => {
+              onAskAbyaWithContext(`Provide quick notes and revision formula summary for "${topic}".`);
+            }}
+          />
+
           <div className="bg-slate-900/80 rounded-2xl p-5 border border-white/10 space-y-2">
             <h3 className="font-bold text-white text-base flex items-center gap-2">
               <RotateCcw className="w-5 h-5 text-cyan-400" />
-              Spaced Repetition & Board PYQ Tracker
+              Chapter PYQ & Board Pass Counter
             </h3>
             <p className="text-xs text-slate-400">
-              Track 1st, 2nd, and 3rd revision passes for long-term retention.
+              Track 1st, 2nd, and 3rd revision passes and board PYQ status for textbook chapters.
             </p>
           </div>
 
@@ -1122,7 +1152,7 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           {/* List of Chapters for Revision */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider">
-              Subject Revision Table
+              Subject Chapter PYQ Status
             </h4>
 
             <div className="divide-y divide-white/10 bg-slate-900/80 rounded-2xl border border-white/10 overflow-hidden">

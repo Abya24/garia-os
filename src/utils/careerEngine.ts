@@ -336,6 +336,44 @@ export const CAREER_CATALOG: CareerOption[] = [
     ],
     whyMatchTags: ["Analytical Thinking", "Finance/Markets", "Coding/Tech", "High Earning Potential"],
   },
+  {
+    id: "defence_nda_tes",
+    title: "National Defence Services (NDA / Technical Entry Scheme)",
+    stream: "Science",
+    category: "Armed Forces & Defence Technology",
+    description: "Commissioned Officer in the Indian Army, Indian Air Force, or Indian Navy leading tactical operations and defence engineering units.",
+    duration: "3 - 4 Years (NDA Khadakwasla / INA / AFA / IMA)",
+    studyPathway: "Class 12 Science (PCM) -> NDA & NA Written Exam -> 5-Day SSB Interview -> Medical Board -> 3 Years NDA + 1 Year IMA/INA/AFA -> Lieutenant/Sub-Lieutenant/Flying Officer.",
+    requiredSubjects: ["Mathematics", "Physics", "Chemistry", "English"],
+    keySkills: ["Strategic Leadership", "Physical Endurance", "Ballistics & Navigation", "Crisis Decision-Making"],
+    workAreas: ["Defence Establishments", "Field Operations", "Aviation Bases", "Naval Fleet"],
+    courseStages: [
+      "NDA Written Examination & SSB Selection",
+      "Tri-Services Cadet Military Training (NDA)",
+      "Specialized Academy Training (IMA / INA / AFA)",
+      "Commissioning as Lieutenant / Flying Officer",
+    ],
+    whyMatchTags: ["Management/Leadership", "Field Work", "Job Security", "Social Impact"],
+  },
+  {
+    id: "isro_space_sci",
+    title: "ISRO & Space Science Engineering (Aerospace & Rocketry)",
+    stream: "Science",
+    category: "Space Science, Satellite Tech & Astronomy",
+    description: "Designs launch vehicles (PSLV/GSLV), space mission payloads, satellite telemetry, planetary orbiters, and deep-space observation systems for ISRO and space startups.",
+    duration: "4 Years (B.Tech Aerospace / Avionics at IIST) / 5 Years (BS-MS)",
+    studyPathway: "Class 12 Science (PCM) -> JEE Advanced -> Indian Institute of Space Science and Technology (IIST) -> Direct Absorption into ISRO as Scientist/Engineer 'SC'.",
+    requiredSubjects: ["Physics", "Mathematics", "Chemistry", "Computer Science"],
+    keySkills: ["Astrodynamics", "Orbital Mechanics", "Propulsion & Rocketry", "Computational Physics"],
+    workAreas: ["ISRO Satellite Centers", "Launch Facilities (SDSC SHAR)", "Space R&D Labs", "Tech/Lab"],
+    courseStages: [
+      "JEE Advanced & IIST Admissions",
+      "Aerospace, Avionics & Propulsion Engineering",
+      "ISRO Center Live Mission Internship & Thesis",
+      "Scientist/Engineer 'SC' Appointment at ISRO",
+    ],
+    whyMatchTags: ["Scientific Research", "Problem Solving", "Coding/Tech", "Global Opportunities"],
+  },
 
   // Arts / Humanities Careers
   {
@@ -561,14 +599,7 @@ export function calculateCareerMatches(
 
   // Strict stream isolation
   let eligibleCareers = CAREER_CATALOG;
-  if (currentClass === "Class 10" || filterStream === "General") {
-    eligibleCareers = CAREER_CATALOG.filter(
-      (c) => c.stream === "General"
-    );
-    if (eligibleCareers.length === 0) {
-      eligibleCareers = CAREER_CATALOG;
-    }
-  } else if (filterStream === "Science") {
+  if (filterStream === "Science") {
     eligibleCareers = CAREER_CATALOG.filter((c) => c.stream === "Science");
   } else if (filterStream === "Commerce") {
     eligibleCareers = CAREER_CATALOG.filter((c) => c.stream === "Commerce");
@@ -576,6 +607,9 @@ export function calculateCareerMatches(
     eligibleCareers = CAREER_CATALOG.filter(
       (c) => c.stream === "Arts" || c.stream === "Arts / Humanities"
     );
+  } else if (currentClass === "Class 10" || filterStream === "General") {
+    const genCareers = CAREER_CATALOG.filter((c) => c.stream === "General");
+    eligibleCareers = genCareers.length > 0 ? genCareers : CAREER_CATALOG;
   }
 
   const results = eligibleCareers.map((career) => {

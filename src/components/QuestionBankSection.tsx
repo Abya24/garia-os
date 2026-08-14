@@ -37,12 +37,14 @@ import {
   SEED_MCQS,
   SEED_PYQS,
   SEED_PRACTICE_QUESTIONS,
+  getQuestionsForCurriculum,
   loadQuestionBankProgress,
   recordMCQAttempt,
   toggleQuestionBookmark,
   toggleItemCompleted,
   calculateRealQuestionCounts,
 } from "../utils/questionBankEngine";
+import { getAllCurriculumSubjects } from "../data/masterCurriculum";
 
 interface QuestionBankSectionProps {
   activeStudent: StudentProfile;

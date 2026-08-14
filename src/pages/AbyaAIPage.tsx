@@ -25,6 +25,19 @@ import {
   Globe,
   X,
   MessageCircle,
+  Brain,
+  Search,
+  Mic,
+  Image as ImageIcon,
+  ExternalLink,
+  Upload,
+  Clock,
+  CheckCircle2,
+  ChevronDown,
+  Layers,
+  FileText,
+  HelpCircle,
+  Award,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -34,7 +47,15 @@ import {
   AbyaQuickActionType,
   ActiveTab,
   AbyaLanguageSetting,
+  AbyaAIMode,
 } from "../types";
+import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
+import {
+  getCurriculumSubjects,
+  CurriculumSubject,
+  CurriculumChapter,
+  CurriculumTopic,
+} from "../data/masterCurriculum";
 
 interface AbyaAIPageProps {
   messages: AbyaMessage[];
@@ -46,7 +67,17 @@ interface AbyaAIPageProps {
   onSendMessage: (
     prompt: string,
     contextNote?: string,
-    actionType?: AbyaQuickActionType
+    actionType?: AbyaQuickActionType,
+    mode?: AbyaAIMode,
+    image?: { data: string; mimeType: string },
+    curriculumContext?: {
+      classLevel?: string;
+      stream?: string;
+      subject?: string;
+      chapter?: string;
+      topic?: string;
+      modeType?: string;
+    }
   ) => Promise<void>;
   onClearChat: () => void;
   onUpdateSettings: (s: UserSettings) => void;
@@ -74,23 +105,136 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   onRetryLastMessage,
 }) => {
   const [inputPrompt, setInputPrompt] = useState("");
+  const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(settings.customApiKey || "");
-  const [activeTabFilter, setActiveTabFilter] = useState<"chat" | "cards">("chat");
+  const [selectedImage, setSelectedImage] = useState<{
+    data: string;
+    mimeType: string;
+    previewUrl: string;
+    fileName: string;
+  } | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // 6 Core Abya AI Modes & Quick Action Chips
+  // Curriculum Hierarchy State (Class -> Stream -> Subject -> Chapter -> Topic)
+  const curriculumSubjects = getCurriculumSubjects(
+    activeStudent.classLevel,
+    activeStudent.stream
+  );
+  const [selectedSubId, setSelectedSubId] = useState<string>(
+    curriculumSubjects[0]?.id || ""
+  );
+  const currentSubject =
+    curriculumSubjects.find((s) => s.id === selectedSubId) ||
+    curriculumSubjects[0];
+  const [selectedChapId, setSelectedChapId] = useState<string>(
+    currentSubject?.chapters[0]?.id || ""
+  );
+  const currentChapter =
+    currentSubject?.chapters.find((c) => c.id === selectedChapId) ||
+    currentSubject?.chapters[0];
+  const [selectedTopId, setSelectedTopId] = useState<string>(
+    currentChapter?.topics[0]?.id || ""
+  );
+  const currentTopic =
+    currentChapter?.topics.find((t) => t.id === selectedTopId) ||
+    currentChapter?.topics[0];
+  const [isCurriculumExpanded, setIsCurriculumExpanded] = useState(false);
+
+  // Update chapter/topic selections when subject changes
+  const handleSelectSubject = (subId: string) => {
+    setSelectedSubId(subId);
+    const sub = curriculumSubjects.find((s) => s.id === subId);
+    if (sub && sub.chapters.length > 0) {
+      setSelectedChapId(sub.chapters[0].id);
+      if (sub.chapters[0].topics.length > 0) {
+        setSelectedTopId(sub.chapters[0].topics[0].id);
+      }
+    }
+  };
+
+  const handleSelectChapter = (chapId: string) => {
+    setSelectedChapId(chapId);
+    const chap = currentSubject?.chapters.find((c) => c.id === chapId);
+    if (chap && chap.topics.length > 0) {
+      setSelectedTopId(chap.topics[0].id);
+    }
+  };
+
+  const handleCurriculumTopicAction = (
+    modeType: "explanation" | "notes" | "revision" | "mcq" | "pyq" | "vvi" | "doubt"
+  ) => {
+    if (!currentSubject || !currentChapter || !currentTopic) return;
+
+    const curriculumContext = {
+      classLevel: activeStudent.classLevel,
+      stream: activeStudent.stream,
+      subject: currentSubject.name,
+      chapter: currentChapter.title,
+      topic: currentTopic.name,
+      modeType,
+    };
+
+    let promptText = "";
+    if (modeType === "explanation") {
+      promptText = `Please provide a thorough, step-by-step concept explanation for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel} ${activeStudent.stream}). Structure your response with: 1. Core Concept in Intuitive Terms, 2. Real-World Analogy, 3. Key Formulas / Rules / Definitions, 4. Step-by-Step Solved Problem, 5. Quick Self-Check Question.`;
+    } else if (modeType === "notes") {
+      promptText = `Generate high-yield quick revision notes and key definition points for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel} ${activeStudent.stream}). Include high-frequency board pointers and formula summaries.`;
+    } else if (modeType === "revision") {
+      promptText = `Provide a 5-minute rapid recall revision summary for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). Focus on must-remember board exam keywords, triggers, and examiner pitfalls.`;
+    } else if (modeType === "mcq") {
+      promptText = `Generate 5 exam-standard Multiple Choice Questions (MCQs) for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel}). Provide 4 distinct options (A, B, C, D), mark the correct option clearly, provide step-by-step solutions, and alert against common student traps.`;
+    } else if (modeType === "pyq") {
+      promptText = `Provide verified previous year board exam questions (PYQs) and expected question patterns for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). Include official step-wise marking tips and answer writing rubrics.`;
+    } else if (modeType === "vvi") {
+      promptText = `Highlight the Most Important (VVI) exam questions and common mistake areas students make in "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). How can I score 100% on questions from this topic?`;
+    } else if (modeType === "doubt") {
+      setInputPrompt(`[${currentSubject.name} - ${currentTopic.name}] Doubt: `);
+      return;
+    }
+
+    handleSend(promptText, "explain_topic", undefined, curriculumContext);
+  };
+
+  // Quick Action Chips
   const quickActions: {
     type: AbyaQuickActionType;
     label: string;
     icon: React.ElementType;
     prompt: string;
     bgHover: string;
+    defaultMode?: AbyaAIMode;
   }[] = [
+    {
+      type: "high_thinking",
+      label: "🧠 High Thinking",
+      icon: Brain,
+      prompt: "Use deep step-by-step reasoning (gemini-3.1-pro-preview with ThinkingLevel.HIGH) to analyze and solve this complex derivation / multi-step proof:",
+      bgHover: "hover:bg-purple-500/15 hover:border-purple-500/50 text-purple-300 border-purple-500/30",
+      defaultMode: "high_thinking",
+    },
+    {
+      type: "search_grounding",
+      label: "🌐 Search Grounded",
+      icon: Search,
+      prompt: "Use Google Search Grounding (gemini-3.5-flash) to find the latest real-time syllabus updates, exam dates, and official announcements for:",
+      bgHover: "hover:bg-blue-500/15 hover:border-blue-500/50 text-blue-300 border-blue-500/30",
+      defaultMode: "search_grounded",
+    },
+    {
+      type: "fast_mode",
+      label: "⚡ Fast Lite",
+      icon: Zap,
+      prompt: "Give me an ultra-fast flashcard summary and rapid-recall key points using gemini-3.1-flash-lite for:",
+      bgHover: "hover:bg-amber-500/15 hover:border-amber-500/50 text-amber-300 border-amber-500/30",
+      defaultMode: "fast_lite",
+    },
     {
       type: "plan_day",
       label: "Study Coach",
@@ -123,15 +267,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       type: "career_guidance",
       label: "Career Guidance",
       icon: Target,
-      prompt: "Give me tailored career guidance based on my stream (Commerce/Science/Arts), my target career pathways, and recommended course stages.",
+      prompt: "Give me tailored career guidance based on my stream, target career pathways, and recommended course stages.",
       bgHover: "hover:bg-cyan-500/10 hover:border-cyan-500/40 text-cyan-300",
-    },
-    {
-      type: "weak_topics",
-      label: "Smart Suggestions",
-      icon: Sparkles,
-      prompt: "Provide smart OS suggestions based on my current study progress, tasks pending, and board exam readiness.",
-      bgHover: "hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-300",
     },
   ];
 
@@ -139,15 +276,71 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSend = async (textToSend?: string, actionType?: AbyaQuickActionType) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file (JPEG, PNG, WebP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64Data = result.split(",")[1];
+      setSelectedImage({
+        data: base64Data,
+        mimeType: file.type,
+        previewUrl: result,
+        fileName: file.name,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSend = async (
+    textToSend?: string,
+    actionType?: AbyaQuickActionType,
+    overrideMode?: AbyaAIMode,
+    curriculumContextPayload?: {
+      classLevel?: string;
+      stream?: string;
+      subject?: string;
+      chapter?: string;
+      topic?: string;
+      modeType?: string;
+    }
+  ) => {
     const prompt = (textToSend || inputPrompt).trim();
-    if (!prompt || isLoading) return;
+    if ((!prompt && !selectedImage) || isLoading) return;
+
+    const modeToUse = overrideMode || selectedMode;
+    const imagePayload = selectedImage
+      ? { data: selectedImage.data, mimeType: selectedImage.mimeType }
+      : undefined;
 
     setInputPrompt("");
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setIsLoading(true);
 
     try {
-      await onSendMessage(prompt, attachedContextNote, actionType);
+      await onSendMessage(
+        prompt || "Please analyze this study image and solve the problem step by step.",
+        attachedContextNote,
+        actionType,
+        modeToUse,
+        imagePayload,
+        curriculumContextPayload
+      );
       if (onClearAttachedContext) onClearAttachedContext();
     } catch (err) {
       console.error("Error sending message to Abya AI", err);
@@ -211,9 +404,11 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-base text-white font-heading">Abya AI</h2>
+              <h2 className="font-bold text-base text-white font-heading">
+                Abya AI
+              </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
-                v1.6 Intelligence
+                Multimodal & Live Voice
               </span>
             </div>
             <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
@@ -225,7 +420,18 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-center">
+        <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
+          {/* Live Voice Button */}
+          <button
+            onClick={() => setShowLiveVoiceModal(true)}
+            className="p-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-400/50 hover:bg-emerald-500/30 text-emerald-300 transition-all text-xs flex items-center gap-1.5 font-bold shadow-md shadow-emerald-500/10"
+            title="Start Live Voice Conversation (gemini-3.1-flash-live-preview)"
+          >
+            <Mic className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <span>Live Voice</span>
+          </button>
+
+          {/* Language Selector */}
           <button
             onClick={() => setShowLanguageModal(true)}
             className="p-2 px-3 rounded-xl glass-pill text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors text-xs flex items-center gap-1.5 font-bold"
@@ -235,6 +441,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             <span className="text-xs">{abyaLanguage}</span>
           </button>
 
+          {/* API Key Config */}
           <button
             onClick={() => setShowApiKeyModal(true)}
             className="p-2 rounded-xl glass-pill text-slate-300 hover:text-emerald-300 transition-colors text-xs flex items-center gap-1.5"
@@ -244,6 +451,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             <span className="hidden sm:inline font-medium">API Key</span>
           </button>
 
+          {/* Clear Chat */}
           <button
             onClick={onClearChat}
             className="p-2 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors"
@@ -252,6 +460,69 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Model Mode Selector Tabs */}
+      <div className="glass-card rounded-2xl p-2 border border-slate-800 mb-3 shrink-0 flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
+        <button
+          onClick={() => setSelectedMode("standard")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+            selectedMode === "standard"
+              ? "bg-slate-800 text-white border border-slate-600 shadow-sm"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Standard (Flash)</span>
+        </button>
+
+        <button
+          onClick={() => setSelectedMode("high_thinking")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+            selectedMode === "high_thinking"
+              ? "bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-500/10"
+              : "text-slate-400 hover:text-purple-300"
+          }`}
+          title="gemini-3.1-pro-preview with ThinkingLevel.HIGH for complex derivations"
+        >
+          <Brain className="w-3.5 h-3.5 text-purple-400" />
+          <span>High Thinking Mode</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 font-mono">
+            3.1-Pro
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedMode("fast_lite")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+            selectedMode === "fast_lite"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-md shadow-amber-500/10"
+              : "text-slate-400 hover:text-amber-300"
+          }`}
+          title="gemini-3.1-flash-lite for ultra low-latency instant answers"
+        >
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <span>Fast Lite</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-200 font-mono">
+            3.1-Lite
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedMode("search_grounded")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+            selectedMode === "search_grounded"
+              ? "bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-md shadow-blue-500/10"
+              : "text-slate-400 hover:text-blue-300"
+          }`}
+          title="gemini-3.5-flash with googleSearch tool for real-time web grounding"
+        >
+          <Search className="w-3.5 h-3.5 text-blue-400" />
+          <span>Search Grounding</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 font-mono">
+            3.5-Flash
+          </span>
+        </button>
       </div>
 
       {/* Abya Insight Cards Slider */}
@@ -324,6 +595,175 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       )}
 
+      {/* Curriculum Topic Intelligence Bar */}
+      {curriculumSubjects.length > 0 && currentSubject && (
+        <div className="glass-card rounded-2xl p-3 border border-emerald-500/20 mb-3 shrink-0 bg-slate-900/60 backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Layers className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-white font-heading truncate">
+                    {currentSubject.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400">›</span>
+                  <span className="text-[11px] text-slate-300 truncate max-w-[140px] sm:max-w-[200px]">
+                    {currentChapter?.title}
+                  </span>
+                  <span className="text-[10px] text-slate-400">›</span>
+                  <span className="text-[11px] text-emerald-300 font-medium truncate max-w-[160px] sm:max-w-[240px]">
+                    {currentTopic?.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsCurriculumExpanded(!isCurriculumExpanded)}
+              className="px-2.5 py-1 rounded-lg glass-pill text-[11px] font-medium text-slate-300 hover:text-white flex items-center gap-1 self-start sm:self-center transition-colors shrink-0"
+            >
+              <span>{isCurriculumExpanded ? "Hide Selector" : "Change Topic"}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform ${
+                  isCurriculumExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Expandable Topic Selector Dropdowns */}
+          {isCurriculumExpanded && (
+            <div className="pt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 animate-in fade-in duration-200">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Subject
+                </label>
+                <select
+                  value={selectedSubId}
+                  onChange={(e) => handleSelectSubject(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                >
+                  {curriculumSubjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.chapters.length} Ch)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Chapter
+                </label>
+                <select
+                  value={selectedChapId}
+                  onChange={(e) => handleSelectChapter(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                >
+                  {currentSubject.chapters.map((chap) => (
+                    <option key={chap.id} value={chap.id}>
+                      Ch {chap.chapterNumber}: {chap.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Topic
+                </label>
+                <select
+                  value={selectedTopId}
+                  onChange={(e) => setSelectedTopId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                >
+                  {currentChapter?.topics.map((top) => (
+                    <option key={top.id} value={top.id}>
+                      {top.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 1-Tap Topic Action Buttons */}
+          <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+            <button
+              onClick={() => handleCurriculumTopicAction("explanation")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="Step-by-step concept breakdown with real-world analogies"
+            >
+              <BookOpen className="w-3 h-3 text-emerald-400" />
+              <span>Explain Concept</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("notes")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="High-yield quick revision notes & formulas"
+            >
+              <FileText className="w-3 h-3 text-cyan-400" />
+              <span>Quick Notes</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("revision")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="5-minute rapid recall summary"
+            >
+              <RotateCw className="w-3 h-3 text-amber-400" />
+              <span>5-Min Revision</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("mcq")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="5 topic-specific MCQs with solution breakdowns"
+            >
+              <Target className="w-3 h-3 text-purple-400" />
+              <span>5 MCQs</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("pyq")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="Board exam previous year questions and marking tips"
+            >
+              <Award className="w-3 h-3 text-blue-400" />
+              <span>Board PYQs</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("vvi")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="High frequency VVI questions and student pitfalls"
+            >
+              <Flame className="w-3 h-3 text-rose-400" />
+              <span>VVI & Traps</span>
+            </button>
+
+            <button
+              onClick={() => handleCurriculumTopicAction("doubt")}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
+              title="Ask a custom doubt about this topic"
+            >
+              <HelpCircle className="w-3 h-3 text-slate-400" />
+              <span>Ask Doubt</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Action Chips Bar */}
       <div className="mb-3 overflow-x-auto pb-1 scrollbar-thin shrink-0">
         <div className="flex items-center gap-2 min-w-max">
@@ -332,9 +772,12 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             return (
               <button
                 key={act.type}
-                onClick={() => handleSend(act.prompt, act.type)}
+                onClick={() => {
+                  if (act.defaultMode) setSelectedMode(act.defaultMode);
+                  handleSend(act.prompt, act.type, act.defaultMode);
+                }}
                 disabled={isLoading}
-                className={`px-3 py-1.5 rounded-xl glass-pill border border-white/10 text-xs font-medium flex items-center gap-1.5 transition-all ${act.bgHover} disabled:opacity-50`}
+                className={`px-3 py-1.5 rounded-xl glass-pill border text-xs font-medium flex items-center gap-1.5 transition-all ${act.bgHover} disabled:opacity-50`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{act.label}</span>
@@ -383,14 +826,78 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                     : "glass-card border-white/10 text-slate-100 rounded-tl-none"
                 }`}
               >
-                {msg.isFallback && (
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono mb-1 font-bold">
-                    <Zap className="w-3 h-3" />
-                    <span>Local Offline Intelligence</span>
+                {/* Mode Badges */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  {msg.mode === "high_thinking" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
+                      <Brain className="w-3 h-3" />
+                      <span>High Thinking (gemini-3.1-pro-preview)</span>
+                    </span>
+                  )}
+                  {msg.mode === "fast_lite" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                      <Zap className="w-3 h-3" />
+                      <span>Fast Lite (gemini-3.1-flash-lite)</span>
+                    </span>
+                  )}
+                  {msg.mode === "search_grounded" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold">
+                      <Search className="w-3 h-3" />
+                      <span>Search Grounded (gemini-3.5-flash)</span>
+                    </span>
+                  )}
+                  {msg.imageUrl && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                      <ImageIcon className="w-3 h-3" />
+                      <span>Photo Analyzed (gemini-3.1-pro-preview)</span>
+                    </span>
+                  )}
+                  {msg.isFallback && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                      <Zap className="w-3 h-3" />
+                      <span>Local Offline Intelligence</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* User Uploaded Image Preview in Chat */}
+                {msg.imageUrl && (
+                  <div className="my-2 rounded-xl overflow-hidden border border-slate-700/80 max-w-sm">
+                    <img
+                      src={msg.imageUrl}
+                      alt="Uploaded study problem"
+                      referrerPolicy="no-referrer"
+                      className="max-h-60 w-auto object-contain bg-slate-950/80"
+                    />
                   </div>
                 )}
 
                 <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
+
+                {/* Search Grounding Sources */}
+                {msg.groundingSources && msg.groundingSources.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-blue-500/20">
+                    <div className="text-[11px] font-bold text-blue-300 flex items-center gap-1.5 mb-1.5">
+                      <Search className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Web Grounding Sources ({msg.groundingSources.length})</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {msg.groundingSources.map((source, sIdx) => (
+                        <a
+                          key={sIdx}
+                          href={source.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 border border-blue-500/30 text-blue-200 text-[11px] transition-colors max-w-xs truncate"
+                          title={source.uri}
+                        >
+                          <ExternalLink className="w-3 h-3 text-blue-400 shrink-0" />
+                          <span className="truncate">{source.title || source.uri}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Error State with Retry & Fallback options */}
                 {msg.isError && (
@@ -418,12 +925,20 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 )}
 
                 <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 font-mono">
-                  <span>
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {msg.thinkingDurationMs && (
+                      <span className="flex items-center gap-0.5 text-purple-300/80">
+                        <Clock className="w-3 h-3" />
+                        <span>{msg.thinkingDurationMs}ms</span>
+                      </span>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => handleCopy(msg.id, msg.content)}
@@ -453,7 +968,15 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce delay-150" />
               <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
               <span className="text-xs text-slate-300 font-mono ml-2">
-                Abya AI is analyzing {activeStudent.name}'s profile...
+                {selectedImage
+                  ? "Analyzing image with gemini-3.1-pro-preview..."
+                  : selectedMode === "high_thinking"
+                  ? "Gemini 3.1 Pro (High Thinking) is reasoning step-by-step..."
+                  : selectedMode === "search_grounded"
+                  ? "Gemini 3.5 Flash is searching Google & grounding data..."
+                  : selectedMode === "fast_lite"
+                  ? "Gemini 3.1 Flash Lite is generating instant response..."
+                  : `Abya AI is processing request for ${activeStudent.name}...`}
               </span>
             </div>
           </div>
@@ -462,7 +985,42 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Form */}
+      {/* Uploaded Image Thumbnail Preview Bar */}
+      {selectedImage && (
+        <div className="glass-card p-2.5 rounded-2xl border border-cyan-500/40 mt-2 mb-1 flex items-center justify-between gap-3 shrink-0 bg-slate-900/80">
+          <div className="flex items-center gap-3">
+            <img
+              src={selectedImage.previewUrl}
+              alt="Selected problem preview"
+              referrerPolicy="no-referrer"
+              className="w-12 h-12 rounded-xl object-cover border border-cyan-500/30"
+            />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white truncate max-w-xs">
+                  {selectedImage.fileName}
+                </span>
+                <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
+                  gemini-3.1-pro-preview
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Photo ready. Type your specific doubt or press send to solve automatically.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleRemoveImage}
+            className="p-1.5 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors"
+            title="Remove Photo"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Input Form with Photo Upload and Mode Status */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -470,23 +1028,65 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         }}
         className="glass-card p-2 rounded-2xl border border-white/10 flex items-center gap-2 mt-2 shrink-0"
       >
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          className="hidden"
+          id="abya-photo-upload"
+        />
+
+        {/* Photo Upload Button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className={`p-2.5 rounded-xl border transition-all flex items-center justify-center ${
+            selectedImage
+              ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
+              : "glass-pill border-slate-700 text-slate-400 hover:text-white"
+          }`}
+          title="Upload / Capture Study Photo (gemini-3.1-pro-preview Image Analysis)"
+        >
+          <ImageIcon className="w-4 h-4" />
+        </button>
+
         <input
           type="text"
-          placeholder={`Ask Abya AI anything for ${activeStudent.name}...`}
+          placeholder={
+            selectedImage
+              ? "Ask a question about this photo (or leave empty to solve step-by-step)..."
+              : selectedMode === "high_thinking"
+              ? `High Thinking Mode: Ask complex derivation or proof for ${activeStudent.name}...`
+              : selectedMode === "search_grounded"
+              ? `Search Grounding: Search latest exam dates, syllabus news for ${activeStudent.name}...`
+              : selectedMode === "fast_lite"
+              ? `Fast Lite Mode: Rapid answer for ${activeStudent.name}...`
+              : `Ask Abya AI anything for ${activeStudent.name}...`
+          }
           value={inputPrompt}
           onChange={(e) => setInputPrompt(e.target.value)}
           disabled={isLoading}
-          className="flex-1 px-4 py-2.5 bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none"
+          className="flex-1 px-3 py-2 bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none"
         />
 
         <button
           type="submit"
-          disabled={!inputPrompt.trim() || isLoading}
+          disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
           className="p-3 rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 text-slate-900 font-bold disabled:opacity-40 hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
         >
           <Send className="w-4 h-4" />
         </button>
       </form>
+
+      {/* Live Voice API Modal */}
+      <AbyaLiveVoiceModal
+        isOpen={showLiveVoiceModal}
+        onClose={() => setShowLiveVoiceModal(false)}
+        activeStudent={activeStudent}
+        customApiKey={settings.customApiKey}
+      />
 
       {/* API Key Modal */}
       {showApiKeyModal && (
@@ -503,12 +1103,20 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              By default, Garia OS v1.6 uses the system's runtime Gemini API Key securely server-side. You can optionally paste your personal Gemini API Key below.
+              By default, Garia OS uses the system's runtime Gemini API Key securely server-side for all models:
+              <br />
+              • <strong className="text-purple-300">gemini-3.1-pro-preview</strong> (High Thinking & Image Analysis)
+              <br />
+              • <strong className="text-amber-300">gemini-3.1-flash-lite</strong> (Low Latency Responses)
+              <br />
+              • <strong className="text-blue-300">gemini-3.5-flash</strong> (Google Search Grounding)
+              <br />
+              • <strong className="text-emerald-300">gemini-3.1-flash-live-preview</strong> (Live Voice API)
             </p>
 
             <div>
               <label className="block text-slate-300 font-medium text-xs mb-1">
-                Custom Gemini API Key
+                Custom Gemini API Key (Optional)
               </label>
               <input
                 type="password"
@@ -549,7 +1157,9 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold font-heading text-white">Abya AI Language Mode</h3>
+                <h3 className="text-base font-bold font-heading text-white">
+                  Abya AI Language Mode
+                </h3>
               </div>
               <button
                 onClick={() => setShowLanguageModal(false)}
@@ -560,7 +1170,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Select response language for active student profile <strong className="text-emerald-300">{activeStudent.name}</strong>. Settings are isolated per profile.
+              Select response language for active student profile{" "}
+              <strong className="text-emerald-300">{activeStudent.name}</strong>. Settings are isolated per profile.
             </p>
 
             <div className="space-y-2">
@@ -569,26 +1180,26 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                   id: "WhatsApp Language" as AbyaLanguageSetting,
                   label: "WhatsApp Language",
                   badge: "Default & Natural",
-                  desc: "Casual, friendly & adaptive. Automatically matches your style (Roman Hindi, Hinglish, English)."
+                  desc: "Casual, friendly & adaptive. Automatically matches your style (Roman Hindi, Hinglish, English).",
                 },
                 {
                   id: "English" as AbyaLanguageSetting,
                   label: "English",
                   badge: "Formal",
-                  desc: "Clear, structured English explanations and academic guidance."
+                  desc: "Clear, structured English explanations and academic guidance.",
                 },
                 {
                   id: "Hindi" as AbyaLanguageSetting,
                   label: "Hindi",
                   badge: "Devanagari / Hindi",
-                  desc: "Conversational Hindi explanations for concepts and questions."
+                  desc: "Conversational Hindi explanations for concepts and questions.",
                 },
                 {
                   id: "Hinglish" as AbyaLanguageSetting,
                   label: "Hinglish",
                   badge: "Mix",
-                  desc: "Natural combination of Hindi & English written in Roman script."
-                }
+                  desc: "Natural combination of Hindi & English written in Roman script.",
+                },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -604,12 +1215,16 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold font-heading text-white">{item.label}</span>
+                      <span className="text-xs font-bold font-heading text-white">
+                        {item.label}
+                      </span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-white/10 font-mono">
                         {item.badge}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">{item.desc}</p>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                      {item.desc}
+                    </p>
                   </div>
                   {abyaLanguage === item.id && (
                     <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-1" />
