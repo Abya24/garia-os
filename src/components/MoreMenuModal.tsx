@@ -25,12 +25,14 @@ import {
 } from "lucide-react";
 import { ActiveTab } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { AppLanguage, translations } from "../utils/i18n";
 
 interface MoreMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: ActiveTab) => void;
   activeTab: ActiveTab;
+  currentLanguage?: AppLanguage;
   onOpenStudentModal?: () => void;
 }
 
@@ -39,97 +41,100 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
   onClose,
   onNavigate,
   activeTab,
+  currentLanguage = "en",
   onOpenStudentModal,
 }) => {
   const [showAbout, setShowAbout] = useState(false);
 
   if (!isOpen) return null;
 
+  const t = translations[currentLanguage] || translations.en;
+
   const moreItems = [
     {
       id: "questionbank" as ActiveTab,
-      label: "Question Bank Center",
-      desc: "MCQ, Quiz, PYQs, Practice, VVI, Revision & Tests",
+      label: t.questionBank || "Question Bank Center",
+      desc: currentLanguage === "hi" ? "एमसीक्यू, क्विज, पीवाईक्यू, अभ्यास और टेस्ट" : "MCQ, Quiz, PYQs, Practice, VVI, Revision & Tests",
       icon: HelpCircle,
       color: "from-emerald-400 to-teal-500",
       badge: "V3 Center",
     },
     {
       id: "academic" as ActiveTab,
-      label: "Academic Center",
-      desc: "Class 10, 11 & 12 curriculum, VVI topics & roadmap",
+      label: t.academics || "Academic Center",
+      desc: currentLanguage === "hi" ? "कक्षा 10, 11 और 12 पाठ्यक्रम, वीवीआई विषय और रोडमैप" : "Class 10, 11 & 12 curriculum, VVI topics & roadmap",
       icon: GraduationCap,
       color: "from-emerald-400 to-cyan-400",
       badge: `v${APP_VERSION}`,
     },
     {
       id: "career" as ActiveTab,
-      label: "Career Center V3",
-      desc: "Science, Commerce, Arts, Govt Jobs, Scholarships & Study Abroad",
+      label: t.careerCenter || "Career Center V3",
+      desc: currentLanguage === "hi" ? "विज्ञान, वाणिज्य, कला, सरकारी नौकरियां और छात्रवृत्तियां" : "Science, Commerce, Arts, Govt Jobs, Scholarships & Study Abroad",
       icon: Compass,
       color: "from-cyan-500 to-blue-500",
       badge: "V3 Suite",
     },
     {
       id: "study" as ActiveTab,
-      label: "Study Tracker",
-      desc: "Subject study logs, chapters & active study session timer",
+      label: t.studyTracker || "Study Tracker",
+      desc: currentLanguage === "hi" ? "विषय अध्ययन लॉग, अध्याय और अध्ययन टाइमर" : "Subject study logs, chapters & active study session timer",
       icon: BookOpen,
       color: "from-teal-500 to-emerald-500",
     },
     {
       id: "tasks" as ActiveTab,
-      label: "Task Manager",
-      desc: "Todo matrix, deadlines, priority tags & categories",
+      label: t.taskManager || "Task Manager",
+      desc: currentLanguage === "hi" ? "कार्य सूची, समय सीमा और प्राथमिकता टैग" : "Todo matrix, deadlines, priority tags & categories",
       icon: CheckSquare,
       color: "from-indigo-500 to-purple-500",
     },
     {
       id: "notes" as ActiveTab,
-      label: "Notes & Docs",
-      desc: "Rich markdown notes, tags & PDF attachments",
+      label: t.notes || "Notes & Docs",
+      desc: currentLanguage === "hi" ? "समृद्ध मार्कडाउन नोट्स, टैग और पीडीएफ अनुलग्नक" : "Rich markdown notes, tags & PDF attachments",
       icon: FileText,
       color: "from-blue-500 to-indigo-500",
     },
     {
       id: "exam" as ActiveTab,
-      label: "Exam Intelligence",
-      desc: "Board profile, readiness score, queue & mock tests",
+      label: t.examIntelligence || "Exam Intelligence",
+      desc: currentLanguage === "hi" ? "बोर्ड प्रोफाइल, तैयारी स्कोर और मॉक टेस्ट" : "Board profile, readiness score, queue & mock tests",
       icon: ShieldAlert,
       color: "from-cyan-400 to-emerald-400",
       badge: `v${APP_VERSION}`,
     },
     {
       id: "focus" as ActiveTab,
-      label: "Focus Timer",
-      desc: "Pomodoro sessions & break tracker",
+      label: t.focusTimer || "Focus Timer",
+      desc: currentLanguage === "hi" ? "पोमोडोरो सत्र और ब्रेक ट्रैकर" : "Pomodoro sessions & break tracker",
       icon: Timer,
       color: "from-amber-500 to-orange-500",
     },
     {
       id: "water" as ActiveTab,
-      label: "Water Tracker",
-      desc: "Daily hydration & glass counter",
+      label: t.waterTracker || "Water Tracker",
+      desc: currentLanguage === "hi" ? "दैनिक जलयोजन और गिलास काउंटर" : "Daily hydration & glass counter",
       icon: Droplet,
       color: "from-blue-500 to-cyan-400",
     },
     {
       id: "habits" as ActiveTab,
-      label: "Habit Tracker",
-      desc: "Daily streaks & routine checks",
+      label: t.habits || "Habit Tracker",
+      desc: currentLanguage === "hi" ? "दैनिक स्ट्रीक्स और दिनचर्या जांच" : "Daily streaks & routine checks",
       icon: Flame,
       color: "from-rose-500 to-pink-500",
     },
     {
       id: "stats" as ActiveTab,
-      label: "Advanced Analytics",
-      desc: "Productivity score & study trends",
+      label: t.analytics || "Advanced Analytics",
+      desc: currentLanguage === "hi" ? "उत्पादकता स्कोर और अध्ययन रुझान" : "Productivity score & study trends",
       icon: BarChart2,
       color: "from-purple-500 to-indigo-500",
     },
     {
       id: "download" as ActiveTab,
-      label: "Download Official APK",
+      label: t.downloadAPK || "Download Official APK",
       desc: `Get Garia OS Android app v${APP_VERSION}`,
       icon: Download,
       color: "from-emerald-500 to-teal-400",
@@ -137,17 +142,22 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
     },
     {
       id: "settings" as ActiveTab,
-      label: "Settings",
-      desc: "Theme, Language, API config & data backup",
+      label: t.settings || "Settings",
+      desc: currentLanguage === "hi" ? "थीम, भाषा, एपीआई कॉन्फ़िगरेशन और डेटा बैकअप" : "Theme, Language, API config & data backup",
       icon: Settings,
       color: "from-slate-500 to-slate-400",
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200">
+    <div
+      id="more-menu-modal-backdrop"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg glass-card rounded-t-3xl sm:rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
+        id="more-menu-modal-card"
+        className="w-full max-w-lg glass-card rounded-t-3xl sm:rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

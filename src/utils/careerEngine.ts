@@ -471,6 +471,83 @@ export const CAREER_CATALOG: CareerOption[] = [
     ],
     whyMatchTags: ["Social Impact", "Field Work", "Global Opportunities", "Theoretical & Analytical"],
   },
+  // Class 10 Foundation Stream Pathways
+  {
+    id: "c10_science_foundation",
+    title: "Science Stream Pathway (PCM / PCB / PCMB)",
+    stream: "General",
+    category: "Senior Secondary Stream Specialization",
+    description: "Prepares for Engineering (JEE), Medical (NEET), Research (IISc/NISER), Defense (NDA), and pure sciences.",
+    duration: "2 Years (Class 11 & 12)",
+    studyPathway: "Class 10 -> Class 11-12 Science -> JEE / NEET / CUET Entrance -> B.Tech / MBBS / B.Sc.",
+    requiredSubjects: ["Mathematics", "Science", "English"],
+    keySkills: ["Analytical Thinking", "Numerical Ability", "Scientific Temper", "Problem Solving"],
+    workAreas: ["Tech/Lab", "Healthcare/Clinic", "Corporate/Office", "Field Work"],
+    courseStages: [
+      "Class 10 Board Mastery & Foundation Concepts",
+      "Class 11 Core Physics, Chemistry, Maths/Bio",
+      "Class 12 Board Prep + Competitive Mock Tests",
+      "JEE / NEET / CUET National Entrance Exams",
+    ],
+    whyMatchTags: ["Coding/Tech", "Scientific Research", "Medicine/Healthcare", "Problem Solving"],
+  },
+  {
+    id: "c10_commerce_foundation",
+    title: "Commerce Stream Pathway (Finance, Accounts & Business)",
+    stream: "General",
+    category: "Senior Secondary Stream Specialization",
+    description: "Leads to prestigious professions in Chartered Accountancy (CA), Company Secretary (CS), Investment Banking, Corporate Law, and Business.",
+    duration: "2 Years (Class 11 & 12)",
+    studyPathway: "Class 10 -> Class 11-12 Commerce with/without Maths -> CA Foundation / CUET -> B.Com / BBA / CA.",
+    requiredSubjects: ["Mathematics", "Social Science", "English"],
+    keySkills: ["Numerical Ability", "Financial Analysis", "Logical Reasoning", "Communication"],
+    workAreas: ["Corporate/Office", "Audit Firms", "Remote/Freelance"],
+    courseStages: [
+      "Class 10 Mathematics & Economics Fundamentals",
+      "Class 11 Accountancy, Business Studies & Economics",
+      "Class 12 Board Prep + CA Foundation / CUET",
+      "Professional Degree / CA Course Enrolment",
+    ],
+    whyMatchTags: ["Finance/Markets", "Management/Leadership", "High Earning Potential"],
+  },
+  {
+    id: "c10_arts_foundation",
+    title: "Humanities & Arts Stream Pathway (Law, Civics & Civil Services)",
+    stream: "General",
+    category: "Senior Secondary Stream Specialization",
+    description: "Ideal foundation for UPSC Civil Services (IAS/IPS), Corporate & Constitutional Law (CLAT), Journalism, Design, and Public Policy.",
+    duration: "2 Years (Class 11 & 12)",
+    studyPathway: "Class 10 -> Class 11-12 Humanities -> CLAT / CUET Entrance -> B.A. LLB / B.A. Hons.",
+    requiredSubjects: ["Social Science", "English", "Hindi"],
+    keySkills: ["Critical Thinking", "Writing & Communication", "Social Analysis", "Current Affairs"],
+    workAreas: ["Corporate/Office", "Field Work", "NGOs & Non-Profits", "Media Houses & TV Studios"],
+    courseStages: [
+      "Class 10 Social Science & History Excellence",
+      "Class 11 History, Political Science, Geography & Sociology",
+      "Class 12 Board Preparation + CLAT / CUET Prep",
+      "Law School / Central University Admissions",
+    ],
+    whyMatchTags: ["Social Impact", "Creative Freedom", "Job Security", "Law/Governance"],
+  },
+  {
+    id: "c10_diploma_polytechnic",
+    title: "Polytechnic & Diploma in Engineering / IT",
+    stream: "General",
+    category: "Technical Vocational Education",
+    description: "Direct hands-on technical qualification after Class 10 with lateral entry into 2nd year B.Tech/B.E.",
+    duration: "3 Years (Polytechnic Diploma)",
+    studyPathway: "Class 10 -> State Polytechnic Entrance -> 3-Year Diploma -> Lateral Entry 2nd Year B.Tech or Junior Engineer.",
+    requiredSubjects: ["Mathematics", "Science"],
+    keySkills: ["Technical Skills", "Hands-on Workshop Practice", "CAD / Coding"],
+    workAreas: ["Tech/Lab", "Corporate/Office", "Field Work"],
+    courseStages: [
+      "Class 10 Science & Math Preparation",
+      "State Polytechnic Entrance Exam",
+      "3-Year Applied Engineering Diploma",
+      "Junior Engineer Placement / Lateral B.Tech",
+    ],
+    whyMatchTags: ["Practical & Hands-on", "Coding/Tech", "Job Security"],
+  },
 ];
 
 export function calculateCareerMatches(
@@ -479,10 +556,30 @@ export function calculateCareerMatches(
   quizAnswers?: any,
   userSubjects?: any[]
 ): CareerMatchResult[] {
-  const filterStream = profile.stream;
+  const currentClass = profile.currentClass || "Class 10";
+  const filterStream = profile.stream || "Commerce";
 
-  const results = CAREER_CATALOG.map((career) => {
-    let score = 50; // baseline score
+  // Strict stream isolation
+  let eligibleCareers = CAREER_CATALOG;
+  if (currentClass === "Class 10" || filterStream === "General") {
+    eligibleCareers = CAREER_CATALOG.filter(
+      (c) => c.stream === "General"
+    );
+    if (eligibleCareers.length === 0) {
+      eligibleCareers = CAREER_CATALOG;
+    }
+  } else if (filterStream === "Science") {
+    eligibleCareers = CAREER_CATALOG.filter((c) => c.stream === "Science");
+  } else if (filterStream === "Commerce") {
+    eligibleCareers = CAREER_CATALOG.filter((c) => c.stream === "Commerce");
+  } else if (filterStream === "Arts" || filterStream === "Arts / Humanities") {
+    eligibleCareers = CAREER_CATALOG.filter(
+      (c) => c.stream === "Arts" || c.stream === "Arts / Humanities"
+    );
+  }
+
+  const results = eligibleCareers.map((career) => {
+    let score = 60; // baseline score
     const whyMatches: string[] = [];
     const relevantStrengths: string[] = [];
     const areasToExplore: string[] = [];
@@ -490,8 +587,6 @@ export function calculateCareerMatches(
     // Stream match boost
     if (career.stream === filterStream || (filterStream === "Arts" && career.stream === "Arts / Humanities")) {
       score += 15;
-    } else {
-      score -= 10;
     }
 
     // Strong subject matches (+10 per subject)

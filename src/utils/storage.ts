@@ -289,8 +289,53 @@ export const DEFAULT_ARTS_STUDY_SUBJECTS: Subject[] = [
   },
 ];
 
-export const getDefaultStudySubjectsForStream = (stream?: StreamType): Subject[] => {
+export const DEFAULT_CLASS10_STUDY_SUBJECTS: Subject[] = [
+  {
+    id: "sub-c10-math",
+    name: "Mathematics",
+    color: "#3b82f6",
+    targetMinutesPerWeek: 300,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+  {
+    id: "sub-c10-sci",
+    name: "Science",
+    color: "#10b981",
+    targetMinutesPerWeek: 300,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+  {
+    id: "sub-c10-sst",
+    name: "Social Science",
+    color: "#f59e0b",
+    targetMinutesPerWeek: 240,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+  {
+    id: "sub-c10-eng",
+    name: "English",
+    color: "#06b6d4",
+    targetMinutesPerWeek: 200,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+  {
+    id: "sub-c10-hin",
+    name: "Hindi",
+    color: "#8b5cf6",
+    targetMinutesPerWeek: 200,
+    completedMinutes: 0,
+    totalSessions: 0,
+  },
+];
+
+export const getDefaultStudySubjectsForStream = (stream?: StreamType, classLevel?: string): Subject[] => {
   const s = (stream || "").toLowerCase();
+  const c = (classLevel || "").toLowerCase();
+  if (c.includes("10") || s === "general" || s.includes("foundation")) return DEFAULT_CLASS10_STUDY_SUBJECTS;
   if (s.includes("science") || s === "pcm" || s === "pcb") return DEFAULT_SCIENCE_STUDY_SUBJECTS;
   if (s.includes("art") || s.includes("humanities")) return DEFAULT_ARTS_STUDY_SUBJECTS;
   return DEFAULT_COMMERCE_STUDY_SUBJECTS;
@@ -995,12 +1040,13 @@ export const saveTasks = (tasks: Task[], profileId?: string): void => {
   setItem(getProfileKey(pId, STORAGE_KEYS.TASKS), tasks);
 };
 
+const CLASS10_DEFAULT_NAMES = new Set(["mathematics", "science", "social science", "english", "hindi"]);
 const COMMERCE_DEFAULT_NAMES = new Set(["accountancy", "economics", "business studies"]);
 const SCIENCE_DEFAULT_NAMES = new Set(["physics", "chemistry", "biology"]);
 const ARTS_DEFAULT_NAMES = new Set(["history", "political science", "geography", "sociology"]);
 
-export const isSubjectListDefaultOfStream = (subs: Subject[], stream: StreamType): boolean => {
-  const defaults = getDefaultStudySubjectsForStream(stream);
+export const isSubjectListDefaultOfStream = (subs: Subject[], stream: StreamType, classLevel?: string): boolean => {
+  const defaults = getDefaultStudySubjectsForStream(stream, classLevel);
   const defaultNames = new Set(defaults.map((d) => d.name.toLowerCase()));
   return (
     subs.length === defaults.length &&
@@ -1013,8 +1059,9 @@ export const loadSubjects = (profileId?: string): Subject[] => {
   const activeProf = loadProfiles().find((p) => p.id === pId);
 
   let stream: string = activeProf?.stream || "Commerce";
+  const isClass10 = activeProf?.classLevel === "Class 10";
 
-  const defaultStreamSubs = getDefaultStudySubjectsForStream(stream as StreamType);
+  const defaultStreamSubs = getDefaultStudySubjectsForStream(stream as StreamType, activeProf?.classLevel);
   const key = getProfileKey(pId, STORAGE_KEYS.SUBJECTS);
   const saved = getItem<Subject[] | null>(key, null);
 
@@ -1025,14 +1072,25 @@ export const loadSubjects = (profileId?: string): Subject[] => {
     return defaultStreamSubs;
   }
 
-  const isScience = stream.toLowerCase().includes("science") || stream === "PCM" || stream === "PCB";
-  const isArts = stream.toLowerCase().includes("art") || stream.toLowerCase().includes("humanities");
-  const isCommerce = !isScience && !isArts;
+  const isScience = !isClass10 && (stream.toLowerCase().includes("science") || stream === "PCM" || stream === "PCB");
+  const isArts = !isClass10 && (stream.toLowerCase().includes("art") || stream.toLowerCase().includes("humanities"));
+  const isCommerce = !isClass10 && !isScience && !isArts;
 
   let needsUpdate = false;
   let updatedSubjects: Subject[] = saved;
 
-  if (isScience) {
+  if (isClass10) {
+    const hasStale12Defaults = saved.some(
+      (s) =>
+        COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
+        SCIENCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
+        ARTS_DEFAULT_NAMES.has(s.name.trim().toLowerCase())
+    );
+    if (hasStale12Defaults) {
+      needsUpdate = true;
+      updatedSubjects = defaultStreamSubs;
+    }
+  } else if (isScience) {
     const hasStaleDefaults = saved.some(
       (s) =>
         COMMERCE_DEFAULT_NAMES.has(s.name.trim().toLowerCase()) ||
@@ -1407,10 +1465,14 @@ export const saveSmartSuggestionsState = (state: SmartSuggestionsState, profileI
 // Academic Loaders & Savers
 export const loadAcademicSubjects = (
   stream: StreamType = "Commerce",
-  profileId?: string
+  profileId?: string,
+  classLevel?: string
 ): AcademicSubject[] => {
   const pId = profileId || loadActiveProfileId();
-  const fallback = getDefaultSubjectsForStream(stream);
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const actualClass = classLevel || activeProf?.classLevel || "Class 10";
+  const actualStream = stream || activeProf?.stream || (actualClass === "Class 10" ? "General" : "Commerce");
+  const fallback = getDefaultSubjectsForStream(actualStream, actualClass);
   return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_SUBJECTS), fallback);
 };
 export const saveAcademicSubjects = (subs: AcademicSubject[], profileId?: string): void => {

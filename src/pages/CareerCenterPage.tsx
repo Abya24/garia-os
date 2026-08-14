@@ -282,7 +282,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     const newRoadmap = generateDefaultRoadmap(career, updatedProfile);
     onUpdateRoadmap(newRoadmap);
 
-    alert(`🎯 "${career.title}" set as your target career! Your personal roadmap has been generated.`);
     setActiveSubTab("roadmap");
   };
 

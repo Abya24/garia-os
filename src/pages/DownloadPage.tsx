@@ -15,6 +15,7 @@ import {
   AlertCircle,
   HelpCircle,
 } from "lucide-react";
+import { APP_VERSION, APP_VERSION_CODE, APP_RELEASE_FILENAME } from "../constants/version";
 
 interface DownloadPageProps {
   onBackToApp?: () => void;
@@ -30,8 +31,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     sha256: string;
     sizeBytes: number;
   }>({
-    version: "2.8.3",
-    versionCode: 13,
+    version: APP_VERSION,
+    versionCode: APP_VERSION_CODE,
     sha256: "435e6833b5061f053244752f3d5958a288ecc014e825a688fc99fb89860a3b6f",
     sizeBytes: 22506
   });
@@ -42,8 +43,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       .then((data) => {
         if (data && data.sha256) {
           setApkInfo({
-            version: data.version || "2.8.3",
-            versionCode: data.versionCode || 13,
+            version: data.version || APP_VERSION,
+            versionCode: data.versionCode || APP_VERSION_CODE,
             sha256: data.sha256,
             sizeBytes: data.sizeBytes || 22506
           });
@@ -61,8 +62,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const handleTriggerDownload = () => {
     setIsDownloading(true);
     const link = document.createElement("a");
-    link.href = "/Garia_OS_v2.8.3_Release_APK.apk";
-    link.download = "Garia_OS_v2.8.3_Release_APK.apk";
+    link.href = `/${APP_RELEASE_FILENAME}`;
+    link.download = APP_RELEASE_FILENAME;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -151,8 +152,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
 
             {/* Direct Link */}
             <a
-              href="/Garia_OS_v2.8.3_Release_APK.apk"
-              download="Garia_OS_v2.8.3_Release_APK.apk"
+              href={`/${APP_RELEASE_FILENAME}`}
+              download={APP_RELEASE_FILENAME}
               className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all"
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />

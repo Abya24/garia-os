@@ -13,9 +13,13 @@ import {
   ShieldAlert,
   GraduationCap,
   ArrowRight,
+  Globe,
+  BookOpen,
 } from "lucide-react";
 import { StudentProfile, StreamType, ExamBoard } from "../types";
 import { StreamSelector } from "./StreamSelector";
+import { APP_VERSION } from "../constants/version";
+import { AppLanguage, translations, saveStoredLanguage } from "../utils/i18n";
 
 interface StudentProfileModalProps {
   isOpen: boolean;
@@ -56,9 +60,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   // Form states
   const [name, setName] = useState("");
-  const [classLevel, setClassLevel] = useState("Class 12");
-  const [stream, setStream] = useState<StreamType>("Commerce");
-  const [board, setBoard] = useState<ExamBoard | string>("BSEB");
+  const [classLevel, setClassLevel] = useState("Class 10");
+  const [stream, setStream] = useState<StreamType>("General");
+  const [board, setBoard] = useState<ExamBoard | string>("CBSE");
+  const [language, setLanguage] = useState<AppLanguage>("en");
   const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENTS[0].value);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -68,9 +73,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   const resetForm = () => {
     setName("");
-    setClassLevel("Class 12");
-    setStream("Commerce");
-    setBoard("BSEB");
+    setClassLevel("Class 10");
+    setStream("General");
+    setBoard("CBSE");
+    setLanguage("en");
     setAvatarColor(AVATAR_GRADIENTS[0].value);
     setEditingProfile(null);
   };
@@ -84,22 +90,35 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setEditingProfile(p);
     setName(p.name);
     setClassLevel(p.classLevel);
-    setStream(p.stream);
+    setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
+    setLanguage(p.language || "en");
     setAvatarColor(p.avatarColor || AVATAR_GRADIENTS[0].value);
     setActiveTab("edit");
+  };
+
+  const handleClassChange = (newClass: string) => {
+    setClassLevel(newClass);
+    if (newClass === "Class 10") {
+      setStream("General");
+    } else if (stream === "General") {
+      setStream("Science");
+    }
   };
 
   const handleSaveAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    const finalStream: StreamType = classLevel === "Class 10" ? "General" : stream;
     onAddProfile({
       name: name.trim(),
       classLevel,
-      stream,
+      stream: finalStream,
       board,
+      language,
       avatarColor,
     });
+    saveStoredLanguage(language);
     resetForm();
     setActiveTab("list");
   };
@@ -107,14 +126,17 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProfile || !name.trim()) return;
+    const finalStream: StreamType = classLevel === "Class 10" ? "General" : stream;
     onUpdateProfile({
       ...editingProfile,
       name: name.trim(),
       classLevel,
-      stream,
+      stream: finalStream,
       board,
+      language,
       avatarColor,
     });
+    saveStoredLanguage(language);
     resetForm();
     setActiveTab("list");
   };
@@ -134,9 +156,19 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     }
   };
 
+  const t = translations[language];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div
+      id="student-profile-modal-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        id="student-profile-modal-card"
+        className="relative w-full max-w-2xl glass-card rounded-3xl border border-emerald-500/30 p-4 sm:p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -151,7 +183,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <h3 className="text-xl font-bold text-white font-heading flex items-center gap-2">
                 Student Profiles
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                  Multi-Student v2.8.3
+                  v{APP_VERSION}
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
@@ -250,10 +282,13 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                             {p.classLevel}
                           </span>
                           <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                            {p.stream}
+                            {p.classLevel === "Class 10" ? "General Curriculum" : p.stream}
                           </span>
                           <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20">
                             {p.board}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                            {p.language === "hi" ? "हिन्दी" : "English"}
                           </span>
                         </div>
                       </div>
@@ -338,8 +373,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <h4 className="font-bold text-white text-base font-heading flex items-center gap-2">
                 {activeTab === "add" ? (
                   <>
-                    <UserPlus className="w-4 h-4 text-emerald-400" /> Add New Student
-                    Profile
+                    <UserPlus className="w-4 h-4 text-emerald-400" /> {t.addNewProfileBtn}
                   </>
                 ) : (
                   <>
@@ -349,61 +383,101 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               </h4>
 
               <div className="space-y-3">
+                {/* 1. Name */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Student Full Name *
+                    {t.studentNameLabel} *
                   </label>
                   <input
                     type="text"
                     required
                     dir="ltr"
-                    style={{ direction: "ltr", textAlign: "left" }}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder={t.studentNamePlaceholder}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm text-left"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* 2. Board */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Class Level
-                    </label>
-                    <select
-                      value={classLevel}
-                      onChange={(e) => setClassLevel(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="Class 12">Class 12</option>
-                      <option value="Class 11">Class 11</option>
-                      <option value="Class 10">Class 10</option>
-                      <option value="Dropper / Gap Year">Dropper / Gap Year</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Board
+                      {t.boardLabel}
                     </label>
                     <select
                       value={board}
                       onChange={(e) => setBoard(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="BSEB">BSEB (Bihar Board)</option>
                       <option value="CBSE">CBSE Board</option>
                       <option value="ICSE">ICSE / ISC Board</option>
-                      <option value="Other">Other State Board</option>
+                      <option value="BSEB">BSEB (Bihar Board)</option>
+                      <option value="State Board">Other State Board</option>
+                    </select>
+                  </div>
+
+                  {/* 3. Language */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                      <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                      {t.languageLabel}
+                    </label>
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value as AppLanguage)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-500"
+                    >
+                      <option value="en">English (English UI)</option>
+                      <option value="hi">हिन्दी (Hindi UI)</option>
+                    </select>
+                  </div>
+
+                  {/* 4. Class */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      {t.classLabel}
+                    </label>
+                    <select
+                      value={classLevel}
+                      onChange={(e) => handleClassChange(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Class 10">Class 10</option>
+                      <option value="Class 11">Class 11</option>
+                      <option value="Class 12">Class 12</option>
+                      <option value="Dropper / Gap Year">Dropper / Gap Year</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Stream Selection Cards */}
-                <StreamSelector
-                  selectedStream={stream}
-                  onSelectStream={(s) => setStream(s)}
-                />
+                {/* Class Logic: Class 10 -> No Stream Selection; Class 11/12 -> Stream Selection */}
+                {classLevel === "Class 10" ? (
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-cyan-500/10 to-transparent border border-emerald-500/20 text-xs text-slate-300 space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-emerald-400">
+                      <BookOpen className="w-4 h-4" />
+                      {t.noStreamNeededClass10}
+                    </div>
+                    <p className="text-slate-400 text-[11px]">
+                      Subjects: Mathematics, Science (Physics/Chemistry/Biology), Social Science, English, Hindi.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">
+                        {t.streamLabel} (Required for {classLevel})
+                      </label>
+                      <span className="text-[10px] text-cyan-400 font-medium">
+                        {t.streamHelperText}
+                      </span>
+                    </div>
+                    <StreamSelector
+                      selectedStream={stream === "General" ? "Science" : stream}
+                      onSelectStream={(s) => setStream(s)}
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-2">
@@ -443,7 +517,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:brightness-110 shadow-lg shadow-emerald-500/20 transition-all"
                 >
-                  {activeTab === "add" ? "Create Student Profile" : "Save Changes"}
+                  {activeTab === "add" ? t.saveProfileBtn : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -459,3 +533,4 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     </div>
   );
 };
+

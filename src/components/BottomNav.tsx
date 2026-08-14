@@ -4,42 +4,59 @@ import {
   GraduationCap,
   HelpCircle,
   Sparkles,
-  MoreHorizontal,
+  User,
 } from "lucide-react";
-import { ActiveTab } from "../types";
+import { ActiveTab, StudentProfile } from "../types";
+import { AppLanguage, translations } from "../utils/i18n";
 
 interface BottomNavProps {
   activeTab: ActiveTab;
   onNavigate: (tab: ActiveTab) => void;
-  onOpenMore: () => void;
-  isMoreOpen: boolean;
+  onOpenProfile?: () => void;
+  activeStudent?: StudentProfile;
+  currentLanguage?: AppLanguage;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onNavigate,
-  onOpenMore,
-  isMoreOpen,
+  onOpenProfile,
+  activeStudent,
+  currentLanguage = "en",
 }) => {
+  const t = translations[currentLanguage] || translations.en;
+
   const mainNavItems = [
-    { id: "home" as ActiveTab, label: "Home", icon: Home },
-    { id: "academic" as ActiveTab, label: "Academics", icon: GraduationCap },
-    { id: "questionbank" as ActiveTab, label: "Question Bank", icon: HelpCircle },
-    { id: "abya" as ActiveTab, label: "Abya AI", icon: Sparkles },
+    { id: "home" as ActiveTab, label: t.home || "Home", icon: Home, elemId: "bottom-nav-home" },
+    { id: "academic" as ActiveTab, label: t.academics || "Academics", icon: GraduationCap, elemId: "bottom-nav-academic" },
+    { id: "questionbank" as ActiveTab, label: t.questionBank || "Question Bank", icon: HelpCircle, elemId: "bottom-nav-questionbank" },
+    { id: "abya" as ActiveTab, label: t.abyaAI || "Abya AI", icon: Sparkles, elemId: "bottom-nav-abya" },
   ];
 
+  const handleProfileClick = () => {
+    if (onOpenProfile) {
+      onOpenProfile();
+    } else {
+      onNavigate("settings");
+    }
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1.5 py-1.5 safe-pb backdrop-blur-xl">
+    <nav
+      id="mobile-bottom-nav"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1 py-1 safe-pb backdrop-blur-xl pointer-events-auto"
+    >
       <div className="flex items-center justify-around max-w-md mx-auto">
         {mainNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id && !isMoreOpen;
+          const isActive = activeTab === item.id;
 
           return (
             <button
               key={item.id}
+              id={item.elemId}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 relative ${
+              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
                 isActive
                   ? "text-emerald-400 font-bold"
                   : "text-slate-400 hover:text-slate-200"
@@ -48,33 +65,41 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               {isActive && (
                 <div className="absolute inset-0 bg-emerald-500/15 rounded-xl border border-emerald-500/30" />
               )}
-              <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-105" : ""}`} />
+              <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-110" : ""}`} />
               <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight whitespace-nowrap">{item.label}</span>
             </button>
           );
         })}
 
-        {/* More Button */}
+        {/* Profile Navigation Button */}
         <button
-          onClick={onOpenMore}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 relative ${
-            isMoreOpen ||
-            ["study", "tasks", "notes", "exam", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(activeTab)
+          id="bottom-nav-profile"
+          onClick={handleProfileClick}
+          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
+            activeTab === "settings"
               ? "text-cyan-400 font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
-          {(isMoreOpen ||
-            ["study", "tasks", "notes", "exam", "career", "focus", "water", "habits", "stats", "settings", "download"].includes(
-              activeTab
-            )) && (
+          {activeTab === "settings" && (
             <div className="absolute inset-0 bg-cyan-500/15 rounded-xl border border-cyan-500/30" />
           )}
-          <MoreHorizontal className="w-4 h-4 z-10" />
-          <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight">More</span>
+          {activeStudent ? (
+            <div
+              className={`w-4 h-4 rounded-full bg-gradient-to-tr ${
+                activeStudent.avatarColor || "from-cyan-400 to-emerald-400"
+              } text-[9px] font-bold text-slate-900 flex items-center justify-center z-10 shadow-sm`}
+            >
+              {activeStudent.name.charAt(0).toUpperCase()}
+            </div>
+          ) : (
+            <User className="w-4 h-4 z-10" />
+          )}
+          <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight">
+            {t.profile || "Profile"}
+          </span>
         </button>
       </div>
     </nav>
   );
 };
-

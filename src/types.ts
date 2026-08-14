@@ -161,12 +161,54 @@ export interface StudentProfile {
   classLevel: string;
   stream: StreamType;
   board: ExamBoard | string;
+  language?: string;
   avatarColor?: string;
+  currentClass?: string;
   createdAt: number;
   updatedAt: number;
 }
 
-export type StreamType = "Commerce" | "Science" | "Arts / Humanities" | "Arts";
+export type StreamType = "Commerce" | "Science" | "Arts / Humanities" | "Arts" | "General";
+
+export interface GovtJobOption {
+  id: string;
+  title: string;
+  organization: string;
+  eligibility: string;
+  minAge: string;
+  examPattern: string[];
+  salaryTier: string;
+  selectionStages: string[];
+  keySubjects: string[];
+  preparationStrategy: string;
+  officialPortal: string;
+}
+
+export interface ScholarshipOption {
+  id: string;
+  title: string;
+  provider: string;
+  eligibility: string;
+  awardAmount: string;
+  applicationPeriod: string;
+  targetClass: string;
+  requiredDocuments: string[];
+  selectionBasis: string;
+  applyUrl: string;
+}
+
+export interface StudyAbroadOption {
+  id: string;
+  country: string;
+  flag: string;
+  popularCourses: string[];
+  avgCostPerYear: string;
+  keyEntranceExams: string[];
+  intakes: string[];
+  visaRequirements: string[];
+  scholarshipAvailable: string;
+  admissionTimeline: string[];
+}
 
 export interface CareerAssessment {
   strongSubjects: string[];
@@ -611,6 +653,7 @@ export type ActiveTab =
   | "home"
   | "exam"
   | "academic"
+  | "questionbank"
   | "career"
   | "tasks"
   | "study"

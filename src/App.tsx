@@ -119,6 +119,7 @@ import {
 } from "./utils/abyaFallbackEngine";
 
 import { hashPassword } from "./utils/auth";
+import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
@@ -128,6 +129,7 @@ import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
+import { QuickSearchModal } from "./components/QuickSearchModal";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -189,6 +191,19 @@ export default function App() {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+
+  // Global search shortcut (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const handleNavigate = (tab: ActiveTab) => {
     if (tab !== activeTab) {
@@ -199,6 +214,10 @@ export default function App() {
   };
 
   const handleGoBack = () => {
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+      return;
+    }
     if (isAuthModalOpen) {
       setIsAuthModalOpen(false);
       return;
@@ -225,6 +244,10 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
+      if (isSearchOpen) {
+        setIsSearchOpen(false);
+        return;
+      }
       if (isAuthModalOpen) {
         setIsAuthModalOpen(false);
         return;
@@ -246,7 +269,7 @@ export default function App() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [isAuthModalOpen, isStudentModalOpen, isMoreMenuOpen, tabHistory, activeTab]);
+  }, [isSearchOpen, isAuthModalOpen, isStudentModalOpen, isMoreMenuOpen, tabHistory, activeTab]);
 
   // Multi-Student Profiles State (v1.5)
   const [profiles, setProfiles] = useState<StudentProfile[]>(loadProfiles);
@@ -255,6 +278,23 @@ export default function App() {
   const activeStudent =
     profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
 
+  // App Language State (English & Hindi)
+  const [currentLanguage, setCurrentLanguage] = useState<AppLanguage>(() => {
+    const stored = getStoredLanguage();
+    if (stored) return stored;
+    return (activeStudent?.language as AppLanguage) || "en";
+  });
+
+  const handleUpdateLanguage = (lang: AppLanguage) => {
+    setCurrentLanguage(lang);
+    saveStoredLanguage(lang);
+    if (activeStudent) {
+      updateStudentProfile({
+        ...activeStudent,
+        language: lang,
+      });
+    }
+  };
 
   // App Data States
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings());
@@ -1271,10 +1311,15 @@ export default function App() {
       <StatusBar
         settings={settings}
         activeStudent={activeStudent}
+        currentLanguage={currentLanguage}
+        onUpdateLanguage={handleUpdateLanguage}
+        onOpenProfile={() => {
+          handleNavigate("settings");
+          setIsMoreMenuOpen(false);
+        }}
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onGoBack={handleGoBack}
-        canGoBack={activeTab !== "home" || tabHistory.length > 1}
+        onOpenMoreMenu={() => setIsMoreMenuOpen(true)}
+        onOpenSearch={() => setIsSearchOpen(true)}
         onUpdateSettings={handleUpdateSettings}
         onNavigate={(tab) => {
           handleNavigate(tab);
@@ -1288,6 +1333,7 @@ export default function App() {
         <DesktopSidebar
           activeTab={activeTab}
           activeStudent={activeStudent}
+          currentLanguage={currentLanguage}
           onOpenStudentModal={() => setIsStudentModalOpen(true)}
           onNavigate={(tab) => {
             handleNavigate(tab);
@@ -1320,6 +1366,7 @@ export default function App() {
               practiceSessions={academicPractice}
               settings={settings}
               activeStudent={activeStudent}
+              currentLanguage={currentLanguage}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
               onNavigate={(tab) => {
                 setActiveTab(tab);
@@ -1432,6 +1479,8 @@ export default function App() {
           {activeTab === "questionbank" && (
             <QuestionBankPage
               activeStudent={activeStudent}
+              currentLanguage={currentLanguage}
+              onAskAbyaAI={(prompt) => handleAskAbyaWithContext(prompt)}
               onAskAbyaWithContext={handleAskAbyaWithContext}
               onNavigate={(tab) => {
                 handleNavigate(tab);
@@ -1568,6 +1617,8 @@ export default function App() {
               settings={settings}
               activeStudent={activeStudent}
               profiles={profiles}
+              currentLanguage={currentLanguage}
+              onUpdateLanguage={handleUpdateLanguage}
               abyaLanguage={abyaLanguage}
               onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
               onOpenStudentModal={() => setIsStudentModalOpen(true)}
@@ -1585,17 +1636,22 @@ export default function App() {
       {/* Mobile Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
+        currentLanguage={currentLanguage}
         onNavigate={(tab) => {
           handleNavigate(tab);
           setIsMoreMenuOpen(false);
         }}
-        onOpenMore={() => setIsMoreMenuOpen(true)}
-        isMoreOpen={isMoreMenuOpen}
+        onOpenProfile={() => {
+          handleNavigate("settings");
+          setIsMoreMenuOpen(false);
+        }}
+        activeStudent={activeStudent}
       />
 
       {/* More Menu Overlay */}
       <MoreMenuModal
         isOpen={isMoreMenuOpen}
+        currentLanguage={currentLanguage}
         onClose={() => setIsMoreMenuOpen(false)}
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
         onNavigate={(tab) => {
@@ -1603,6 +1659,17 @@ export default function App() {
           setIsMoreMenuOpen(false);
         }}
         activeTab={activeTab}
+      />
+
+      {/* Quick Search Overlay (Cmd+K / Search trigger) */}
+      <QuickSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onNavigate={(tab) => {
+          handleNavigate(tab);
+          setIsSearchOpen(false);
+        }}
+        activeStudent={activeStudent}
       />
 
       {/* Multi-Student Profile Management Modal (v1.5) */}

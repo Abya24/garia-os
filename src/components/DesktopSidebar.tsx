@@ -19,12 +19,14 @@ import {
 } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { AppLanguage, translations } from "../utils/i18n";
 
 interface DesktopSidebarProps {
   activeTab: ActiveTab;
   onNavigate: (tab: ActiveTab) => void;
   settings: UserSettings;
   activeStudent?: StudentProfile;
+  currentLanguage?: AppLanguage;
   onOpenStudentModal?: () => void;
 }
 
@@ -33,75 +35,82 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   onNavigate,
   settings,
   activeStudent,
+  currentLanguage = "en",
   onOpenStudentModal,
 }) => {
+  const t = translations[currentLanguage] || translations.en;
+
   const navCategories = [
     {
-      title: "Core Navigation",
+      title: currentLanguage === "hi" ? "मुख्य नेविगेशन" : "Core Navigation",
       items: [
-        { id: "home" as ActiveTab, label: "Home Dashboard", icon: Home },
-        { id: "academic" as ActiveTab, label: "Academic Center", icon: GraduationCap, badge: "V3" },
-        { id: "questionbank" as ActiveTab, label: "Question Bank", icon: HelpCircle, badge: "New" },
-        { id: "abya" as ActiveTab, label: "Abya AI Coach", icon: Sparkles, badge: "AI" },
+        { id: "home" as ActiveTab, label: t.homeDashboard || "Home Dashboard", icon: Home },
+        { id: "academic" as ActiveTab, label: t.academics || "Academic Center", icon: GraduationCap, badge: "V3" },
+        { id: "questionbank" as ActiveTab, label: t.questionBank || "Question Bank", icon: HelpCircle, badge: "New" },
+        { id: "abya" as ActiveTab, label: t.abyaAICoach || "Abya AI Coach", icon: Sparkles, badge: "AI" },
       ],
     },
     {
-      title: "Academic & Career",
+      title: currentLanguage === "hi" ? "शैक्षणिक और करियर" : "Academic & Career",
       items: [
-        { id: "career" as ActiveTab, label: "Career Center V3", icon: Compass, badge: "V3" },
-        { id: "exam" as ActiveTab, label: "Exam Intelligence", icon: ShieldAlert },
-        { id: "study" as ActiveTab, label: "Study Tracker", icon: BookOpen },
-        { id: "tasks" as ActiveTab, label: "Task Manager", icon: CheckSquare },
+        { id: "career" as ActiveTab, label: t.careerCenter || "Career Center V3", icon: Compass, badge: "V3" },
+        { id: "exam" as ActiveTab, label: t.examIntelligence || "Exam Intelligence", icon: ShieldAlert },
+        { id: "study" as ActiveTab, label: t.studyTracker || "Study Tracker", icon: BookOpen },
+        { id: "tasks" as ActiveTab, label: t.taskManager || "Task Manager", icon: CheckSquare },
       ],
     },
     {
-      title: "Tools & Wellness",
+      title: currentLanguage === "hi" ? "टूल्स और स्वास्थ्य" : "Tools & Wellness",
       items: [
-        { id: "notes" as ActiveTab, label: "Notes & Docs", icon: FileText },
-        { id: "focus" as ActiveTab, label: "Focus Timer", icon: Timer },
-        { id: "habits" as ActiveTab, label: "Habits Tracker", icon: Flame },
-        { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
-        { id: "stats" as ActiveTab, label: "Analytics", icon: BarChart2 },
+        { id: "notes" as ActiveTab, label: t.notes || "Notes & Docs", icon: FileText },
+        { id: "focus" as ActiveTab, label: t.focusTimer || "Focus Timer", icon: Timer },
+        { id: "habits" as ActiveTab, label: t.habits || "Habits Tracker", icon: Flame },
+        { id: "water" as ActiveTab, label: t.waterTracker || "Water Tracker", icon: Droplet },
+        { id: "stats" as ActiveTab, label: t.analytics || "Analytics", icon: BarChart2 },
       ],
     },
     {
-      title: "Platform",
+      title: currentLanguage === "hi" ? "प्लेटफ़ॉर्म" : "Platform",
       items: [
-        { id: "download" as ActiveTab, label: "Download APK", icon: Download, badge: `v${APP_VERSION}` },
-        { id: "settings" as ActiveTab, label: "Settings", icon: Settings },
+        { id: "download" as ActiveTab, label: t.downloadAPK || "Download APK", icon: Download, badge: `v${APP_VERSION}` },
+        { id: "settings" as ActiveTab, label: t.settings || "Settings", icon: Settings },
       ],
     },
   ];
 
-  const studentName = activeStudent?.name || settings.userName;
+  const studentName = activeStudent?.name || settings.userName || (currentLanguage === "hi" ? "विद्यार्थी" : "Student");
 
   return (
     <aside className="hidden md:flex flex-col w-64 glass-card border-r border-white/10 h-[calc(100vh-53px)] sticky top-[53px] p-4 shrink-0">
       {/* Profile summary & Switcher button */}
       <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-cyan-500/10 to-transparent border border-emerald-500/20 mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <button
+          onClick={() => onNavigate("settings")}
+          className="flex items-center gap-2.5 min-w-0 text-left group flex-1 cursor-pointer"
+          title={t.profile || "Open Profile Settings"}
+        >
           <div
             className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${
               activeStudent?.avatarColor || "from-emerald-400 to-cyan-400"
-            } p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shrink-0`}
+            } p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shrink-0 group-hover:scale-105 transition-transform`}
           >
             {studentName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h4 className="font-bold text-sm text-white font-heading truncate">
+            <h4 className="font-bold text-sm text-white font-heading truncate group-hover:text-emerald-300 transition-colors">
               {studentName}
             </h4>
             <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono truncate">
-              {activeStudent ? `${activeStudent.currentClass || "Class 12"} • ${activeStudent.stream || "General"}` : "Online OS"}
+              {activeStudent ? `${activeStudent.classLevel || "Class 10"} • ${activeStudent.classLevel === "Class 10" ? "General" : activeStudent.stream || "General"}` : "Online OS"}
             </span>
           </div>
-        </div>
+        </button>
 
         {onOpenStudentModal && (
           <button
             onClick={onOpenStudentModal}
-            title="Switch Student Profile"
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
+            title={t.studentProfiles || "Switch Student Profile"}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/30 transition-all shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
           >
             <Users className="w-4 h-4" />
           </button>

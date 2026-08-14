@@ -37,7 +37,16 @@ export const DEFAULT_ARTS_SUBJECTS: AcademicSubject[] = [
   { id: "sub-eng-arts", name: "English Core", stream: "Arts / Humanities", color: "blue" },
 ];
 
-export function getDefaultSubjectsForStream(stream: StreamType): AcademicSubject[] {
+export const DEFAULT_CLASS10_SUBJECTS: AcademicSubject[] = [
+  { id: "sub-c10-math", name: "Mathematics", stream: "General", color: "blue" },
+  { id: "sub-c10-sci", name: "Science", stream: "General", color: "emerald" },
+  { id: "sub-c10-sst", name: "Social Science", stream: "General", color: "amber" },
+  { id: "sub-c10-eng", name: "English Language & Lit", stream: "General", color: "cyan" },
+  { id: "sub-c10-hin", name: "Hindi Course", stream: "General", color: "purple" },
+];
+
+export function getDefaultSubjectsForStream(stream: StreamType, classLevel?: string): AcademicSubject[] {
+  if (classLevel === "Class 10" || stream === "General") return DEFAULT_CLASS10_SUBJECTS;
   if (stream === "Science") return DEFAULT_SCIENCE_SUBJECTS;
   if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_SUBJECTS;
   return DEFAULT_COMMERCE_SUBJECTS;
@@ -340,6 +349,146 @@ export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [
     pyqStatus: "Pending",
     revisionCount: 1,
     testStatus: "Pending",
+  },
+
+  // Class 10 Foundation - Mathematics
+  {
+    id: "ch-c10-math-1",
+    subjectId: "sub-c10-math",
+    chapterNumber: 1,
+    title: "Real Numbers",
+    topics: ["Fundamental Theorem of Arithmetic", "Irrational Numbers Proofs", "HCF & LCM Applications"],
+    status: "Completed",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 3,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-c10-math-2",
+    subjectId: "sub-c10-math",
+    chapterNumber: 2,
+    title: "Polynomials & Quadratic Equations",
+    topics: ["Geometrical Meaning of Zeroes", "Relationship between Zeroes and Coefficients", "Discriminant & Nature of Roots"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+  {
+    id: "ch-c10-math-3",
+    subjectId: "sub-c10-math",
+    chapterNumber: 3,
+    title: "Introduction to Trigonometry",
+    topics: ["Trigonometric Ratios", "Trigonometric Values (0°, 30°, 45°, 60°, 90°)", "Trigonometric Identities (sin²θ + cos²θ = 1)"],
+    status: "Not Started",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 0,
+    testStatus: "Pending",
+  },
+
+  // Class 10 Foundation - Science
+  {
+    id: "ch-c10-sci-1",
+    subjectId: "sub-c10-sci",
+    chapterNumber: 1,
+    title: "Chemical Reactions and Equations",
+    topics: ["Balancing Chemical Equations", "Types of Chemical Reactions", "Corrosion & Rancidity"],
+    status: "Completed",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-c10-sci-2",
+    subjectId: "sub-c10-sci",
+    chapterNumber: 2,
+    title: "Life Processes",
+    topics: ["Autotrophic & Heterotrophic Nutrition", "Human Respiration & Circulation", "Excretion in Humans & Plants"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+  {
+    id: "ch-c10-sci-3",
+    subjectId: "sub-c10-sci",
+    chapterNumber: 3,
+    title: "Light - Reflection and Refraction",
+    topics: ["Spherical Mirrors & Mirror Formula", "Refraction & Snell's Law", "Lens Formula & Power of Lens"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+
+  // Class 10 Foundation - Social Science
+  {
+    id: "ch-c10-sst-1",
+    subjectId: "sub-c10-sst",
+    chapterNumber: 1,
+    title: "Nationalism in India",
+    topics: ["First World War, Khilafat & Non-Cooperation", "Differing Strands within the Movement", "Civil Disobedience & Sense of Collective Belonging"],
+    status: "Completed",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-c10-sst-2",
+    subjectId: "sub-c10-sst",
+    chapterNumber: 2,
+    title: "Power Sharing & Federalism",
+    topics: ["Case Studies of Belgium & Sri Lanka", "Forms of Power Sharing", "Key Features of Indian Federalism & Decentralisation"],
+    status: "In Progress",
+    priority: "Important",
+    isWeak: false,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+  },
+
+  // Class 10 Foundation - English
+  {
+    id: "ch-c10-eng-1",
+    subjectId: "sub-c10-eng",
+    chapterNumber: 1,
+    title: "A Letter to God & Nelson Mandela",
+    topics: ["Faith and Human Character Analysis", "Struggle for Freedom & South African Democracy", "Grammar & Formal Letter Writing"],
+    status: "Completed",
+    priority: "Important",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
+  },
+
+  // Class 10 Foundation - Hindi
+  {
+    id: "ch-c10-hin-1",
+    subjectId: "sub-c10-hin",
+    chapterNumber: 1,
+    title: "क्षितिज: नेताजी का चश्मा एवं सूरदास के पद",
+    topics: ["देशभक्ति एवं मानवीय भावना", "भ्रमरगीत सार एवं पद व्याख्या", "रचना के आधार पर वाक्य रूपांतरण एवं समास"],
+    status: "Completed",
+    priority: "Important",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 2,
+    testStatus: "Tested",
   },
 ];
 
