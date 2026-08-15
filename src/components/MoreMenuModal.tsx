@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { ActiveTab } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
 
 interface MoreMenuModalProps {
@@ -253,15 +254,17 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
         </div>
 
         {/* Quick Footer Links */}
-        <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 font-mono">
-          <button
-            onClick={() => setShowAbout(true)}
-            className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" />
-            <span>About Garia OS</span>
-          </button>
-          <span>Garia OS v{APP_VERSION}</span>
+        <div className="pt-3 border-t border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <button
+              onClick={() => setShowAbout(true)}
+              className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>About Garia OS & System Information</span>
+            </button>
+          </div>
+          <ProductionVersionBadge variant="compact" showCopy={true} />
         </div>
       </div>
 
@@ -272,7 +275,7 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
           onClick={() => setShowAbout(false)}
         >
           <div
-            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -297,6 +300,9 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
               </button>
             </div>
 
+            {/* Permanent Version Badge */}
+            <ProductionVersionBadge variant="card" showCopy={true} />
+
             <div className="space-y-2.5 text-xs text-slate-300 leading-relaxed">
               <p>
                 <strong className="text-white">Garia OS</strong> is an offline-first academic operating system designed specifically for students across Class 10, 11, and 12 (Science, Commerce, Arts).
@@ -311,8 +317,8 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-[11px] text-slate-300">
-                <div className="font-bold text-cyan-300 flex items-center gap-1.5 mb-1">
+              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-[11px] text-slate-300 font-mono">
+                <div className="font-bold text-cyan-300 flex items-center gap-1.5 mb-1 font-sans">
                   <Zap className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Core V3 Modules</span>
                 </div>

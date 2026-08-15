@@ -20,6 +20,7 @@ import {
 import { UserSettings, StudentProfile, AbyaLanguageSetting, AppTheme } from "../types";
 import { exportStudentProfileJSON, importStudentProfileJSON } from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
+import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
 
 interface SettingsPageProps {
@@ -592,14 +593,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <h3 className="text-lg font-bold font-heading text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Info className="w-5 h-5 text-emerald-400" />
-            <span>{currentLanguage === "hi" ? "गारिया ओएस के बारे में" : "About Garia OS"}</span>
+            <span>{currentLanguage === "hi" ? "गारिया ओएस के बारे में व सिस्टम जानकारी" : "About Garia OS & System Information"}</span>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
             v{APP_VERSION} Release
           </span>
         </h3>
 
-        <div className="text-xs text-slate-300 space-y-1 font-mono">
+        {/* Permanent Production Version Badge */}
+        <ProductionVersionBadge variant="card" showCopy={true} />
+
+        <div className="text-xs text-slate-300 space-y-1 font-mono p-3 rounded-2xl bg-slate-900/50 border border-white/5">
           <p>
             <strong>System:</strong> Garia OS (Android & Web Edition)
           </p>

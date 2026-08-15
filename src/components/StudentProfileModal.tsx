@@ -15,10 +15,13 @@ import {
   ArrowRight,
   Globe,
   BookOpen,
+  Info,
+  Cpu,
 } from "lucide-react";
 import { StudentProfile, StreamType, ExamBoard } from "../types";
 import { StreamSelector } from "./StreamSelector";
 import { APP_VERSION } from "../constants/version";
+import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations, saveStoredLanguage } from "../utils/i18n";
 
 interface StudentProfileModalProps {
@@ -55,7 +58,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   onExportProfile,
   onImportProfile,
 }) => {
-  const [activeTab, setActiveTab] = useState<"list" | "add" | "edit">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "add" | "edit" | "info">("list");
   const [editingProfile, setEditingProfile] = useState<StudentProfile | null>(null);
 
   // Form states
@@ -200,35 +203,46 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
         </div>
 
         {/* Modal Navigation */}
-        <div className="flex items-center gap-2 my-4 bg-slate-900/50 p-1.5 rounded-2xl border border-white/10 shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4 bg-slate-900/50 p-1.5 rounded-2xl border border-white/10 shrink-0">
           <button
             onClick={() => setActiveTab("list")}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === "list"
                 ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md font-bold"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            Profiles ({profiles.length})
+            <span className="truncate">Profiles ({profiles.length})</span>
           </button>
           <button
             onClick={handleStartAdd}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === "add"
                 ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md font-bold"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            Add Student
+            <span className="truncate">Add Student</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("info")}
+            className={`py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "info"
+                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-md font-bold"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span className="truncate">System Info</span>
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-white/10 transition-all flex items-center gap-1.5"
+            className="py-2 px-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-1.5"
           >
             <Upload className="w-3.5 h-3.5 text-cyan-400" />
-            Import JSON
+            <span className="truncate">Import JSON</span>
           </button>
           <input
             type="file"
@@ -522,12 +536,66 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               </div>
             </form>
           )}
+
+          {/* SYSTEM INFO TAB */}
+          {activeTab === "info" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-white font-heading flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-emerald-400" />
+                  <span>Garia OS System Information & Architecture</span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Real-time runtime diagnostics, multi-student isolation, and production version telemetry.
+                </p>
+              </div>
+
+              {/* Permanent Version Badge */}
+              <ProductionVersionBadge variant="card" showCopy={true} />
+
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="text-slate-500">Active Profile ID:</span>
+                  <span className="text-cyan-300 font-bold">{activeProfile.id}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="text-slate-500">Profile Name:</span>
+                  <span className="text-white">{activeProfile.name}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="text-slate-500">Class & Stream:</span>
+                  <span className="text-emerald-400 font-semibold">
+                    {activeProfile.classLevel} ({activeProfile.stream})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="text-slate-500">Storage Partition:</span>
+                  <span className="text-purple-300">Isolated Local Context</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="text-slate-500">Total Enrolled Profiles:</span>
+                  <span className="text-amber-300 font-bold">{profiles.length}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("list")}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
+              >
+                Back to Profiles List
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer Info */}
-        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500">
-          <span>Active Profile ID: {activeProfile.id}</span>
-          <span>Per-student isolated storage active</span>
+        <div className="mt-4 pt-3 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Active: {activeProfile.name} ({activeProfile.id.slice(0, 8)}...)</span>
+          </div>
+          <ProductionVersionBadge variant="minimal" showCopy={false} />
         </div>
       </div>
     </div>

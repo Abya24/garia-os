@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
 
 interface DesktopSidebarProps {
@@ -161,8 +162,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       </div>
 
       {/* Footer info */}
-      <div className="pt-3 border-t border-white/10 text-center">
-        <p className="text-xs text-slate-500 font-mono">Garia OS v{APP_VERSION}</p>
+      <div className="pt-2 border-t border-white/10">
+        <ProductionVersionBadge variant="footer" showCopy={true} />
       </div>
     </aside>
   );
