@@ -48,6 +48,7 @@ import { AcademicVVITopicSection } from "../components/AcademicVVITopicSection";
 import { AcademicRevisionPlannerSection } from "../components/AcademicRevisionPlannerSection";
 import { AcademicPracticeTrackerSection } from "../components/AcademicPracticeTrackerSection";
 import { QuestionBankSection } from "../components/QuestionBankSection";
+import { AcademicDrawer, AcademicDrawerAction } from "../components/AcademicDrawer";
 import { StudentProfile } from "../types";
 
 interface AcademicCenterPageProps {
@@ -116,6 +117,54 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   );
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Academic Drawer State
+  const [isAcademicDrawerOpen, setIsAcademicDrawerOpen] = useState(false);
+
+  const handleAcademicDrawerAction = (action: AcademicDrawerAction) => {
+    switch (action) {
+      case "roadmap":
+        setActiveTab("roadmap");
+        break;
+      case "dashboard":
+        setActiveTab("dashboard");
+        break;
+      case "chapters":
+        setActiveTab("chapters");
+        break;
+      case "topics":
+        setActiveTab("chapters");
+        break;
+      case "vvi":
+        setActiveTab("vvi");
+        break;
+      case "mcq_practice":
+        setActiveTab("mcq_practice");
+        break;
+      case "pyqs":
+        setActiveTab("pyqs");
+        break;
+      case "chapter_tests":
+      case "mock_tests":
+      case "test_performance":
+        setActiveTab("tests");
+        break;
+      case "revision_planner":
+        setActiveTab("revision");
+        break;
+      case "daily_journal":
+      case "study_goals":
+        setActiveTab("plan");
+        break;
+      case "progress_analytics":
+      case "weak_topics":
+      case "study_streak":
+        setActiveTab("priority");
+        break;
+      default:
+        setActiveTab("dashboard");
+    }
+  };
 
   // Modals state
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
@@ -395,6 +444,15 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              id="open-academic-drawer-btn"
+              onClick={() => setIsAcademicDrawerOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Layers className="w-4 h-4 text-emerald-400" />
+              Academic Drawer
+            </button>
+
             <button
               onClick={() =>
                 onAskAbyaWithContext(
@@ -1612,6 +1670,16 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Dedicated Academic Intelligence Drawer */}
+      <AcademicDrawer
+        isOpen={isAcademicDrawerOpen}
+        onClose={() => setIsAcademicDrawerOpen(false)}
+        onSelectAction={handleAcademicDrawerAction}
+        activeAction={activeTab}
+        studentClassName={activeStudent?.classLevel || "Class 12"}
+        studentStream={careerProfile.stream || "Science"}
+      />
     </div>
   );
 };

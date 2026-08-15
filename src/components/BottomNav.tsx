@@ -1,10 +1,10 @@
 import React from "react";
 import {
   Home,
-  GraduationCap,
-  HelpCircle,
+  CheckSquare,
+  Timer,
   Sparkles,
-  User,
+  Layers,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { AppLanguage, translations } from "../utils/i18n";
@@ -12,6 +12,8 @@ import { AppLanguage, translations } from "../utils/i18n";
 interface BottomNavProps {
   activeTab: ActiveTab;
   onNavigate: (tab: ActiveTab) => void;
+  onOpenMore: () => void;
+  isMoreOpen?: boolean;
   onOpenProfile?: () => void;
   activeStudent?: StudentProfile;
   currentLanguage?: AppLanguage;
@@ -20,83 +22,98 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onNavigate,
+  onOpenMore,
+  isMoreOpen = false,
   onOpenProfile,
   activeStudent,
   currentLanguage = "en",
 }) => {
   const t = translations[currentLanguage] || translations.en;
 
-  const mainNavItems = [
-    { id: "home" as ActiveTab, label: t.home || "Home", icon: Home, elemId: "bottom-nav-home" },
-    { id: "academic" as ActiveTab, label: t.academics || "Academics", icon: GraduationCap, elemId: "bottom-nav-academic" },
-    { id: "questionbank" as ActiveTab, label: t.questionBank || "Question Bank", icon: HelpCircle, elemId: "bottom-nav-questionbank" },
-    { id: "abya" as ActiveTab, label: t.abyaAI || "Abya AI", icon: Sparkles, elemId: "bottom-nav-abya" },
+  const coreNavItems = [
+    {
+      id: "home" as ActiveTab,
+      label: t.home || "Home",
+      icon: Home,
+      elemId: "bottom-nav-home",
+    },
+    {
+      id: "tasks" as ActiveTab,
+      label: t.tasks || "Tasks",
+      icon: CheckSquare,
+      elemId: "bottom-nav-tasks",
+    },
+    {
+      id: "focus" as ActiveTab,
+      label: t.focus || "Focus",
+      icon: Timer,
+      elemId: "bottom-nav-focus",
+    },
+    {
+      id: "abya" as ActiveTab,
+      label: t.abyaAI || "Abya AI",
+      icon: Sparkles,
+      elemId: "bottom-nav-abya",
+    },
   ];
-
-  const handleProfileClick = () => {
-    if (onOpenProfile) {
-      onOpenProfile();
-    } else {
-      onNavigate("settings");
-    }
-  };
 
   return (
     <nav
       id="mobile-bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1 py-1 safe-pb backdrop-blur-xl pointer-events-auto"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1 py-1 safe-pb backdrop-blur-xl pointer-events-auto shadow-2xl"
     >
       <div className="flex items-center justify-around max-w-md mx-auto">
-        {mainNavItems.map((item) => {
+        {coreNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id && !isMoreOpen;
 
           return (
             <button
               key={item.id}
               id={item.elemId}
               onClick={() => onNavigate(item.id)}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
+              className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
                 isActive
                   ? "text-emerald-400 font-bold"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {isActive && (
-                <div className="absolute inset-0 bg-emerald-500/15 rounded-xl border border-emerald-500/30" />
+                <div className="absolute inset-0 bg-emerald-500/15 rounded-xl border border-emerald-500/30 shadow-sm" />
               )}
-              <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-110" : ""}`} />
-              <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight whitespace-nowrap">{item.label}</span>
+              <Icon
+                className={`w-4 h-4 z-10 transition-transform ${
+                  isActive ? "scale-110" : ""
+                }`}
+              />
+              <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight whitespace-nowrap">
+                {item.label}
+              </span>
             </button>
           );
         })}
 
-        {/* Profile Navigation Button */}
+        {/* More Apps Drawer Launcher */}
         <button
-          id="bottom-nav-profile"
-          onClick={handleProfileClick}
-          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
-            activeTab === "settings"
+          id="bottom-nav-more"
+          onClick={onOpenMore}
+          aria-label="Open More Apps Drawer"
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 relative min-h-[48px] min-w-[48px] active:scale-95 ${
+            isMoreOpen
               ? "text-cyan-400 font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
-          {activeTab === "settings" && (
-            <div className="absolute inset-0 bg-cyan-500/15 rounded-xl border border-cyan-500/30" />
+          {isMoreOpen && (
+            <div className="absolute inset-0 bg-cyan-500/15 rounded-xl border border-cyan-500/30 shadow-sm" />
           )}
-          {activeStudent ? (
-            <div
-              className={`w-4 h-4 rounded-full bg-gradient-to-tr ${
-                activeStudent.avatarColor || "from-cyan-400 to-emerald-400"
-              } text-[9px] font-bold text-slate-900 flex items-center justify-center z-10 shadow-sm`}
-            >
-              {activeStudent.name.charAt(0).toUpperCase()}
-            </div>
-          ) : (
-            <User className="w-4 h-4 z-10" />
-          )}
-          <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight">
-            {t.profile || "Profile"}
+          <Layers
+            className={`w-4 h-4 z-10 transition-transform ${
+              isMoreOpen ? "scale-110 text-cyan-400" : ""
+            }`}
+          />
+          <span className="text-[10px] mt-0.5 z-10 font-medium tracking-tight whitespace-nowrap">
+            {currentLanguage === "hi" ? "और ऐप्स" : "More"}
           </span>
         </button>
       </div>

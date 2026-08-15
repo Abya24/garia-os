@@ -126,6 +126,7 @@ import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n
 import { StatusBar } from "./components/StatusBar";
 import { BottomNav } from "./components/BottomNav";
 import { DesktopSidebar } from "./components/DesktopSidebar";
+import { MoreDrawer } from "./components/MoreDrawer";
 import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
@@ -1355,6 +1356,7 @@ export default function App() {
           activeStudent={activeStudent}
           currentLanguage={currentLanguage}
           onOpenStudentModal={() => setIsStudentModalOpen(true)}
+          onOpenMoreDrawer={() => setIsMoreMenuOpen(true)}
           onNavigate={(tab) => {
             handleNavigate(tab);
             setIsMoreMenuOpen(false);
@@ -1673,6 +1675,8 @@ export default function App() {
           handleNavigate(tab);
           setIsMoreMenuOpen(false);
         }}
+        onOpenMore={() => setIsMoreMenuOpen((prev) => !prev)}
+        isMoreOpen={isMoreMenuOpen}
         onOpenProfile={() => {
           handleNavigate("settings");
           setIsMoreMenuOpen(false);
@@ -1680,8 +1684,8 @@ export default function App() {
         activeStudent={activeStudent}
       />
 
-      {/* More Menu Overlay */}
-      <MoreMenuModal
+      {/* More Apps & Modules Slide Drawer (V3) */}
+      <MoreDrawer
         isOpen={isMoreMenuOpen}
         currentLanguage={currentLanguage}
         onClose={() => setIsMoreMenuOpen(false)}
@@ -1691,6 +1695,7 @@ export default function App() {
           setIsMoreMenuOpen(false);
         }}
         activeTab={activeTab}
+        activeStudent={activeStudent}
       />
 
       {/* Quick Search Overlay (Cmd+K / Search trigger) */}

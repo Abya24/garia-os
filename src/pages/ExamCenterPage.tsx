@@ -58,6 +58,8 @@ import { SubjectPerformanceAnalysisSection } from "../components/SubjectPerforma
 import { WeakAreaDetectionSection } from "../components/WeakAreaDetectionSection";
 import { SubjectComparisonView } from "../components/SubjectComparisonView";
 import { ExamReadinessScoreCard } from "../components/ExamReadinessScoreCard";
+import { ExamIntelligenceDrawer, ExamDrawerAction } from "../components/ExamIntelligenceDrawer";
+import { Layers } from "lucide-react";
 
 interface ExamCenterPageProps {
   examProfile: ExamProfile;
@@ -111,6 +113,39 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<
     "overview" | "syllabus" | "queue" | "revision" | "tests" | "plan" | "milestones"
   >("overview");
+
+  const [isExamDrawerOpen, setIsExamDrawerOpen] = useState(false);
+
+  const handleExamDrawerAction = (action: ExamDrawerAction) => {
+    switch (action) {
+      case "dashboard_upcoming":
+      case "dashboard_countdown":
+      case "dashboard_calendar":
+      case "intel_exam_alerts":
+        setActiveSubTab("overview");
+        break;
+      case "planning_smart_planner":
+        setActiveSubTab("plan");
+        break;
+      case "planning_revision_planner":
+        setActiveSubTab("revision");
+        break;
+      case "planning_daily_targets":
+        setActiveSubTab("milestones");
+        break;
+      case "performance_mock_analytics":
+      case "performance_subject_perf":
+      case "performance_weak_areas":
+        setActiveSubTab("tests");
+        break;
+      case "intel_vvi_predictions":
+      case "intel_high_yield":
+        setActiveSubTab("queue");
+        break;
+      default:
+        setActiveSubTab("overview");
+    }
+  };
 
   // Modals & Forms
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -316,7 +351,15 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="open-exam-drawer-btn"
+              onClick={() => setIsExamDrawerOpen(true)}
+              className="px-4 py-2.5 rounded-2xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-2 border border-cyan-500/40 transition-all shadow-lg"
+            >
+              <Layers className="w-4 h-4 text-cyan-400" />
+              <span>Exam Drawer</span>
+            </button>
             <button
               onClick={() => setShowProfileModal(true)}
               className="px-4 py-2.5 rounded-2xl glass-pill border border-cyan-500/40 hover:bg-cyan-500/20 text-cyan-200 text-xs font-semibold flex items-center gap-2 transition-all shadow-lg"
@@ -1431,6 +1474,18 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
           }
         }}
         editingTest={editingTestRecord}
+      />
+
+      {/* Dedicated Exam Intelligence Drawer */}
+      <ExamIntelligenceDrawer
+        isOpen={isExamDrawerOpen}
+        onClose={() => setIsExamDrawerOpen(false)}
+        onSelectAction={handleExamDrawerAction}
+        activeAction={activeSubTab}
+        studentBoard={examProfile.board || "CBSE"}
+        studentClass={examProfile.classLevel || "Class 12"}
+        daysRemaining={countdown.daysRemaining}
+        readinessScore={readiness.overallScore}
       />
     </div>
   );

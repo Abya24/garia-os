@@ -42,6 +42,8 @@ import {
 import { AppLanguage, translations } from "../utils/i18n";
 import { APP_VERSION } from "../constants/version";
 import { MockTestEngine } from "../components/MockTestEngine";
+import { QuestionBankDrawer, QuestionBankDrawerAction } from "../components/QuestionBankDrawer";
+import { Layers } from "lucide-react";
 
 interface QuestionBankPageProps {
   activeStudent?: StudentProfile;
@@ -85,6 +87,51 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
     }
   };
   const [activeTab, setActiveTab] = useState<QuestionBankTab>("mcq");
+  const [isQBankDrawerOpen, setIsQBankDrawerOpen] = useState(false);
+
+  const handleQBankDrawerAction = (action: QuestionBankDrawerAction) => {
+    switch (action) {
+      case "browse_subjects":
+      case "browse_chapters":
+      case "browse_topics":
+      case "browse_vvi":
+        setActiveTab("mcq");
+        break;
+      case "practice_mcq":
+        setActiveTab("mcq");
+        break;
+      case "practice_pyq":
+        setActiveTab("pyq");
+        break;
+      case "practice_assertion":
+      case "practice_case_based":
+        setActiveTab("practice");
+        break;
+      case "tests_chapter":
+      case "tests_subject":
+      case "tests_full_syllabus":
+        setActiveTab("test");
+        break;
+      case "tests_speed":
+        setActiveTab("quiz");
+        break;
+      case "analytics_accuracy":
+      case "analytics_wrong_answers":
+      case "analytics_weak_topics":
+      case "analytics_history":
+        setActiveTab("revision");
+        break;
+      case "quick_continue":
+      case "quick_recent":
+        setActiveTab("mcq");
+        break;
+      case "quick_bookmarked":
+        setActiveTab("practice");
+        break;
+      default:
+        setActiveTab("mcq");
+    }
+  };
 
   // Profile-driven filters with strict class & stream isolation
   const defaultClass = activeStudent?.classLevel || "Class 10";
@@ -300,43 +347,54 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         </div>
 
         {/* Global Controls & Filters */}
-        <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
-            <Filter className="w-4 h-4 text-indigo-400" />
-            <select
-              value={selectedClass}
-              onChange={(e) => {
-                setSelectedClass(e.target.value);
-                setSelectedSubject("ALL");
-              }}
-              className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+        <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              id="open-qbank-drawer-btn"
+              onClick={() => setIsQBankDrawerOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              {activeStudent?.classLevel === "Class 10" ? (
-                <option value="Class 10" className="bg-slate-900">Class 10 (Direct Syllabus)</option>
-              ) : (
-                <>
-                  <option value="ALL" className="bg-slate-900">All Classes</option>
-                  <option value="Class 10" className="bg-slate-900">Class 10</option>
-                  <option value="Class 11" className="bg-slate-900">Class 11</option>
-                  <option value="Class 12" className="bg-slate-900">Class 12</option>
-                </>
-              )}
-            </select>
-          </div>
+              <Layers className="w-4 h-4 text-cyan-400" />
+              <span>Q-Bank Drawer</span>
+            </button>
 
-          <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
-            <BookOpen className="w-4 h-4 text-cyan-400" />
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
-            >
-              {availableSubjects.map((sub) => (
-                <option key={sub.value} value={sub.value} className="bg-slate-900">
-                  {sub.label}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
+              <Filter className="w-4 h-4 text-indigo-400" />
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  setSelectedSubject("ALL");
+                }}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              >
+                {activeStudent?.classLevel === "Class 10" ? (
+                  <option value="Class 10" className="bg-slate-900">Class 10 (Direct Syllabus)</option>
+                ) : (
+                  <>
+                    <option value="ALL" className="bg-slate-900">All Classes</option>
+                    <option value="Class 10" className="bg-slate-900">Class 10</option>
+                    <option value="Class 11" className="bg-slate-900">Class 11</option>
+                    <option value="Class 12" className="bg-slate-900">Class 12</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
+              <BookOpen className="w-4 h-4 text-cyan-400" />
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              >
+                {availableSubjects.map((sub) => (
+                  <option key={sub.value} value={sub.value} className="bg-slate-900">
+                    {sub.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex-1 min-w-[200px] relative">
@@ -1030,6 +1088,17 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
           }}
         />
       )}
+
+      {/* Dedicated Question Bank Drawer */}
+      <QuestionBankDrawer
+        isOpen={isQBankDrawerOpen}
+        onClose={() => setIsQBankDrawerOpen(false)}
+        onSelectAction={handleQBankDrawerAction}
+        activeAction={activeTab}
+        studentClassName={activeStudent?.classLevel || "Class 10"}
+        studentStream={activeStudent?.stream || "Science"}
+        bookmarkCount={Object.keys(progress.bookmarkedQuestions || {}).length}
+      />
     </div>
   );
 };
