@@ -1,22 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Search,
-  Bell,
-  BellRing,
   Grid,
-  Sparkles,
-  Check,
-  Globe,
   Palette,
-  Sun,
-  Moon,
+  Check,
 } from "lucide-react";
 import { UserSettings, ActiveTab, StudentProfile, AppTheme } from "../types";
 import { APP_VERSION } from "../constants/version";
-import {
-  getNotificationPermission,
-  requestNotificationPermission,
-} from "../utils/notifications";
 import { AppLanguage, translations } from "../utils/i18n";
 
 interface StatusBarProps {
@@ -40,22 +29,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   activeTab,
   activeStudent,
   currentLanguage = "en",
-  onUpdateLanguage,
   onOpenProfile,
   onOpenStudentModal,
   onOpenMoreMenu,
-  onOpenSearch,
 }) => {
-  const [notificationState, setNotificationState] = useState<string>("default");
-  const [showNotificationToast, setShowNotificationToast] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string>("");
-
   const t = translations[currentLanguage] || translations.en;
-
-  useEffect(() => {
-    const perm = getNotificationPermission();
-    setNotificationState(perm);
-  }, []);
 
   const [isThemePickerOpen, setIsThemePickerOpen] = useState<boolean>(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
@@ -78,37 +56,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     setIsThemePickerOpen(false);
   };
 
-  const handleNotificationClick = async () => {
-    try {
-      const granted = await requestNotificationPermission();
-      if (granted) {
-        setNotificationState("granted");
-        setToastMessage(
-          currentLanguage === "hi"
-            ? "🔔 सूचनाएं सक्रिय: अध्ययन अलर्ट और संशोधन अनुस्मारक सक्षम हैं।"
-            : "🔔 Notifications Active: Study alerts & revision reminders enabled."
-        );
-      } else {
-        setNotificationState("denied");
-        setToastMessage(
-          currentLanguage === "hi"
-            ? "🔕 सूचनाएं म्यूट: सेटिंग्स में ब्राउज़र अनुमति चालू करें।"
-            : "🔕 Notifications Muted: Enable browser permissions in settings."
-        );
-      }
-    } catch {
-      setToastMessage(
-        currentLanguage === "hi"
-          ? "🔔 दैनिक अध्ययन अनुस्मारक तैयार हैं।"
-          : "🔔 Notifications ready for daily study reminders."
-      );
-    }
-    setShowNotificationToast(true);
-    setTimeout(() => {
-      setShowNotificationToast(false);
-    }, 3500);
-  };
-
   const handleProfileClick = () => {
     if (onOpenProfile) {
       onOpenProfile();
@@ -116,13 +63,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       onOpenStudentModal();
     } else {
       onNavigate("settings");
-    }
-  };
-
-  const toggleLanguage = () => {
-    if (onUpdateLanguage) {
-      const nextLang = currentLanguage === "hi" ? "en" : "hi";
-      onUpdateLanguage(nextLang);
     }
   };
 
@@ -157,48 +97,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           </button>
         </div>
 
-        {/* Right Section: Language Toggle, Search, Notifications, More Apps, Profile */}
+        {/* Right Section: Theme Picker, More Apps, Profile */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Language Toggle Button */}
-          {onUpdateLanguage && (
-            <button
-              onClick={toggleLanguage}
-              id="header-language-toggle"
-              title={currentLanguage === "hi" ? "Switch to English" : "हिंदी में बदलें"}
-              className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-emerald-500/30 text-emerald-300 hover:text-white transition-all text-xs font-semibold min-h-[40px]"
-            >
-              <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {currentLanguage === "hi" ? "हिन्दी" : "EN"}
-              </span>
-            </button>
-          )}
-
-          {/* 2. Search Button */}
-          {onOpenSearch && (
-            <button
-              onClick={onOpenSearch}
-              id="header-search-button"
-              title={`${t.search || "Search"} (Ctrl+K)`}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition-all text-xs min-h-[40px] group"
-            >
-              <Search className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline text-[11px] text-slate-300">
-                {t.search || "Search"}
-              </span>
-              <kbd className="hidden md:inline-block text-[9px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-white/10">
-                ⌘K
-              </kbd>
-            </button>
-          )}
-
           {/* Instant Theme Picker Button */}
           <div className="relative" ref={themePickerRef}>
             <button
               onClick={() => setIsThemePickerOpen((prev) => !prev)}
               id="header-theme-picker-button"
               title={currentLanguage === "hi" ? "थीम बदलें (7 रंग थीम)" : "Change Theme (7 Themes)"}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition-all text-xs min-h-[40px]"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition-all text-xs min-h-[40px]"
             >
               <Palette className="w-3.5 h-3.5 text-purple-400" />
               <span className="hidden xl:inline text-[11px] font-medium capitalize">
@@ -243,45 +150,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             )}
           </div>
 
-          {/* 3. Notifications Bell */}
-          <div className="relative">
-            <button
-              onClick={handleNotificationClick}
-              id="header-notifications-button"
-              title={t.notifications || "Notifications & Study Reminders"}
-              className="relative p-2 rounded-full glass-pill hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all min-h-[40px] min-w-[40px] flex items-center justify-center"
-            >
-              {notificationState === "granted" ? (
-                <BellRing className="w-4 h-4 text-emerald-400" />
-              ) : (
-                <Bell className="w-4 h-4" />
-              )}
-              {notificationState === "granted" && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-pulse" />
-              )}
-            </button>
-
-            {/* Notification Toast Popup */}
-            {showNotificationToast && (
-              <div className="absolute right-0 top-11 z-50 w-64 p-3 rounded-2xl bg-slate-900 border border-emerald-500/30 shadow-2xl text-xs text-slate-200 animate-in fade-in zoom-in-95">
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-3 h-3 stroke-[3]" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-white">{toastMessage}</p>
-                    <p className="text-[10px] text-slate-400">
-                      {currentLanguage === "hi"
-                        ? "समय सारिणी, परीक्षा वेटेज और स्मार्ट रिवीजन अलर्ट।"
-                        : "Timetable, exam weightage & smart revision alerts."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 4. More Apps Button */}
+          {/* More Apps Button */}
           {onOpenMoreMenu && (
             <button
               onClick={onOpenMoreMenu}
@@ -294,7 +163,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             </button>
           )}
 
-          {/* 5. Profile Button */}
+          {/* Profile Button */}
           <button
             onClick={handleProfileClick}
             id="header-profile-button"

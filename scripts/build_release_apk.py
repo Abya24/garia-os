@@ -333,11 +333,13 @@ public class MainActivity extends Activity {
     return aligned_apk, sha256
 
 if __name__ == "__main__":
-    primary_apk_path = "public/Garia_OS_v2.8.3_Release_APK.apk"
-    primary_aligned, primary_sha = build_real_android_apk(primary_apk_path)
+    primary_apk_path = "public/GariaOS_v3.0.0_release.apk"
+    primary_aligned, primary_sha = build_real_android_apk(primary_apk_path, version_name="3.0.0", version_code=300)
 
     # Copy to all target fallback paths
     targets = [
+        "public/Garia_OS_v3.0.0_Release_APK.apk",
+        "public/Garia_OS_v2.8.3_Release_APK.apk",
         "public/Garia_OS_v2.8.2_Release_APK.apk",
         "public/Garia_OS_v2.8.1_Release_APK.apk",
         "public/Garia_OS_v2.8.0_Release_APK.apk",
@@ -346,11 +348,17 @@ if __name__ == "__main__":
         "public/Garia_OS_v2.5.0_Release_APK.apk",
         "public/Garia_OS_v2.4.0_Release_APK.apk",
         "public/Garia_OS.apk",
+        "public/garia-os.apk",
         "public/garia-os-release.apk",
         "public/download.apk",
+        "public/downloads/garia-os.apk",
+        "public/downloads/GariaOS_v3.0.0_release.apk",
+        "public/downloads/Garia_OS.apk",
     ]
     if os.path.exists("dist"):
         targets.extend([
+            "dist/GariaOS_v3.0.0_release.apk",
+            "dist/Garia_OS_v3.0.0_Release_APK.apk",
             "dist/Garia_OS_v2.8.3_Release_APK.apk",
             "dist/Garia_OS_v2.8.2_Release_APK.apk",
             "dist/Garia_OS_v2.8.1_Release_APK.apk",
@@ -360,8 +368,12 @@ if __name__ == "__main__":
             "dist/Garia_OS_v2.5.0_Release_APK.apk",
             "dist/Garia_OS_v2.4.0_Release_APK.apk",
             "dist/Garia_OS.apk",
+            "dist/garia-os.apk",
             "dist/garia-os-release.apk",
             "dist/download.apk",
+            "dist/downloads/garia-os.apk",
+            "dist/downloads/GariaOS_v3.0.0_release.apk",
+            "dist/downloads/Garia_OS.apk",
         ])
 
     for target in targets:

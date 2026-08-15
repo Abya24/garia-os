@@ -33,6 +33,9 @@ import {
   AcademicRevisionItem,
   AcademicPracticeSession,
   AcademicRoadmapData,
+  AbyaDiagnosticsInfo,
+  AbyaFallbackReason,
+  AbyaProvider,
 } from "./types";
 import {
   loadTasks,
@@ -815,12 +818,86 @@ export default function App() {
   // Last User Prompt for Abya AI Retry
   const [lastUserPrompt, setLastUserPrompt] = useState<string>("");
 
+  // Live Abya AI Provider Diagnostics State
+  const [abyaDiagnostics, setAbyaDiagnostics] = useState<AbyaDiagnosticsInfo>({
+    provider: "online_ai",
+    activeModel: "gemini-3.7-flash",
+    latencyMs: 0,
+    lastStatus: "idle",
+    lastFallbackReason: "none",
+    isOnlineNetwork: typeof navigator !== "undefined" ? navigator.onLine : true,
+    totalOnlineCalls: 0,
+    totalFallbackCalls: 0,
+    lastCheckedAt: Date.now(),
+  });
+
+  // Track network online/offline state for diagnostics
+  useEffect(() => {
+    const handleOnline = () => {
+      setAbyaDiagnostics((prev) => ({
+        ...prev,
+        isOnlineNetwork: true,
+        lastCheckedAt: Date.now(),
+      }));
+    };
+    const handleOffline = () => {
+      setAbyaDiagnostics((prev) => ({
+        ...prev,
+        isOnlineNetwork: false,
+        lastStatus: "offline",
+        lastCheckedAt: Date.now(),
+      }));
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Diagnostic Ping / Test Function
+  const handleTestAbyaDiagnostics = async () => {
+    const start = Date.now();
+    try {
+      const res = await fetch("/api/ai/diagnostics");
+      const data = await res.json();
+      const latency = Date.now() - start;
+      setAbyaDiagnostics((prev) => ({
+        ...prev,
+        provider: "online_ai",
+        activeModel: data.defaultModel || "gemini-3.7-flash",
+        latencyMs: latency,
+        lastStatus: data.configured ? "online" : "fallback",
+        lastFallbackReason: data.configured ? "none" : "api_error",
+        isOnlineNetwork: true,
+        lastCheckedAt: Date.now(),
+        lastErrorDetails: data.configured ? undefined : "API key not configured in environment.",
+      }));
+    } catch (err: any) {
+      const latency = Date.now() - start;
+      const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+      setAbyaDiagnostics((prev) => ({
+        ...prev,
+        latencyMs: latency,
+        lastStatus: isOffline ? "offline" : "fallback",
+        lastFallbackReason: isOffline ? "network_offline" : "api_error",
+        isOnlineNetwork: !isOffline,
+        lastCheckedAt: Date.now(),
+        lastErrorDetails: err.message || "Failed to reach diagnostics endpoint",
+      }));
+    }
+  };
+
   const handleUpdateAbyaLanguage = (lang: AbyaLanguageSetting) => {
     setAbyaLanguage(lang);
     saveAbyaLanguage(lang, activeStudent.id);
   };
 
-  // Abya AI Chat Messaging Handler with Multimodal & Model Selection Support
+  // Abya AI Chat Messaging Handler
+  // CRITICAL RULE: Online AI is ALWAYS the default provider.
+  // Local Intelligence triggers ONLY on: Network offline, Request Timeout (>35s), Rate Limit (429), or API Failure.
   const handleSendAbyaMessage = async (
     prompt: string,
     contextNote?: string,
@@ -857,7 +934,7 @@ export default function App() {
     setAbyaChat(newChatWithUser);
     saveAbyaChat(newChatWithUser);
 
-    // Recent context window (last 10 messages prior to prompt)
+    // Context payload
     const recentHistory = abyaChat.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
     const requestPayload = {
@@ -950,16 +1027,24 @@ export default function App() {
 
     let aiReplyText: string | null = null;
     let responseData: any = null;
-    let isUnauthorizedKey = false;
-    const maxAttempts = 3;
+    let fallbackReason: AbyaFallbackReason = "none";
+    let failureDetail = "";
 
-    try {
+    // 1. Check if device is completely offline before calling network
+    const isNetworkOffline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (isNetworkOffline) {
+      fallbackReason = "network_offline";
+      failureDetail = "Device is currently offline";
+      console.warn("[Abya AI Client] Device is offline. Directing to Local Mentor Fallback.");
+    } else {
+      // 2. Primary: Online AI Invocation with retry logic
+      const maxAttempts = 2;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 35000);
 
         try {
-          console.log(`[Abya AI Client] Request attempt ${attempt}/${maxAttempts} (mode=${mode}, hasImage=${!!image}) for prompt: "${prompt.slice(0, 35)}..."`);
+          console.log(`[Abya AI Client] Calling Online AI (attempt ${attempt}/${maxAttempts}, mode=${mode})...`);
           const res = await fetch("/api/ai/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -973,40 +1058,60 @@ export default function App() {
           if (res.ok && data.text) {
             aiReplyText = data.text;
             responseData = data;
-            console.log(`[Abya AI Client] Attempt ${attempt} succeeded with ${data.modelUsed || "model"} in ${data.durationMs || "N/A"}ms.`);
+            console.log(`[Abya AI Client] Online AI response generated with ${data.modelUsed} in ${data.durationMs}ms.`);
+            break;
+          }
+
+          if (res.status === 429 || data.code === "RATE_LIMITED") {
+            fallbackReason = "rate_limited";
+            failureDetail = "Rate limit reached on AI service";
+            console.warn("[Abya AI Client] Online AI rate limited (429). Triggering fallback.");
             break;
           }
 
           if (res.status === 401 || data.code === "MISSING_API_KEY") {
-            console.warn("[Abya AI Client] 401 Unauthorized / Missing API key. Triggering Local Intelligence fallback directly.");
-            isUnauthorizedKey = true;
+            fallbackReason = "api_error";
+            failureDetail = "API key unconfigured on server";
+            console.warn("[Abya AI Client] Missing API key. Triggering fallback.");
             break;
           }
 
-          throw new Error(data.error || `Server responded with status ${res.status}`);
+          fallbackReason = "api_error";
+          failureDetail = data.error || `Server returned ${res.status}`;
+          throw new Error(failureDetail);
         } catch (err: any) {
           clearTimeout(timeoutId);
           const isAbort = err.name === "AbortError";
-          const errMsg = isAbort ? "Request timed out after 35s" : err?.message || "Network error";
-          console.warn(`[Abya AI Client] Attempt ${attempt}/${maxAttempts} failed: ${errMsg}`);
+          if (isAbort) {
+            fallbackReason = "timeout";
+            failureDetail = "Online AI request timed out after 35s";
+          } else if (!fallbackReason || fallbackReason === "none") {
+            fallbackReason = "api_error";
+            failureDetail = err?.message || "Network connection failure";
+          }
+          console.warn(`[Abya AI Client] Online AI attempt ${attempt} failed: ${failureDetail}`);
 
-          if (attempt < maxAttempts) {
-            const delay = attempt === 1 ? 1000 : 2000;
-            console.log(`[Abya AI Client] Waiting ${delay}ms before retry...`);
-            await new Promise((resolve) => setTimeout(resolve, delay));
+          if (attempt < maxAttempts && fallbackReason !== "rate_limited" && fallbackReason !== "timeout") {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         }
       }
+    }
 
+    try {
       if (aiReplyText) {
+        // Successful Online AI Response
         const modelMsg: AbyaMessage = {
           id: "model-" + Date.now(),
           role: "model",
           content: aiReplyText,
           timestamp: Date.now(),
           mode: responseData?.modeUsed || mode,
+          provider: "online_ai",
+          modelUsed: responseData?.modelUsed || "gemini-3.7-flash",
           groundingSources: responseData?.groundingSources,
           thinkingDurationMs: responseData?.durationMs,
+          isFallback: false,
         };
 
         setAbyaChat((prev) => {
@@ -1014,9 +1119,21 @@ export default function App() {
           saveAbyaChat(updated);
           return updated;
         });
+
+        setAbyaDiagnostics((prev) => ({
+          ...prev,
+          provider: "online_ai",
+          activeModel: responseData?.modelUsed || "gemini-3.7-flash",
+          latencyMs: responseData?.durationMs || 0,
+          lastStatus: "online",
+          lastFallbackReason: "none",
+          totalOnlineCalls: prev.totalOnlineCalls + 1,
+          lastCheckedAt: Date.now(),
+          lastErrorDetails: undefined,
+        }));
       } else {
-        // Automatic Local Intelligence Fallback
-        console.log(`[Abya AI Client] External AI service unavailable (unauthorizedKey=${isUnauthorizedKey}). Using Local Intelligence.`);
+        // Graceful Local Intelligence Fallback
+        console.log(`[Abya AI Client] Activating Local Intelligence fallback (Reason: ${fallbackReason}).`);
         const activeStudentData = {
           profile: activeStudent,
           tasks,
@@ -1047,7 +1164,10 @@ export default function App() {
           role: "model",
           content: fallbackContent,
           timestamp: Date.now(),
+          provider: "local_fallback",
+          modelUsed: "Local Mentor Engine",
           isFallback: true,
+          fallbackReason: fallbackReason || "api_error",
         };
 
         setAbyaChat((prev) => {
@@ -1055,15 +1175,26 @@ export default function App() {
           saveAbyaChat(updated);
           return updated;
         });
+
+        setAbyaDiagnostics((prev) => ({
+          ...prev,
+          lastStatus: isNetworkOffline ? "offline" : "fallback",
+          lastFallbackReason: fallbackReason || "api_error",
+          totalFallbackCalls: prev.totalFallbackCalls + 1,
+          lastCheckedAt: Date.now(),
+          lastErrorDetails: failureDetail,
+        }));
       }
     } catch (e: any) {
-      console.error("[Abya AI Client] Unexpected error in chat flow:", e);
+      console.error("[Abya AI Client] Error processing chat response:", e);
       const errorMsg: AbyaMessage = {
         id: "error-" + Date.now(),
         role: "model",
-        content: "Abya couldn't respond right now. Please try again or use Local Intelligence.",
+        content: "Abya Mentor se connect nahi ho paya. Kripya thodi der me dobara try karein!",
         timestamp: Date.now(),
         isError: true,
+        provider: "local_fallback",
+        fallbackReason: "api_error",
       };
       setAbyaChat((prev) => {
         const updated = [...prev, errorMsg];
@@ -1103,7 +1234,7 @@ export default function App() {
 
     const fallbackContent = generateAbyaFallbackResponse(
       actionType || "general",
-      lastUserPrompt || "Help",
+      lastUserPrompt || "Study guidance",
       activeStudentData
     );
 
@@ -1112,7 +1243,10 @@ export default function App() {
       role: "model",
       content: fallbackContent,
       timestamp: Date.now(),
+      provider: "local_fallback",
+      modelUsed: "Local Mentor Engine",
       isFallback: true,
+      fallbackReason: "none",
     };
 
     const updated = [...abyaChat, fallbackMsg];
@@ -1495,6 +1629,7 @@ export default function App() {
               onUpdatePracticeSessions={handleUpdateAcademicPractice}
               onUpdateRoadmap={handleUpdateAcademicRoadmap}
               onAskAbyaWithContext={handleAskAbyaWithContext}
+              onBack={() => setActiveTab("home")}
             />
           )}
 
@@ -1509,6 +1644,7 @@ export default function App() {
                 setIsMoreMenuOpen(false);
               }}
               onSaveExamTestRecord={handleSaveExamTestRecord}
+              onBack={() => setActiveTab("home")}
             />
           )}
 
@@ -1525,6 +1661,7 @@ export default function App() {
               onUpdateRoadmap={handleUpdateCareerRoadmap}
               onUpdateQuiz={handleUpdateCareerQuiz}
               onNavigateToAbya={() => setActiveTab("abya")}
+              onBack={() => setActiveTab("home")}
             />
           )}
 
@@ -1614,6 +1751,8 @@ export default function App() {
               }}
               onTriggerFallbackAction={handleTriggerAbyaFallback}
               onRetryLastMessage={handleRetryLastMessage}
+              diagnostics={abyaDiagnostics}
+              onTestDiagnostics={handleTestAbyaDiagnostics}
             />
           )}
 
@@ -1688,6 +1827,7 @@ export default function App() {
       <MoreDrawer
         isOpen={isMoreMenuOpen}
         currentLanguage={currentLanguage}
+        onUpdateLanguage={handleUpdateLanguage}
         onClose={() => setIsMoreMenuOpen(false)}
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
         onNavigate={(tab) => {

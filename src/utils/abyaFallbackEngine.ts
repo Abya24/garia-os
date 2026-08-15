@@ -154,7 +154,9 @@ export const generateAbyaInsightCards = (
 };
 
 /**
- * Deterministic Rule-Based Fallback Generator for Abya AI
+ * Study Mentor Local Intelligence Fallback Generator for Abya AI
+ * Used exclusively when Online AI is temporarily unreachable (offline, timeout, API error, rate limit).
+ * Delivers warm, student-friendly, actionable mentor guidance in conversational Hindi + English mix.
  */
 export const generateAbyaFallbackResponse = (
   actionType: AbyaQuickActionType | "general",
@@ -164,6 +166,7 @@ export const generateAbyaFallbackResponse = (
   const {
     profile,
     tasks,
+    subjects,
     chapters,
     tests,
     mockTests,
@@ -173,77 +176,70 @@ export const generateAbyaFallbackResponse = (
     readinessScore,
   } = data;
 
-  const prefix = `[Offline Local Intelligence Fallback for ${profile.name}]\n\n`;
-
   switch (actionType) {
     case "plan_day": {
       const pendingTasks = tasks.filter((t) => !t.completed);
       const weakOrVvi = chapters.filter((c) => c.isWeak || c.priority === "VVI").slice(0, 3);
+      const primaryChap = weakOrVvi[0]?.title || "Core Chapter";
+      const secondaryChap = weakOrVvi[1]?.title || "Revision Topic";
 
-      return `${prefix}📅 **Smart Daily Plan for ${profile.name} (${profile.classLevel} ${profile.stream})**
-Target Hours Today: ${examProfile.dailyStudyHours} hrs | Days to Exam: ${daysRemaining} Days
+      return `Arre ${profile.name}! Chalo aaj ka ekdum focused aur stress-free study plan banate hain (${profile.classLevel} ${profile.stream}).
 
-**Recommended Schedule:**
-- 🌅 **Block 1 (Concept Study - 2 hrs):** Focus on ${
-        weakOrVvi[0] ? `"${weakOrVvi[0].title}"` : "your core syllabus topics"
-      }. Read theory & write key formulas/definitions.
-- ☕ **Break (15 mins):** Stretch, drink water, and reset.
-- ⚡ **Block 2 (Revision & PYQs - 1.5 hrs):** Revise ${
-        weakOrVvi[1] ? `"${weakOrVvi[1].title}"` : "previous chapter notes"
-      } and solve 5-10 Past Year Questions.
-- 🍎 **Rest & Meal Break (45 mins)**
-- 📝 **Block 3 (Task Completion & Practice - 1.5 hrs):**
+🎯 **Aaj Ka Target:** ${examProfile.dailyStudyHours || 4} Ghante | ⏳ **Exam me bache hain:** ${daysRemaining} Days
+
+📌 **Aaj Ka Step-by-Step Schedule:**
+1. 🌅 **Block 1 (Deep Concept Study - 2 hrs):** Sabse pehle "${primaryChap}" ke concepts padho aur 2-3 important formulas/definitions likh lo.
+2. ☕ **Quick Break (15 mins):** Thoda stretch karo, paani piyo aur aankhon ko rest do.
+3. ⚡ **Block 2 (Practice & PYQs - 1.5 hrs):** "${secondaryChap}" ke 5 previous year questions practice karo.
+4. 📝 **Block 3 (Daily Tasks & Revision - 1 hr):**
 ${
   pendingTasks.length > 0
-    ? pendingTasks.map((t) => `  • Task: ${t.title}`).join("\n")
-    : "  • Complete remaining chapter practice problems and review test notes."
+    ? pendingTasks.slice(0, 3).map((t) => `   • ${t.title}`).join("\n")
+    : "   • Pending notes review karo aur formulas revise karo."
 }
-- 🌙 **Evening Review (30 mins):** Quick memory audit & plan for tomorrow.
+5. 🌙 **Night Wind-Down (20 mins):** Aaj jo padha usko dimag me recall karo aur kal ke liye ready ho jao!
 
-*Tip: Stick to this balanced plan with proper breaks to prevent burnout!*`;
+💡 *Mentor Tip: Ek saath lambi padhai mat karo, 45-50 min ke baad 10 min break lene se focus 2x badh jata hai!*`;
     }
 
     case "explain_topic": {
-      return `${prefix}📚 **Concept Tutor Mode**
+      return `Haan ${profile.name}! Main concept ko ekdum simple Hinglish me explain kar deta hoon.
 
-To explain a topic tailored for ${profile.classLevel} (${profile.board} ${profile.stream}):
+Batao kaunsa topic ya question samajhna hai?
+Jaise hi topic doge, hum usko in 4 simple steps me clear karenge:
+1. 💡 **Easy Concept:** 2 line me aasan bhasha me samjhayenge.
+2. 🌟 **Real-Life Example:** Rozmarra ki zindagi ya relatable example se connect karenge.
+3. 📌 **Exam Points & Formulae:** Jo board exam me likhna zaroori hai.
+4. ✏️ **Step-by-Step Question:** Ek solved example taaki numericals/theory me marks na katein.
 
-1. **Simple Explanation:** Ask me a specific term (e.g. "Ratio Analysis", "Newton's Laws", "Partnership Goodwill", or "Organic Mechanisms").
-2. **Real-World Analogy:** I will connect the concept to everyday examples.
-3. **Key Points:** 3 to 5 core points to memorize for exams.
-4. **Example Problem:** Step-by-step solved sample.
-5. **Quick Check Question:** Test your understanding!
-
-*Type your question or topic above to get a full explanation!*`;
+*Upar apna topic ya doubt likho, chalo milkar solve karte hain!*`;
     }
 
     case "weak_topics": {
       const weakChapters = chapters.filter((c) => c.isWeak);
       if (weakChapters.length === 0) {
-        return `${prefix}🔥 **Weak Topic Coach for ${profile.name}**
+        return `Shabash ${profile.name}! 🎉 Abhi tumhara koi bhi chapter weak mark nahi hai.
 
-🎉 **Great job!** You currently have 0 chapters marked as weak.
-
-**Recommendations to maintain top performance:**
-- Continue solving Previous Year Questions (PYQs).
-- Take timed mock tests in the Exam Center.
-- Conduct weekly revision to lock in long-term memory.`;
+**Top Score banaye rakhne ke liye:**
+- 📝 Roz 5-10 Past Year Questions (PYQs) solve karte raho.
+- ⏱️ Exam Center me timed mock test do speed test karne ke liye.
+- 🔄 Weekly revision loop maintain rakho.`;
       }
 
-      return `${prefix}🔥 **Weak Topic Coach for ${profile.name}**
-Identified ${weakChapters.length} chapter(s) that **need more practice**:
+      return `Koi tension nahi ${profile.name}! Thoda extra dhyan dene se ye topics bhi super strong ho jayenge:
 
+🔥 **Topics needing attention (${weakChapters.length}):**
 ${weakChapters
+  .slice(0, 4)
   .map(
-    (c, idx) => `**${idx + 1}. ${c.title}**
-- 📌 *Why attention is needed:* Marked for extra reinforcement in ${c.subjectId}.
-- 💡 *What to study:* Re-read foundational textbook notes & formulas.
-- ✏️ *Practice advice:* Solve 5 basic numericals/questions before moving to PYQs.
-- ⏰ *Revision timing:* Schedule a 30-minute review session within 48 hours.`
+    (c, idx) => `**${idx + 1}. ${c.title}** (${c.subjectId})
+   • 💡 *Kaise padhein:* Pehle basic theory aur summary points re-read karo.
+   • ✏️ *Practice:* Directly difficult questions mat lagao, pehle 3-4 simple questions solve karo.
+   • ⏰ *Action:* Agle 48 ghante me iska 30 min ka ek revision block lagao.`
   )
   .join("\n\n")}
 
-*Remember: Supportive practice leads to mastery!*`;
+💪 *Mentor Advice: Har topper ka koi na koi weak chapter hota hai, bas regular practice se wo strong ban jata hai!*`;
     }
 
     case "revise": {
@@ -252,23 +248,24 @@ ${weakChapters
         .slice(0, 4);
 
       if (revisionQueue.length === 0) {
-        return `${prefix}🔄 **Revision Coach for ${profile.name}**
+        return `Bahut badhiya ${profile.name}! ✅ Tumhare active chapters ka multiple rounds revision ho chuka hai.
 
-✅ All active chapters have been revised at least twice!
-- Keep doing light weekly reviews to maintain your readiness score of **${readinessScore}%**.`;
+- Current Readiness Score: **${readinessScore}%**
+- Ab bas light weekly review karte raho taaki concepts memory me lock rahein!`;
       }
 
-      return `${prefix}🔄 **Prioritized Revision Queue for ${profile.name}**
+      return `Revision se hi memory strong hoti hai ${profile.name}! 🔄
 
+📌 **Aaj Ka Priority Revision Queue:**
 ${revisionQueue
   .map(
-    (c, idx) => `**${idx + 1}. ${c.title}** (Revisions: ${c.revisionCount}/3)
-- Priority: ${c.priority} | Status: ${c.isWeak ? "Needs extra practice" : "In Progress"}
-- Action: Review formula summary & solve 3 key past exam questions.`
+    (c, idx) => `**${idx + 1}. ${c.title}** (Revised: ${c.revisionCount}/3 baar)
+   • Priority: ${c.priority} | Status: ${c.isWeak ? "Extra practice required" : "In Progress"}
+   • Action: Formula sheet dekho aur 2 standard exam questions bina dekhe solve karo.`
   )
   .join("\n\n")}
 
-*Open Academic Center to mark revision progress once done!*`;
+*Revision complete hote hi Academic Center me 'Revised' mark kar dena!*`;
     }
 
     case "analyze_tests": {
@@ -278,59 +275,108 @@ ${revisionQueue
       ];
 
       if (allTestRecords.length === 0) {
-        return `${prefix}📝 **Test Analyst:**
-Not enough test data yet. Log mock tests or chapter quizzes in the Exam/Academic Center to see AI score trends and topic insights.`;
+        return `Hey ${profile.name}! Abhi koi test score log nahi hua hai.
+
+Exam Center ya Academic Center me jaise hi mock test ya chapter quiz doge, hum yahan score trends aur mistake analysis discuss karenge!`;
       }
 
       const avgPct = Math.round(
         allTestRecords.reduce((a, b) => a + b.pct, 0) / allTestRecords.length
       );
 
-      return `${prefix}📝 **Test Performance Analysis for ${profile.name}**
+      return `Chalo ${profile.name}, tumhari test performance analyze karte hain: 📊
 
-- 📊 **Total Tests Taken:** ${allTestRecords.length}
+- 📝 **Total Tests Logged:** ${allTestRecords.length}
 - 📈 **Average Score:** ${avgPct}%
-- 🎯 **Recent Trend:** ${
+- 🎯 **Analysis:** ${
         avgPct >= 75
-          ? "Strong performance — ready for advanced exam mocks!"
-          : "Steady progress — focus on weak chapters to boost accuracy."
+          ? "Zabardast score hai! Accuracy high hai, ab speed aur time management par focus karo."
+          : "Steady progress chal rahi hai! Bas silly mistakes note down karo aur weak formulas revise karo."
       }
 
-**Recommended Next Action:**
-- Take a timed 30-minute Mock Test in your lowest scoring subject to build exam stamina.`;
+🚀 **Next Step:** Lowest scoring subject me ek 30-minute timed quiz lagao taaki confidence boost ho!`;
     }
 
     case "career_guidance": {
-      const target = careerRoadmap.careerTitle || "Higher Education";
-      return `${prefix}🎯 **Career-Aware Academic Guidance**
-Student Goal: **${target}** (${profile.stream} Stream | ${profile.board} Board)
+      const target = careerRoadmap.careerTitle || "Higher Studies";
+      return `Sahi direction me aage badh rahe ho ${profile.name}! 🎯
 
-**Strategic Priority Alignment:**
-1. 🏆 **Board Exam First:** Always ensure core ${profile.stream} subjects are thoroughly prepared for your ${profile.board} Board Exams.
-2. 📚 **Career Subjects:** Focus extra attention on key subjects aligned with ${target}.
-3. 🚀 **Roadmap Milestones:** Keep completing steps in your Career Center roadmap alongside daily studies.
+📌 **Tumhara Career Goal:** **${target}** (${profile.stream} Stream • ${profile.board} Board)
 
-*Need specific guidance? Ask Abya AI about courses, competitive entrance exams, or subject choices!*`;
+**Mentor Guidance for Success:**
+1. 🏆 **Board Exams Foundation:** Pehle apne core ${profile.stream} subjects me command banao, kyunki solid foundation se hi aage ke entrance exams crack hote hain.
+2. 📚 **Key Subjects par focus:** ${target} ke liye jo main subjects zaroori hain, unme 85%+ score ka target rakho.
+3. 🚀 **Roadmap Steps:** Career Center ke roadmap milestones ko month-by-month follow karte raho.
+
+*Koi specific college, entrance exam ya subject selection ka doubt ho toh bejhijhak pucho!*`;
     }
 
     case "exam_coach": {
-      return `${prefix}🏆 **Exam Coach Summary for ${profile.name}**
-- 📋 **Exam:** ${examProfile.board} ${examProfile.classLevel} Board Exam
-- ⏳ **Countdown:** ${daysRemaining} Days Remaining
-- 📈 **Exam Readiness Score:** ${readinessScore}%
+      return `Exam pass aa raha hai ${profile.name}, par ghabrane ki bilkul zaroorat nahi! 🏆
 
-**Today's Focus Checklist:**
-1. ✅ Complete 1 revision block from your revision queue.
-2. 📝 Solve at least 5 Past Year Questions (PYQs).
-3. 🎯 Focus on your highest weightage VVI topics.
+- 📋 **Exam:** ${examProfile.board} ${examProfile.classLevel}
+- ⏳ **Days Left:** ${daysRemaining} Din
+- 📈 **Readiness Score:** ${readinessScore}%
 
-*Stay disciplined, rest well, and keep progressing step by step!*`;
+**Aaj Ka 3-Point Action Plan:**
+1. ✅ Ek tough chapter ka formula chart bana kar room me paste karo.
+2. 📝 Kam se kam 5 Past Year Questions (PYQs) solve karo.
+3. 🧘 7-8 ghante ki proper neend zaroor lo taaki dimag fresh rahe.
+
+*Consistency hi success ki key hai. Lag jaao, tum kar sakte ho!*`;
     }
 
     default: {
-      return `${prefix}Hello ${profile.name}! I am Abya AI, your AI study coach for ${profile.classLevel} (${profile.board} - ${profile.stream}).
+      const lowerPrompt = (userPrompt || "").toLowerCase();
+      const matchedChapter = chapters.find(
+        (c) =>
+          lowerPrompt.includes(c.title.toLowerCase()) ||
+          c.title.toLowerCase().includes(lowerPrompt.slice(0, 8))
+      );
+      const primarySubject = subjects[0]?.name || `${profile.stream} Core`;
 
-How can I help you today with your studies, tasks, revision, or career strategy? You can also use the Quick Action buttons above!`;
+      if (lowerPrompt.length > 3 && matchedChapter) {
+        return `Namaste ${profile.name}! "${matchedChapter.title}" (${matchedChapter.subjectId}) ke baare me tumne pucha.
+
+📌 **Study Mentor Quick Breakdown for ${matchedChapter.title}:**
+1. 💡 **Core Fundamentals:** Pehle is chapter ki main definitions aur standard formula sheet review karo.
+2. 🎯 **Exam Weightage:** Is topic se Board Exams me ${matchedChapter.priority === "VVI" ? "heavy 5-mark / long questions" : "direct objective & short numerical questions"} aate hain.
+3. ✏️ **Action Step:** Pehle 2-3 solved examples dekho, fir 3 Past Year Questions (PYQs) solve karo.
+4. 🔄 **Revision Tracker:** Complete hone ke baad Academic Center me iska progress update kar dena!
+
+*Agar numerical me specific step ya formula me doubt hai, toh detail likho hum step-by-step decode karenge!*`;
+      }
+
+      if (
+        lowerPrompt.includes("plan") ||
+        lowerPrompt.includes("schedule") ||
+        lowerPrompt.includes("time table") ||
+        lowerPrompt.includes("aaj")
+      ) {
+        const pendingTasks = tasks.filter((t) => !t.completed);
+        return `Haan ${profile.name}! Aaj ka balanced study plan ye raha:
+
+🎯 **Target:** ${examProfile.dailyStudyHours || 4} Ghante | ⏳ **Days to Exam:** ${daysRemaining} Days
+
+1. 🌅 **Session 1 (Focus):** Core ${profile.stream} ke sabse important chapter ka theory padho.
+2. ⚡ **Session 2 (PYQs):** 5 Previous Year Questions practice karo.
+3. 📝 **Session 3 (Tasks):** ${
+          pendingTasks.length > 0
+            ? pendingTasks.slice(0, 2).map((t) => `\n   • ${t.title}`).join("")
+            : "Formula revision & notes check."
+        }
+
+*Consistency is everything. Chalo shuru karte hain!*`;
+      }
+
+      return `Namaste ${profile.name}! 😊 Main hoon tumhara Study Mentor Abya (${profile.classLevel} ${profile.stream} • ${profile.board}).
+
+Kaise chal rahi hai taiyari? 
+- 📈 **Exam Readiness:** ${readinessScore}%
+- ⏳ **Days Left:** ${daysRemaining} Days
+- 📚 **Focus Subject:** ${primarySubject}
+
+Tum mujhse koi bhi concept explanation, study plan, numericals ya PYQ strategy puch sakte ho!`;
     }
   }
 };

@@ -33,15 +33,27 @@ async function startServer() {
   });
 
   // APK Version & Metadata Endpoint
-  app.get("/api/apk/version", (req, res) => {
-    const v283Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.3_Release_APK.apk");
-    const v283Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.3_Release_APK.apk");
-    const targetFile = fs.existsSync(v283Dist) ? v283Dist : v283Public;
+  app.get(["/api/apk/version", "/api/version/apk"], (req, res) => {
+    const candidates = [
+      path.join(process.cwd(), "dist", "GariaOS_v3.0.0_release.apk"),
+      path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"),
+      path.join(process.cwd(), "public", "downloads", "garia-os.apk"),
+      path.join(process.cwd(), "public", "Garia_OS.apk"),
+      path.join(process.cwd(), "dist", "Garia_OS.apk"),
+    ];
+
+    let targetFile = "";
+    for (const cand of candidates) {
+      if (fs.existsSync(cand) && fs.statSync(cand).size > 0) {
+        targetFile = cand;
+        break;
+      }
+    }
 
     let size = 0;
     let sha256 = "";
 
-    if (fs.existsSync(targetFile)) {
+    if (targetFile && fs.existsSync(targetFile)) {
       const stats = fs.statSync(targetFile);
       size = stats.size;
       const fileBuffer = fs.readFileSync(targetFile);
@@ -51,13 +63,70 @@ async function startServer() {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json({
-      version: "2.8.3",
-      versionCode: 13,
+      status: "ready",
+      version: "3.0.0",
+      versionCode: 300,
       packageName: "com.gariaos.app",
-      fileName: "Garia_OS_v2.8.3_Release_APK.apk",
+      fileName: "GariaOS_v3.0.0_release.apk",
+      canonicalUrl: "/downloads/garia-os.apk",
+      mirrors: [
+        "/downloads/garia-os.apk",
+        "/GariaOS_v3.0.0_release.apk",
+        "/Garia_OS_v3.0.0_Release_APK.apk",
+        "/api/download/apk",
+        "/garia-os.apk",
+        "/Garia_OS.apk",
+      ],
       sizeBytes: size,
+      sizeFormatted: size > 0 ? `${(size / 1024).toFixed(1)} KB` : "32.1 KB",
       sha256: sha256,
+      minSdkVersion: 21,
+      targetSdkVersion: 34,
       releaseDate: new Date().toISOString(),
+    });
+  });
+
+  // APK Diagnostics Endpoint
+  app.get("/api/apk/diagnostics", (req, res) => {
+    const checkPaths = [
+      { name: "Public v3.0.0", path: path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"), url: "/GariaOS_v3.0.0_release.apk" },
+      { name: "Downloads dir", path: path.join(process.cwd(), "public", "downloads", "garia-os.apk"), url: "/downloads/garia-os.apk" },
+      { name: "Public generic", path: path.join(process.cwd(), "public", "garia-os.apk"), url: "/garia-os.apk" },
+      { name: "Public Garia_OS", path: path.join(process.cwd(), "public", "Garia_OS.apk"), url: "/Garia_OS.apk" },
+      { name: "Dist v3.0.0", path: path.join(process.cwd(), "dist", "GariaOS_v3.0.0_release.apk"), url: "/GariaOS_v3.0.0_release.apk" },
+      { name: "Dist downloads", path: path.join(process.cwd(), "dist", "downloads", "garia-os.apk"), url: "/downloads/garia-os.apk" },
+    ];
+
+    const results = checkPaths.map((item) => {
+      const exists = fs.existsSync(item.path);
+      let size = 0;
+      let sha256 = "";
+      if (exists) {
+        try {
+          const stats = fs.statSync(item.path);
+          size = stats.size;
+          const buf = fs.readFileSync(item.path);
+          sha256 = crypto.createHash("sha256").update(buf).digest("hex");
+        } catch (e) {
+          // ignore
+        }
+      }
+      return {
+        name: item.name,
+        url: item.url,
+        exists,
+        sizeBytes: size,
+        sha256: sha256 ? sha256.slice(0, 16) + "..." : null,
+      };
+    });
+
+    const anyReady = results.some((r) => r.exists && r.sizeBytes > 0);
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      status: anyReady ? "HEALTHY" : "MISSING_APK",
+      contentType: "application/vnd.android.package-archive",
+      files: results,
     });
   });
 
@@ -87,9 +156,80 @@ async function startServer() {
     ]);
   });
 
-  // Direct APK Download Endpoint
+  // Direct APK Download Handler
+  const handleApkDownload = (req: express.Request, res: express.Response) => {
+    const requestedFile = req.params.filename || path.basename(req.path) || "GariaOS_v3.0.0_release.apk";
+    console.log(`[APK Download] Attempting download for path "${req.path}" (requested: "${requestedFile}") from IP: ${req.ip}`);
+
+    const candidateFiles = [
+      // 1. Direct match in public/downloads
+      path.join(process.cwd(), "public", "downloads", requestedFile),
+      path.join(process.cwd(), "public", "downloads", "garia-os.apk"),
+      path.join(process.cwd(), "dist", "downloads", requestedFile),
+      path.join(process.cwd(), "dist", "downloads", "garia-os.apk"),
+      // 2. Direct match in public or dist
+      path.join(process.cwd(), "public", requestedFile),
+      path.join(process.cwd(), "dist", requestedFile),
+      // 3. Known canonical files
+      path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"),
+      path.join(process.cwd(), "dist", "GariaOS_v3.0.0_release.apk"),
+      path.join(process.cwd(), "public", "garia-os.apk"),
+      path.join(process.cwd(), "public", "Garia_OS_v3.0.0_Release_APK.apk"),
+      path.join(process.cwd(), "public", "Garia_OS.apk"),
+      path.join(process.cwd(), "public", "download.apk"),
+      path.join(process.cwd(), "public", "Garia_OS_v2.8.3_Release_APK.apk"),
+    ];
+
+    let foundFile: string | null = null;
+    for (const candidate of candidateFiles) {
+      if (fs.existsSync(candidate)) {
+        try {
+          const stats = fs.statSync(candidate);
+          if (stats.size > 0) {
+            foundFile = candidate;
+            break;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    if (foundFile) {
+      const stats = fs.statSync(foundFile);
+      const downloadFilename = requestedFile.endsWith(".apk") ? requestedFile : "GariaOS_v3.0.0_release.apk";
+
+      console.log(`[APK Download] SUCCESS: Serving "${foundFile}" (${stats.size} bytes) as "${downloadFilename}"`);
+
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`);
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Accept-Ranges", "bytes");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, must-revalidate");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+
+      return res.sendFile(path.resolve(foundFile));
+    }
+
+    console.error(`[APK Download] FAILED: No APK file found for path "${req.path}"`);
+    res.status(404).json({
+      error: "APK Download Failed",
+      message: "The requested APK file could not be located on the server. Please try again or check the release page.",
+      path: req.path,
+    });
+  };
+
+  // Register all APK download routes
+  app.get("/downloads/:filename", handleApkDownload);
+  app.get("/downloads", (req, res) => handleApkDownload(req, res));
+  app.get("/api/download/apk", handleApkDownload);
+  app.get("/api/apk/download", handleApkDownload);
+  app.get("/download/apk", handleApkDownload);
   app.get(
     [
+      "/GariaOS_v3.0.0_release.apk",
+      "/Garia_OS_v3.0.0_Release_APK.apk",
       "/Garia_OS_v2.8.3_Release_APK.apk",
       "/Garia_OS_v2.8.2_Release_APK.apk",
       "/Garia_OS_v2.8.1_Release_APK.apk",
@@ -99,34 +239,31 @@ async function startServer() {
       "/Garia_OS_v2.5.0_Release_APK.apk",
       "/Garia_OS_v2.4.0_Release_APK.apk",
       "/Garia_OS.apk",
+      "/garia-os.apk",
       "/garia-os-release.apk",
       "/download.apk",
-      "/download",
-      "/api/download/apk",
     ],
-    (req, res) => {
-      const v283Dist = path.join(process.cwd(), "dist", "Garia_OS_v2.8.3_Release_APK.apk");
-      const v283Public = path.join(process.cwd(), "public", "Garia_OS_v2.8.3_Release_APK.apk");
-      const fallbackPublic = path.join(process.cwd(), "public", "Garia_OS.apk");
-
-      let targetFile = fs.existsSync(v283Dist)
-        ? v283Dist
-        : fs.existsSync(v283Public)
-        ? v283Public
-        : fallbackPublic;
-
-      if (fs.existsSync(targetFile)) {
-        res.setHeader("Content-Type", "application/vnd.android.package-archive");
-        res.setHeader(
-          "Content-Disposition",
-          'attachment; filename="Garia_OS_v2.8.3_Release_APK.apk"'
-        );
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        return res.sendFile(targetFile);
-      }
-      res.status(404).send("APK file not found");
-    }
+    handleApkDownload
   );
+
+  // Abya AI Provider Diagnostics & Health Check Endpoint
+  app.get("/api/ai/diagnostics", (req, res) => {
+    const hasEnvKey = !!process.env.GEMINI_API_KEY;
+    res.json({
+      status: "ok",
+      provider: "online_ai",
+      defaultModel: "gemini-3.7-flash",
+      supportedModels: [
+        "gemini-3.7-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-live-preview",
+      ],
+      configured: hasEnvKey,
+      timestamp: Date.now(),
+    });
+  });
 
   // Abya AI Multimodal & Advanced Mode Endpoint
   app.post("/api/ai/chat", async (req, res) => {
@@ -176,100 +313,102 @@ async function startServer() {
       const selectedLanguage = abyaLanguage || "WhatsApp Language";
       let languageGuidance = "";
       if (selectedLanguage === "English") {
-        languageGuidance = "🌐 LANGUAGE MODE: ENGLISH. Respond strictly in clear, natural, student-friendly English.";
+        languageGuidance = "🌐 LANGUAGE: Respond in clean, warm, student-friendly conversational English.";
       } else if (selectedLanguage === "Hindi") {
-        languageGuidance = "🌐 LANGUAGE MODE: HINDI. Respond in clear Hindi. If the user writes in Devanagari script, use Devanagari. If they write in Roman Hindi, use clean Roman Hindi.";
+        languageGuidance = "🌐 LANGUAGE: Respond in clear, friendly Hindi. Use Devanagari if the student uses Devanagari, or Roman Hindi if preferred.";
       } else if (selectedLanguage === "Hinglish") {
-        languageGuidance = "🌐 LANGUAGE MODE: HINGLISH. Respond in natural Hinglish (mix of Hindi and English written in Roman script). Keep core subject names and academic terms in standard English.";
+        languageGuidance = "🌐 LANGUAGE: Respond in friendly, natural Hinglish (Roman script Hindi + English mix).";
       } else {
-        languageGuidance = `💬 LANGUAGE MODE: WHATSAPP CASUAL / ADAPTIVE (DEFAULT).
-- Reply naturally, warmly, and casually like a close, intelligent study buddy chatting on WhatsApp.
-- Dynamically adapt to the user's latest messaging style and script:
-  * If the user writes in Roman Hindi or Hinglish (e.g. "kal physics ka kya padhu?", "bhai mujhe samajh nahi aa raha"), reply in natural Roman Hinglish (e.g. "Kal Physics me pehle Current Electricity revise kar lo...", "Koi tension nahi 😄 chalo step by step samajhte hain.").
-  * If the user writes in English (e.g. "Explain this in English"), respond completely in English.
-  * If the user mixes Hindi + English, naturally mix Hindi + English.
-  * Do NOT force Devanagari script unless the user explicitly types in Devanagari script.
-- CRITICAL RULES:
-  * Do NOT translate student's actual names, notes, task titles, subject names, or custom chapter titles into unnatural text.
-  * Avoid dry, formal, or robotic machine translation.
-  * Keep tone warm, encouraging, conversational, and structured with friendly emojis when appropriate.`;
+        languageGuidance = `💬 LANGUAGE & STYLE (DEFAULT: HINDI + ENGLISH MIX):
+- Speak like an encouraging, supportive study mentor / elder study buddy (dost + mentor) chatting naturally.
+- Use a natural, easy-to-understand mix of Hindi and English in Roman script (Hinglish), e.g.:
+  * "Arre tension mat lo! Chalo is concept ko ek simple example se samajhte hain..."
+  * "Pehle ye 2 core formulas revise kar lo, fir 3 questions practice karte hain."
+- Keep core academic subjects, formulas, definitions, and technical chapter terms in standard English (e.g. "Kinematics", "Goodwill", "Current Electricity", "PYQs", "Derivations").
+- If the student writes purely in English, match their language warmly in English. If they write in Devanagari Hindi, match in Devanagari Hindi.`;
       }
 
-      const systemInstruction = `You are Abya AI, the intelligent built-in academic, career, and exam AI coach for Garia OS.
-Your purpose is to empower the ACTIVE student with profile-aware intelligence:
+      const systemInstruction = `You are Abya AI, a friendly, encouraging, and deeply knowledgeable Study Mentor & Guide for students.
+You behave like a real human study mentor (not a robotic AI assistant or system tool).
 
-Core Capabilities:
-1. 👤 ACTIVE STUDENT CONTEXT: Always customize responses strictly for the current active student profile (${studentProfileContext?.name || "Student"}, Class: ${studentProfileContext?.classLevel || "Class 12"}, Stream: ${studentProfileContext?.stream || "Commerce"}, Board: ${studentProfileContext?.board || "CBSE"}). Never mention or leak other students' data.
-2. 📅 SMART DAILY COACH ("Plan My Day"): Recommend a realistic daily schedule (study blocks, revision, PYQ practice, test practice, breaks, buffer time). Do not schedule every minute.
-3. 📚 CONCEPT TUTOR & DOUBT SOLVER ("Explain This" / Image Doubt): Explain concepts with: 1. Simple explanation, 2. Real-world analogy, 3. Key formulas/points, 4. Solved example, 5. Quick check question. Adapt depth to student class level. If analyzing an uploaded image/photo, provide deep step-by-step resolution of all handwritten or printed questions, diagrams, and equations.
-4. 🔥 WEAK TOPIC COACH ("Help My Weak Topics"): Address weak topics with supportive wording like "Needs more practice". Explain why attention is needed, what to study, practice steps, and revision timing.
-5. 🔄 REVISION COACH ("What Should I Revise?"): Provide a prioritized revision queue connected to Academic and Exam revision systems.
-6. 📝 TEST ANALYST ("Analyze My Tests"): Analyze test score history, trends, strong subjects, and areas needing practice.
-7. 🎯 CAREER-AWARE GUIDANCE: Align guidance with career goals (e.g. CA -> Accounts/Eco/BS, Engineering -> Physics/Math/Chem, Medicine -> Bio/Chem), but Board/Exam priorities always come first. Present career information as guidance, not certainty.
-8. 🏆 EXAM COACH: Provide exam countdown status, readiness score insights, today's focus, and what to revise next. Never present readiness as predicted board marks.
-9. 🛡️ STUDENT-SAFE GUIDANCE: Encourage balanced study, rest, proper breaks, avoid extreme schedules, avoid shame-based language.
-10. 🎓 CURRICULUM & TOPIC INTELLIGENCE (Strict CBSE / State Board & NCERT Alignment):
-- Automatically adhere to the student's exact academic tier: Class ${studentProfileContext?.classLevel || "10/11/12"}, Stream: ${studentProfileContext?.stream || "General"}.
-- When requested for Topic Explanations: Provide 1. Plain-English conceptual breakdown, 2. Real-world relatable analogy, 3. Core formulas / key definitions, 4. Step-by-step solved numerical/problem, 5. Quick check question.
-- When requested for Quick Notes: Provide high-yield structured bullet points, definition cards, and formula boxes.
-- When requested for Revision Summaries: Deliver a 5-minute rapid recall summary with critical board triggers and common examiner pitfalls.
-- When requested for MCQs / Practice: Generate exam-standard multiple choice questions with 4 distinct options, clearly marked correct option, and detailed explanation.
-- When requested for PYQs: Present verified previous years' board questions with marking scheme breakdown and step-wise mark distribution.
-- When requested for VVI Questions: Emphasize highest-frequency board exam questions and examiner focus areas.
-11. ${languageGuidance}
+CORE PERSONA RULES:
+1. 🤝 STUDY MENTOR TONE: Be warm, empathetic, practical, and highly motivating. You are the student's study partner and mentor.
+2. 🚫 NO ROBOTIC LANGUAGE: Never say "As an AI model", "I have processed your query", "According to system data", "Executing request", or "Deterministic output". Speak directly, naturally, and warmly.
+3. 🚫 NO TECHNICAL AI TERMS: Never mention tokens, LLM, parameters, temperature, system prompts, API endpoints, or JSON objects.
+4. ⚡ SHORT ACTIONABLE GUIDANCE: Provide clear, bite-sized, high-yield guidance. Use 3-4 bullet points, simple step-by-step action items, and real-world analogies (daily life, sports, cricket, pocket money, everyday examples).
+5. 🎯 ACTIVE STUDENT FOCUS: Personalize all advice for student "${studentProfileContext?.name || "Student"}" (${studentProfileContext?.classLevel || "Class 12"} • ${studentProfileContext?.stream || "Commerce"} • ${studentProfileContext?.board || "CBSE"}). Keep all guidance aligned with their syllabus.
+6. 📚 CONCEPT EXPLANATIONS: Explain concepts simply with:
+   - 💡 1-line Simple Core Idea
+   - 🌟 Relatable Real-World Example
+   - 📌 2-3 Key Formulae / Rules / Keywords to remember
+   - ✏️ Step-by-step solved question
+   - ❓ Quick 1-question check for practice
+7. 🛡️ STRESS-FREE & SUPPORTIVE: If a student has pending tasks or weak topics, motivate them with positive actionable advice ("Needs a little practice, step by step easy ho jayega!") rather than stress or pressure.
+8. ${languageGuidance}
 
-Active Student Context Summary:
-${studentProfileContext ? `- Name: "${studentProfileContext.name}", Class: ${studentProfileContext.classLevel}, Stream: ${studentProfileContext.stream}, Board: ${studentProfileContext.board}, Profile ID: ${studentProfileContext.id}` : "- Profile: Default"}
-${curriculumContext ? `- Curriculum Context: Class: ${curriculumContext.classLevel || studentProfileContext?.classLevel}, Stream: ${curriculumContext.stream || studentProfileContext?.stream}, Subject: "${curriculumContext.subject || "N/A"}", Chapter: "${curriculumContext.chapter || "N/A"}", Topic: "${curriculumContext.topic || "N/A"}"` : ""}
-- Language Preference: "${selectedLanguage}"
-${todayContext ? `- Today's Tasks: ${todayContext.pendingTasksCount} pending, ${todayContext.completedTasksCount} completed` : ""}
-${contextNote ? `- Attached Context / Focus Note: "${contextNote}"` : ""}
-${
-  careerContext
-    ? `- Career Goal: "${careerContext.targetCareer || "General"}", Stream: ${careerContext.stream}, Roadmap Progress: ${careerContext.roadmapProgress || 0}%, Strong Subjects: ${Array.isArray(careerContext.strongSubjects) ? careerContext.strongSubjects.join(", ") : "None"}`
-    : ""
-}
-${
-  academicContext
-    ? `- Academic Progress: ${academicContext.overallProgress}%, Active Subjects: ${academicContext.activeSubjectsCount}, Weak Topics Count: ${academicContext.weakTopicsCount}, Weak Chapters: "${academicContext.weakChapterTitles || "None"}", Test Avg Score: ${academicContext.testAverage}%`
-    : ""
-}
-${
-  examContext
-    ? `- Exam: "${examContext.examName}", Board: ${examContext.board}, Countdown: ${examContext.daysRemaining} days remaining, Readiness Score: ${examContext.readinessScore}%, Status: ${examContext.readinessStatus}, Urgent Priority Chapters: "${examContext.urgentChapters || "None"}", Weak Topics: "${examContext.weakTopics || "None"}"`
-    : ""
-}`;
+Current Student Context:
+- Student Name: ${studentProfileContext?.name || "Student"}
+- Academic Tier: ${studentProfileContext?.classLevel || "Class 12"} (${studentProfileContext?.stream || "General"} Stream, ${studentProfileContext?.board || "CBSE"} Board)
+${curriculumContext ? `- Current Subject Focus: "${curriculumContext.subject || "N/A"}" › Chapter: "${curriculumContext.chapter || "N/A"}" › Topic: "${curriculumContext.topic || "N/A"}"` : ""}
+${todayContext ? `- Today's Study Tasks: ${todayContext.pendingTasksCount} pending, ${todayContext.completedTasksCount} done` : ""}
+${contextNote ? `- Attached Note Context: "${contextNote}"` : ""}
+${careerContext ? `- Target Career Goal: "${careerContext.targetCareer || "General"}"` : ""}
+${academicContext ? `- Syllabus Progress: ${academicContext.overallProgress}%, Weak Chapters: "${academicContext.weakChapterTitles || "None"}"` : ""}
+${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRemaining} days remaining, Readiness: ${examContext.readinessScore}%` : ""}`;
 
-      // Model Selection & Configuration per Feature Specifications:
-      let targetModel = "gemini-3.7-flash";
-      let requestConfig: any = { systemInstruction };
+      // Build ordered model candidates for automatic resiliency against 429 quota and 503 high-demand limits:
+      interface ModelCandidate {
+        model: string;
+        config: any;
+      }
+      const candidates: ModelCandidate[] = [];
 
-      // 1. IMAGE UNDERSTANDING / PHOTO DOUBT SOLVER -> gemini-3.1-pro-preview
       if (image && image.data) {
-        targetModel = "gemini-3.1-pro-preview";
-      }
-      // 2. HIGH THINKING MODE -> gemini-3.1-pro-preview with ThinkingLevel.HIGH (no maxOutputTokens)
-      else if (mode === "high_thinking") {
-        targetModel = "gemini-3.1-pro-preview";
-        requestConfig = {
-          systemInstruction,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
+        candidates.push(
+          { model: "gemini-3.1-pro-preview", config: { systemInstruction } },
+          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
+        );
+      } else if (mode === "high_thinking") {
+        candidates.push(
+          {
+            model: "gemini-3.1-pro-preview",
+            config: {
+              systemInstruction,
+              thinkingConfig: {
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
           },
-        };
-      }
-      // 3. LOW-LATENCY RESPONSES -> gemini-3.1-flash-lite
-      else if (mode === "fast_lite") {
-        targetModel = "gemini-3.1-flash-lite";
-        requestConfig = { systemInstruction };
-      }
-      // 4. SEARCH GROUNDING (Google Search Data) -> gemini-3.5-flash with googleSearch tool
-      else if (mode === "search_grounded") {
-        targetModel = "gemini-3.5-flash";
-        requestConfig = {
-          systemInstruction,
-          tools: [{ googleSearch: {} }],
-        };
+          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
+        );
+      } else if (mode === "fast_lite") {
+        candidates.push(
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
+          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-flash-latest", config: { systemInstruction } }
+        );
+      } else if (mode === "search_grounded") {
+        candidates.push(
+          {
+            model: "gemini-3.5-flash",
+            config: {
+              systemInstruction,
+              tools: [{ googleSearch: {} }],
+            },
+          },
+          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
+        );
+      } else {
+        // Standard study mentor default
+        candidates.push(
+          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
+          { model: "gemini-flash-latest", config: { systemInstruction } },
+          { model: "gemini-3.5-flash", config: { systemInstruction } }
+        );
       }
 
       // Build contents
@@ -332,32 +471,35 @@ ${
         contents = messageTurns;
       }
 
-      console.log(
-        `[Abya AI Server] Dispatching request with model="${targetModel}", mode="${mode}", hasImage=${!!image} for student "${studentProfileContext?.name || "Student"}"...`
-      );
-
-      // Attempt AI request with 1 internal server retry
+      // Attempt AI request across candidate models in priority order
       let response: any;
+      let usedModel = candidates[0].model;
       let lastErr: any;
-      for (let attempt = 1; attempt <= 2; attempt++) {
+
+      for (const candidate of candidates) {
+        console.log(
+          `[Abya AI Server] Dispatching request with model="${candidate.model}", mode="${mode}", hasImage=${!!image} for student "${studentProfileContext?.name || "Student"}"...`
+        );
         try {
           response = await ai.models.generateContent({
-            model: targetModel,
+            model: candidate.model,
             contents: contents,
-            config: requestConfig,
+            config: candidate.config,
           });
-          if (response) break;
+          if (response) {
+            usedModel = candidate.model;
+            break;
+          }
         } catch (err: any) {
           lastErr = err;
-          console.warn(`[Abya AI Server] Attempt ${attempt}/2 on ${targetModel} failed (${err?.message || err}).`);
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 800));
-          }
+          console.warn(
+            `[Abya AI Server] Candidate ${candidate.model} failed (${err?.message || err}). Trying next candidate...`
+          );
         }
       }
 
       if (!response) {
-        throw lastErr || new Error(`Failed to receive response from ${targetModel}.`);
+        throw lastErr || new Error("All candidate AI models were unavailable or rate-limited.");
       }
 
       const replyText =
@@ -377,12 +519,12 @@ ${
 
       const duration = Date.now() - startTime;
       console.log(
-        `[Abya AI Server] ${targetModel} response generated successfully in ${duration}ms (sources: ${groundingSources?.length || 0}).`
+        `[Abya AI Server] ${usedModel} response generated successfully in ${duration}ms (sources: ${groundingSources?.length || 0}).`
       );
       return res.json({
         text: replyText,
         durationMs: duration,
-        modelUsed: targetModel,
+        modelUsed: usedModel,
         modeUsed: mode,
         groundingSources,
       });

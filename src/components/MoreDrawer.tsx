@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -23,11 +23,19 @@ import {
   ShieldCheck,
   Cpu,
   Layers,
+  Globe,
+  Bell,
+  BellRing,
+  Check,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+} from "../utils/notifications";
 
 interface MoreDrawerProps {
   isOpen: boolean;
@@ -35,6 +43,7 @@ interface MoreDrawerProps {
   onNavigate: (tab: ActiveTab) => void;
   activeTab: ActiveTab;
   currentLanguage?: AppLanguage;
+  onUpdateLanguage?: (lang: AppLanguage) => void;
   onOpenStudentModal?: () => void;
   activeStudent?: StudentProfile;
 }
@@ -56,11 +65,43 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
   onNavigate,
   activeTab,
   currentLanguage = "en",
+  onUpdateLanguage,
   onOpenStudentModal,
   activeStudent,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [notificationState, setNotificationState] = useState<string>("default");
+  const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const perm = getNotificationPermission();
+    setNotificationState(perm);
+  }, []);
+
+  const handleNotificationClick = async () => {
+    try {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setNotificationState("granted");
+        setNotificationMsg(
+          currentLanguage === "hi"
+            ? "सूचनाएं सक्षम हैं"
+            : "Notifications enabled"
+        );
+      } else {
+        setNotificationState("denied");
+        setNotificationMsg(
+          currentLanguage === "hi"
+            ? "सूचनाएं म्यूट हैं"
+            : "Notifications muted"
+        );
+      }
+    } catch {
+      setNotificationMsg("Notifications configured");
+    }
+    setTimeout(() => setNotificationMsg(null), 3000);
+  };
 
   const t = translations[currentLanguage] || translations.en;
 
@@ -310,6 +351,60 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+              </div>
+
+              {/* Quick Settings: Language & Notifications */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                {/* Language Switcher */}
+                {onUpdateLanguage && (
+                  <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400 ml-1.5" />
+                    <button
+                      onClick={() => onUpdateLanguage("en")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        currentLanguage === "en"
+                          ? "bg-emerald-500 text-slate-950 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      English
+                    </button>
+                    <button
+                      onClick={() => onUpdateLanguage("hi")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        currentLanguage === "hi"
+                          ? "bg-emerald-500 text-slate-950 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      हिन्दी
+                    </button>
+                  </div>
+                )}
+
+                {/* Notifications Quick Toggle */}
+                <button
+                  onClick={handleNotificationClick}
+                  id="more-drawer-notifications-btn"
+                  title="Toggle study alert notifications"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-white/10 text-xs text-slate-300 hover:text-white transition-all ml-auto"
+                >
+                  {notificationState === "granted" ? (
+                    <BellRing className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Bell className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span className="text-[11px] font-semibold">
+                    {notificationMsg ||
+                      (notificationState === "granted"
+                        ? currentLanguage === "hi"
+                          ? "सूचना चालू"
+                          : "Alerts On"
+                        : currentLanguage === "hi"
+                          ? "सूचना बंद"
+                          : "Alerts Muted")}
+                  </span>
+                </button>
               </div>
             </div>
 

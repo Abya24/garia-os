@@ -607,6 +607,8 @@ export function calculateCareerMatches(
     eligibleCareers = CAREER_CATALOG.filter(
       (c) => c.stream === "Arts" || c.stream === "Arts / Humanities"
     );
+  } else if ((filterStream as string) === "All") {
+    eligibleCareers = CAREER_CATALOG;
   } else if (currentClass === "Class 10" || filterStream === "General") {
     const genCareers = CAREER_CATALOG.filter((c) => c.stream === "General");
     eligibleCareers = genCareers.length > 0 ? genCareers : CAREER_CATALOG;

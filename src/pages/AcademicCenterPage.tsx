@@ -23,6 +23,7 @@ import {
   Edit3,
   CheckSquare,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 import {
   AcademicSubject,
@@ -72,6 +73,7 @@ interface AcademicCenterPageProps {
   onUpdatePracticeSessions: (sessions: AcademicPracticeSession[]) => void;
   onUpdateRoadmap: (roadmap: AcademicRoadmapData) => void;
   onAskAbyaWithContext: (text: string) => void;
+  onBack?: () => void;
 }
 
 export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
@@ -95,6 +97,7 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   onUpdatePracticeSessions,
   onUpdateRoadmap,
   onAskAbyaWithContext,
+  onBack,
 }) => {
   const [activeTab, setActiveTab] = useState<
     | "roadmap"
@@ -428,12 +431,31 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
         <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-semibold">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Garia OS v1.4.1 Academic Center</span>
-              <span className="bg-emerald-400/20 px-1.5 py-0.5 rounded text-[10px]">
-                {careerProfile.stream} Stream
-              </span>
+            <div className="flex items-center gap-2">
+              {onBack && (
+                <button
+                  onClick={() => {
+                    if (activeTab !== "roadmap" && activeTab !== "dashboard") {
+                      setActiveTab("roadmap");
+                    } else {
+                      onBack();
+                    }
+                  }}
+                  id="academic-back-btn"
+                  aria-label="Go Back"
+                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
+                </button>
+              )}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-semibold">
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span>Garia OS v1.4.1 Academic Center</span>
+                <span className="bg-emerald-400/20 px-1.5 py-0.5 rounded text-[10px]">
+                  {careerProfile.stream} Stream
+                </span>
+              </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
               Smart Academic Intelligence

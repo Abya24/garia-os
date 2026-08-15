@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Compass,
   CheckCircle2,
   Sparkles,
   ArrowRight,
+  ArrowLeft,
   Sliders,
   Layers,
   Award,
@@ -58,6 +59,7 @@ interface CareerCenterPageProps {
   onUpdateRoadmap: (r: CareerRoadmap) => void;
   onUpdateQuiz?: (q: CareerQuizAnswers) => void;
   onNavigateToAbya: () => void;
+  onBack?: () => void;
 }
 
 const SUBJECT_OPTIONS = [
@@ -136,12 +138,64 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   onUpdateRoadmap,
   onUpdateQuiz,
   onNavigateToAbya,
+  onBack,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
     "matches" | "govt_jobs" | "scholarships" | "study_abroad" | "ai_advisor" | "assessment" | "compare" | "roadmap"
   >("matches");
 
   const [isCareerDrawerOpen, setIsCareerDrawerOpen] = useState(false);
+
+  const [stream, setStream] = useState<StreamType>(profile.stream || "Commerce");
+  const [currentClass, setCurrentClass] = useState<string>(
+    profile.currentClass || "Class 12"
+  );
+
+  // Search filter for catalog
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCatalogStream, setSelectedCatalogStream] = useState<
+    "All" | "Commerce" | "Science" | "Arts / Humanities" | "Arts"
+  >(profile.stream || "Commerce");
+
+  // Keep stream and target career validated when profile stream changes
+  useEffect(() => {
+    if (profile.stream) {
+      setStream(profile.stream);
+      setSelectedCatalogStream(profile.stream);
+
+      // Check if currently selected target career matches new stream
+      const currentTarget = CAREER_CATALOG.find((c) => c.id === profile.selectedCareerId);
+      const isTargetValid =
+        currentTarget &&
+        (profile.stream === "General" ||
+          profile.stream === "All" ||
+          currentTarget.stream === profile.stream ||
+          ((profile.stream === "Arts" || profile.stream === "Arts / Humanities") &&
+            (currentTarget.stream === "Arts" || currentTarget.stream === "Arts / Humanities")));
+
+      if (!isTargetValid) {
+        // Auto-select first valid career for this stream
+        const firstMatching = CAREER_CATALOG.find(
+          (c) =>
+            c.stream === profile.stream ||
+            ((profile.stream === "Arts" || profile.stream === "Arts / Humanities") &&
+              (c.stream === "Arts" || c.stream === "Arts / Humanities"))
+        ) || CAREER_CATALOG[0];
+
+        if (firstMatching && firstMatching.id !== profile.selectedCareerId) {
+          const updatedProf: CareerProfile = {
+            ...profile,
+            selectedCareerId: firstMatching.id,
+            stream: firstMatching.stream,
+            updatedAt: Date.now(),
+          };
+          onUpdateProfile(updatedProf);
+          const newRoadmap = generateDefaultRoadmap(firstMatching, updatedProf);
+          onUpdateRoadmap(newRoadmap);
+        }
+      }
+    }
+  }, [profile.stream]);
 
   const handleCareerDrawerAction = (action: CareerDrawerAction) => {
     switch (action) {
@@ -190,11 +244,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
 
   const [showQuizModal, setShowQuizModal] = useState(false);
 
-  const [stream, setStream] = useState<StreamType>(profile.stream || "Commerce");
-  const [currentClass, setCurrentClass] = useState<string>(
-    profile.currentClass || "Class 12"
-  );
-
   // Local assessment state
   const [strongSubjects, setStrongSubjects] = useState<string[]>(
     assessment.strongSubjects || []
@@ -212,12 +261,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   // Compare selection state
   const [compareIdA, setCompareIdA] = useState<string>("ca");
   const [compareIdB, setCompareIdB] = useState<string>("fin_analyst");
-
-  // Search filter for catalog
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCatalogStream, setSelectedCatalogStream] = useState<
-    "All" | "Commerce" | "Science" | "Arts / Humanities" | "Arts"
-  >(profile.stream);
 
   // Filters for other tabs
   const [govtJobSearch, setGovtJobSearch] = useState("");
@@ -277,7 +320,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     setActiveSubTab("matches");
   };
 
-  // Calculate live match results with quiz answers & student subjects
+  // Calculate live match results with quiz answers & student subjects for active stream
   const currentAssessment: CareerAssessment = {
     strongSubjects,
     interests,
@@ -288,7 +331,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   };
   const currentProfile: CareerProfile = {
     ...profile,
-    stream,
+    stream: selectedCatalogStream === "All" ? ("All" as any) : selectedCatalogStream,
     currentClass,
   };
 
@@ -302,7 +345,10 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   // Filter match results for catalog view
   const filteredMatches = matchResults.filter((res) => {
     const matchesStream =
-      selectedCatalogStream === "All" || res.career.stream === selectedCatalogStream;
+      selectedCatalogStream === "All" ||
+      res.career.stream === selectedCatalogStream ||
+      ((selectedCatalogStream === "Arts" || selectedCatalogStream === "Arts / Humanities") &&
+        (res.career.stream === "Arts" || res.career.stream === "Arts / Humanities"));
     const matchesQuery =
       res.career.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       res.career.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -376,9 +422,10 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
       : 0;
 
   // Selected Target Career Object
-  const selectedCareerObj = CAREER_CATALOG.find(
-    (c) => c.id === (profile.selectedCareerId || "ca")
-  ) || CAREER_CATALOG[0];
+  const selectedCareerObj =
+    CAREER_CATALOG.find((c) => c.id === profile.selectedCareerId) ||
+    CAREER_CATALOG.find((c) => c.stream === profile.stream) ||
+    CAREER_CATALOG[0];
 
   return (
     <div className="space-y-6 pb-24 md:pb-8 max-w-6xl mx-auto animate-in fade-in duration-300">
@@ -387,9 +434,22 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
-              <Compass className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Garia OS v1.4 Feature</span>
+            <div className="flex items-center gap-2 mb-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  id="career-back-btn"
+                  aria-label="Go Back"
+                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
+                </button>
+              )}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Garia OS v1.4 Feature</span>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold font-heading text-white tracking-tight">
               Career & Stream Intelligence Center
@@ -595,7 +655,17 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
               {(["Commerce", "Science", "Arts / Humanities", "All"] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setSelectedCatalogStream(s)}
+                  onClick={() => {
+                    setSelectedCatalogStream(s);
+                    if (s !== "All") {
+                      setStream(s as StreamType);
+                      onUpdateProfile({
+                        ...profile,
+                        stream: s as StreamType,
+                        updatedAt: Date.now(),
+                      });
+                    }
+                  }}
                   className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     selectedCatalogStream === s
                       ? "bg-emerald-500 text-slate-950 font-bold shadow-md"

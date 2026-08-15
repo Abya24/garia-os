@@ -90,6 +90,13 @@ export interface CalendarEvent {
 }
 
 export type AbyaAIMode = "standard" | "high_thinking" | "fast_lite" | "search_grounded";
+export type AbyaProvider = "online_ai" | "local_fallback";
+export type AbyaFallbackReason =
+  | "api_error"
+  | "timeout"
+  | "network_offline"
+  | "rate_limited"
+  | "none";
 
 export interface GroundingSource {
   title: string;
@@ -103,11 +110,27 @@ export interface AbyaMessage {
   timestamp: number;
   isError?: boolean;
   isFallback?: boolean;
+  fallbackReason?: AbyaFallbackReason;
+  provider?: AbyaProvider;
+  modelUsed?: string;
   mode?: AbyaAIMode;
   imageUrl?: string;
   imageMimeType?: string;
   groundingSources?: GroundingSource[];
   thinkingDurationMs?: number;
+}
+
+export interface AbyaDiagnosticsInfo {
+  provider: AbyaProvider;
+  activeModel: string;
+  latencyMs?: number;
+  lastStatus: "online" | "fallback" | "idle" | "error";
+  lastFallbackReason?: AbyaFallbackReason;
+  isOnlineNetwork: boolean;
+  totalOnlineCalls: number;
+  totalFallbackCalls: number;
+  lastCheckedAt?: number;
+  lastErrorDetails?: string;
 }
 
 export type AbyaQuickActionType =

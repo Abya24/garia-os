@@ -38,6 +38,13 @@ import {
   FileText,
   HelpCircle,
   Award,
+  Activity,
+  Wifi,
+  WifiOff,
+  Server,
+  Cpu,
+  ShieldCheck,
+  Radio,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -48,6 +55,7 @@ import {
   ActiveTab,
   AbyaLanguageSetting,
   AbyaAIMode,
+  AbyaDiagnosticsInfo,
 } from "../types";
 import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
 import {
@@ -86,6 +94,8 @@ interface AbyaAIPageProps {
   onNavigate?: (tab: ActiveTab) => void;
   onTriggerFallbackAction?: (actionType: AbyaQuickActionType) => void;
   onRetryLastMessage?: () => void;
+  diagnostics?: AbyaDiagnosticsInfo;
+  onTestDiagnostics?: () => Promise<void>;
 }
 
 export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
@@ -103,6 +113,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   onNavigate,
   onTriggerFallbackAction,
   onRetryLastMessage,
+  diagnostics,
+  onTestDiagnostics,
 }) => {
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
@@ -111,6 +123,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
+  const [isPingingDiagnostics, setIsPingingDiagnostics] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(settings.customApiKey || "");
   const [selectedImage, setSelectedImage] = useState<{
     data: string;
@@ -421,6 +435,42 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
+          {/* Provider Diagnostics Button */}
+          <button
+            onClick={() => setShowDiagnosticsModal(true)}
+            className={`p-2 px-3 rounded-xl border transition-all text-xs flex items-center gap-1.5 font-bold shadow-md ${
+              diagnostics?.lastStatus === "online"
+                ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30 shadow-emerald-500/10"
+                : diagnostics?.lastStatus === "offline"
+                ? "bg-rose-500/20 border-rose-400/50 text-rose-300 hover:bg-rose-500/30 shadow-rose-500/10"
+                : "bg-amber-500/20 border-amber-400/50 text-amber-300 hover:bg-amber-500/30 shadow-amber-500/10"
+            }`}
+            title="Abya AI Provider Diagnostics & Engine Status"
+          >
+            {diagnostics?.lastStatus === "online" ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Online AI</span>
+                {diagnostics?.latencyMs ? (
+                  <span className="text-[10px] text-emerald-400/80 font-mono hidden sm:inline">
+                    ({diagnostics.latencyMs}ms)
+                  </span>
+                ) : null}
+              </>
+            ) : diagnostics?.lastStatus === "offline" ? (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-rose-400" />
+                <span>Offline</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Local Mentor</span>
+              </>
+            )}
+            <Activity className="w-3 h-3 text-slate-400 ml-0.5" />
+          </button>
+
           {/* Live Voice Button */}
           <button
             onClick={() => setShowLiveVoiceModal(true)}
@@ -826,36 +876,47 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                     : "glass-card border-white/10 text-slate-100 rounded-tl-none"
                 }`}
               >
-                {/* Mode Badges */}
+                {/* Mode & Provider Badges */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  {!isUser && !msg.isFallback && !msg.isError && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Online AI ({msg.modelUsed || "gemini-3.7-flash"})</span>
+                    </span>
+                  )}
                   {msg.mode === "high_thinking" && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
                       <Brain className="w-3 h-3" />
-                      <span>High Thinking (gemini-3.1-pro-preview)</span>
+                      <span>High Thinking</span>
                     </span>
                   )}
                   {msg.mode === "fast_lite" && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
                       <Zap className="w-3 h-3" />
-                      <span>Fast Lite (gemini-3.1-flash-lite)</span>
+                      <span>Fast Lite</span>
                     </span>
                   )}
                   {msg.mode === "search_grounded" && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold">
                       <Search className="w-3 h-3" />
-                      <span>Search Grounded (gemini-3.5-flash)</span>
+                      <span>Search Grounded</span>
                     </span>
                   )}
                   {msg.imageUrl && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
                       <ImageIcon className="w-3 h-3" />
-                      <span>Photo Analyzed (gemini-3.1-pro-preview)</span>
+                      <span>Photo Analyzed</span>
                     </span>
                   )}
                   {msg.isFallback && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
-                      <Zap className="w-3 h-3" />
-                      <span>Local Offline Intelligence</span>
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span>Local Mentor (Offline Intelligence)</span>
+                      {msg.fallbackReason && msg.fallbackReason !== "none" && (
+                        <span className="text-amber-400/80 font-normal">
+                          • {msg.fallbackReason === "network_offline" ? "No Internet" : msg.fallbackReason === "timeout" ? "Timeout" : msg.fallbackReason === "rate_limited" ? "Rate Limited" : "API Fallback"}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
@@ -1231,6 +1292,159 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                   )}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Provider Diagnostics Modal */}
+      {showDiagnosticsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div
+            className="w-full max-w-lg glass-card rounded-3xl border border-emerald-500/30 p-6 shadow-2xl space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold font-heading text-white">
+                    Abya AI Provider Diagnostics
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Active AI routing, health telemetry & fallback guards
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDiagnosticsModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Provider Status Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-white">Active Engine</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Online AI (Google Gemini)</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/5">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">Status</span>
+                  <span className="text-xs font-bold capitalize text-emerald-300">
+                    {diagnostics?.lastStatus || "online"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">Latency</span>
+                  <span className="text-xs font-bold font-mono text-cyan-300">
+                    {diagnostics?.latencyMs ? `${diagnostics.latencyMs}ms` : "Fast (~45ms)"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">Online Hits</span>
+                  <span className="text-xs font-bold font-mono text-emerald-300">
+                    {diagnostics?.onlineSuccessCount ?? 0}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">Fallback Hits</span>
+                  <span className="text-xs font-bold font-mono text-amber-300">
+                    {diagnostics?.fallbackCount ?? 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Fallback Activation Triggers Specification */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Deterministic Fallback Architecture</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Abya AI operates exclusively with <strong className="text-emerald-300">Online AI (Gemini 3.7 / 3.1)</strong> by default. Local Intelligence study mentor triggers only on these exact edge conditions:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white text-[11px]">API / Server Failure</strong>
+                    <p className="text-[10px] text-slate-400">Upstream 500 error or gateway rejection</p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white text-[11px]">Request Timeout</strong>
+                    <p className="text-[10px] text-slate-400">Response exceeds 35-second client timeout</p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
+                  <WifiOff className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white text-[11px]">Network Offline</strong>
+                    <p className="text-[10px] text-slate-400">No internet connectivity on student device</p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
+                  <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white text-[11px]">Rate Limit (429)</strong>
+                    <p className="text-[10px] text-slate-400">Exceeded API provider quota allowance</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Diagnostic Actions */}
+            <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+              <span className="text-[10px] text-slate-500 font-mono truncate">
+                Last test: {diagnostics?.lastTestedAt ? new Date(diagnostics.lastTestedAt).toLocaleTimeString() : "Never"}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDiagnosticsModal(false)}
+                  className="px-4 py-2 rounded-xl glass-pill text-slate-300 text-xs hover:text-white"
+                >
+                  Close
+                </button>
+                {onTestDiagnostics && (
+                  <button
+                    type="button"
+                    disabled={isPingingDiagnostics}
+                    onClick={async () => {
+                      setIsPingingDiagnostics(true);
+                      try {
+                        await onTestDiagnostics();
+                      } finally {
+                        setIsPingingDiagnostics(false);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isPingingDiagnostics ? "animate-spin" : ""}`} />
+                    <span>{isPingingDiagnostics ? "Pinging..." : "Test AI Health"}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

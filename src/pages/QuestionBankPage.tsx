@@ -22,6 +22,8 @@ import {
   Flame,
   ArrowRight,
   TrendingUp,
+  ArrowLeft,
+  Layers,
 } from "lucide-react";
 import {
   StudentProfile,
@@ -43,7 +45,6 @@ import { AppLanguage, translations } from "../utils/i18n";
 import { APP_VERSION } from "../constants/version";
 import { MockTestEngine } from "../components/MockTestEngine";
 import { QuestionBankDrawer, QuestionBankDrawerAction } from "../components/QuestionBankDrawer";
-import { Layers } from "lucide-react";
 
 interface QuestionBankPageProps {
   activeStudent?: StudentProfile;
@@ -52,6 +53,7 @@ interface QuestionBankPageProps {
   onAskAbyaWithContext?: (prompt: string, context?: any) => void;
   onNavigate?: (tab: string) => void;
   onSaveExamTestRecord?: (record: any) => void;
+  onBack?: () => void;
 }
 
 type QuestionBankTab =
@@ -70,6 +72,7 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
   onAskAbyaWithContext,
   onNavigate,
   onSaveExamTestRecord,
+  onBack,
 }) => {
   const langKey: AppLanguage =
     currentLanguage === "hi"
@@ -312,6 +315,23 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
+              {onBack && (
+                <button
+                  onClick={() => {
+                    if (activeTab !== "mcq") {
+                      setActiveTab("mcq");
+                    } else {
+                      onBack();
+                    }
+                  }}
+                  id="qbank-back-btn"
+                  aria-label="Go Back"
+                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
+                </button>
+              )}
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 {t.questionBankTitle}
               </span>
