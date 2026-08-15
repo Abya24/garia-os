@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { AcademicRoadmapData, RoadmapStageStatus } from "../types";
+import { CalendarSyncDropdown } from "./CalendarSyncDropdown";
 
 interface AcademicRoadmapSectionProps {
   roadmap: AcademicRoadmapData;
@@ -130,11 +131,22 @@ export const AcademicRoadmapSection: React.FC<AcademicRoadmapSectionProps> = ({
               </div>
 
               {/* Progress & Nav Button */}
-              <div className="flex items-center gap-3 self-start md:self-auto shrink-0">
-                <div className="w-28 text-right hidden sm:block">
+              <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                <div className="w-28 text-right hidden sm:block mr-1">
                   <div className="text-xs text-slate-400">Completion</div>
                   <div className="text-sm font-semibold text-purple-300">{stage.progress}%</div>
                 </div>
+                <CalendarSyncDropdown
+                  event={{
+                    id: `roadmap-stage-${stage.id}`,
+                    title: `[Roadmap Stage ${idx + 1}] ${stage.title}`,
+                    description: `Progress: ${stage.progress}%\nStatus: ${stage.status}\nPending: ${stage.pendingItems.join(", ")}\nSuggested Action: ${stage.suggestedAction}`,
+                    date: new Date().toISOString().split("T")[0],
+                    category: "ROADMAP",
+                  }}
+                  buttonLabel="Sync .ics"
+                  variant="pill"
+                />
                 {idx > 0 && idx < 6 && onNavigateToTab && (
                   <button
                     onClick={() => onNavigateToTab(getStageTabTarget(idx))}

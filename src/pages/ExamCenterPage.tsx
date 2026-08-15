@@ -59,7 +59,15 @@ import { WeakAreaDetectionSection } from "../components/WeakAreaDetectionSection
 import { SubjectComparisonView } from "../components/SubjectComparisonView";
 import { ExamReadinessScoreCard } from "../components/ExamReadinessScoreCard";
 import { ExamIntelligenceDrawer, ExamDrawerAction } from "../components/ExamIntelligenceDrawer";
-import { Layers } from "lucide-react";
+import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import {
+  exportExamMilestoneIcs,
+  exportAllMilestonesIcs,
+  exportFullExamScheduleIcs,
+  exportStudyPlanIcs,
+  exportSubjectExamDatesIcs,
+} from "../utils/icsExport";
+import { Layers, Download } from "lucide-react";
 
 interface ExamCenterPageProps {
   examProfile: ExamProfile;
@@ -353,6 +361,14 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={() => exportFullExamScheduleIcs(examProfile, academicSubjects, examMilestones)}
+              className="px-3.5 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-2 transition-all shadow-lg"
+              title="Export complete exam milestones & subject papers as .ics file"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Schedule (.ics)</span>
+            </button>
+            <button
               id="open-exam-drawer-btn"
               onClick={() => setIsExamDrawerOpen(true)}
               className="px-4 py-2.5 rounded-2xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-2 border border-cyan-500/40 transition-all shadow-lg"
@@ -402,12 +418,26 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
 
           <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 font-mono">
             <span>Class 12 • {examProfile.stream}</span>
-            <button
-              onClick={() => setShowProfileModal(true)}
-              className="text-cyan-400 hover:underline flex items-center gap-1"
-            >
-              Edit Dates <Edit2 className="w-3 h-3" />
-            </button>
+            <div className="flex items-center gap-2">
+              <CalendarSyncDropdown
+                event={{
+                  id: `exam-kickoff-${examProfile.board}`,
+                  title: `[Exam Kickoff] ${examProfile.examName} (${examProfile.board})`,
+                  description: `Target Goal: ${examProfile.targetScorePercent}% score target.\nClass 12 ${examProfile.stream} Board Exams Begin!`,
+                  date: examProfile.examStartDate,
+                  time: "09:00",
+                  category: "EXAM",
+                }}
+                buttonLabel="Sync .ics"
+                variant="minimal"
+              />
+              <button
+                onClick={() => setShowProfileModal(true)}
+                className="text-cyan-400 hover:underline flex items-center gap-1 ml-1"
+              >
+                Edit <Edit2 className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1158,12 +1188,25 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={handleGenerateStudyPlan}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs shadow-lg flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" /> Regenerate Daily Plan
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {examPlan && examPlan.slots && examPlan.slots.length > 0 && (
+                <button
+                  onClick={() => exportStudyPlanIcs(examPlan.slots)}
+                  className="px-3.5 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 font-bold text-xs shadow-md flex items-center gap-2 transition-all"
+                  title="Export today's study slots to .ics calendar"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export Timetable (.ics)</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleGenerateStudyPlan}
+                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs shadow-lg flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" /> Regenerate Daily Plan
+              </button>
+            </div>
           </div>
 
           {!examPlan ? (
@@ -1205,7 +1248,19 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                     </div>
                   </div>
 
-                  <span className="text-xs text-slate-400 font-mono shrink-0">{slot.priority}</span>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-xs text-slate-400 font-mono">{slot.priority}</span>
+                    <CalendarSyncDropdown
+                      event={{
+                        id: `slot-${slot.id}`,
+                        title: `[Study] ${slot.subjectName}: ${slot.chapterTitle}`,
+                        description: `Activity: ${slot.activity}\nPriority: ${slot.priority}\nTime: ${slot.timeSlot}\nNotes: ${slot.explanation}`,
+                        date: new Date().toISOString().split("T")[0],
+                        category: "STUDY",
+                      }}
+                      variant="icon"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -1218,14 +1273,27 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       ========================================== */}
       {activeSubTab === "milestones" && (
         <div className="space-y-6">
-          <div className="glass-card p-5 rounded-3xl border border-white/10">
-            <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-cyan-400" />
-              Exam Preparation Milestones
-            </h3>
-            <p className="text-xs text-slate-300 mt-1">
-              Track major structural achievements across your preparation journey.
-            </p>
+          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-cyan-400" />
+                Exam Preparation Milestones
+              </h3>
+              <p className="text-xs text-slate-300 mt-1">
+                Track major structural achievements across your preparation journey.
+              </p>
+            </div>
+
+            {examMilestones.length > 0 && (
+              <button
+                onClick={() => exportAllMilestonesIcs(examMilestones, examProfile.examName)}
+                className="px-3.5 py-2 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-bold text-xs flex items-center gap-2 transition-all shadow-md"
+                title="Export all milestones to .ics file"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export All Milestones (.ics)</span>
+              </button>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -1262,7 +1330,22 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                   </div>
                 </div>
 
-                <span className="text-xs font-mono text-slate-500">{m.category}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-mono text-slate-500">{m.category}</span>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <CalendarSyncDropdown
+                      event={{
+                        id: `milestone-${m.id}`,
+                        title: `[Exam Milestone] ${m.title}`,
+                        description: `Category: ${m.category}\nStatus: ${m.completed ? "Completed" : "Pending"}\n${m.description}`,
+                        date: m.targetDate || examProfile.examStartDate,
+                        category: m.category,
+                      }}
+                      buttonLabel="Sync .ics"
+                      variant="pill"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

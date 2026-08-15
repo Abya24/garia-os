@@ -27,6 +27,7 @@ import {
   generateComprehensiveRevisionPlan,
   SpacedRepetitionInterval,
 } from "../utils/revisionIntelligenceEngine";
+import { CalendarSyncDropdown } from "./CalendarSyncDropdown";
 
 interface AcademicRevisionPlannerSectionProps {
   revisions: AcademicRevisionItem[];
@@ -395,13 +396,24 @@ export const AcademicRevisionPlannerSection: React.FC<AcademicRevisionPlannerSec
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-end sm:self-center shrink-0 text-xs text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> {rev.scheduledDate}
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0 text-xs text-slate-400">
+                <span className="flex items-center gap-1 font-mono text-[11px]">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" /> {rev.scheduledDate}
                 </span>
+                <CalendarSyncDropdown
+                  event={{
+                    id: `rev-${rev.id}`,
+                    title: `[Revision] ${rev.subjectName}: ${rev.chapterTitle}`,
+                    description: `Priority: ${rev.priority}\nScheduled: ${rev.scheduledDate}\nNotes: ${rev.notes || "None"}`,
+                    date: rev.scheduledDate,
+                    category: "REVISION",
+                  }}
+                  variant="icon"
+                />
                 <button
                   onClick={() => onDeleteRevision(rev.id)}
                   className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                  title="Delete Revision Task"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

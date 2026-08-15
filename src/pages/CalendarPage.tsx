@@ -14,6 +14,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Download,
+  Share2,
 } from "lucide-react";
 import {
   CalendarEvent,
@@ -22,6 +24,13 @@ import {
   Goal,
 } from "../types";
 import { getTodayString } from "../utils/storage";
+import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import {
+  exportAllCalendarEventsIcs,
+  buildVCalendar,
+  downloadIcsFile,
+  getGoogleCalendarWebUrl,
+} from "../utils/icsExport";
 
 interface CalendarPageProps {
   events: CalendarEvent[];
@@ -165,13 +174,26 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:scale-105 transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Add Event</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {events.length > 0 && (
+            <button
+              onClick={() => exportAllCalendarEventsIcs(events)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-amber-500/30 text-amber-300 font-bold text-xs shadow-md transition-all"
+              title="Export all events into an .ics calendar file"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export All (.ics)</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:scale-105 transition-all"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Add Event</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Grid & Sidebar Layout */}
@@ -370,16 +392,30 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Calendar / Google Sync Dropdown */}
+                        <CalendarSyncDropdown
+                          event={{
+                            id: ev.id,
+                            title: `[Garia OS] ${ev.title}`,
+                            description: ev.description || `Category: ${ev.category.toUpperCase()}`,
+                            date: ev.date,
+                            time: ev.time,
+                            category: ev.category,
+                          }}
+                          variant="icon"
+                        />
                         <button
                           onClick={() => handleOpenEdit(ev)}
                           className="p-1 rounded text-slate-400 hover:text-white"
+                          title="Edit Event"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => onDeleteEvent(ev.id)}
                           className="p-1 rounded text-slate-400 hover:text-rose-400"
+                          title="Delete Event"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -417,16 +453,29 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => onToggleTaskComplete(t)}
-                        className={`p-1.5 rounded-xl border transition-all ${
-                          t.completed
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                            : "glass-pill text-slate-400 hover:text-emerald-400"
-                        }`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <CalendarSyncDropdown
+                          event={{
+                            id: `task-${t.id}`,
+                            title: `[Task] ${t.title}`,
+                            description: `Priority: ${t.priority.toUpperCase()}\nCategory: ${t.category}\nStatus: ${t.completed ? "Completed" : "Pending"}`,
+                            date: t.date,
+                            time: t.time,
+                            category: "TASK",
+                          }}
+                          variant="icon"
+                        />
+                        <button
+                          onClick={() => onToggleTaskComplete(t)}
+                          className={`p-1.5 rounded-xl border transition-all ${
+                            t.completed
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                              : "glass-pill text-slate-400 hover:text-emerald-400"
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -442,7 +491,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                   {goalsForSelectedDate.map((g) => (
                     <div
                       key={g.id}
-                      className="p-3 rounded-2xl glass-pill border border-purple-500/20 flex items-center justify-between"
+                      className="p-3 rounded-2xl glass-pill border border-purple-500/20 flex items-center justify-between gap-2"
                     >
                       <div>
                         <h5 className="text-sm font-bold text-white font-heading">{g.title}</h5>
@@ -450,6 +499,17 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                           {g.progress}% completed
                         </span>
                       </div>
+
+                      <CalendarSyncDropdown
+                        event={{
+                          id: `goal-${g.id}`,
+                          title: `[Goal Due] ${g.title}`,
+                          description: `Category: ${g.category}\nProgress: ${g.progress}%`,
+                          date: g.targetDate,
+                          category: "GOAL",
+                        }}
+                        variant="icon"
+                      />
                     </div>
                   ))}
                 </div>
