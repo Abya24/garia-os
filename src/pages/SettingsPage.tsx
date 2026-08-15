@@ -17,7 +17,7 @@ import {
   Check,
   Globe,
 } from "lucide-react";
-import { UserSettings, StudentProfile, AbyaLanguageSetting } from "../types";
+import { UserSettings, StudentProfile, AbyaLanguageSetting, AppTheme } from "../types";
 import { exportStudentProfileJSON, importStudentProfileJSON } from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
@@ -104,7 +104,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     showToast(currentLanguage === "hi" ? "सेटिंग्स सफलतापूर्वक सहेजी गईं!" : "Settings saved successfully!");
   };
 
-  const handleThemeChange = (theme: "dark" | "light" | "system") => {
+  const handleThemeChange = (theme: AppTheme) => {
     onUpdateSettings({ ...settings, theme });
   };
 
@@ -373,36 +373,60 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 4. Appearance Section */}
+      {/* 4. Appearance & Multi-Theme System */}
       <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-          <Sun className="w-5 h-5 text-amber-400" />
-          <span>{currentLanguage === "hi" ? "दिखावट व थीम" : "Appearance"}</span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
+            <Sun className="w-5 h-5 text-amber-400" />
+            <span>{currentLanguage === "hi" ? "दिखावट व थीम सिस्टम" : "Appearance & Theme System"}</span>
+          </h3>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+            V3.0 Themes
+          </span>
+        </div>
+        <p className="text-xs text-slate-400">
+          {currentLanguage === "hi"
+            ? "अपनी पसंद के अनुसार तुरंत थीम स्विच करें। आंखों के तनाव को कम करने और फोकस बढ़ाने के लिए तैयार।"
+            : "Switch instantly between 7 high-contrast student-focused themes designed for focus and low eye strain."}
+        </p>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
           {[
-            { id: "dark", label: currentLanguage === "hi" ? "डार्क मोड" : "Dark Mode", icon: Moon },
-            { id: "light", label: currentLanguage === "hi" ? "लाइट मोड" : "Light Mode", icon: Sun },
-            { id: "system", label: currentLanguage === "hi" ? "सिस्टम डिफ़ॉल्ट" : "System Default", icon: Settings },
-          ].map((mode) => {
-            const Icon = mode.icon;
-            const isActive = settings.theme === mode.id;
+            { id: "dark", label: currentLanguage === "hi" ? "डार्क थीम" : "Dark Theme", desc: "Classic Slate", color: "bg-slate-900 border-slate-700", dot: "bg-emerald-400" },
+            { id: "light", label: currentLanguage === "hi" ? "लाइट थीम" : "Light Theme", desc: "Crisp & Clean", color: "bg-slate-100 border-slate-300 text-slate-900", dot: "bg-emerald-600" },
+            { id: "amoled", label: currentLanguage === "hi" ? "एमोलेड ब्लैक" : "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
+            { id: "ocean", label: currentLanguage === "hi" ? "ओशन ब्लू" : "Ocean Blue", desc: "Midnight Navy", color: "bg-sky-950 border-sky-800", dot: "bg-cyan-400" },
+            { id: "forest", label: currentLanguage === "hi" ? "फॉरेस्ट ग्रीन" : "Forest Green", desc: "Calm Emerald", color: "bg-emerald-950 border-emerald-800", dot: "bg-emerald-400" },
+            { id: "purple", label: currentLanguage === "hi" ? "पर्पल फोकस" : "Purple Focus", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
+            { id: "sunset", label: currentLanguage === "hi" ? "सनसेट ऑरेंज" : "Sunset Orange", desc: "Warm Twilight", color: "bg-orange-950 border-orange-800", dot: "bg-orange-400" },
+            { id: "system", label: currentLanguage === "hi" ? "सिस्टम डिफ़ॉल्ट" : "System Auto", desc: "OS Preference", color: "bg-slate-800/80 border-white/10", dot: "bg-indigo-400" },
+          ].map((themeItem) => {
+            const isActive = settings.theme === themeItem.id;
 
             return (
               <button
-                key={mode.id}
-                onClick={() =>
-                  handleThemeChange(mode.id as "dark" | "light" | "system")
-                }
-                className={`p-4 rounded-2xl border text-center flex flex-col items-center justify-center gap-2 transition-all ${
+                key={themeItem.id}
+                onClick={() => handleThemeChange(themeItem.id as AppTheme)}
+                className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2.5 transition-all card-press ${
                   isActive
-                    ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-md"
-                    : "glass-pill border-white/5 text-slate-400 hover:text-white"
+                    ? "bg-emerald-500/20 border-emerald-400 text-white font-bold shadow-lg shadow-emerald-500/20 scale-[1.02]"
+                    : "glass-pill border-white/10 text-slate-300 hover:text-white hover:border-white/20"
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-xs font-heading">{mode.label}</span>
+                <div className="flex items-center justify-between">
+                  <div className={`w-6 h-6 rounded-lg ${themeItem.color} border flex items-center justify-center`}>
+                    <span className={`w-2 h-2 rounded-full ${themeItem.dot}`} />
+                  </div>
+                  {isActive && (
+                    <span className="w-4 h-4 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-[10px] font-bold">
+                      ✓
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold font-heading">{themeItem.label}</h4>
+                  <p className="text-[10px] opacity-70 mt-0.5">{themeItem.desc}</p>
+                </div>
               </button>
             );
           })}

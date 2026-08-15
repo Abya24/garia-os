@@ -3,31 +3,30 @@ import {
   Plus,
   Minus,
   Timer,
-  FilePlus,
   BookOpen,
   Droplet,
-  CheckCircle2,
-  Circle,
   Sparkles,
   Flame,
   Clock,
-  ArrowUpRight,
   Target,
-  Calendar,
   GraduationCap,
   ShieldAlert,
-  Users,
-  Check,
   ListTodo,
   Atom,
   TrendingUp,
   Compass,
   HelpCircle,
   Play,
-  AlertCircle,
   RotateCw,
   ChevronRight,
   Zap,
+  Bot,
+  MessageSquare,
+  Check,
+  Brain,
+  ArrowRight,
+  CheckCircle2,
+  Calendar,
 } from "lucide-react";
 import {
   Task,
@@ -56,10 +55,6 @@ import { APP_VERSION } from "../constants/version";
 import { getTodayString, loadSmartSuggestionsState, saveSmartSuggestionsState } from "../utils/storage";
 import { generateSmartSuggestions } from "../utils/suggestionsEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
-import { SmartSuggestionsWidget } from "../components/SmartSuggestionsWidget";
-import { AcademicRoadmapWidget } from "../components/AcademicRoadmapWidget";
-import { ExamIntelligenceWidget } from "../components/ExamIntelligenceWidget";
-
 import { AppLanguage, translations } from "../utils/i18n";
 
 interface HomeDashboardProps {
@@ -149,10 +144,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       );
       setLiveDate(
         now.toLocaleDateString(currentLanguage === "hi" ? "hi-IN" : "en-US", {
-          weekday: "long",
-          month: "long",
+          weekday: "short",
+          month: "short",
           day: "numeric",
-          year: "numeric",
         })
       );
     };
@@ -172,16 +166,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       ? Math.round((completedTodayTasks.length / todayTasks.length) * 100)
       : 0;
 
-  // 2. Habits Metrics for Today
-  const habitsDoneToday = habits.filter((h) =>
-    h.completedDates.includes(todayStr)
-  );
-  const habitProgressPercent =
-    habits.length > 0
-      ? Math.round((habitsDoneToday.length / habits.length) * 100)
-      : 0;
-
-  // 3. Study Metrics (Today & Overall)
+  // 2. Study Metrics (Today & Overall)
   const todayStudySessions = studySessions.filter((s) => {
     if (!s.timestamp) return false;
     const d = new Date(s.timestamp);
@@ -215,45 +200,27 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         )
       : 0;
 
-  // 4. Water Metrics
+  // 3. Water Metrics
   const waterProgressPercent =
     water.goal > 0 ? Math.min(100, Math.round((water.glasses / water.goal) * 100)) : 0;
 
-  // 5. Focus Logs Metrics Today
-  const todayFocusLogs = focusLogs.filter((f) => {
-    if (!f.timestamp) return false;
-    const d = new Date(f.timestamp);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}` === todayStr;
-  });
-
-  // Overall Daily Productivity Score calculation (weighted active components)
-  let activeComponentsCount = 0;
-  let activeComponentsSum = 0;
+  // 4. Overall Productivity Score
+  let activeScoreCount = 0;
+  let activeScoreSum = 0;
 
   if (todayTasks.length > 0) {
-    activeComponentsCount++;
-    activeComponentsSum += taskProgressPercent;
+    activeScoreCount++;
+    activeScoreSum += taskProgressPercent;
   }
-  if (habits.length > 0) {
-    activeComponentsCount++;
-    activeComponentsSum += habitProgressPercent;
-  }
-  // Water metric is always active
-  activeComponentsCount++;
-  activeComponentsSum += waterProgressPercent;
-
   if (totalTargetStudyMinutes > 0) {
-    activeComponentsCount++;
-    activeComponentsSum += studyProgressPercent;
+    activeScoreCount++;
+    activeScoreSum += studyProgressPercent;
   }
+  activeScoreCount++;
+  activeScoreSum += waterProgressPercent;
 
-  const overallPercent =
-    activeComponentsCount > 0
-      ? Math.round(activeComponentsSum / activeComponentsCount)
-      : 0;
+  const overallScorePercent =
+    activeScoreCount > 0 ? Math.round(activeScoreSum / activeScoreCount) : 0;
 
   // Stream Meta Helper
   const currentStream = activeStudent?.stream || "Commerce";
@@ -283,9 +250,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   };
 
   const streamMeta = getStreamMeta(currentStream);
-  const StreamIcon = streamMeta.icon;
 
-  // Smart OS Suggestions
+  // Suggestions & Intelligence State
   const activeProfForSug: StudentProfile = activeStudent || {
     id: "default",
     name: settings.userName || "Student",
@@ -300,7 +266,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     return loadSmartSuggestionsState(activeStudent?.id).dismissedIds || [];
   });
 
-  // Re-sync dismissedIds whenever active student changes
   useEffect(() => {
     const loaded = loadSmartSuggestionsState(activeStudent?.id);
     setDismissedIds(loaded.dismissedIds || []);
@@ -309,10 +274,12 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const handleDismissSuggestion = (sugId: string) => {
     const updated = [...dismissedIds, sugId];
     setDismissedIds(updated);
-    saveSmartSuggestionsState({ dismissedIds: updated, lastUpdated: Date.now() }, activeStudent?.id);
+    saveSmartSuggestionsState(
+      { dismissedIds: updated, lastUpdated: Date.now() },
+      activeStudent?.id
+    );
   };
 
-  // Exam Intelligence Report (V1.9)
   const defaultExamProfile: ExamProfile = examProfile || {
     board: activeProfForSug.board || "BSEB",
     classLevel: activeProfForSug.classLevel || "Class 12",
@@ -351,54 +318,51 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     examReport
   );
 
-  const handleSuggestionAction = (targetTab?: string) => {
-    if (targetTab === "home") return;
-    if (targetTab === "water") {
-      onAddWaterGlass();
-      return;
-    }
-    if (targetTab) {
-      onNavigate(targetTab as ActiveTab);
-    }
-  };
+  // Active Chapter for Continue Learning
+  const activeChapter =
+    chapters.find((c) => c.status === "in_progress") ||
+    chapters.find((c) => c.status === "not_started") ||
+    chapters[0];
+  const activeChapterSubject = academicSubjects.find(
+    (s) => s.id === activeChapter?.subjectId
+  );
+  const chapterProgress = activeChapter?.progress || 0;
 
   return (
-    <div className="space-y-4 pb-20 md:pb-6 animate-in fade-in duration-200 max-w-7xl mx-auto">
-      {/* 1. HEADER — Compact Greeting & Active Profile Bar */}
-      <div className="glass-card rounded-2xl p-4 sm:p-5 border border-white/10 relative overflow-hidden card-press">
+    <div className="space-y-5 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
+      {/* 1. COMPACT STUDENT HEADER BAR */}
+      <div className="glass-card rounded-2xl p-4 sm:p-5 border border-white/10 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full glass-pill border border-emerald-500/30 text-emerald-400 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full glass-pill border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Garia OS v{APP_VERSION}</span>
+                <span>Garia OS V3.0</span>
               </span>
               {activeStudent && (
                 <button
                   onClick={onOpenStudentModal}
                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-300 text-[11px] font-medium transition-all"
                 >
-                  <Users className="w-3 h-3" />
                   <span>
-                    {activeStudent.name} • {activeStudent.stream}
+                    {activeStudent.name} • {activeStudent.classLevel} ({activeStudent.stream})
                   </span>
-                  <span className="text-[10px] text-cyan-400 font-normal underline ml-0.5">Switch</span>
                 </button>
               )}
             </div>
-            <h1 className="text-lg sm:text-2xl font-bold font-heading text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold font-heading text-white tracking-tight">
               {greeting}, {activeStudent?.name || settings.userName || "Student"}
             </h1>
             <p className="text-slate-400 text-xs">
-              {activeStudent
-                ? `${activeStudent.classLevel} (${activeStudent.stream} - ${activeStudent.board})`
-                : "Your daily dashboard is loaded."}
+              {currentLanguage === "hi"
+                ? "आज का सुव्यवस्थित अध्ययन डैशबोर्ड। एक क्लिक में अध्ययन शुरू करें।"
+                : "Your focused daily learning cockpit. Fast, clean, and distraction-free."}
             </p>
           </div>
 
           <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
             <div className="text-left sm:text-right">
-              <div className="text-lg font-bold font-mono text-emerald-400 leading-none">
+              <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 leading-none">
                 {liveTime}
               </div>
               <div className="text-[11px] text-slate-400 mt-0.5">{liveDate}</div>
@@ -407,615 +371,605 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 1.5. CONTINUE LEARNING BANNER (PW / Next Topper Inspired) */}
-      {chapters.length > 0 && (() => {
-        const activeChapter =
-          chapters.find((c) => c.status === "in_progress") ||
-          chapters.find((c) => c.status === "not_started") ||
-          chapters[0];
-        const subject = academicSubjects.find((s) => s.id === activeChapter?.subjectId);
-        const progress = activeChapter?.progress || 0;
-
-        return (
-          <div className="glass-card rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 via-slate-900/60 to-emerald-950/20 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/30 flex items-center gap-1">
-                    <Play className="w-2.5 h-2.5 fill-cyan-400 text-cyan-400" />
-                    Continue Learning
-                  </span>
-                  {subject && (
-                    <span className="text-xs font-semibold text-slate-300">
-                      {subject.name}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    {progress}% Done
-                  </span>
-                </div>
-                <h2 className="text-base sm:text-lg font-bold text-white font-heading truncate">
-                  {activeChapter?.title || "Active Syllabus Chapter"}
-                </h2>
-                <p className="text-xs text-slate-300 line-clamp-1">
-                  {activeChapter?.description || "Master core concepts, practice topic MCQs, and solve verified PYQs."}
-                </p>
-
-                {/* Chapter Progress Bar */}
-                <div className="w-full bg-slate-800/90 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div
-                    className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.max(5, progress)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                <button
-                  onClick={() => onNavigate("academic")}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Resume Study</span>
-                </button>
-                <button
-                  onClick={() => onNavigate("questionbank")}
-                  className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl glass-pill hover:bg-white/10 text-cyan-300 border border-cyan-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  <span>Q-Bank</span>
-                </button>
-              </div>
+      {/* 2. ONE-TAP QUICK ACTIONS ROW */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <button
+          onClick={() => onNavigate("study")}
+          id="quick-action-start-study"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/40 text-left flex items-center gap-3 transition-all card-press group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "अध्ययन सत्र" : "Start Study"}
+            </div>
+            <div className="text-[10px] text-emerald-300/80 truncate">
+              {currentLanguage === "hi" ? "सत्र शुरू करें" : "Track time & topics"}
             </div>
           </div>
-        );
-      })()}
+        </button>
 
-      {/* 2. PRIMARY SUMMARY — Compact Daily Progress Card */}
-      <div className="glass-card rounded-2xl p-4 border border-white/10 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-              <Target className="w-4 h-4" />
+        <button
+          onClick={onQuickAddTask}
+          id="quick-action-add-task"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 text-left flex items-center gap-3 transition-all card-press group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Plus className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "+ नया कार्य" : "+ Add Task"}
             </div>
-            <div>
-              <h2 className="text-sm font-bold font-heading text-white">
-                Daily Productivity Score
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                {overallPercent >= 80
-                  ? "Outstanding progress today!"
-                  : overallPercent >= 50
-                  ? "Solid steady momentum"
-                  : "Keep pushing towards daily targets"}
-              </p>
+            <div className="text-[10px] text-cyan-300/80 truncate">
+              {currentLanguage === "hi" ? "दैनिक लक्ष्य जोड़ें" : "Quick daily to-do"}
             </div>
           </div>
-          <div className="flex items-baseline gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-            <span className="text-lg font-extrabold font-heading text-emerald-400">
-              {overallPercent}%
-            </span>
-          </div>
-        </div>
+        </button>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 rounded-full transition-all duration-500"
-            style={{ width: `${Math.max(3, overallPercent)}%` }}
-          />
-        </div>
-
-        {/* Quick Action Shortcuts */}
-        <div className="pt-2 border-t border-white/5">
-          <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">
-            Quick Actions
+        <button
+          onClick={() => onNavigate("focus")}
+          id="quick-action-focus-timer"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-left flex items-center gap-3 transition-all card-press group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Timer className="w-5 h-5" />
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-            <button
-              onClick={() => onNavigate("questionbank")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all text-center group"
-            >
-              <HelpCircle className="w-4 h-4 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Q-Bank</span>
-            </button>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "पोमोडोरो फोकस" : "Focus Timer"}
+            </div>
+            <div className="text-[10px] text-amber-300/80 truncate">
+              {currentLanguage === "hi" ? "25m / 50m सत्र" : "25m / 50m sessions"}
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate("abya")}
+          id="quick-action-ask-abya"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-left flex items-center gap-3 transition-all card-press group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "अव्या एआई चैट" : "Ask Abya AI"}
+            </div>
+            <div className="text-[10px] text-purple-300/80 truncate">
+              {currentLanguage === "hi" ? "डाउट व प्रश्न पूछें" : "Instant doubt solver"}
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {/* 3. CONTINUE LEARNING HERO CARD */}
+      <div className="glass-card rounded-3xl p-5 sm:p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-cyan-950/20 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+          <div className="space-y-2 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1.5">
+                <Play className="w-2.5 h-2.5 fill-emerald-400 text-emerald-400" />
+                {currentLanguage === "hi" ? "पढ़ाई जारी रखें" : "Continue Learning"}
+              </span>
+              {activeChapterSubject && (
+                <span className="text-xs font-semibold text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-md border border-white/10">
+                  {activeChapterSubject.name}
+                </span>
+              )}
+              <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                {chapterProgress}% {currentLanguage === "hi" ? "पूर्ण" : "Completed"}
+              </span>
+            </div>
+
+            <h2 className="text-lg sm:text-xl font-extrabold text-white font-heading truncate">
+              {activeChapter?.title || "Active Board Syllabus Chapter"}
+            </h2>
+            <p className="text-xs text-slate-300 line-clamp-2 max-w-2xl">
+              {activeChapter?.description ||
+                "Deep conceptual breakdown with verified NCERT solutions, VVI topic markers, and curated question banks."}
+            </p>
+
+            {/* Chapter Progress Bar */}
+            <div className="w-full max-w-xl bg-slate-800/90 h-2 rounded-full overflow-hidden mt-3">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(8, chapterProgress)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0 pt-2 md:pt-0">
             <button
               onClick={() => onNavigate("academic")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all text-center group"
+              id="hero-resume-study-btn"
+              className="flex-1 md:flex-none px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
             >
-              <GraduationCap className="w-4 h-4 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Academic</span>
+              <BookOpen className="w-4 h-4" />
+              <span>{currentLanguage === "hi" ? "अध्ययन खोलें" : "Resume Study"}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={() => onNavigate("exam")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-cyan-500/30 transition-all text-center group"
-            >
-              <ShieldAlert className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Exam</span>
-            </button>
-            <button
-              onClick={onQuickAddTask}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all text-center group"
-            >
-              <Plus className="w-4 h-4 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">+ Task</span>
-            </button>
-            <button
-              onClick={() => onNavigate("career")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-purple-500/30 transition-all text-center group"
-            >
-              <Compass className="w-4 h-4 text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Career</span>
-            </button>
-            <button
-              onClick={() => onNavigate("calendar")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-amber-500/30 transition-all text-center group"
-            >
-              <Calendar className="w-4 h-4 text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Calendar</span>
-            </button>
-            <button
-              onClick={() => onNavigate("focus")}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-amber-500/30 transition-all text-center group"
-            >
-              <Timer className="w-4 h-4 text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">Focus</span>
-            </button>
-            <button
-              onClick={onQuickAddNote}
-              className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/80 border border-white/5 hover:border-cyan-500/30 transition-all text-center group"
-            >
-              <FilePlus className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-200 truncate w-full">+ Note</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. QUICK METRICS — 2-Column Compact Grid */}
-      <div>
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
-          Quick Metrics
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {/* Metric 1: Study Time */}
-          <div
-            onClick={() => onNavigate("study")}
-            className="glass-card rounded-xl p-3 border border-white/10 hover:border-cyan-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-400 truncate">
-                Study Time
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
-                <BookOpen className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div>
-              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
-                {todayStudyHours > 0
-                  ? `${todayStudyHours}h ${todayStudyMinsRem}m`
-                  : `${todayStudyMinutes} mins`}
-              </div>
-              <div className="text-[10px] text-cyan-400 font-medium mt-0.5">
-                {studyProgressPercent}% of weekly target
-              </div>
-            </div>
-          </div>
-
-          {/* Metric 2: Water Tracker */}
-          <div className="glass-card rounded-xl p-3 border border-white/10 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-1.5 card-press">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-400 truncate">
-                Water
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
-                <Droplet className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-1">
-              <div>
-                <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
-                  {water.glasses}/{water.goal} <span className="text-xs text-slate-400 font-normal">g</span>
-                </div>
-                <div className="text-[10px] text-blue-400 font-medium mt-0.5">
-                  {waterProgressPercent}% hydrated
-                </div>
-              </div>
-
-              {/* Interactive +1 / -1 Buttons */}
-              <div className="flex items-center gap-1 shrink-0">
-                {onRemoveWaterGlass && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveWaterGlass();
-                    }}
-                    disabled={water.glasses <= 0}
-                    className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white flex items-center justify-center transition-all border border-white/10"
-                    title="Remove 1 glass"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddWaterGlass();
-                  }}
-                  className="px-1.5 py-1 rounded bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-[10px] flex items-center gap-0.5 transition-all shadow-sm"
-                  title="Add 1 glass"
-                >
-                  <Plus className="w-3 h-3 stroke-[3]" />
-                  <span>1</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Metric 3: Tasks */}
-          <div
-            onClick={() => onNavigate("tasks")}
-            className="glass-card rounded-xl p-3 border border-white/10 hover:border-emerald-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-400 truncate">
-                Tasks Today
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                <ListTodo className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div>
-              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
-                {completedTodayTasks.length} / {todayTasks.length}
-              </div>
-              <div className="text-[10px] text-emerald-400 font-medium mt-0.5">
-                {taskProgressPercent}% tasks complete
-              </div>
-            </div>
-          </div>
-
-          {/* Metric 4: Habits */}
-          <div
-            onClick={() => onNavigate("habits")}
-            className="glass-card rounded-xl p-3 border border-white/10 hover:border-rose-500/40 transition-all cursor-pointer flex flex-col justify-between gap-1.5 card-press"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-400 truncate">
-                Habits Today
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
-                <Flame className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div>
-              <div className="text-base sm:text-lg font-bold font-heading text-white leading-tight">
-                {habitsDoneToday.length} / {habits.length}
-              </div>
-              <div className="text-[10px] text-rose-400 font-medium mt-0.5">
-                {habitProgressPercent}% habits done
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3.5. TODAY'S TASK MATRIX (TickTick Inspired) */}
-      <div className="glass-card rounded-2xl p-4 border border-white/10 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-              <ListTodo className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold font-heading text-white">
-                Today's Task Matrix
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                {todayTasks.length > 0
-                  ? `${completedTodayTasks.length} of ${todayTasks.length} tasks completed.`
-                  : "No tasks scheduled for today."}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onQuickAddTask}
-              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-[11px] font-semibold transition-all flex items-center gap-1 border border-emerald-500/25"
-            >
-              <Plus className="w-3 h-3" />
-              <span>Add Task</span>
-            </button>
-            <button
-              onClick={() => onNavigate("tasks")}
-              className="text-[11px] text-slate-400 hover:text-white transition-colors"
-            >
-              View All
-            </button>
-          </div>
-        </div>
-
-        {todayTasks.length > 0 ? (
-          <div className="space-y-1.5">
-            {todayTasks.slice(0, 4).map((task) => (
-              <div
-                key={task.id}
-                onClick={() => onToggleTask && onToggleTask(task)}
-                className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
-                  task.completed
-                    ? "bg-slate-950/40 border-white/5 opacity-60"
-                    : "bg-slate-900/60 hover:bg-slate-800/80 border-white/5 hover:border-emerald-500/30"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleTask && onToggleTask(task);
-                    }}
-                    className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
-                      task.completed
-                        ? "bg-emerald-500 border-emerald-400 text-slate-950"
-                        : "border-slate-600 hover:border-emerald-400 text-transparent"
-                    }`}
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  </button>
-                  <span
-                    className={`text-xs font-medium truncate ${
-                      task.completed ? "line-through text-slate-400" : "text-slate-100"
-                    }`}
-                  >
-                    {task.title}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {task.priority && (
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase font-mono ${
-                        task.priority === "high"
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                          : task.priority === "medium"
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-slate-700/50 text-slate-300 border border-slate-600/50"
-                      }`}
-                    >
-                      {task.priority}
-                    </span>
-                  )}
-                  {task.category && (
-                    <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-white/5 hidden sm:inline">
-                      {task.category}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 rounded-xl bg-slate-950/40 border border-dashed border-white/10 text-center space-y-1">
-            <p className="text-xs text-slate-400">Your task queue for today is empty.</p>
-            <button
-              onClick={onQuickAddTask}
-              className="text-xs text-emerald-400 font-bold hover:underline"
-            >
-              + Create your first daily task
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 3.6. SMART REVISION DUE & WEAK TOPICS (Spaced Repetition) */}
-      {(revisions.length > 0 || vviTopics.length > 0) && (
-        <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-slate-900/50 space-y-3">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
-                <RotateCw className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold font-heading text-white flex items-center gap-1.5">
-                  <span>Smart Revision & Weak Topics</span>
-                  <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                    Spaced Repetition
-                  </span>
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Topics recommended for immediate review before your test.
-                </p>
-              </div>
-            </div>
-
             <button
               onClick={() => onNavigate("questionbank")}
-              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] font-semibold transition-all flex items-center gap-1 border border-amber-500/25 shrink-0"
+              id="hero-qbank-btn"
+              className="flex-1 md:flex-none px-4 py-3 rounded-2xl glass-pill hover:bg-white/10 text-cyan-300 border border-cyan-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
             >
-              <Zap className="w-3 h-3" />
-              <span>Practice Now</span>
+              <HelpCircle className="w-4 h-4" />
+              <span>{currentLanguage === "hi" ? "प्रश्न बैंक" : "Solve PYQs"}</span>
             </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {revisions.slice(0, 2).map((rev) => (
-              <div
-                key={rev.id}
-                className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                    {rev.topicName || "Core Topic"}
-                  </div>
-                  <div className="text-xs font-semibold text-white truncate">
-                    Confidence: {rev.confidenceLevel || "Review Needed"}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Cycle #{rev.cycleCount || 1} • Due {rev.scheduledDate || "Today"}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onNavigate("questionbank")}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 transition-colors shrink-0"
-                  title="Practice in Question Bank"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-
-            {vviTopics.slice(0, revisions.length > 0 ? 1 : 2).map((vvi) => (
-              <div
-                key={vvi.id}
-                className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
-                    <Flame className="w-3 h-3" />
-                    <span>High Weightage VVI</span>
-                  </div>
-                  <div className="text-xs font-semibold text-white truncate">
-                    {vvi.title}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    {vvi.marksWeightage || 5} Marks • High Exam Probability
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onNavigate("academic")}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 transition-colors shrink-0"
-                  title="View in Academic Center"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
-      )}
+      </div>
 
-      {/* 4. ACADEMIC SECTION — Stream Study Tracker + Academic Roadmap */}
-      <div className="space-y-3">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-          Academic Overview
-        </div>
-
-        {/* Stream Study Tracker */}
-        <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
-                <StreamIcon className="w-4 h-4" />
+      {/* 4. MAIN TWO-COLUMN DASHBOARD GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* LEFT COLUMN (7 COLS): Tasks, Focus Timer, Revision Due */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* A. TODAY'S TASKS MATRIX */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                  <ListTodo className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-heading text-white">
+                    {currentLanguage === "hi" ? "आज के कार्य" : "Today's Tasks"}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {todayTasks.length > 0
+                      ? `${completedTodayTasks.length} of ${todayTasks.length} completed (${taskProgressPercent}%)`
+                      : currentLanguage === "hi"
+                      ? "आज के लिए कोई कार्य निर्धारित नहीं है।"
+                      : "No tasks scheduled for today."}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold font-heading text-white">
-                  {streamMeta.label} Subjects
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  {todayStudyMinutes > 0
-                    ? `Logged ${todayStudyHours}h ${todayStudyMinsRem}m today.`
-                    : "No study logged yet today."}
-                </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onQuickAddTask}
+                  id="dashboard-add-task-btn"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-semibold transition-all flex items-center gap-1 border border-emerald-500/30"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{currentLanguage === "hi" ? "जोड़ें" : "New"}</span>
+                </button>
+                <button
+                  onClick={() => onNavigate("tasks")}
+                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  {currentLanguage === "hi" ? "सभी देखें" : "View All"}
+                </button>
               </div>
             </div>
 
-            <button
-              onClick={() => onNavigate("study")}
-              className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 text-[11px] font-semibold transition-all flex items-center gap-1 border border-cyan-500/25"
-            >
-              <BookOpen className="w-3 h-3" />
-              <span>Study</span>
-            </button>
+            {todayTasks.length > 0 ? (
+              <div className="space-y-2">
+                {todayTasks.slice(0, 5).map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => onToggleTask && onToggleTask(task)}
+                    className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer card-press ${
+                      task.completed
+                        ? "bg-slate-950/40 border-white/5 opacity-60"
+                        : "bg-slate-900/60 hover:bg-slate-800/80 border-white/5 hover:border-emerald-500/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleTask && onToggleTask(task);
+                        }}
+                        className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                          task.completed
+                            ? "bg-emerald-500 border-emerald-400 text-slate-950"
+                            : "border-slate-600 hover:border-emerald-400 text-transparent"
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                      <span
+                        className={`text-xs font-medium truncate ${
+                          task.completed ? "line-through text-slate-400" : "text-slate-100"
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {task.priority && (
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase font-mono ${
+                            task.priority === "high"
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                              : task.priority === "medium"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : "bg-slate-700/50 text-slate-300 border border-slate-600/50"
+                          }`}
+                        >
+                          {task.priority}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-5 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 text-center space-y-1.5">
+                <p className="text-xs text-slate-400">
+                  {currentLanguage === "hi" ? "आज के लिए कोई कार्य नहीं है।" : "Your task list is all clear today."}
+                </p>
+                <button
+                  onClick={onQuickAddTask}
+                  className="text-xs text-emerald-400 font-bold hover:underline inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{currentLanguage === "hi" ? "दैनिक कार्य जोड़ें" : "Add daily study task"}</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Subjects Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {subjects.map((sub) => {
-              const pct =
-                sub.targetMinutesPerWeek > 0
-                  ? Math.min(
-                      100,
-                      Math.round((sub.completedMinutes / sub.targetMinutesPerWeek) * 100)
-                    )
-                  : 0;
-              const hrsCompleted = (sub.completedMinutes / 60).toFixed(1);
+          {/* B. FOCUS TIMER WIDGET */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                  <Timer className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-heading text-white">
+                    {currentLanguage === "hi" ? "पोमोडोरो व फोकस टाइमर" : "Focus Timer Launcher"}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {currentLanguage === "hi"
+                      ? "गहन अध्ययन के लिए टाइमर शुरू करें।"
+                      : "Scientifically proven interval timers for maximum retention."}
+                  </p>
+                </div>
+              </div>
 
-              return (
-                <div
-                  key={sub.id}
-                  className="p-2.5 rounded-xl bg-slate-900/50 border border-white/5 flex flex-col justify-between gap-1.5"
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: sub.color || "#10b981" }}
-                      />
-                      <h4 className="font-bold text-white text-xs truncate">
-                        {sub.name}
-                      </h4>
-                    </div>
-                    <span className="text-[10px] font-mono text-cyan-400 font-bold shrink-0">
-                      {pct}%
+              <button
+                onClick={() => onNavigate("focus")}
+                className="text-xs text-amber-400 hover:text-amber-300 font-semibold transition-colors"
+              >
+                {currentLanguage === "hi" ? "पूरा टाइमर" : "Full Screen"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <button
+                onClick={() => onNavigate("focus")}
+                className="p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-800 border border-amber-500/20 hover:border-amber-500/40 text-left transition-all card-press"
+              >
+                <div className="text-lg font-bold font-mono text-amber-400">25 Min</div>
+                <div className="text-xs font-semibold text-white mt-0.5">
+                  {currentLanguage === "hi" ? "पोमोडोरो सत्र" : "Standard Focus"}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">5m Rest</div>
+              </button>
+
+              <button
+                onClick={() => onNavigate("focus")}
+                className="p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-500/40 text-left transition-all card-press"
+              >
+                <div className="text-lg font-bold font-mono text-cyan-400">50 Min</div>
+                <div className="text-xs font-semibold text-white mt-0.5">
+                  {currentLanguage === "hi" ? "गहन अध्ययन" : "Deep Work"}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">10m Rest</div>
+              </button>
+
+              <button
+                onClick={() => onNavigate("study")}
+                className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-800 border border-emerald-500/20 hover:border-emerald-500/40 text-left transition-all card-press"
+              >
+                <div className="text-lg font-bold font-mono text-emerald-400">Log</div>
+                <div className="text-xs font-semibold text-white mt-0.5">
+                  {currentLanguage === "hi" ? "सत्र लॉग" : "Subject Logger"}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">Real-time</div>
+              </button>
+            </div>
+          </div>
+
+          {/* C. REVISION DUE (Spaced Repetition) */}
+          <div className="glass-card rounded-3xl p-5 border border-amber-500/20 bg-gradient-to-r from-amber-950/15 via-slate-900/60 to-slate-900/60 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                  <RotateCw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-heading text-white flex items-center gap-2">
+                    <span>{currentLanguage === "hi" ? "स्मार्ट रिवीजन कतार" : "Revision Due Today"}</span>
+                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-mono font-bold">
+                      1-3-7-15-30
                     </span>
-                  </div>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {currentLanguage === "hi"
+                      ? "विस्मरण वक्र को रोकने के लिए आज अनुशंसित विषय।"
+                      : "Spaced repetition topics due for review before forgetting."}
+                  </p>
+                </div>
+              </div>
 
-                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor: sub.color || "#10b981",
-                      }}
-                    />
-                  </div>
+              <button
+                onClick={() => onNavigate("questionbank")}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold transition-all flex items-center gap-1 border border-amber-500/30 shrink-0"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>{currentLanguage === "hi" ? "अभ्यास करें" : "Practice"}</span>
+              </button>
+            </div>
 
-                  <div className="text-[10px] text-slate-400 flex justify-between">
-                    <span>{hrsCompleted}h logged</span>
-                    <span>{sub.totalSessions} sess</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {revisions.length > 0 ? (
+                revisions.slice(0, 2).map((rev) => (
+                  <div
+                    key={rev.id}
+                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                        {rev.topicName || "Key Chapter Concept"}
+                      </div>
+                      <div className="text-xs font-semibold text-white truncate mt-0.5">
+                        Confidence: {rev.confidenceLevel || "Needs Review"}
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        Cycle #{rev.cycleCount || 1} • Due {rev.scheduledDate || "Today"}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onNavigate("questionbank")}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 transition-colors shrink-0"
+                      title="Practice topic"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full p-4 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 text-center text-xs text-slate-400">
+                  {currentLanguage === "hi"
+                    ? "सभी रिवीजन शेड्यूल अपडेट हैं। शानदार काम!"
+                    : "All scheduled revisions are complete. Great job keeping your memory curve strong!"}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN (5 COLS): Progress Overview, Abya AI Suggestions */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* A. PROGRESS OVERVIEW */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-heading text-white">
+                    {currentLanguage === "hi" ? "प्रगति सारांश" : "Progress Overview"}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {currentLanguage === "hi" ? "दैनिक व साप्ताहिक अध्ययन मेट्रिक्स" : "Daily & weekly learning metrics"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-bold text-xs">
+                {overallScorePercent}% Score
+              </div>
+            </div>
+
+            {/* Productivity Score Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold text-slate-300">
+                <span>{currentLanguage === "hi" ? "दैनिक उत्पादकता स्कोर" : "Daily Productivity"}</span>
+                <span className="text-emerald-400 font-mono">{overallScorePercent}%</span>
+              </div>
+              <div className="w-full bg-slate-800/90 h-2 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(5, overallScorePercent)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Metrics Mini Grid */}
+            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+              {/* Study Hours */}
+              <div
+                onClick={() => onNavigate("study")}
+                className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 hover:border-cyan-500/30 transition-all cursor-pointer card-press"
+              >
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>{currentLanguage === "hi" ? "अध्ययन समय" : "Study Time"}</span>
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                </div>
+                <div className="text-base font-bold font-heading text-white mt-1">
+                  {todayStudyHours > 0
+                    ? `${todayStudyHours}h ${todayStudyMinsRem}m`
+                    : `${todayStudyMinutes} mins`}
+                </div>
+                <div className="text-[10px] text-cyan-400 mt-0.5">
+                  {studyProgressPercent}% {currentLanguage === "hi" ? "साप्ताहिक लक्ष्य" : "weekly target"}
+                </div>
+              </div>
+
+              {/* Water Intake */}
+              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 hover:border-blue-500/30 transition-all card-press">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>{currentLanguage === "hi" ? "जल स्तर" : "Hydration"}</span>
+                  <Droplet className="w-3.5 h-3.5 text-blue-400" />
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-base font-bold font-heading text-white">
+                    {water.glasses}/{water.goal} <span className="text-xs text-slate-400 font-normal">g</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {onRemoveWaterGlass && (
+                      <button
+                        onClick={onRemoveWaterGlass}
+                        disabled={water.glasses <= 0}
+                        className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white flex items-center justify-center text-xs"
+                      >
+                        -
+                      </button>
+                    )}
+                    <button
+                      onClick={onAddWaterGlass}
+                      className="px-1.5 py-0.5 rounded bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-xs"
+                    >
+                      +1
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+                <div className="text-[10px] text-blue-400 mt-0.5">
+                  {waterProgressPercent}% {currentLanguage === "hi" ? "लक्ष्य" : "goal reached"}
+                </div>
+              </div>
+            </div>
+
+            {/* Stream Subjects Mini List */}
+            {subjects.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {streamMeta.label}
+                </div>
+                <div className="space-y-1.5">
+                  {subjects.slice(0, 3).map((sub) => {
+                    const pct =
+                      sub.targetMinutesPerWeek > 0
+                        ? Math.min(
+                            100,
+                            Math.round((sub.completedMinutes / sub.targetMinutesPerWeek) * 100)
+                          )
+                        : 0;
+                    return (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between gap-2 text-xs p-2 rounded-xl bg-slate-900/40 border border-white/5"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: sub.color || "#10b981" }}
+                          />
+                          <span className="font-semibold text-white truncate">{sub.name}</span>
+                        </div>
+                        <span className="text-[11px] font-mono text-cyan-400 font-bold shrink-0">
+                          {pct}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* B. ABYA AI SUGGESTIONS WIDGET */}
+          <div className="glass-card rounded-3xl p-5 border border-purple-500/30 bg-gradient-to-br from-purple-950/20 via-slate-900/80 to-slate-900/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-heading text-white flex items-center gap-1.5">
+                    <span>{currentLanguage === "hi" ? "अव्या एआई सुझाव" : "Abya AI Suggestions"}</span>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full font-mono font-bold">
+                      Adaptive
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {currentLanguage === "hi"
+                      ? "आपकी अध्ययन गति के आधार पर वैयक्तिकृत सिफारिशें।"
+                      : "Personalized recommendations based on your recent activity."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate("abya")}
+                className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-semibold transition-all flex items-center gap-1 border border-purple-500/30 shrink-0"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>{currentLanguage === "hi" ? "चैट करें" : "Ask AI"}</span>
+              </button>
+            </div>
+
+            {/* Suggestions List */}
+            <div className="space-y-2.5">
+              {smartSuggestions.length > 0 ? (
+                smartSuggestions.slice(0, 2).map((sug) => (
+                  <div
+                    key={sug.id}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/20 hover:border-purple-500/40 space-y-2 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                          <span className="truncate">{sug.title}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 line-clamp-2">
+                          {sug.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                      <button
+                        onClick={() => {
+                          if (sug.targetTab) onNavigate(sug.targetTab as ActiveTab);
+                        }}
+                        className="text-[11px] text-purple-300 hover:text-white font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <span>{sug.actionText || "Start Action"}</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDismissSuggestion(sug.id)}
+                        className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 text-center space-y-1">
+                  <p className="text-xs text-slate-300">
+                    {currentLanguage === "hi"
+                      ? "अव्या एआई का सुझाव: आज के 25 मिनट पोमोडोरो सत्र से शुरुआत करें!"
+                      : "Abya AI Tip: Begin today with a 25-minute focused study session."}
+                  </p>
+                  <button
+                    onClick={() => onNavigate("abya")}
+                    className="text-xs text-purple-300 font-bold hover:underline"
+                  >
+                    {currentLanguage === "hi" ? "अव्या से मार्गदर्शन लें →" : "Get AI Strategy →"}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Academic Roadmap Widget */}
-        {roadmap && (
-          <AcademicRoadmapWidget
-            roadmap={roadmap}
-            vviTopics={vviTopics}
-            revisions={revisions}
-            onNavigate={onNavigate}
-          />
-        )}
-      </div>
-
-      {/* 5. INTELLIGENCE SECTION — Smart OS Suggestions + Exam Intelligence */}
-      <div className="space-y-3">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-          Exam Intelligence & OS Suggestions
-        </div>
-
-        {/* Smart OS Suggestions Widget */}
-        <SmartSuggestionsWidget
-          suggestions={smartSuggestions}
-          onAction={handleSuggestionAction}
-          onDismiss={handleDismissSuggestion}
-          studentName={activeStudent?.name}
-        />
-
-        {/* Exam Intelligence Summary Widget */}
-        <ExamIntelligenceWidget
-          report={examReport}
-          onNavigate={(tab) => onNavigate(tab as ActiveTab)}
-        />
       </div>
     </div>
   );

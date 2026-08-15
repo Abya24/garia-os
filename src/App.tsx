@@ -506,22 +506,20 @@ export default function App() {
     });
   }, [profiles, activeProfileId, activeStudent]);
 
-  // Sync Theme with DOM
+  // Sync Multi-Theme System with DOM
   useEffect(() => {
     const root = document.documentElement;
+    const themeClasses = ["light", "amoled", "ocean", "forest", "purple", "sunset"];
 
     const applyTheme = () => {
-      let isLight = false;
-      if (settings.theme === "light") {
-        isLight = true;
-      } else if (settings.theme === "system") {
-        isLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+      let active = settings.theme || "dark";
+      if (active === "system") {
+        active = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
       }
 
-      if (isLight) {
-        root.classList.add("light");
-      } else {
-        root.classList.remove("light");
+      themeClasses.forEach((cls) => root.classList.remove(cls));
+      if (active !== "dark" && themeClasses.includes(active)) {
+        root.classList.add(active);
       }
     };
 

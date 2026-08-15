@@ -154,17 +154,19 @@ export function generateComprehensiveRevisionPlan(
 
   // 1. Weak chapters from recent tests
   examTests.forEach((t) => {
-    if (t.accuracy < 65 && t.topicName) {
-      const existing = dailySuggested.some((s) => s.chapterTitle === t.topicName);
+    const accuracy = t.maxMarks > 0 ? Math.round((t.marksObtained / t.maxMarks) * 100) : 0;
+    const testTopic = t.testName || "Core Topic";
+    if (accuracy < 65) {
+      const existing = dailySuggested.some((s) => s.chapterTitle === testTopic);
       if (!existing) {
         dailySuggested.push({
           subjectId: t.subjectId || "sub-auto",
           subjectName: t.subjectName || "Subject",
-          chapterTitle: t.topicName,
+          chapterTitle: testTopic,
           priority: "VVI",
-          reason: `Mock Test Weak Area (${t.accuracy}% accuracy)`,
+          reason: `Mock Test Weak Area (${accuracy}% accuracy)`,
         });
-        weeklyFocus.push(`${t.subjectName || "Subject"}: ${t.topicName}`);
+        weeklyFocus.push(`${t.subjectName || "Subject"}: ${testTopic}`);
       }
     }
   });

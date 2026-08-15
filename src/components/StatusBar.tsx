@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Bell,
@@ -7,8 +7,11 @@ import {
   Sparkles,
   Check,
   Globe,
+  Palette,
+  Sun,
+  Moon,
 } from "lucide-react";
-import { UserSettings, ActiveTab, StudentProfile } from "../types";
+import { UserSettings, ActiveTab, StudentProfile, AppTheme } from "../types";
 import { APP_VERSION } from "../constants/version";
 import {
   getNotificationPermission,
@@ -53,6 +56,27 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     const perm = getNotificationPermission();
     setNotificationState(perm);
   }, []);
+
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState<boolean>(false);
+  const themePickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        themePickerRef.current &&
+        !themePickerRef.current.contains(event.target as Node)
+      ) {
+        setIsThemePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectTheme = (thm: AppTheme) => {
+    onUpdateSettings({ ...settings, theme: thm });
+    setIsThemePickerOpen(false);
+  };
 
   const handleNotificationClick = async () => {
     try {
@@ -167,6 +191,57 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               </kbd>
             </button>
           )}
+
+          {/* Instant Theme Picker Button */}
+          <div className="relative" ref={themePickerRef}>
+            <button
+              onClick={() => setIsThemePickerOpen((prev) => !prev)}
+              id="header-theme-picker-button"
+              title={currentLanguage === "hi" ? "थीम बदलें (7 रंग थीम)" : "Change Theme (7 Themes)"}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition-all text-xs min-h-[40px]"
+            >
+              <Palette className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden xl:inline text-[11px] font-medium capitalize">
+                {settings.theme || "Dark"}
+              </span>
+            </button>
+
+            {isThemePickerOpen && (
+              <div className="absolute right-0 top-11 z-50 w-56 p-2.5 rounded-2xl bg-slate-900 border border-white/15 shadow-2xl space-y-1.5 animate-in fade-in zoom-in-95">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center justify-between">
+                  <span>{currentLanguage === "hi" ? "थीम चुनें" : "Theme Engine"}</span>
+                  <span className="text-[9px] text-emerald-400">7 Modes</span>
+                </div>
+                <div className="space-y-1">
+                  {[
+                    { id: "dark", label: "Dark (Default)", dot: "bg-slate-900 border-slate-700" },
+                    { id: "light", label: "Light", dot: "bg-slate-100 border-slate-300" },
+                    { id: "amoled", label: "AMOLED Black", dot: "bg-black border-slate-800" },
+                    { id: "ocean", label: "Ocean Blue", dot: "bg-blue-600 border-blue-400" },
+                    { id: "forest", label: "Forest Green", dot: "bg-emerald-600 border-emerald-400" },
+                    { id: "purple", label: "Purple Focus", dot: "bg-purple-600 border-purple-400" },
+                    { id: "sunset", label: "Sunset Orange", dot: "bg-amber-600 border-amber-400" },
+                  ].map((thm) => (
+                    <button
+                      key={thm.id}
+                      onClick={() => handleSelectTheme(thm.id as AppTheme)}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all ${
+                        settings.theme === thm.id
+                          ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
+                          : "text-slate-300 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full border ${thm.dot}`} />
+                        <span>{thm.label}</span>
+                      </div>
+                      {settings.theme === thm.id && <Check className="w-3 h-3 text-emerald-400" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* 3. Notifications Bell */}
           <div className="relative">

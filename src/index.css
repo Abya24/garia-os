@@ -11,17 +11,97 @@
   }
 
   .light {
-    --bg-main: #f1f5f9;
+    --bg-main: #f8fafc;
     --card-bg: #ffffff;
-    --card-border: #cbd5e1;
+    --card-border: #e2e8f0;
     --text-primary: #0f172a;
-    --text-secondary: #334155;
+    --text-secondary: #475569;
     --accent-glow: rgba(16, 185, 129, 0.08);
+  }
+
+  .amoled {
+    --bg-main: #000000;
+    --card-bg: #09090b;
+    --card-border: rgba(255, 255, 255, 0.12);
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --accent-glow: rgba(255, 255, 255, 0.08);
+  }
+
+  .ocean {
+    --bg-main: #050e1d;
+    --card-bg: rgba(10, 25, 47, 0.85);
+    --card-border: rgba(56, 189, 248, 0.16);
+    --text-primary: #f0f9ff;
+    --text-secondary: #7dd3fc;
+    --accent-glow: rgba(14, 165, 233, 0.15);
+  }
+
+  .forest {
+    --bg-main: #04140e;
+    --card-bg: rgba(6, 36, 24, 0.85);
+    --card-border: rgba(52, 211, 153, 0.16);
+    --text-primary: #ecfdf5;
+    --text-secondary: #6ee7b7;
+    --accent-glow: rgba(16, 185, 129, 0.15);
+  }
+
+  .purple {
+    --bg-main: #0e091b;
+    --card-bg: rgba(24, 14, 46, 0.85);
+    --card-border: rgba(192, 132, 252, 0.16);
+    --text-primary: #faf5ff;
+    --text-secondary: #d8b4fe;
+    --accent-glow: rgba(168, 85, 247, 0.15);
+  }
+
+  .sunset {
+    --bg-main: #18090f;
+    --card-bg: rgba(43, 15, 26, 0.85);
+    --card-border: rgba(251, 146, 60, 0.16);
+    --text-primary: #fff7ed;
+    --text-secondary: #fdba74;
+    --accent-glow: rgba(249, 115, 22, 0.15);
   }
 }
 
+.amoled body, .amoled {
+  background-color: #000000 !important;
+}
+.amoled .bg-slate-950, .amoled .bg-slate-900 {
+  background-color: #08080a !important;
+}
+
+.ocean body, .ocean {
+  background-color: #050e1d !important;
+}
+.ocean .bg-slate-950, .ocean .bg-slate-900 {
+  background-color: #0a192f !important;
+}
+
+.forest body, .forest {
+  background-color: #04140e !important;
+}
+.forest .bg-slate-950, .forest .bg-slate-900 {
+  background-color: #062418 !important;
+}
+
+.purple body, .purple {
+  background-color: #0e091b !important;
+}
+.purple .bg-slate-950, .purple .bg-slate-900 {
+  background-color: #180e2e !important;
+}
+
+.sunset body, .sunset {
+  background-color: #18090f !important;
+}
+.sunset .bg-slate-950, .sunset .bg-slate-900 {
+  background-color: #2b0f1a !important;
+}
+
 .light body {
-  background-color: #f1f5f9 !important;
+  background-color: #f8fafc !important;
   color: #0f172a !important;
 }
 

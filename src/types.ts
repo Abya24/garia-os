@@ -159,9 +159,19 @@ export type AbyaLanguageSetting =
   | "Hinglish"
   | "WhatsApp Language";
 
+export type AppTheme =
+  | "dark"
+  | "light"
+  | "amoled"
+  | "ocean"
+  | "forest"
+  | "purple"
+  | "sunset"
+  | "system";
+
 export interface UserSettings {
   userName: string;
-  theme: "dark" | "light" | "system";
+  theme: AppTheme;
   customApiKey: string;
   notificationsEnabled: boolean;
   notifications?: NotificationSettings;
