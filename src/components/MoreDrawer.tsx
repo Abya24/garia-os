@@ -27,6 +27,7 @@ import {
   Bell,
   BellRing,
   Check,
+  Mail,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -162,6 +163,15 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
         category: "intelligence",
       },
       // Workspace & Tools
+      {
+        id: "gmail" as ActiveTab,
+        label: "Gmail Center",
+        desc: currentLanguage === "hi" ? "गूगल ईमेल, लीव एप्लिकेशन, डाउट्स व नोटिफिकेशन्स" : "Google Workspace mail, academic letters & teacher inbox",
+        icon: Mail,
+        color: "from-red-500 to-rose-600",
+        badge: "Gmail",
+        category: "tools",
+      },
       {
         id: "notes" as ActiveTab,
         label: t.notes || "Notes & Books",

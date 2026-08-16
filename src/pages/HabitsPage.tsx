@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 import { Habit } from "../types";
 import { getTodayString } from "../utils/storage";
@@ -18,6 +19,7 @@ interface HabitsPageProps {
   onAddHabit: (habit: Omit<Habit, "id" | "streak" | "completedDates" | "createdAt">) => void;
   onToggleHabitDate: (habitId: string, dateStr: string) => void;
   onDeleteHabit: (id: string) => void;
+  onBack?: () => void;
 }
 
 export const HabitsPage: React.FC<HabitsPageProps> = ({
@@ -25,6 +27,7 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
   onAddHabit,
   onToggleHabitDate,
   onDeleteHabit,
+  onBack,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -67,13 +70,26 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            Habit Tracker
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Build consistency with daily streaks for study, health, and mindset.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="habits-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              Habit Tracker
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Build consistency with daily streaks for study, health, and mindset.
+            </p>
+          </div>
         </div>
 
         <button

@@ -18,9 +18,13 @@ import {
   Search,
   Filter,
   CheckCircle2,
+  ArrowLeft,
 } from "lucide-react";
 import { Subject, StudySession, AcademicChapter, StudentProfile } from "../types";
 import { getTodayString } from "../utils/storage";
+import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import { getStudyMilestones } from "../utils/gamificationEngine";
+import { MilestoneBadgesCard } from "../components/MilestoneBadgesCard";
 
 interface StudyTrackerProps {
   subjects: Subject[];
@@ -34,6 +38,7 @@ interface StudyTrackerProps {
   onLogStudySession: (session: Omit<StudySession, "id" | "timestamp">) => void;
   onDeleteStudySession?: (sessionId: string) => void;
   onUpdateStudySession?: (session: StudySession) => void;
+  onBack?: () => void;
 }
 
 interface PersistedTimerState {
@@ -56,6 +61,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   onLogStudySession,
   onDeleteStudySession,
   onUpdateStudySession,
+  onBack,
 }) => {
   const profileId = activeStudent?.id || "default-student";
   const timerStorageKey = `garia_timer_state_${profileId}`;
@@ -417,6 +423,8 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     return matchesSearch && matchesSubject;
   });
 
+  const studyMilestones = getStudyMilestones(studySessions, subjects);
+
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Notification Toast */}
@@ -429,20 +437,33 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-              Study Tracker
-            </h1>
-            {activeStudent && (
-              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-semibold border border-cyan-500/30">
-                {activeStudent.name} ({activeStudent.stream})
-              </span>
-            )}
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="study-tracker-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+                Study Tracker
+              </h1>
+              {activeStudent && (
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-semibold border border-cyan-500/30">
+                  {activeStudent.name} ({activeStudent.stream})
+                </span>
+              )}
+            </div>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Track live study sessions, log offline hours, and analyze subject mastery.
+            </p>
           </div>
-          <p className="text-slate-400 text-sm mt-1">
-            Track live study sessions, log offline hours, and analyze subject mastery.
-          </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -479,6 +500,18 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Study Hours & Mastery Milestone Badges */}
+      <MilestoneBadgesCard
+        title="Study Milestones & Hours Badges"
+        subtitle="Clock study hours like '10 Hours Studied' or multi-subject mastery to unlock academic prestige badges."
+        category="study"
+        badges={studyMilestones.badges}
+        unlockedCount={studyMilestones.unlockedCount}
+        totalCount={studyMilestones.totalCount}
+        latestUnlocked={studyMilestones.latestUnlocked}
+        defaultExpanded={true}
+      />
 
       {/* Active Study Session Timer Card */}
       <div className="glass-card rounded-3xl p-6 border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/80 to-emerald-950/30 shadow-2xl relative overflow-hidden">
@@ -790,6 +823,17 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 self-end sm:self-auto shrink-0">
+                    <CalendarSyncDropdown
+                      event={{
+                        id: session.id,
+                        title: `Study Session: ${session.subjectName}`,
+                        description: `Duration: ${formatDurationDisplay(session.durationSeconds)}${session.notes ? `\nNotes: ${session.notes}` : ""}`,
+                        date: session.date,
+                        category: "STUDY",
+                      }}
+                      buttonLabel="Sync"
+                      variant="icon"
+                    />
                     <button
                       onClick={() => handleOpenEditSessionModal(session)}
                       className="p-1.5 rounded-lg glass-pill text-slate-400 hover:text-cyan-300 transition-colors"

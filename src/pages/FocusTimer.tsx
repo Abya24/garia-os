@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Bell,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 import { FocusSessionLog, UserSettings } from "../types";
 import { sendNotification } from "../utils/notifications";
@@ -18,12 +19,14 @@ interface FocusTimerProps {
   settings: UserSettings;
   focusLogs: FocusSessionLog[];
   onLogFocusSession: (log: Omit<FocusSessionLog, "id">) => void;
+  onBack?: () => void;
 }
 
 export const FocusTimer: React.FC<FocusTimerProps> = ({
   settings,
   focusLogs,
   onLogFocusSession,
+  onBack,
 }) => {
   const [mode, setMode] = useState<"focus" | "break">("focus");
   const [focusDurationMinutes, setFocusDurationMinutes] = useState<number>(
@@ -128,13 +131,26 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            Focus Timer
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Pomodoro technique for deep work & structured study intervals.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="focus-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              Focus Timer
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Pomodoro technique for deep work & structured study intervals.
+            </p>
+          </div>
         </div>
 
         {/* Mode Selector */}
@@ -220,29 +236,34 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
           </div>
         </div>
 
-        {/* Duration Quick Presets */}
+        {/* Duration Dropdown Selector */}
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-xs text-slate-400 font-medium mr-1">
-            Duration:
-          </span>
-          {(mode === "focus" ? [15, 25, 45, 60] : [5, 10, 15]).map((mins) => (
-            <button
-              key={mins}
-              disabled={isRunning}
-              onClick={() => {
-                if (mode === "focus") setFocusDurationMinutes(mins);
-                else setBreakDurationMinutes(mins);
-              }}
-              className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all border ${
-                (mode === "focus" ? focusDurationMinutes : breakDurationMinutes) ===
-                mins
-                  ? "bg-white/20 text-white border-white/40"
-                  : "glass-pill text-slate-400 hover:text-white border-white/5"
-              }`}
-            >
-              {mins}m
-            </button>
-          ))}
+          <span className="text-xs text-slate-400 font-mono">Duration:</span>
+          <select
+            disabled={isRunning}
+            value={mode === "focus" ? focusDurationMinutes : breakDurationMinutes}
+            onChange={(e) => {
+              const mins = Number(e.target.value);
+              if (mode === "focus") setFocusDurationMinutes(mins);
+              else setBreakDurationMinutes(mins);
+            }}
+            className="px-4 py-2 rounded-xl glass-pill text-xs font-bold text-amber-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-amber-500/50 bg-slate-900 shadow-sm"
+          >
+            {mode === "focus" ? (
+              <>
+                <option value={15} className="bg-slate-900 text-white">15 minutes (Quick Sprint)</option>
+                <option value={25} className="bg-slate-900 text-white">25 minutes (Pomodoro Standard)</option>
+                <option value={45} className="bg-slate-900 text-white">45 minutes (Deep Study)</option>
+                <option value={60} className="bg-slate-900 text-white">60 minutes (Intensive Block)</option>
+              </>
+            ) : (
+              <>
+                <option value={5} className="bg-slate-900 text-white">5 minutes (Short Rest)</option>
+                <option value={10} className="bg-slate-900 text-white">10 minutes (Coffee Break)</option>
+                <option value={15} className="bg-slate-900 text-white">15 minutes (Full Reset)</option>
+              </>
+            )}
+          </select>
         </div>
 
         {/* Action Control Buttons */}

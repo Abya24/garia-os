@@ -25,6 +25,7 @@ import {
   X,
   Edit2,
   Trash2,
+  ArrowLeft,
 } from "lucide-react";
 import {
   ExamProfile,
@@ -92,6 +93,7 @@ interface ExamCenterPageProps {
   onUpdateChapters: (chapters: AcademicChapter[]) => void;
   onAskAbyaWithContext: (contextText: string) => void;
   onNavigate: (tab: any) => void;
+  onBack?: () => void;
 }
 
 export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
@@ -117,12 +119,21 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   onUpdateChapters,
   onAskAbyaWithContext,
   onNavigate,
+  onBack,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
     "overview" | "syllabus" | "queue" | "revision" | "tests" | "plan" | "milestones"
   >("overview");
 
   const [isExamDrawerOpen, setIsExamDrawerOpen] = useState(false);
+
+  const handleBack = () => {
+    if (activeSubTab !== "overview") {
+      setActiveSubTab("overview");
+    } else if (onBack) {
+      onBack();
+    }
+  };
 
   const handleExamDrawerAction = (action: ExamDrawerAction) => {
     switch (action) {
@@ -341,22 +352,35 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       <div className="glass-card p-5 sm:p-6 rounded-3xl relative overflow-hidden border border-cyan-500/30 bg-gradient-to-br from-cyan-950/40 via-slate-900/60 to-purple-950/30">
         <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full filter blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wide">
-                Garia OS v1.4.2
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Exam Intelligence Engine
-              </span>
+          <div className="flex items-start gap-3">
+            {(onBack || activeSubTab !== "overview") && (
+              <button
+                onClick={handleBack}
+                id="exam-back-btn"
+                aria-label="Go Back"
+                className="mt-1 p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+            )}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wide">
+                  Garia OS v1.4.2
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  Exam Intelligence Engine
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight flex items-center gap-2">
+                <ShieldAlert className="w-7 h-7 text-cyan-400" />
+                <span>Exam Intelligence Center</span>
+              </h1>
+              <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+                Connected Board Prep: Board Profile • Smart Readiness Score • Urgent Prep Queue • Mock Test Analytics • Revision Scheduler
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight flex items-center gap-2">
-              <ShieldAlert className="w-7 h-7 text-cyan-400" />
-              Exam Intelligence Center
-            </h1>
-            <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-              Connected Board Prep: Board Profile • Smart Readiness Score • Urgent Prep Queue • Mock Test Analytics • Revision Scheduler
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

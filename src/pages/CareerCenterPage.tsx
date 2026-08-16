@@ -437,12 +437,18 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
             <div className="flex items-center gap-2 mb-3">
               {onBack && (
                 <button
-                  onClick={onBack}
+                  onClick={() => {
+                    if (activeSubTab !== "matches") {
+                      setActiveSubTab("matches");
+                    } else {
+                      onBack();
+                    }
+                  }}
                   id="career-back-btn"
                   aria-label="Go Back"
-                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                  className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <ArrowLeft className="w-4 h-4 text-emerald-400" />
                   <span>Back</span>
                 </button>
               )}
@@ -650,31 +656,30 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
         <div className="space-y-6">
           {/* Filters & Search Bar */}
           <div className="glass-card p-4 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Stream Filter Pills */}
-            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-              {(["Commerce", "Science", "Arts / Humanities", "All"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setSelectedCatalogStream(s);
-                    if (s !== "All") {
-                      setStream(s as StreamType);
-                      onUpdateProfile({
-                        ...profile,
-                        stream: s as StreamType,
-                        updatedAt: Date.now(),
-                      });
-                    }
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedCatalogStream === s
-                      ? "bg-emerald-500 text-slate-950 font-bold shadow-md"
-                      : "glass-pill text-slate-400 hover:text-white border border-white/5"
-                  }`}
-                >
-                  {s === "All" ? "All Streams" : `${s}`}
-                </button>
-              ))}
+            {/* Stream Filter Dropdown */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs font-mono text-slate-400 shrink-0 font-bold">Stream Filter:</label>
+              <select
+                value={selectedCatalogStream}
+                onChange={(e) => {
+                  const s = e.target.value as "Commerce" | "Science" | "Arts / Humanities" | "All";
+                  setSelectedCatalogStream(s);
+                  if (s !== "All") {
+                    setStream(s as StreamType);
+                    onUpdateProfile({
+                      ...profile,
+                      stream: s as StreamType,
+                      updatedAt: Date.now(),
+                    });
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
+              >
+                <option value="All" className="bg-slate-900 text-white">All Streams (All 15+ Careers)</option>
+                <option value="Commerce" className="bg-slate-900 text-white">Commerce Careers</option>
+                <option value="Science" className="bg-slate-900 text-white">Science Careers</option>
+                <option value="Arts / Humanities" className="bg-slate-900 text-white">Arts / Humanities Careers</option>
+              </select>
             </div>
 
             {/* Search Box */}
@@ -910,22 +915,14 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 font-mono">
                 1. Select Academic Stream
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                {(["Commerce", "Science"] as const).map((s) => (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => setStream(s)}
-                    className={`p-3.5 rounded-2xl border text-center font-bold text-xs transition-all ${
-                      stream === s
-                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-md"
-                        : "glass-pill border-white/5 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {s} Stream
-                  </button>
-                ))}
-              </div>
+              <select
+                value={stream}
+                onChange={(e) => setStream(e.target.value as StreamType)}
+                className="w-full px-4 py-3 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900"
+              >
+                <option value="Commerce" className="bg-slate-900 text-white">Commerce Stream</option>
+                <option value="Science" className="bg-slate-900 text-white">Science Stream</option>
+              </select>
             </div>
 
             <div>
@@ -935,7 +932,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
               <select
                 value={currentClass}
                 onChange={(e) => setCurrentClass(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-4 py-3 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900"
               >
                 <option value="Class 11" className="bg-slate-900 text-white">Class 11</option>
                 <option value="Class 12" className="bg-slate-900 text-white">Class 12</option>
@@ -948,104 +945,188 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
           {/* 2. Strong Subjects */}
           <div className="space-y-2 pt-2 border-t border-white/10">
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-              2. Strong Subjects (Select top 2-4)
+              2. Strong Subjects ({strongSubjects.length} Selected)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {SUBJECT_OPTIONS.map((subj) => {
-                const isSelected = strongSubjects.includes(subj);
-                return (
-                  <button
-                    type="button"
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                onChange={(e) => {
+                  if (e.target.value && !strongSubjects.includes(e.target.value)) {
+                    setStrongSubjects([...strongSubjects, e.target.value]);
+                  }
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="w-full sm:w-80 px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900"
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  + Add Strong Subject from Dropdown...
+                </option>
+                {SUBJECT_OPTIONS.map((subj) => (
+                  <option key={subj} value={subj} disabled={strongSubjects.includes(subj)} className="bg-slate-900 text-white">
+                    {subj} {strongSubjects.includes(subj) ? "(Selected)" : ""}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {strongSubjects.map((subj) => (
+                  <span
                     key={subj}
-                    onClick={() => togglePill(strongSubjects, setStrongSubjects, subj)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-emerald-500 text-slate-950 font-bold border border-emerald-400 shadow-md"
-                        : "glass-pill border-white/5 text-slate-300 hover:bg-white/10"
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold shadow-sm"
                   >
-                    {isSelected ? `✓ ${subj}` : subj}
-                  </button>
-                );
-              })}
+                    <span>✓ {subj}</span>
+                    <button
+                      type="button"
+                      onClick={() => setStrongSubjects(strongSubjects.filter((s) => s !== subj))}
+                      className="hover:text-white text-emerald-400 ml-1"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* 3. Key Interests */}
           <div className="space-y-2 pt-2 border-t border-white/10">
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-              3. Interests & Passions
+              3. Interests & Passions ({interests.length} Selected)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {INTEREST_OPTIONS.map((interest) => {
-                const isSelected = interests.includes(interest);
-                return (
-                  <button
-                    type="button"
-                    key={interest}
-                    onClick={() => togglePill(interests, setInterests, interest)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-cyan-500 text-slate-950 font-bold border border-cyan-400 shadow-md"
-                        : "glass-pill border-white/5 text-slate-300 hover:bg-white/10"
-                    }`}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                onChange={(e) => {
+                  if (e.target.value && !interests.includes(e.target.value)) {
+                    setInterests([...interests, e.target.value]);
+                  }
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="w-full sm:w-80 px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-slate-900"
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  + Add Interest/Passion from Dropdown...
+                </option>
+                {INTEREST_OPTIONS.map((int) => (
+                  <option key={int} value={int} disabled={interests.includes(int)} className="bg-slate-900 text-white">
+                    {int} {interests.includes(int) ? "(Selected)" : ""}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {interests.map((int) => (
+                  <span
+                    key={int}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold shadow-sm"
                   >
-                    {isSelected ? `✓ ${interest}` : interest}
-                  </button>
-                );
-              })}
+                    <span>✓ {int}</span>
+                    <button
+                      type="button"
+                      onClick={() => setInterests(interests.filter((i) => i !== int))}
+                      className="hover:text-white text-cyan-400 ml-1"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* 4. Core Skills */}
           <div className="space-y-2 pt-2 border-t border-white/10">
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-              4. Key Skills
+              4. Key Skills ({skills.length} Selected)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {SKILL_OPTIONS.map((sk) => {
-                const isSelected = skills.includes(sk);
-                return (
-                  <button
-                    type="button"
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                onChange={(e) => {
+                  if (e.target.value && !skills.includes(e.target.value)) {
+                    setSkills([...skills, e.target.value]);
+                  }
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="w-full sm:w-80 px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 bg-slate-900"
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  + Add Core Skill from Dropdown...
+                </option>
+                {SKILL_OPTIONS.map((sk) => (
+                  <option key={sk} value={sk} disabled={skills.includes(sk)} className="bg-slate-900 text-white">
+                    {sk} {skills.includes(sk) ? "(Selected)" : ""}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {skills.map((sk) => (
+                  <span
                     key={sk}
-                    onClick={() => togglePill(skills, setSkills, sk)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-purple-500 text-white font-bold border border-purple-400 shadow-md"
-                        : "glass-pill border-white/5 text-slate-300 hover:bg-white/10"
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold shadow-sm"
                   >
-                    {isSelected ? `✓ ${sk}` : sk}
-                  </button>
-                );
-              })}
+                    <span>✓ {sk}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSkills(skills.filter((s) => s !== sk))}
+                      className="hover:text-white text-purple-400 ml-1"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* 5. Preferred Work Environment */}
           <div className="space-y-2 pt-2 border-t border-white/10">
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-              5. Preferred Work Environment
+              5. Preferred Work Environment ({workAreas.length} Selected)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {WORK_AREA_OPTIONS.map((wa) => {
-                const isSelected = workAreas.includes(wa);
-                return (
-                  <button
-                    type="button"
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                onChange={(e) => {
+                  if (e.target.value && !workAreas.includes(e.target.value)) {
+                    setWorkAreas([...workAreas, e.target.value]);
+                  }
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="w-full sm:w-80 px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/50 bg-slate-900"
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  + Add Work Environment from Dropdown...
+                </option>
+                {WORK_AREA_OPTIONS.map((wa) => (
+                  <option key={wa} value={wa} disabled={workAreas.includes(wa)} className="bg-slate-900 text-white">
+                    {wa} {workAreas.includes(wa) ? "(Selected)" : ""}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {workAreas.map((wa) => (
+                  <span
                     key={wa}
-                    onClick={() => togglePill(workAreas, setWorkAreas, wa)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-amber-500 text-slate-950 font-bold border border-amber-400 shadow-md"
-                        : "glass-pill border-white/5 text-slate-300 hover:bg-white/10"
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold shadow-sm"
                   >
-                    {isSelected ? `✓ ${wa}` : wa}
-                  </button>
-                );
-              })}
+                    <span>✓ {wa}</span>
+                    <button
+                      type="button"
+                      onClick={() => setWorkAreas(workAreas.filter((w) => w !== wa))}
+                      className="hover:text-white text-amber-400 ml-1"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1054,25 +1135,17 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
               6. Study & Learning Style
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {STUDY_PREF_OPTIONS.map((pref) => {
-                const isSelected = studyPreference === pref;
-                return (
-                  <button
-                    type="button"
-                    key={pref}
-                    onClick={() => setStudyPreference(pref)}
-                    className={`p-3 rounded-2xl border text-center text-xs font-semibold transition-all ${
-                      isSelected
-                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-md"
-                        : "glass-pill border-white/5 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {pref}
-                  </button>
-                );
-              })}
-            </div>
+            <select
+              value={studyPreference}
+              onChange={(e) => setStudyPreference(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900"
+            >
+              {STUDY_PREF_OPTIONS.map((pref) => (
+                <option key={pref} value={pref} className="bg-slate-900 text-white">
+                  {pref}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Save & Run Engine */}

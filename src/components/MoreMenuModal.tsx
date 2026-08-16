@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Zap,
   HelpCircle,
+  Mail,
 } from "lucide-react";
 import { ActiveTab } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -104,6 +105,14 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       icon: ShieldAlert,
       color: "from-cyan-400 to-emerald-400",
       badge: `v${APP_VERSION}`,
+    },
+    {
+      id: "gmail" as ActiveTab,
+      label: "Gmail Center",
+      desc: currentLanguage === "hi" ? "गूगल ईमेल, लीव एप्लिकेशन, डाउट्स व नोटिफिकेशन्स" : "Google Workspace mail, academic letters & teacher inbox",
+      icon: Mail,
+      color: "from-red-500 to-rose-600",
+      badge: "Gmail",
     },
     {
       id: "focus" as ActiveTab,

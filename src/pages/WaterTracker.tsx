@@ -1,15 +1,17 @@
 import React, { useState } from "react";
-import { Droplet, Plus, Minus, RotateCcw, CheckCircle2, Sparkles } from "lucide-react";
+import { Droplet, Plus, Minus, RotateCcw, CheckCircle2, Sparkles, ArrowLeft } from "lucide-react";
 import { WaterLog } from "../types";
 
 interface WaterTrackerProps {
   water: WaterLog;
   onUpdateWater: (water: WaterLog) => void;
+  onBack?: () => void;
 }
 
 export const WaterTracker: React.FC<WaterTrackerProps> = ({
   water,
   onUpdateWater,
+  onBack,
 }) => {
   const [goal, setGoal] = useState<number>(water.goal || 8);
 
@@ -39,13 +41,26 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            Water Tracker
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Stay hydrated during intensive study and work sessions.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="water-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              Water Tracker
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Stay hydrated during intensive study and work sessions.
+            </p>
+          </div>
         </div>
 
         {/* Goal adjustment selector */}

@@ -16,15 +16,20 @@ import {
   AlertCircle,
   Download,
   Share2,
+  RefreshCw,
+  Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 import {
   CalendarEvent,
   Task,
   StudySession,
   Goal,
+  StudentProfile,
 } from "../types";
 import { getTodayString } from "../utils/storage";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
 import {
   exportAllCalendarEventsIcs,
   buildVCalendar,
@@ -37,10 +42,12 @@ interface CalendarPageProps {
   tasks: Task[];
   studySessions: StudySession[];
   goals: Goal[];
+  activeProfile?: StudentProfile | null;
   onAddEvent: (event: Omit<CalendarEvent, "id" | "createdAt">) => void;
   onUpdateEvent: (updatedEvent: CalendarEvent) => void;
   onDeleteEvent: (eventId: string) => void;
   onToggleTaskComplete: (task: Task) => void;
+  onBack?: () => void;
 }
 
 export const CalendarPage: React.FC<CalendarPageProps> = ({
@@ -48,14 +55,17 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   tasks,
   studySessions,
   goals,
+  activeProfile,
   onAddEvent,
   onUpdateEvent,
   onDeleteEvent,
   onToggleTaskComplete,
+  onBack,
 }) => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getTodayString());
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState<boolean>(false);
+  const [isGCalSyncModalOpen, setIsGCalSyncModalOpen] = useState<boolean>(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   // New Event Form State
@@ -164,17 +174,40 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
-            <CalendarIcon className="w-7 h-7 text-amber-400" />
-            <span>Academic Calendar</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Visual month overview for tasks, study sessions, exams, and key goals.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="calendar-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
+              <CalendarIcon className="w-7 h-7 text-amber-400" />
+              <span>Academic Calendar</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Visual month overview for tasks, study sessions, exams, and key goals.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {/* Google Calendar API Integration Button */}
+          <button
+            onClick={() => setIsGCalSyncModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs shadow-md transition-all group"
+            title="Configure and Sync with Google Calendar API"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span>Google Calendar Sync</span>
+          </button>
+
           {events.length > 0 && (
             <button
               onClick={() => exportAllCalendarEventsIcs(events)}
@@ -644,6 +677,16 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
           </div>
         </div>
       )}
+      {/* Google Calendar Sync Modal */}
+      <GoogleCalendarSyncModal
+        isOpen={isGCalSyncModalOpen}
+        onClose={() => setIsGCalSyncModalOpen(false)}
+        tasks={tasks}
+        studySessions={studySessions}
+        events={events}
+        goals={goals}
+        activeProfile={activeProfile}
+      />
     </div>
   );
 };

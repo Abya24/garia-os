@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Settings,
   Sun,
@@ -16,17 +16,62 @@ import {
   UserPlus,
   Check,
   Globe,
+  Calendar as CalendarIcon,
+  ExternalLink,
+  RefreshCw,
+  Sliders,
+  CheckSquare,
+  BookOpen,
+  Target,
+  Bell,
+  LogOut,
+  Flame,
+  CloudUpload,
+  CloudDownload,
+  Database,
+  Cloud,
+  ArrowLeft,
 } from "lucide-react";
-import { UserSettings, StudentProfile, AbyaLanguageSetting, AppTheme } from "../types";
-import { exportStudentProfileJSON, importStudentProfileJSON } from "../utils/storage";
+import {
+  UserSettings,
+  StudentProfile,
+  AbyaLanguageSetting,
+  AppTheme,
+  Task,
+  StudySession,
+  CalendarEvent,
+  Goal,
+} from "../types";
+import { exportStudentProfileJSON, importStudentProfileJSON, getWorkspaceSnapshot, restoreWorkspaceSnapshot } from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
+import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
+import {
+  loadCalendarSyncSettings,
+  saveCalendarSyncSettings,
+  GoogleCalendarSyncSettings,
+  signInWithGoogle,
+  signOutGoogle,
+  initGoogleAuth,
+} from "../utils/googleCalendar";
+import {
+  auth,
+  uploadWorkspaceToCloud,
+  downloadWorkspaceFromCloud,
+  signInWithGoogle as fbSignInWithGoogle,
+  signOutFromFirebase,
+} from "../utils/firebase";
+import { User, onAuthStateChanged } from "firebase/auth";
 
 interface SettingsPageProps {
   settings: UserSettings;
   activeStudent?: StudentProfile;
   profiles?: StudentProfile[];
+  tasks?: Task[];
+  studySessions?: StudySession[];
+  events?: CalendarEvent[];
+  goals?: Goal[];
   currentLanguage?: AppLanguage;
   onUpdateLanguage?: (lang: AppLanguage) => void;
   abyaLanguage?: AbyaLanguageSetting;
@@ -38,12 +83,17 @@ interface SettingsPageProps {
   onClearChatHistory: () => void;
   onClearAllOSData: () => void;
   onReloadData: () => void;
+  onBack?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   settings,
   activeStudent,
   profiles = [],
+  tasks = [],
+  studySessions = [],
+  events = [],
+  goals = [],
   currentLanguage = "en",
   onUpdateLanguage,
   abyaLanguage = "WhatsApp Language",
@@ -55,12 +105,105 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onClearChatHistory,
   onClearAllOSData,
   onReloadData,
+  onBack,
 }) => {
   const t = translations[currentLanguage] || translations.en;
   const [userName, setUserName] = useState(settings.userName || activeStudent?.name || "Student");
   const [apiKey, setApiKey] = useState(settings.customApiKey || "");
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
+
+  // Google Calendar Integration State
+  const [gcalUser, setGcalUser] = useState<User | null>(null);
+  const [gcalToken, setGcalToken] = useState<string | null>(null);
+  const [isGCalModalOpen, setIsGCalModalOpen] = useState(false);
+  const [gcalSettings, setGcalSettings] = useState<GoogleCalendarSyncSettings>(() =>
+    loadCalendarSyncSettings(activeStudent?.id)
+  );
+
+  // Firebase Firestore Cloud Sync State
+  const [fbUser, setFbUser] = useState<User | null>(auth.currentUser);
+  const [isFbSyncing, setIsFbSyncing] = useState(false);
+  const [fbLastSynced, setFbLastSynced] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setFbUser(u);
+    });
+    return () => unsubAuth();
+  }, []);
+
+  const handleFbBackup = async () => {
+    if (!fbUser) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setIsFbSyncing(true);
+    try {
+      const snap = getWorkspaceSnapshot();
+      const res = await uploadWorkspaceToCloud(fbUser.uid, {
+        activeProfileId: snap.activeProfileId,
+        profiles: snap.profiles,
+        fullStorageDump: snap.fullStorageDump,
+      });
+      setFbLastSynced(new Date(res.timestamp).toLocaleTimeString());
+      showToast("Workspace backed up to Firebase Firestore!");
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to backup to Firebase.");
+    } finally {
+      setIsFbSyncing(false);
+    }
+  };
+
+  const handleFbRestore = async () => {
+    if (!fbUser) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setIsFbSyncing(true);
+    try {
+      const cloudData = await downloadWorkspaceFromCloud(fbUser.uid);
+      if (!cloudData || !cloudData.payloadJson) {
+        showToast("No Firestore cloud backup found.");
+        return;
+      }
+      const restored = restoreWorkspaceSnapshot({
+        activeProfileId: cloudData.activeProfileId,
+        profiles: cloudData.profiles,
+        fullStorageDump: cloudData.payloadJson,
+      });
+      if (restored) {
+        showToast("Workspace restored from Firestore!");
+        onReloadData();
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to restore from Firebase.");
+    } finally {
+      setIsFbSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsub = initGoogleAuth(
+      (u, token) => {
+        setGcalUser(u);
+        setGcalToken(token);
+      },
+      () => {
+        setGcalUser(null);
+        setGcalToken(null);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const handleUpdateGCalSettings = (updates: Partial<GoogleCalendarSyncSettings>) => {
+    const updated = { ...gcalSettings, ...updates };
+    setGcalSettings(updated);
+    saveCalendarSyncSettings(updated, activeStudent?.id);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -140,15 +283,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="space-y-6 pb-24 md:pb-8 max-w-3xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-          {t.settings}
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {currentLanguage === "hi"
-            ? "प्राथमिकताएं, भाषा, एआई क्रेडेंशियल्स और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
-            : "Configure preferences, language, AI credentials, and multi-student profiles."}
-        </p>
+      <div className="flex items-center gap-3">
+        {onBack && (
+          <button
+            onClick={onBack}
+            id="settings-back-btn"
+            aria-label="Go Back"
+            className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Back</span>
+          </button>
+        )}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+            {t.settings}
+          </h1>
+          <p className="text-slate-400 text-sm mt-0.5">
+            {currentLanguage === "hi"
+              ? "प्राथमिकताएं, भाषा, एआई क्रेडेंशियल्स और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
+              : "Configure preferences, language, AI credentials, and multi-student profiles."}
+          </p>
+        </div>
       </div>
 
       {/* 0. App Language Selector Card */}
@@ -308,6 +464,297 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
+      {/* 2.2 Firebase Firestore Cloud Sync Section */}
+      <div className="glass-card p-6 rounded-3xl border border-orange-500/30 space-y-5 bg-gradient-to-br from-orange-500/5 via-slate-900/40 to-transparent shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/20 text-orange-400 border border-orange-500/40 flex items-center justify-center shrink-0 shadow-md shadow-orange-500/10">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400 font-mono">
+                  Firebase Database
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                  Cloud Firestore
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  tokyo-pipe-lf6jr
+                </span>
+              </div>
+              <h3 className="text-lg font-bold font-heading text-white mt-0.5">
+                Firebase Firestore Cloud Sync
+              </h3>
+              <p className="text-xs text-slate-400">
+                Persistent cross-device synchronization for all student profiles, tasks, notes, habits, and exam data.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleFbBackup}
+              disabled={isFbSyncing}
+              className="px-3.5 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <CloudUpload className="w-3.5 h-3.5" />
+              <span>{isFbSyncing ? "Syncing..." : "Backup to Cloud"}</span>
+            </button>
+            <button
+              onClick={handleFbRestore}
+              disabled={isFbSyncing}
+              className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <CloudDownload className="w-3.5 h-3.5" />
+              <span>Restore</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Firebase Config Meta Bar */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            {fbUser?.photoURL ? (
+              <img
+                src={fbUser.photoURL}
+                alt="Firebase user avatar"
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-full border border-orange-500/40 object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-orange-400">
+                <Flame className="w-4 h-4" />
+              </div>
+            )}
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <span>{fbUser ? (fbUser.displayName || fbUser.email) : "Guest / Local Offline Session"}</span>
+                {fbUser && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Online
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                {fbUser ? fbUser.email : "Sign in via Auth Modal to enable automatic cloud backup"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+            <div>
+              Region: <span className="text-slate-200">asia-southeast1</span>
+            </div>
+            {fbLastSynced && (
+              <div className="text-emerald-400 font-bold">
+                Synced at: {fbLastSynced}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 2.5 Google Calendar API Sync Settings */}
+      <div className="glass-card p-6 rounded-3xl border border-amber-500/30 space-y-5 bg-gradient-to-br from-amber-500/5 via-slate-900/40 to-transparent shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/10">
+              <CalendarIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-mono">
+                  Google Workspace
+                </span>
+                <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Google Calendar API
+                </span>
+                <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                  Gmail API
+                </span>
+              </div>
+              <h3 className="text-lg font-bold font-heading text-white mt-0.5">
+                Google Workspace & Calendar Sync
+              </h3>
+              <p className="text-xs text-slate-400">
+                Sync academic tasks, study sessions, exams, and access your Student Gmail directly in Garia OS
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Master Toggle */}
+            <div className="flex items-center gap-2.5 bg-slate-950/80 px-3 py-1.5 rounded-2xl border border-white/10">
+              <span className="text-xs font-semibold text-slate-300">
+                {gcalSettings.enabled ? "Sync Enabled" : "Sync Disabled"}
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={gcalSettings.enabled}
+                  onChange={(e) => handleUpdateGCalSettings({ enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+
+            <button
+              onClick={() => setIsGCalModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 hover:scale-105 shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Open Sync Center</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Account Info Bar */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {gcalUser?.photoURL ? (
+              <img
+                src={gcalUser.photoURL}
+                alt="Google avatar"
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-full border border-amber-500/40"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-amber-300">
+                {gcalUser?.email ? gcalUser.email[0].toUpperCase() : "G"}
+              </div>
+            )}
+            <div>
+              <div className="text-xs font-bold text-white">
+                {gcalUser ? (gcalUser.displayName || gcalUser.email) : "No Google account connected"}
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                {gcalUser ? gcalUser.email : "Sign in to allow direct API synchronization"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {gcalUser ? (
+              <>
+                <a
+                  href="https://calendar.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3 h-3 text-cyan-400" />
+                  <span>Google Calendar</span>
+                </a>
+                <button
+                  onClick={async () => {
+                    await signOutGoogle();
+                    setGcalUser(null);
+                    setGcalToken(null);
+                    showToast("Google account disconnected");
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold flex items-center gap-1"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Disconnect</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await signInWithGoogle();
+                    if (res) {
+                      setGcalUser(res.user);
+                      setGcalToken(res.accessToken);
+                      showToast("Google Account Connected Successfully!");
+                    }
+                  } catch (e: any) {
+                    showToast(e.message || "Failed to sign in with Google");
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-md transition-all flex items-center gap-2"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 48 48">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                </svg>
+                <span>Sign in with Google</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Granular Sync Selection Checkboxes */}
+        {gcalSettings.enabled && (
+          <div className="space-y-3 pt-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-heading block">
+              Choose Items to Sync:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Tasks */}
+              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-white">Tasks</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={gcalSettings.syncTasks}
+                  onChange={(e) => handleUpdateGCalSettings({ syncTasks: e.target.checked })}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
+                />
+              </label>
+
+              {/* Study Sessions */}
+              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold text-white">Study Sessions</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={gcalSettings.syncStudySessions}
+                  onChange={(e) => handleUpdateGCalSettings({ syncStudySessions: e.target.checked })}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
+                />
+              </label>
+
+              {/* Exams */}
+              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-rose-400" />
+                  <span className="text-xs font-bold text-white">Exams & Events</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={gcalSettings.syncExams}
+                  onChange={(e) => handleUpdateGCalSettings({ syncExams: e.target.checked })}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
+                />
+              </label>
+
+              {/* Goals */}
+              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-bold text-white">Goal Targets</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={gcalSettings.syncGoals}
+                  onChange={(e) => handleUpdateGCalSettings({ syncGoals: e.target.checked })}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 3. Notifications Center */}
       <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
         <div className="flex items-center justify-between">
@@ -382,27 +829,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <span>{currentLanguage === "hi" ? "दिखावट व थीम सिस्टम" : "Appearance & Theme System"}</span>
           </h3>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-            V3.0 Themes
+            8 Premium Themes
           </span>
         </div>
         <p className="text-xs text-slate-400">
           {currentLanguage === "hi"
             ? "अपनी पसंद के अनुसार तुरंत थीम स्विच करें। आंखों के तनाव को कम करने और फोकस बढ़ाने के लिए तैयार।"
-            : "Switch instantly between 7 high-contrast student-focused themes designed for focus and low eye strain."}
+            : "Switch instantly between 8 high-contrast student-focused themes designed for focus and low eye strain."}
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
           {[
-            { id: "dark", label: currentLanguage === "hi" ? "डार्क थीम" : "Dark Theme", desc: "Classic Slate", color: "bg-slate-900 border-slate-700", dot: "bg-emerald-400" },
-            { id: "light", label: currentLanguage === "hi" ? "लाइट थीम" : "Light Theme", desc: "Crisp & Clean", color: "bg-slate-100 border-slate-300 text-slate-900", dot: "bg-emerald-600" },
-            { id: "amoled", label: currentLanguage === "hi" ? "एमोलेड ब्लैक" : "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
-            { id: "ocean", label: currentLanguage === "hi" ? "ओशन ब्लू" : "Ocean Blue", desc: "Midnight Navy", color: "bg-sky-950 border-sky-800", dot: "bg-cyan-400" },
-            { id: "forest", label: currentLanguage === "hi" ? "फॉरेस्ट ग्रीन" : "Forest Green", desc: "Calm Emerald", color: "bg-emerald-950 border-emerald-800", dot: "bg-emerald-400" },
-            { id: "purple", label: currentLanguage === "hi" ? "पर्पल फोकस" : "Purple Focus", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
-            { id: "sunset", label: currentLanguage === "hi" ? "सनसेट ऑरेंज" : "Sunset Orange", desc: "Warm Twilight", color: "bg-orange-950 border-orange-800", dot: "bg-orange-400" },
-            { id: "system", label: currentLanguage === "hi" ? "सिस्टम डिफ़ॉल्ट" : "System Auto", desc: "OS Preference", color: "bg-slate-800/80 border-white/10", dot: "bg-indigo-400" },
+            { id: "amoled", label: "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
+            { id: "purple", label: "Royal Purple", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
+            { id: "midnight", label: "Midnight Blue", desc: "Navy Horizon", color: "bg-sky-950 border-sky-800", dot: "bg-cyan-400" },
+            { id: "graphite", label: "Graphite Gray", desc: "Slate Minimal", color: "bg-slate-900 border-slate-700", dot: "bg-slate-300" },
+            { id: "arctic", label: "Arctic White", desc: "Crisp & Clean", color: "bg-slate-100 border-slate-300 text-slate-900", dot: "bg-emerald-600" },
+            { id: "frost", label: "Frost Glass", desc: "Translucent Ice", color: "bg-slate-800/60 border-cyan-500/30", dot: "bg-cyan-200" },
+            { id: "emerald", label: "Emerald Green", desc: "Calm Focus", color: "bg-emerald-950 border-emerald-800", dot: "bg-emerald-400" },
+            { id: "sunset", label: "Sunset Orange", desc: "Warm Twilight", color: "bg-orange-950 border-orange-800", dot: "bg-orange-400" },
           ].map((themeItem) => {
-            const isActive = settings.theme === themeItem.id;
+            const isActive =
+              settings.theme === themeItem.id ||
+              (themeItem.id === "arctic" && settings.theme === "light") ||
+              (themeItem.id === "midnight" && settings.theme === "ocean") ||
+              (themeItem.id === "emerald" && settings.theme === "forest") ||
+              (themeItem.id === "graphite" && settings.theme === "dark");
 
             return (
               <button
@@ -687,6 +1139,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Google Calendar Sync Modal */}
+      <GoogleCalendarSyncModal
+        isOpen={isGCalModalOpen}
+        onClose={() => setIsGCalModalOpen(false)}
+        tasks={tasks}
+        studySessions={studySessions}
+        events={events}
+        goals={goals}
+        activeProfile={activeStudent}
+      />
     </div>
   );
 };

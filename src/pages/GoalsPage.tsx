@@ -10,6 +10,8 @@ import {
   ChevronRight,
   TrendingUp,
   BookOpen,
+  ArrowLeft,
+  Filter,
 } from "lucide-react";
 import { Goal, Subject } from "../types";
 import { getTodayString } from "../utils/storage";
@@ -20,6 +22,7 @@ interface GoalsPageProps {
   onAddGoal: (goal: Omit<Goal, "id" | "createdAt">) => void;
   onUpdateGoal: (updatedGoal: Goal) => void;
   onDeleteGoal: (goalId: string) => void;
+  onBack?: () => void;
 }
 
 export const GoalsPage: React.FC<GoalsPageProps> = ({
@@ -28,6 +31,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   onAddGoal,
   onUpdateGoal,
   onDeleteGoal,
+  onBack,
 }) => {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "completed">("all");
@@ -133,14 +137,27 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
-            <Target className="w-7 h-7 text-emerald-400" />
-            <span>Goal Tracker</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Set ambitious targets, track progress, and achieve your academic & personal milestones.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="goals-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
+              <Target className="w-7 h-7 text-emerald-400" />
+              <span>Goal Tracker</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Set ambitious targets, track progress, and achieve your academic & personal milestones.
+            </p>
+          </div>
         </div>
 
         <button
@@ -194,49 +211,35 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 glass-card p-2 rounded-2xl border border-white/10">
-        <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-1 sm:pb-0">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilterCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition-all ${
-                filterCategory.toLowerCase() === cat.toLowerCase()
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* Filter Dropdown Selectors */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 glass-card p-3 rounded-2xl border border-white/10">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+          <span className="text-xs text-slate-400 font-medium shrink-0">Category:</span>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat} className="bg-slate-900 text-white">
+                {cat.charAt(0).toUpperCase() + cat.slice(1)} Goals
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium ${
-              filterStatus === "all" ? "bg-white/10 text-white" : "text-slate-400"
-            }`}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs text-slate-400 font-medium shrink-0">Status:</span>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as any)}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
           >
-            All
-          </button>
-          <button
-            onClick={() => setFilterStatus("active")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium ${
-              filterStatus === "active" ? "bg-white/10 text-white" : "text-slate-400"
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setFilterStatus("completed")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium ${
-              filterStatus === "completed" ? "bg-white/10 text-white" : "text-slate-400"
-            }`}
-          >
-            Done
-          </button>
+            <option value="all" className="bg-slate-900 text-white">All Statuses</option>
+            <option value="active" className="bg-slate-900 text-white">Active Only</option>
+            <option value="completed" className="bg-slate-900 text-white">Done (Completed)</option>
+          </select>
         </div>
       </div>
 

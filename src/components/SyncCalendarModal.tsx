@@ -11,6 +11,8 @@ import {
   FileText,
   Copy,
   Info,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import {
   IcsEventOptions,
@@ -18,6 +20,11 @@ import {
   downloadIcsFile,
   getGoogleCalendarWebUrl,
 } from "../utils/icsExport";
+import {
+  getGoogleAccessToken,
+  createGoogleCalendarEvent,
+  signInWithGoogle,
+} from "../utils/googleCalendar";
 
 interface SyncCalendarModalProps {
   isOpen: boolean;
@@ -36,6 +43,9 @@ export const SyncCalendarModal: React.FC<SyncCalendarModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [isDirectSyncing, setIsDirectSyncing] = useState(false);
+  const [directSynced, setDirectSynced] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -54,6 +64,45 @@ export const SyncCalendarModal: React.FC<SyncCalendarModalProps> = ({
     navigator.clipboard.writeText(icsContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleDirectApiSync = async () => {
+    setIsDirectSyncing(true);
+    setSyncStatusMsg(null);
+    try {
+      let token = await getGoogleAccessToken();
+      if (!token) {
+        // Prompt for Google sign in
+        const res = await signInWithGoogle();
+        token = res?.accessToken || null;
+      }
+      if (!token) {
+        setSyncStatusMsg("Google sign in was cancelled.");
+        setIsDirectSyncing(false);
+        return;
+      }
+
+      await createGoogleCalendarEvent(token, {
+        id: event.id || `event-${Date.now()}`,
+        type: event.category === "exam" ? "exam" : event.category === "TASK" ? "task" : "event",
+        title: event.title,
+        description: event.description,
+        date: event.date,
+        time: event.time,
+        category: event.category,
+      });
+
+      setDirectSynced(true);
+      setSyncStatusMsg("Successfully added to your Google Calendar!");
+      setTimeout(() => {
+        setDirectSynced(false);
+      }, 4000);
+    } catch (err: any) {
+      console.error(err);
+      setSyncStatusMsg(err.message || "Failed to sync to Google Calendar API.");
+    } finally {
+      setIsDirectSyncing(false);
+    }
   };
 
   return (
@@ -122,41 +171,72 @@ export const SyncCalendarModal: React.FC<SyncCalendarModalProps> = ({
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Download .ics Button */}
+            {/* Direct Google Calendar API Sync Button */}
             <button
-              onClick={handleDownloadIcs}
-              className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 group"
+              onClick={handleDirectApiSync}
+              disabled={isDirectSyncing}
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-60"
             >
-              {downloaded ? (
+              {isDirectSyncing ? (
                 <>
-                  <Check className="w-4 h-4" />
-                  <span>Downloaded .ics!</span>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Syncing API...</span>
+                </>
+              ) : directSynced ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                  <span>Synced to GCal!</span>
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
-                  <span>Download .ics File</span>
+                  <Sparkles className="w-4 h-4 text-slate-950" />
+                  <span>Direct Sync (GCal API)</span>
                 </>
               )}
             </button>
 
-            {/* Direct Google Calendar Web Link */}
+            {/* Download .ics Button */}
+            <button
+              onClick={handleDownloadIcs}
+              className="p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 group"
+            >
+              {downloaded ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="text-emerald-300">Downloaded .ics!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+                  <span>Download .ics File</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {syncStatusMsg && (
+            <div
+              className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                directSynced
+                  ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                  : "bg-rose-500/15 border border-rose-500/30 text-rose-300"
+              }`}
+            >
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>{syncStatusMsg}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-1">
             <a
               href={googleUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-md"
+              className="text-amber-400 hover:underline flex items-center gap-1"
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>Add to Google Calendar</span>
+              <span>Or open in browser GCal</span>
+              <ExternalLink className="w-3 h-3" />
             </a>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-1">
-            <span className="flex items-center gap-1">
-              <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              Works on Android, iOS, Windows, Mac & Linux
-            </span>
             <button
               onClick={handleCopyIcs}
               className="text-slate-400 hover:text-white transition-colors flex items-center gap-1 underline underline-offset-2"

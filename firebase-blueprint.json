@@ -1,0 +1,186 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated student user profile and cloud metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "email", "createdAt"]
+    },
+    "StudentProfile": {
+      "title": "StudentProfile",
+      "description": "Student profile configuration including stream, class, and board",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "classLevel": { "type": "string", "maxLength": 64 },
+        "stream": { "type": "string", "maxLength": 64 },
+        "board": { "type": "string", "maxLength": 64 },
+        "avatarColor": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "name", "stream", "userId", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Academic and personal study tasks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string", "maxLength": 32 },
+        "time": { "type": "string", "maxLength": 16 },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "category": { "type": "string", "maxLength": 64 },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "completed", "userId", "createdAt"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Academic study subjects and tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "color": { "type": "string", "maxLength": 32 },
+        "targetMinutesPerWeek": { "type": "number" },
+        "completedMinutes": { "type": "number" },
+        "totalSessions": { "type": "number" },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "name", "userId"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Student academic notes, formula cheat sheets, and summaries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "content": { "type": "string", "maxLength": 50000 },
+        "pinned": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "title", "userId", "createdAt"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "Daily student routine and habit tracker",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "iconName": { "type": "string", "maxLength": 64 },
+        "streak": { "type": "number" },
+        "completedDates": { "type": "array" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "userId", "createdAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Student short and long term targets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 64 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "targetDate": { "type": "string", "maxLength": 32 },
+        "progress": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "progress", "userId", "createdAt"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Academic calendar schedule and deadlines",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string", "maxLength": 32 },
+        "time": { "type": "string", "maxLength": 16 },
+        "category": { "type": "string", "maxLength": 64 },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "date", "userId", "createdAt"]
+    },
+    "CloudSyncState": {
+      "title": "CloudSyncState",
+      "description": "Cloud backup snapshot containing multi-profile student state",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "lastSyncedAt": { "type": "number" },
+        "version": { "type": "string", "maxLength": 32 },
+        "activeProfileId": { "type": "string", "maxLength": 128 },
+        "profiles": { "type": "array" },
+        "payloadJson": { "type": "string", "maxLength": 500000 }
+      },
+      "required": ["userId", "lastSyncedAt", "version"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile root document"
+    },
+    "/users/{userId}/profiles/{profileId}": {
+      "schema": "StudentProfile",
+      "description": "Student academic profiles per user"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Student task collection"
+    },
+    "/users/{userId}/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Subject tracking collection"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Student notes collection"
+    },
+    "/users/{userId}/habits/{habitId}": {
+      "schema": "Habit",
+      "description": "Student habit tracker collection"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": "Goal",
+      "description": "Academic and personal goals"
+    },
+    "/users/{userId}/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Academic calendar events"
+    },
+    "/users/{userId}/sync/cloud_backup": {
+      "schema": "CloudSyncState",
+      "description": "Full cross-device cloud sync state document"
+    }
+  }
+}

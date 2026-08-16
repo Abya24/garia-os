@@ -15,6 +15,7 @@ import {
   Users,
   Download,
   BookOpen,
+  Mail,
 } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -57,6 +58,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         { id: "questionbank" as ActiveTab, label: t.questionBank || "Question Bank", icon: HelpCircle, badge: "Drawer" },
         { id: "career" as ActiveTab, label: t.careerCenter || "Career Center", icon: Compass, badge: "Drawer" },
         { id: "exam" as ActiveTab, label: t.examIntelligence || "Exam Intelligence", icon: ShieldAlert, badge: "Drawer" },
+        { id: "gmail" as ActiveTab, label: "Gmail Center", icon: Mail, badge: "Google" },
         { id: "notes" as ActiveTab, label: t.notes || "Notes & Books", icon: FileText },
         { id: "stats" as ActiveTab, label: t.analytics || "Progress Analytics", icon: BarChart2 },
         { id: "study" as ActiveTab, label: t.studyTracker || "Study Tracker", icon: BookOpen },

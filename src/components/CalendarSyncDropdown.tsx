@@ -6,6 +6,9 @@ import {
   ChevronDown,
   Check,
   Share2,
+  Sparkles,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import {
   IcsEventOptions,
@@ -13,6 +16,11 @@ import {
   downloadIcsFile,
   getGoogleCalendarWebUrl,
 } from "../utils/icsExport";
+import {
+  getGoogleAccessToken,
+  createGoogleCalendarEvent,
+  signInWithGoogle,
+} from "../utils/googleCalendar";
 
 interface CalendarSyncDropdownProps {
   event: IcsEventOptions;
@@ -29,6 +37,8 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [isDirectSyncing, setIsDirectSyncing] = useState(false);
+  const [directSynced, setDirectSynced] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,6 +65,42 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
       setDownloaded(false);
       setIsOpen(false);
     }, 1800);
+  };
+
+  const handleDirectSync = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDirectSyncing(true);
+    try {
+      let token = await getGoogleAccessToken();
+      if (!token) {
+        const res = await signInWithGoogle();
+        token = res?.accessToken || null;
+      }
+      if (!token) {
+        setIsDirectSyncing(false);
+        return;
+      }
+
+      await createGoogleCalendarEvent(token, {
+        id: event.id || `event-${Date.now()}`,
+        type: event.category === "exam" ? "exam" : event.category === "TASK" ? "task" : "event",
+        title: event.title,
+        description: event.description,
+        date: event.date,
+        time: event.time,
+        category: event.category,
+      });
+
+      setDirectSynced(true);
+      setTimeout(() => {
+        setDirectSynced(false);
+        setIsOpen(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Direct sync error", err);
+    } finally {
+      setIsDirectSyncing(false);
+    }
   };
 
   const handleOpenGoogle = (e: React.MouseEvent) => {
@@ -135,7 +181,7 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
 
       {isOpen && (
         <div
-          className="absolute right-0 mt-1.5 w-56 rounded-2xl bg-slate-900/95 border border-amber-500/30 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 mt-1.5 w-60 rounded-2xl bg-slate-900/95 border border-amber-500/30 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-2.5 py-1.5 border-b border-white/10 mb-1">
@@ -145,13 +191,39 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
             <div className="text-xs font-bold text-white truncate font-heading">{event.title}</div>
           </div>
 
+          {/* Direct Google Calendar API Sync */}
+          <button
+            type="button"
+            onClick={handleDirectSync}
+            disabled={isDirectSyncing}
+            className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 flex items-center justify-between transition-colors group"
+          >
+            <span className="flex items-center gap-2">
+              {isDirectSyncing ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+              ) : directSynced ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span>
+                {isDirectSyncing
+                  ? "Syncing GCal API..."
+                  : directSynced
+                  ? "Synced to Google!"
+                  : "Direct Sync to Google"}
+              </span>
+            </span>
+            {directSynced && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+          </button>
+
           <button
             type="button"
             onClick={handleDownloadIcs}
-            className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:text-white hover:bg-amber-500/20 flex items-center justify-between transition-colors group"
+            className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 flex items-center justify-between transition-colors group"
           >
             <span className="flex items-center gap-2">
-              <Download className="w-3.5 h-3.5 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+              <Download className="w-3.5 h-3.5 text-slate-400 group-hover:translate-y-0.5 transition-transform" />
               <span>Download .ics File</span>
             </span>
             {downloaded && <Check className="w-3.5 h-3.5 text-emerald-400" />}
@@ -160,7 +232,7 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
           <button
             type="button"
             onClick={handleOpenGoogle}
-            className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:text-white hover:bg-amber-500/20 flex items-center gap-2 transition-colors"
+            className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
             <span>Open in Google Calendar</span>

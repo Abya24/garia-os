@@ -1,6 +1,6 @@
 {
   "name": "Garia OS",
-  "description": "Comprehensive Multi-Student Academic OS featuring Question Bank Center, Academic Center, Career Center, Exam Intelligence, and Gemini-Powered Abya AI with Live Voice, High Thinking, Search Grounding, Image Doubt Solver, and Fast Response modes.",
+  "description": "Comprehensive Multi-Student Academic OS featuring Question Bank Center, Academic Center, Career Center, Exam Intelligence, Google Workspace & Gmail Integration, and Gemini-Powered Abya AI with Live Voice, High Thinking, Search Grounding, Image Doubt Solver, and Fast Response modes.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

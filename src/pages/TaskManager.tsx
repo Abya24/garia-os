@@ -12,15 +12,23 @@ import {
   AlertCircle,
   Tag,
   X,
+  Share2,
+  ArrowLeft,
+  Award,
+  Sparkles,
 } from "lucide-react";
 import { Task, Priority, TaskCategory } from "../types";
 import { getTodayString } from "../utils/storage";
+import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import { getTaskMilestones } from "../utils/gamificationEngine";
+import { MilestoneBadgesCard } from "../components/MilestoneBadgesCard";
 
 interface TaskManagerProps {
   tasks: Task[];
   onAddTask: (task: Omit<Task, "id" | "createdAt">) => void;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
+  onBack?: () => void;
 }
 
 export const TaskManager: React.FC<TaskManagerProps> = ({
@@ -28,6 +36,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onBack,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all"); // all, today, upcoming, high, study, personal
@@ -139,17 +148,37 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     }
   };
 
+  const taskMilestones = getTaskMilestones(tasks);
+
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            Task Manager
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Organize, prioritize, and track your daily & study objectives.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="tasks-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+                Task Manager
+              </h1>
+              <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                {tasks.filter((t) => t.completed).length}/{tasks.length} Done
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Organize, prioritize, and track your daily & study objectives.
+            </p>
+          </div>
         </div>
 
         <button
@@ -160,6 +189,18 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
           <span>Add New Task</span>
         </button>
       </div>
+
+      {/* Task Milestone Badges & Achievements Section */}
+      <MilestoneBadgesCard
+        title="Task Milestones & Achievements"
+        subtitle="Complete daily and study tasks to unlock milestone achievement badges and earn XP bonus."
+        category="tasks"
+        badges={taskMilestones.badges}
+        unlockedCount={taskMilestones.unlockedCount}
+        totalCount={taskMilestones.totalCount}
+        latestUnlocked={taskMilestones.latestUnlocked}
+        defaultExpanded={true}
+      />
 
       {/* Search and Filters Bar */}
       <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
@@ -172,33 +213,27 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
               placeholder="Search tasks by title or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-2xl glass-pill text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-pill text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
             />
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
-            {[
-              { id: "today", label: "Today" },
-              { id: "upcoming", label: "Upcoming" },
-              { id: "completed", label: "Completed" },
-              { id: "all", label: "All Tasks" },
-              { id: "high", label: "High Priority" },
-              { id: "study", label: "Study" },
-              { id: "personal", label: "Personal" },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setSelectedFilter(f.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
-                  selectedFilter === f.id
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                    : "glass-pill text-slate-400 hover:text-white border-white/5"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          {/* Filter Dropdown Selector */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <select
+              value={selectedFilter}
+              onChange={(e) => setSelectedFilter(e.target.value)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-2xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Tasks ({tasks.length})</option>
+              <option value="today" className="bg-slate-900 text-white">Due Today</option>
+              <option value="upcoming" className="bg-slate-900 text-white">Upcoming</option>
+              <option value="completed" className="bg-slate-900 text-white">Completed</option>
+              <option value="high" className="bg-slate-900 text-white">High Priority Only</option>
+              <option value="study" className="bg-slate-900 text-white">Study Category</option>
+              <option value="personal" className="bg-slate-900 text-white">Personal Category</option>
+              <option value="work" className="bg-slate-900 text-white">Work Category</option>
+            </select>
           </div>
         </div>
       </div>
@@ -294,6 +329,18 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
               {/* Task Actions */}
               <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <CalendarSyncDropdown
+                  event={{
+                    id: task.id,
+                    title: `Task: ${task.title}`,
+                    description: task.description || `Priority: ${task.priority} | Category: ${task.category}`,
+                    date: task.date,
+                    time: task.time,
+                    category: "TASK",
+                  }}
+                  buttonLabel="Sync"
+                  variant="icon"
+                />
                 <button
                   onClick={() => handleOpenEditModal(task)}
                   className="p-2 rounded-xl glass-pill text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"

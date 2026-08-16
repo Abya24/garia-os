@@ -1754,6 +1754,67 @@ export const importDataJSON = (jsonString: string): boolean => {
   return result.success;
 };
 
+export const getWorkspaceSnapshot = (): {
+  activeProfileId: string;
+  profiles: StudentProfile[];
+  fullStorageDump: Record<string, string>;
+} => {
+  const profiles = loadProfiles();
+  const activeProfileId = loadActiveProfileId();
+  const fullStorageDump: Record<string, string> = {};
+
+  if (typeof localStorage !== "undefined") {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("garia_") || key.startsWith("smart_") || key.startsWith("vvi_") || key.startsWith("revisions_") || key.startsWith("practice_") || key.startsWith("academic_") || key.startsWith("career_") || key.startsWith("exam_"))) {
+        const val = localStorage.getItem(key);
+        if (val !== null) {
+          fullStorageDump[key] = val;
+        }
+      }
+    }
+  }
+
+  return {
+    activeProfileId,
+    profiles,
+    fullStorageDump,
+  };
+};
+
+export const restoreWorkspaceSnapshot = (snapshot: {
+  activeProfileId?: string;
+  profiles?: StudentProfile[];
+  fullStorageDump?: Record<string, string> | string;
+}): boolean => {
+  try {
+    if (!snapshot) return false;
+    let dump: Record<string, string> = {};
+    if (typeof snapshot.fullStorageDump === "string") {
+      dump = JSON.parse(snapshot.fullStorageDump);
+    } else if (snapshot.fullStorageDump && typeof snapshot.fullStorageDump === "object") {
+      dump = snapshot.fullStorageDump;
+    }
+
+    if (typeof localStorage !== "undefined") {
+      Object.entries(dump).forEach(([key, val]) => {
+        localStorage.setItem(key, val);
+      });
+    }
+
+    if (snapshot.profiles && Array.isArray(snapshot.profiles) && snapshot.profiles.length > 0) {
+      saveProfiles(snapshot.profiles);
+    }
+    if (snapshot.activeProfileId) {
+      saveActiveProfileId(snapshot.activeProfileId);
+    }
+    return true;
+  } catch (e) {
+    console.error("Failed to restore workspace snapshot", e);
+    return false;
+  }
+};
+
 export const clearAllData = () => {
   const profiles = loadProfiles();
   profiles.forEach((p) => {

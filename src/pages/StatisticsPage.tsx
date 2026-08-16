@@ -12,6 +12,8 @@ import {
   Timer,
   Calendar,
   Brain,
+  ArrowLeft,
+  Filter,
 } from "lucide-react";
 import {
   Task,
@@ -50,6 +52,7 @@ interface StatisticsPageProps {
   academicPractice?: AcademicPracticeSession[];
   examTestRecords?: ExamTestRecord[];
   onNavigate?: (tab: string) => void;
+  onBack?: () => void;
 }
 
 type AnalyticsSubTab = "intelligence" | "productivity" | "subjects" | "habits";
@@ -71,10 +74,19 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
   academicPractice = [],
   examTestRecords = [],
   onNavigate,
+  onBack,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<AnalyticsSubTab>("intelligence");
   const [timeframe, setTimeframe] = useState<Timeframe>("daily");
   const todayStr = getTodayString();
+
+  const handleBack = () => {
+    if (activeSubTab !== "intelligence") {
+      setActiveSubTab("intelligence");
+    } else if (onBack) {
+      onBack();
+    }
+  };
 
   // Load question bank progress for student
   const profileId = activeStudent?.id || "default";
@@ -228,14 +240,27 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header & Sub-Tab Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
-            <BarChart2 className="w-7 h-7 text-cyan-400" />
-            <span>Student Intelligence & Analytics</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Real-time curriculum progress, MCQ & test accuracy, weak/strong topic intelligence, and habits.
-          </p>
+        <div className="flex items-center gap-3">
+          {(onBack || activeSubTab !== "intelligence") && (
+            <button
+              onClick={handleBack}
+              id="stats-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2">
+              <BarChart2 className="w-7 h-7 text-cyan-400" />
+              <span>Student Intelligence & Analytics</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Real-time curriculum progress, MCQ & test accuracy, weak/strong topic intelligence, and habits.
+            </p>
+          </div>
         </div>
 
         {/* Sub-Tabs */}
@@ -278,39 +303,17 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
       {activeSubTab === "productivity" && (
         <div className="space-y-6">
           {/* Timeframe selector */}
-          <div className="flex justify-end">
-            <div className="flex items-center gap-1 glass-card p-1 rounded-xl border border-white/10">
-              <button
-                onClick={() => setTimeframe("daily")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  timeframe === "daily"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Daily
-              </button>
-              <button
-                onClick={() => setTimeframe("weekly")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  timeframe === "weekly"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setTimeframe("monthly")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  timeframe === "monthly"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Monthly
-              </button>
-            </div>
+          <div className="flex justify-end items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium">Timeframe:</span>
+            <select
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+              className="px-4 py-2 rounded-xl glass-pill text-xs font-bold text-cyan-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-slate-900 shadow-sm"
+            >
+              <option value="daily" className="bg-slate-900 text-white">Daily View</option>
+              <option value="weekly" className="bg-slate-900 text-white">Weekly View</option>
+              <option value="monthly" className="bg-slate-900 text-white">Monthly View</option>
+            </select>
           </div>
 
       {/* Top Banner Productivity Score */}

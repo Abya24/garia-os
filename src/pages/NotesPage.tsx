@@ -9,6 +9,8 @@ import {
   Sparkles,
   X,
   Share2,
+  ArrowLeft,
+  Filter,
 } from "lucide-react";
 import { Note, ActiveTab } from "../types";
 
@@ -18,6 +20,7 @@ interface NotesPageProps {
   onUpdateNote: (note: Note) => void;
   onDeleteNote: (id: string) => void;
   onAskAbyaWithContext: (contextText: string) => void;
+  onBack?: () => void;
 }
 
 export const NotesPage: React.FC<NotesPageProps> = ({
@@ -26,6 +29,7 @@ export const NotesPage: React.FC<NotesPageProps> = ({
   onUpdateNote,
   onDeleteNote,
   onAskAbyaWithContext,
+  onBack,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<"all" | "pinned" | "recent">("all");
@@ -93,13 +97,26 @@ export const NotesPage: React.FC<NotesPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            Notes System
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Capture revision notes, key formulas, and study summaries.
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="notes-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              Notes System
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              Capture revision notes, key formulas, and study summaries.
+            </p>
+          </div>
         </div>
 
         <button
@@ -111,37 +128,30 @@ export const NotesPage: React.FC<NotesPageProps> = ({
         </button>
       </div>
 
-      {/* Search Bar & Category Filters */}
-      <div className="glass-card p-3 rounded-2xl border border-white/10 space-y-2.5">
-        <div className="relative w-full">
+      {/* Search Bar & Dropdown Filter */}
+      <div className="glass-card p-3 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative w-full sm:flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search notes by title or content..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl glass-pill text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-pill text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-          {[
-            { id: "all", label: "All Notes" },
-            { id: "pinned", label: "Pinned Only" },
-            { id: "recent", label: "Recent (7 Days)" },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedFilter(cat.id as any)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all border ${
-                selectedFilter === cat.id
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                  : "glass-pill text-slate-400 hover:text-white border-white/5"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+          <select
+            value={selectedFilter}
+            onChange={(e) => setSelectedFilter(e.target.value as any)}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
+          >
+            <option value="all" className="bg-slate-900 text-white">All Notes ({notes.length})</option>
+            <option value="pinned" className="bg-slate-900 text-white">Pinned Notes Only</option>
+            <option value="recent" className="bg-slate-900 text-white">Recent Notes (Last 7 Days)</option>
+          </select>
         </div>
       </div>
 

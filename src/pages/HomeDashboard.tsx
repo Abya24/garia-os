@@ -27,6 +27,10 @@ import {
   ArrowRight,
   CheckCircle2,
   Calendar,
+  Mail,
+  Quote,
+  Briefcase,
+  BarChart3,
 } from "lucide-react";
 import {
   Task,
@@ -55,7 +59,10 @@ import { APP_VERSION } from "../constants/version";
 import { getTodayString, loadSmartSuggestionsState, saveSmartSuggestionsState } from "../utils/storage";
 import { generateSmartSuggestions } from "../utils/suggestionsEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
+import { calculateGamificationState } from "../utils/gamificationEngine";
+import { loadQuestionBankProgress } from "../utils/questionBankEngine";
 import { AppLanguage, translations } from "../utils/i18n";
+import { getDailyQuote, DailyQuote } from "../data/quotes";
 
 interface HomeDashboardProps {
   tasks: Task[];
@@ -124,6 +131,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const [greeting, setGreeting] = useState<string>("Good Morning");
   const [liveTime, setLiveTime] = useState<string>("");
   const [liveDate, setLiveDate] = useState<string>("");
+  const [quote, setQuote] = useState<DailyQuote>(() => getDailyQuote());
+
+  useEffect(() => {
+    setQuote(getDailyQuote());
+  }, [currentLanguage]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -140,7 +152,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       }
 
       setLiveTime(
-        now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })
       );
       setLiveDate(
         now.toLocaleDateString(currentLanguage === "hi" ? "hi-IN" : "en-US", {
@@ -328,6 +340,42 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   );
   const chapterProgress = activeChapter?.progress || 0;
 
+  // Calculate live gamification state
+  const qbankProgress = activeStudent ? loadQuestionBankProgress(activeStudent.id) : undefined;
+  const gamification = calculateGamificationState(
+    activeStudent,
+    tasks,
+    studySessions,
+    focusLogs,
+    habits,
+    goals,
+    examTestRecords,
+    practiceSessions,
+    qbankProgress
+  );
+
+  // Target exam details for countdown
+  const targetExamName =
+    examProfile?.targetExamName ||
+    (activeStudent?.classLevel === "Class 10"
+      ? "Class 10 Board Exam 2026"
+      : activeStudent?.classLevel === "Class 12"
+      ? "Class 12 Board Exam 2026"
+      : "Annual Academic Exam 2026");
+
+  const targetExamDateStr = examProfile?.examStartDate || "2026-03-01";
+  const calculateDaysLeft = () => {
+    try {
+      const target = new Date(targetExamDateStr).getTime();
+      const now = new Date().getTime();
+      const diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+      return diff > 0 ? diff : 0;
+    } catch {
+      return 180;
+    }
+  };
+  const daysUntilExam = calculateDaysLeft();
+
   return (
     <div className="space-y-5 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
       {/* 1. COMPACT STUDENT HEADER BAR */}
@@ -371,8 +419,255 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. ONE-TAP QUICK ACTIONS ROW */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      {/* 1.1 GAMIFICATION & EXAM READINESS COCKPIT ROW */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* A. Level, XP & Streak Card */}
+        <div className="glass-card rounded-2xl p-4 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-slate-900/90 to-slate-900/90 space-y-3 shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center font-bold text-sm shadow-sm">
+                L{gamification.currentLevel}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold font-heading text-white">
+                    {gamification.levelTitle}
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {gamification.totalXP} XP
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                  <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
+                  <span className="text-amber-300 font-semibold">{gamification.currentStreak} Day Streak</span>
+                  <span>•</span>
+                  <span>{gamification.latestBadge?.icon || "🌱"} {gamification.latestBadge?.name || "Scholar"}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate("stats")}
+              className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-[11px] font-semibold border border-white/10 transition-all flex items-center gap-1"
+            >
+              <span>Badges</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Level Progress Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] font-medium text-slate-400">
+              <span>Next Level Progress</span>
+              <span className="font-mono text-emerald-400 font-semibold">{gamification.levelProgressPercent}%</span>
+            </div>
+            <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(5, gamification.levelProgressPercent)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* B. Exam Countdown & Readiness Card */}
+        <div className="glass-card rounded-2xl p-4 border border-cyan-500/30 bg-gradient-to-br from-cyan-950/20 via-slate-900/90 to-slate-900/90 space-y-3 shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shadow-sm">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold font-heading text-white truncate max-w-[180px]">
+                    {targetExamName}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                  <Calendar className="w-3 h-3 text-cyan-400" />
+                  <span className="text-cyan-300 font-bold font-mono">{daysUntilExam} Days Left</span>
+                  <span>•</span>
+                  <span className="text-emerald-400 font-semibold">{examReport.overallReadinessScore || 70}% Ready</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate("exam")}
+              className="px-2.5 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-[11px] font-semibold border border-cyan-500/30 transition-all flex items-center gap-1"
+            >
+              <span>Exam Prep</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Readiness Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] font-medium text-slate-400">
+              <span>Exam Readiness Score</span>
+              <span className="font-mono text-cyan-400 font-semibold">{examReport.overallReadinessScore || 70}%</span>
+            </div>
+            <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(5, examReport.overallReadinessScore || 70)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 1.2 DAILY MOTIVATIONAL QUOTE (Student Focused & Dynamic Rotation) */}
+      <div className="glass-card rounded-2xl p-4 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/60 to-transparent flex items-start gap-3 relative overflow-hidden">
+        <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/10">
+          <Quote className="w-4 h-4" />
+        </div>
+        <div className="space-y-1 min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">
+              Daily Motivation
+            </span>
+            <span className="text-[9px] px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 capitalize">
+              {quote.category}
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm font-medium text-slate-100 italic leading-relaxed">
+            "{currentLanguage === "hi" && quote.hindiTranslation ? quote.hindiTranslation : quote.quote}"
+          </p>
+          <div className="text-[11px] text-slate-400 font-medium text-right">
+            — <span className="text-amber-200">{quote.author}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. PRIMARY QUICK ACCESS MODULES (6 Core Pillars) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-bold font-heading uppercase tracking-wider text-slate-400">
+            Quick Access
+          </h2>
+          <span className="text-[10px] text-emerald-400 font-mono">Garia Core Ecosystem</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {/* 1. Academic Center */}
+          <button
+            onClick={() => onNavigate("academic")}
+            id="quick-access-academic"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-blue-500/30 hover:border-blue-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-blue-300 transition-colors">
+                Academic Center
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Class 10, 11 & 12
+              </div>
+            </div>
+          </button>
+
+          {/* 2. Question Bank */}
+          <button
+            onClick={() => onNavigate("questionbank")}
+            id="quick-access-questionbank"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-cyan-500/30 hover:border-cyan-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <HelpCircle className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-cyan-300 transition-colors">
+                Question Bank
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                MCQ, PYQ & Tests
+              </div>
+            </div>
+          </button>
+
+          {/* 3. Career Center */}
+          <button
+            onClick={() => onNavigate("career")}
+            id="quick-access-career"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-amber-500/30 hover:border-amber-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-amber-300 transition-colors">
+                Career Center
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Roadmaps & Jobs
+              </div>
+            </div>
+          </button>
+
+          {/* 4. Abya AI */}
+          <button
+            onClick={() => onNavigate("abya")}
+            id="quick-access-abya"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-purple-500/30 hover:border-purple-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-purple-300 transition-colors">
+                Abya AI
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                AI Mentor & Doubts
+              </div>
+            </div>
+          </button>
+
+          {/* 5. Study Intelligence */}
+          <button
+            onClick={() => onNavigate("stats")}
+            id="quick-access-stats"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-emerald-500/30 hover:border-emerald-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <BarChart3 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-emerald-300 transition-colors">
+                Study Intelligence
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Analytics & Score
+              </div>
+            </div>
+          </button>
+
+          {/* 6. Task Manager */}
+          <button
+            onClick={() => onNavigate("tasks")}
+            id="quick-access-tasks"
+            className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-rose-500/30 hover:border-rose-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
+          >
+            <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <ListTodo className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold font-heading text-white truncate group-hover:text-rose-300 transition-colors">
+                Task Manager
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Tasks & Routines
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* 2.2 ONE-TAP QUICK ACTIONS ROW */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         <button
           onClick={() => onNavigate("study")}
           id="quick-action-start-study"
@@ -428,9 +723,27 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </button>
 
         <button
+          onClick={() => onNavigate("gmail")}
+          id="quick-action-gmail"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 border border-red-500/40 text-left flex items-center gap-3 transition-all card-press group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-400/40 text-red-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Mail className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "स्टूडेंट मेल" : "Student Mail"}
+            </div>
+            <div className="text-[10px] text-red-300/80 truncate">
+              {currentLanguage === "hi" ? "गूगल जीमेल इनबॉक्स" : "Gmail & templates"}
+            </div>
+          </div>
+        </button>
+
+        <button
           onClick={() => onNavigate("abya")}
           id="quick-action-ask-abya"
-          className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-left flex items-center gap-3 transition-all card-press group"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-left flex items-center gap-3 transition-all card-press group col-span-2 sm:col-span-1"
         >
           <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
             <Bot className="w-5 h-5" />

@@ -1,0 +1,94 @@
+export interface DailyQuote {
+  quote: string;
+  author: string;
+  category: "focus" | "resilience" | "consistency" | "excellence" | "discipline";
+  hindiTranslation?: string;
+}
+
+export const MOTIVATIONAL_QUOTES: DailyQuote[] = [
+  {
+    quote: "The secret of getting ahead is getting started.",
+    author: "Mark Twain",
+    category: "focus",
+    hindiTranslation: "आगे बढ़ने का राज़ बस शुरुआत करना है।",
+  },
+  {
+    quote: "Continuous effort – not strength or intelligence – is the key to unlocking our potential.",
+    author: "Winston Churchill",
+    category: "consistency",
+    hindiTranslation: "लगातार प्रयास ही हमारी वास्तविक क्षमता को उजागर करने की कुंजी है।",
+  },
+  {
+    quote: "Success is the sum of small efforts, repeated day in and day out.",
+    author: "Robert Collier",
+    category: "consistency",
+    hindiTranslation: "सफलता हर दिन दोहराए जाने वाले छोटे-छोटे प्रयासों का जोड़ है।",
+  },
+  {
+    quote: "Live as if you were to die tomorrow. Learn as if you were to live forever.",
+    author: "Mahatma Gandhi",
+    category: "excellence",
+    hindiTranslation: "ऐसे जियो जैसे कल तुम्हारा अंतिम दिन हो। ऐसे सीखो जैसे तुम्हें हमेशा जीना हो।",
+  },
+  {
+    quote: "Discipline is the bridge between goals and accomplishment.",
+    author: "Jim Rohn",
+    category: "discipline",
+    hindiTranslation: "अनुशासन ही लक्ष्यों और उपलब्धियों के बीच का सेतु है।",
+  },
+  {
+    quote: "An investment in knowledge pays the best interest.",
+    author: "Benjamin Franklin",
+    category: "excellence",
+    hindiTranslation: "ज्ञान में किया गया निवेश जीवन में सबसे अच्छा प्रतिफल देता है।",
+  },
+  {
+    quote: "It always seems impossible until it's done.",
+    author: "Nelson Mandela",
+    category: "resilience",
+    hindiTranslation: "जब तक कोई काम पूरा न हो जाए, तब तक वह हमेशा असंभव लगता है।",
+  },
+  {
+    quote: "Do not wait; the time will never be 'just right'. Start where you stand.",
+    author: "Napoleon Hill",
+    category: "focus",
+    hindiTranslation: "इंतज़ार मत करो; समय कभी 'बिल्कुल सही' नहीं होगा। जहां हो वहीं से शुरू करो।",
+  },
+  {
+    quote: "The beautiful thing about learning is that no one can take it away from you.",
+    author: "B.B. King",
+    category: "excellence",
+    hindiTranslation: "सीखने की सबसे खूबसूरत बात यह है कि इसे आपसे कोई छीन नहीं सकता।",
+  },
+  {
+    quote: "Hard work beats talent when talent fails to work hard.",
+    author: "Tim Notke",
+    category: "discipline",
+    hindiTranslation: "कठिन परिश्रम प्रतिभा को भी हरा देता है जब प्रतिभा कठिन परिश्रम नहीं करती।",
+  },
+  {
+    quote: "Education is the most powerful weapon which you can use to change the world.",
+    author: "Dr. A.P.J. Abdul Kalam",
+    category: "excellence",
+    hindiTranslation: "शिक्षा सबसे शक्तिशाली हथियार है जिसका उपयोग आप दुनिया को बदलने के लिए कर सकते हैं।",
+  },
+  {
+    quote: "Don't watch the clock; do what it does. Keep going.",
+    author: "Sam Levenson",
+    category: "consistency",
+    hindiTranslation: "घड़ी मत देखो; वही करो जो वह करती है। निरंतर आगे बढ़ते रहो।",
+  },
+];
+
+export function getDailyQuote(dateStr?: string): DailyQuote {
+  const date = dateStr ? new Date(dateStr) : new Date();
+  const dayOfYear = Math.floor(
+    (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) /
+      1000 /
+      60 /
+      60 /
+      24
+  );
+  const index = Math.abs(dayOfYear) % MOTIVATIONAL_QUOTES.length;
+  return MOTIVATIONAL_QUOTES[index];
+}

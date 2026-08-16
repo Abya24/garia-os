@@ -124,6 +124,7 @@ import {
 
 import { hashPassword } from "./utils/auth";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
+import { loadQuestionBankProgress } from "./utils/questionBankEngine";
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
@@ -135,6 +136,8 @@ import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { QuickSearchModal } from "./components/QuickSearchModal";
+import { NotificationsModal } from "./components/NotificationsModal";
+import { SavedItemsModal } from "./components/SavedItemsModal";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -153,6 +156,7 @@ import { AcademicCenterPage } from "./pages/AcademicCenterPage";
 import { QuestionBankPage } from "./pages/QuestionBankPage";
 import { ExamCenterPage } from "./pages/ExamCenterPage";
 import { DownloadPage } from "./pages/DownloadPage";
+import { GmailCenter } from "./pages/GmailCenter";
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -177,6 +181,9 @@ export default function App() {
       if (path === "/career" || hash === "#career") {
         return "career";
       }
+      if (path === "/gmail" || hash === "#gmail" || hash === "#mail") {
+        return "gmail";
+      }
     }
     return "home";
   });
@@ -197,6 +204,8 @@ export default function App() {
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [isSavedItemsOpen, setIsSavedItemsOpen] = useState<boolean>(false);
 
   // Global search shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -1475,6 +1484,9 @@ export default function App() {
         onOpenStudentModal={() => setIsStudentModalOpen(true)}
         onOpenMoreMenu={() => setIsMoreMenuOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
+        onOpenSavedItems={() => setIsSavedItemsOpen(true)}
+        onGoBack={handleGoBack}
         onUpdateSettings={handleUpdateSettings}
         onNavigate={(tab) => {
           handleNavigate(tab);
@@ -1551,6 +1563,7 @@ export default function App() {
               onAddTask={handleAddTask}
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1561,6 +1574,7 @@ export default function App() {
               onAddGoal={handleAddGoal}
               onUpdateGoal={handleUpdateGoal}
               onDeleteGoal={handleDeleteGoal}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1570,10 +1584,12 @@ export default function App() {
               tasks={tasks}
               studySessions={studySessions}
               goals={goals}
+              activeProfile={activeStudent}
               onAddEvent={handleAddCalendarEvent}
               onUpdateEvent={handleUpdateCalendarEvent}
               onDeleteEvent={handleDeleteCalendarEvent}
               onToggleTaskComplete={handleUpdateTask}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1604,6 +1620,7 @@ export default function App() {
                 setActiveTab(tab);
                 setIsMoreMenuOpen(false);
               }}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1629,7 +1646,7 @@ export default function App() {
               onUpdatePracticeSessions={handleUpdateAcademicPractice}
               onUpdateRoadmap={handleUpdateAcademicRoadmap}
               onAskAbyaWithContext={handleAskAbyaWithContext}
-              onBack={() => setActiveTab("home")}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1644,7 +1661,7 @@ export default function App() {
                 setIsMoreMenuOpen(false);
               }}
               onSaveExamTestRecord={handleSaveExamTestRecord}
-              onBack={() => setActiveTab("home")}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1661,7 +1678,7 @@ export default function App() {
               onUpdateRoadmap={handleUpdateCareerRoadmap}
               onUpdateQuiz={handleUpdateCareerQuiz}
               onNavigateToAbya={() => setActiveTab("abya")}
-              onBack={() => setActiveTab("home")}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1678,6 +1695,7 @@ export default function App() {
               onLogStudySession={handleLogStudySession}
               onDeleteStudySession={handleDeleteStudySession}
               onUpdateStudySession={handleUpdateStudySession}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1686,6 +1704,7 @@ export default function App() {
               settings={settings}
               focusLogs={focusLogs}
               onLogFocusSession={handleLogFocusSession}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1696,6 +1715,20 @@ export default function App() {
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
               onAskAbyaWithContext={handleAskAbyaWithContext}
+              onBack={handleGoBack}
+            />
+          )}
+
+          {activeTab === "gmail" && (
+            <GmailCenter
+              activeStudent={activeStudent}
+              onAddTask={(newTask) => handleAddTask(newTask)}
+              onAddCalendarEvent={(newEvent) => handleAddCalendarEvent(newEvent)}
+              onNavigateAbya={() => {
+                setActiveTab("abya");
+                setIsMoreMenuOpen(false);
+              }}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1703,6 +1736,7 @@ export default function App() {
             <WaterTracker
               water={water}
               onUpdateWater={handleUpdateWater}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1712,6 +1746,7 @@ export default function App() {
               onAddHabit={handleAddHabit}
               onToggleHabitDate={handleToggleHabitDate}
               onDeleteHabit={handleDeleteHabit}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1753,6 +1788,7 @@ export default function App() {
               onRetryLastMessage={handleRetryLastMessage}
               diagnostics={abyaDiagnostics}
               onTestDiagnostics={handleTestAbyaDiagnostics}
+              onBack={handleGoBack}
             />
           )}
 
@@ -1776,12 +1812,13 @@ export default function App() {
                 handleNavigate(tab);
                 setIsMoreMenuOpen(false);
               }}
+              onBack={handleGoBack}
             />
           )}
 
           {activeTab === "download" && (
             <DownloadPage
-              onBackToApp={() => setActiveTab("home")}
+              onBackToApp={handleGoBack}
             />
           )}
 
@@ -1790,6 +1827,10 @@ export default function App() {
               settings={settings}
               activeStudent={activeStudent}
               profiles={profiles}
+              tasks={tasks}
+              studySessions={studySessions}
+              events={calendarEvents}
+              goals={goals}
               currentLanguage={currentLanguage}
               onUpdateLanguage={handleUpdateLanguage}
               abyaLanguage={abyaLanguage}
@@ -1801,6 +1842,7 @@ export default function App() {
               onClearChatHistory={handleClearChatHistory}
               onClearAllOSData={handleClearAllOSData}
               onReloadData={handleReloadData}
+              onBack={handleGoBack}
             />
           )}
         </main>
@@ -1849,6 +1891,32 @@ export default function App() {
         activeStudent={activeStudent}
       />
 
+      {/* Notifications Center Overlay */}
+      <NotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onNavigate={(tab) => {
+          handleNavigate(tab);
+          setIsNotificationsOpen(false);
+        }}
+        revisions={academicRevisions}
+        goals={goals}
+        habits={habits}
+        tasks={tasks}
+      />
+
+      {/* Saved Items & Bookmarks Overlay */}
+      <SavedItemsModal
+        isOpen={isSavedItemsOpen}
+        onClose={() => setIsSavedItemsOpen(false)}
+        onNavigate={(tab) => {
+          handleNavigate(tab);
+          setIsSavedItemsOpen(false);
+        }}
+        notes={notes}
+        qbankProgress={activeStudent ? loadQuestionBankProgress(activeStudent.id) : undefined}
+      />
+
       {/* Multi-Student Profile Management Modal (v1.5) */}
       <StudentProfileModal
         isOpen={isStudentModalOpen}
@@ -1872,6 +1940,7 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+        onReloadData={handleReloadData}
       />
     </div>
   );

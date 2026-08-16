@@ -45,6 +45,7 @@ import {
   Cpu,
   ShieldCheck,
   Radio,
+  ArrowLeft,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -96,6 +97,7 @@ interface AbyaAIPageProps {
   onRetryLastMessage?: () => void;
   diagnostics?: AbyaDiagnosticsInfo;
   onTestDiagnostics?: () => Promise<void>;
+  onBack?: () => void;
 }
 
 export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
@@ -115,6 +117,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   onRetryLastMessage,
   diagnostics,
   onTestDiagnostics,
+  onBack,
 }) => {
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
@@ -413,6 +416,17 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       {/* Top Header Card */}
       <div className="glass-card rounded-2xl p-4 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 shrink-0">
         <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              id="abya-back-btn"
+              aria-label="Go Back"
+              className="p-2 sm:px-3 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-emerald-500/20">
             <Sparkles className="w-5 h-5 text-slate-900" />
           </div>

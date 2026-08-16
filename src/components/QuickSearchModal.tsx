@@ -18,6 +18,7 @@ import {
   Home,
   BookOpen,
   ArrowRight,
+  Mail,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -102,6 +103,15 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       description: "Board profile, exam readiness score, high-yield question queue & mock tests",
       icon: ShieldAlert,
       tags: ["exam", "intelligence", "board", "readiness", "score", "weightage", "cbse", "bihar board", "icse"],
+    },
+    {
+      id: "nav-gmail",
+      tab: "gmail",
+      title: "Student Gmail Center",
+      category: "Tools & Productivity",
+      description: "Google Workspace emails, leave applications, teacher doubt letters & inbox sync",
+      icon: Mail,
+      tags: ["gmail", "email", "mail", "google", "leave", "application", "inbox", "sent", "teacher", "workspace", "message"],
     },
     {
       id: "nav-study",
