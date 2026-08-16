@@ -50,7 +50,9 @@ import { AcademicRevisionPlannerSection } from "../components/AcademicRevisionPl
 import { AcademicPracticeTrackerSection } from "../components/AcademicPracticeTrackerSection";
 import { QuestionBankSection } from "../components/QuestionBankSection";
 import { AcademicDrawer, AcademicDrawerAction } from "../components/AcademicDrawer";
+import { AcademicAuditReportModal } from "../components/AcademicAuditReportModal";
 import { StudentProfile } from "../types";
+import { ShieldCheck, Share2 } from "lucide-react";
 
 interface AcademicCenterPageProps {
   careerProfile: CareerProfile;
@@ -170,6 +172,7 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
   };
 
   // Modals state
+  const [isAuditReportOpen, setIsAuditReportOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
   const [newSubName, setNewSubName] = useState("");
   const [newSubColor, setNewSubColor] = useState("emerald");
@@ -466,6 +469,17 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              id="open-audit-report-btn"
+              onClick={() => setIsAuditReportOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+              title="View & Share Full Academic Audit Report"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Academic</span> Audit Report
+              <Share2 className="w-3.5 h-3.5 text-emerald-400 ml-0.5" />
+            </button>
+
             <button
               id="open-academic-drawer-btn"
               onClick={() => setIsAcademicDrawerOpen(true)}
@@ -1701,6 +1715,15 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
         activeAction={activeTab}
         studentClassName={activeStudent?.classLevel || "Class 12"}
         studentStream={careerProfile.stream || "Science"}
+      />
+
+      {/* Academic Status & Integrity Audit Report Modal */}
+      <AcademicAuditReportModal
+        isOpen={isAuditReportOpen}
+        onClose={() => setIsAuditReportOpen(false)}
+        subjects={subjects}
+        chapters={chapters}
+        careerProfile={careerProfile}
       />
     </div>
   );

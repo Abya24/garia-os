@@ -563,6 +563,7 @@ export interface ExamMilestone {
   completed: boolean;
   completedAt?: number;
   category: "Syllabus" | "Revision" | "PYQ" | "Mock" | "Weakness" | "Review";
+  targetDate?: string; // YYYY-MM-DD
 }
 
 export interface ExamMockTest {
