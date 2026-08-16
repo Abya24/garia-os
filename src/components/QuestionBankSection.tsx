@@ -103,10 +103,16 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // ----------------------------------------------------
   const availableClasses = ["Class 10", "Class 11", "Class 12"];
 
-  // Unique Subjects present in Question Data or active profile
+  // Unique Subjects present in Question Data or active profile or Master Curriculum
   const availableSubjects = useMemo(() => {
     const set = new Set<string>();
     subjects.forEach((s) => set.add(s.name));
+    const allCurriculum = getAllCurriculumSubjects();
+    allCurriculum.forEach((sub) => {
+      if (sub.classLevel.toLowerCase() === selectedClass.toLowerCase()) {
+        set.add(sub.name);
+      }
+    });
     SEED_MCQS.forEach((m) => {
       if (m.classLevel.toLowerCase() === selectedClass.toLowerCase()) set.add(m.subjectName);
     });
@@ -122,6 +128,14 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // Unique Chapters
   const availableChapters = useMemo(() => {
     const set = new Set<string>();
+    const allCurriculum = getAllCurriculumSubjects();
+    allCurriculum.forEach((sub) => {
+      if (sub.classLevel.toLowerCase() === selectedClass.toLowerCase()) {
+        if (!selectedSubject || selectedSubject === "ALL" || sub.name.toLowerCase() === selectedSubject.toLowerCase()) {
+          sub.chapters.forEach((c) => set.add(c.title));
+        }
+      }
+    });
     chapters.forEach((c) => {
       const sub = subjects.find((s) => s.id === c.subjectId);
       if (!selectedSubject || selectedSubject === "ALL" || (sub && sub.name === selectedSubject)) {
@@ -158,6 +172,18 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // Unique Topics
   const availableTopics = useMemo(() => {
     const set = new Set<string>();
+    const allCurriculum = getAllCurriculumSubjects();
+    allCurriculum.forEach((sub) => {
+      if (sub.classLevel.toLowerCase() === selectedClass.toLowerCase()) {
+        if (!selectedSubject || selectedSubject === "ALL" || sub.name.toLowerCase() === selectedSubject.toLowerCase()) {
+          sub.chapters.forEach((c) => {
+            if (selectedChapter === "ALL" || c.title.toLowerCase() === selectedChapter.toLowerCase()) {
+              c.topics.forEach((t) => set.add(t.name));
+            }
+          });
+        }
+      }
+    });
     chapters.forEach((c) => {
       if (selectedChapter === "ALL" || c.title === selectedChapter) {
         c.topics.forEach((t) => set.add(t));
@@ -187,10 +213,20 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
 
   // PYQ Available Years
   const availableYears = useMemo(() => {
-    const years = new Set<number>();
+    const years = new Set<number>([2024, 2023, 2022, 2021, 2020, 2019]);
     SEED_PYQS.forEach((p) => years.add(p.year));
     return Array.from(years).sort((a, b) => b - a);
   }, []);
+
+  // Complete Verified Dataset on Demand
+  const fullQuestionsDataset = useMemo(() => {
+    return getQuestionsForCurriculum(
+      selectedClass,
+      selectedSubject !== "ALL" ? selectedSubject : undefined,
+      selectedChapter !== "ALL" ? selectedChapter : undefined,
+      selectedTopic !== "ALL" ? selectedTopic : undefined
+    );
+  }, [selectedClass, selectedSubject, selectedChapter, selectedTopic]);
 
   // Calculate Real Counts
   const counts = useMemo(() => {
@@ -206,19 +242,8 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // FILTERED MCQS
   // ----------------------------------------------------
   const filteredMCQs = useMemo(() => {
-    let list = SEED_MCQS.filter(
-      (m) => m.classLevel.toLowerCase() === selectedClass.toLowerCase()
-    );
+    let list = fullQuestionsDataset.mcqs;
 
-    if (selectedSubject !== "ALL") {
-      list = list.filter((m) => m.subjectName.toLowerCase() === selectedSubject.toLowerCase());
-    }
-    if (selectedChapter !== "ALL") {
-      list = list.filter((m) => m.chapterTitle.toLowerCase() === selectedChapter.toLowerCase());
-    }
-    if (selectedTopic !== "ALL") {
-      list = list.filter((m) => m.topicName.toLowerCase() === selectedTopic.toLowerCase());
-    }
     if (difficultyFilter !== "ALL") {
       list = list.filter((m) => m.difficulty.toLowerCase() === difficultyFilter.toLowerCase());
     }
@@ -242,10 +267,7 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
     }
     return list;
   }, [
-    selectedClass,
-    selectedSubject,
-    selectedChapter,
-    selectedTopic,
+    fullQuestionsDataset.mcqs,
     difficultyFilter,
     searchQuery,
     retryMode,
@@ -265,16 +287,8 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // FILTERED PYQS
   // ----------------------------------------------------
   const filteredPYQs = useMemo(() => {
-    let list = SEED_PYQS.filter(
-      (p) => p.classLevel.toLowerCase() === selectedClass.toLowerCase()
-    );
+    let list = fullQuestionsDataset.pyqs;
 
-    if (selectedSubject !== "ALL") {
-      list = list.filter((p) => p.subjectName.toLowerCase() === selectedSubject.toLowerCase());
-    }
-    if (selectedChapter !== "ALL") {
-      list = list.filter((p) => p.chapterTitle.toLowerCase() === selectedChapter.toLowerCase());
-    }
     if (yearFilter !== "ALL") {
       list = list.filter((p) => p.year === parseInt(yearFilter, 10));
     }
@@ -298,9 +312,7 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
     }
     return list;
   }, [
-    selectedClass,
-    selectedSubject,
-    selectedChapter,
+    fullQuestionsDataset.pyqs,
     yearFilter,
     difficultyFilter,
     searchQuery,
@@ -312,21 +324,8 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
   // FILTERED PRACTICE QUESTIONS
   // ----------------------------------------------------
   const filteredPractice = useMemo(() => {
-    let list = SEED_PRACTICE_QUESTIONS.filter(
-      (pr) => pr.classLevel.toLowerCase() === selectedClass.toLowerCase()
-    );
+    let list = fullQuestionsDataset.practice;
 
-    if (selectedSubject !== "ALL") {
-      list = list.filter((pr) => pr.subjectName.toLowerCase() === selectedSubject.toLowerCase());
-    }
-    if (selectedChapter !== "ALL") {
-      list = list.filter((pr) => pr.chapterTitle.toLowerCase() === selectedChapter.toLowerCase());
-    }
-    if (selectedTopic !== "ALL") {
-      list = list.filter(
-        (pr) => pr.topicName && pr.topicName.toLowerCase() === selectedTopic.toLowerCase()
-      );
-    }
     if (difficultyFilter !== "ALL") {
       list = list.filter((pr) => pr.difficulty.toLowerCase() === difficultyFilter.toLowerCase());
     }
@@ -348,10 +347,7 @@ export const QuestionBankSection: React.FC<QuestionBankSectionProps> = ({
     }
     return list;
   }, [
-    selectedClass,
-    selectedSubject,
-    selectedChapter,
-    selectedTopic,
+    fullQuestionsDataset.practice,
     difficultyFilter,
     searchQuery,
     statusFilter,
