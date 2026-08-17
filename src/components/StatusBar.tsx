@@ -28,6 +28,9 @@ import {
   Sparkles,
   Layers,
   Database,
+  Zap,
+  CloudUpload,
+  Trash2,
 } from "lucide-react";
 import {
   UserSettings,
@@ -40,6 +43,12 @@ import {
 } from "../types";
 import { APP_VERSION } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
+import {
+  subscribeToOfflineQueue,
+  reconcilePendingQueueWithFirestore,
+  clearPendingQueue,
+  OfflineQueueState,
+} from "../utils/offlineQueue";
 
 interface StatusBarProps {
   settings: UserSettings;
@@ -102,9 +111,34 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
+  // Offline Pending Queue State
+  const [offlineQueueState, setOfflineQueueState] = useState<OfflineQueueState>(() => ({
+    pendingActions: [],
+    pendingCount: 0,
+    isReconciling: false,
+    lastReconciledAt: null,
+    lastReconciliationStatus: "idle",
+    isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
+  }));
+
   const networkMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const notificationMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToOfflineQueue((qState) => {
+      setOfflineQueueState(qState);
+      if (qState.lastReconciledAt) {
+        setLastSyncTime(
+          new Date(qState.lastReconciledAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -336,7 +370,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
         {/* Right Section: Interactive Indicators & Action Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5">
-          {/* 1. INTERACTIVE ONLINE STATUS INDICATOR (Critical Issue 3) */}
+          {/* 1. INTERACTIVE ONLINE STATUS INDICATOR (Critical Issue 3 + Offline Queue) */}
           <div className="relative" ref={networkMenuRef}>
             <button
               onClick={() => {
@@ -348,14 +382,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               aria-label={isOnline ? "Online status" : "Offline status"}
               title={
                 isOnline
-                  ? currentLanguage === "hi"
+                  ? offlineQueueState.pendingCount > 0
+                    ? `Online - ${offlineQueueState.pendingCount} actions reconciling with Firestore`
+                    : currentLanguage === "hi"
                     ? "ऑनलाइन: सिंक व क्लाउड सक्रिय (क्लिक करें)"
                     : `Online (${pingLatency ? `${pingLatency}ms` : "Connected"}) - Click for details`
+                  : offlineQueueState.pendingCount > 0
+                  ? `Offline - ${offlineQueueState.pendingCount} actions queued for reconciliation`
                   : currentLanguage === "hi"
                   ? "ऑफ़लाइन: लोकल सुरक्षित मोड (क्लिक करें)"
                   : "Offline: Local safe mode - Click for details"
               }
-              className={`p-1.5 rounded-full border transition-all text-xs min-h-[32px] min-w-[32px] sm:min-h-[34px] sm:min-w-[34px] flex items-center justify-center card-press shadow-sm ${
+              className={`p-1.5 rounded-full border transition-all text-xs min-h-[32px] min-w-[32px] sm:min-h-[34px] sm:min-w-[34px] flex items-center justify-center gap-1 card-press shadow-sm ${
                 isOnline
                   ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
                   : "bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-300 animate-pulse"
@@ -371,13 +409,21 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
                 </span>
               )}
+
+              {/* Pending Queue Count Badge */}
+              {offlineQueueState.pendingCount > 0 && (
+                <span className="flex items-center text-[10px] font-bold px-1 py-0.2 rounded-full bg-amber-500/30 text-amber-300 border border-amber-500/40">
+                  <Zap className="w-2.5 h-2.5 mr-0.5 text-amber-400" />
+                  {offlineQueueState.pendingCount}
+                </span>
+              )}
             </button>
 
             {/* Network & Cloud Sync Popover */}
             {isNetworkMenuOpen && (
               <div
                 id="online-status-dropdown-card"
-                className="absolute right-0 top-10 z-50 w-72 sm:w-84 p-3.5 rounded-2xl bg-slate-900/95 border border-white/15 backdrop-blur-xl shadow-2xl space-y-3 animate-in fade-in zoom-in-95"
+                className="absolute right-0 top-10 z-50 w-80 sm:w-92 p-3.5 rounded-2xl bg-slate-900/95 border border-white/15 backdrop-blur-xl shadow-2xl space-y-3 animate-in fade-in zoom-in-95 max-h-[85vh] overflow-y-auto"
               >
                 {/* Header Title */}
                 <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
@@ -425,12 +471,78 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                       {isOnline
                         ? currentLanguage === "hi"
                           ? "सभी परिवर्तन वास्तविक समय में सुरक्षित रूप से अपडेट हो रहे हैं।"
-                          : "Your academic progress, notes, tasks, and test results are continuously synced."
+                          : "Your academic progress, notes, tasks, and test results are continuously synced with Firestore."
                         : currentLanguage === "hi"
                         ? "आपके सभी नोट्स, टास्क और टेस्ट स्कोर इस डिवाइस में सुरक्षित सेव हैं। ऑनलाइन आने पर स्वतः सिंक होंगे।"
-                        : "Zero data loss: All tasks, notes, flashcards, and test attempts are stored safely in local storage."}
+                        : "Zero data loss: All actions are stored in your offline Pending Queue and will automatically reconcile with Firestore upon reconnecting."}
                     </p>
                   </div>
+                </div>
+
+                {/* Pending Offline Queue Card */}
+                <div className="p-2.5 rounded-xl bg-slate-800/90 border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-200">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{currentLanguage === "hi" ? "लंबित ऑफ़लाइन कतार" : "Offline Pending Queue"}</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      offlineQueueState.pendingCount > 0
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                        : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    }`}>
+                      {offlineQueueState.pendingCount} {currentLanguage === "hi" ? "क्रियाएं" : "actions"}
+                    </span>
+                  </div>
+
+                  {offlineQueueState.pendingCount > 0 ? (
+                    <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                      {offlineQueueState.pendingActions.slice(0, 5).map((act) => (
+                        <div
+                          key={act.id}
+                          className="flex items-center justify-between text-[10px] py-1 px-2 rounded-lg bg-white/5 border border-white/5 text-slate-300"
+                        >
+                          <span className="font-mono text-amber-300 truncate max-w-[150px]">
+                            {act.type.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-slate-400">
+                            {new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                      ))}
+                      {offlineQueueState.pendingActions.length > 5 && (
+                        <p className="text-[10px] text-slate-400 text-center">
+                          +{offlineQueueState.pendingActions.length - 5} more pending actions...
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">
+                      {currentLanguage === "hi"
+                        ? "✓ कोई लंबित ऑफ़लाइन क्रिया नहीं है। संपूर्ण डेटा समकालिक है।"
+                        : "✓ All offline mutations are reconciled and up to date."}
+                    </p>
+                  )}
+
+                  {/* Reconcile Action Button */}
+                  {offlineQueueState.pendingCount > 0 && isOnline && (
+                    <button
+                      onClick={async () => {
+                        setIsCheckingConnection(true);
+                        await reconcilePendingQueueWithFirestore();
+                        setIsCheckingConnection(false);
+                      }}
+                      disabled={offlineQueueState.isReconciling || isCheckingConnection}
+                      className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+                    >
+                      <CloudUpload className={`w-3.5 h-3.5 ${offlineQueueState.isReconciling ? "animate-bounce" : ""}`} />
+                      <span>
+                        {offlineQueueState.isReconciling
+                          ? "Reconciling with Firestore..."
+                          : "Reconcile Queue Now"}
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Firebase & Cloud Status */}
@@ -473,19 +585,24 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   </div>
                 </div>
 
-                {/* Action: Test / Re-check Connection */}
+                {/* Action: Test / Re-check Connection & Auto-Reconcile */}
                 <button
-                  onClick={checkLivePing}
-                  disabled={isCheckingConnection}
+                  onClick={async () => {
+                    await checkLivePing();
+                    if (offlineQueueState.pendingCount > 0) {
+                      await reconcilePendingQueueWithFirestore();
+                    }
+                  }}
+                  disabled={isCheckingConnection || offlineQueueState.isReconciling}
                   id="btn-recheck-network"
                   className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 active:bg-emerald-500/40 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all disabled:opacity-50 card-press"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isCheckingConnection ? "animate-spin text-emerald-400" : "text-emerald-400"}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCheckingConnection || offlineQueueState.isReconciling ? "animate-spin text-emerald-400" : "text-emerald-400"}`} />
                   <span>
-                    {isCheckingConnection
+                    {isCheckingConnection || offlineQueueState.isReconciling
                       ? currentLanguage === "hi"
-                        ? "जाँचा जा रहा है..."
-                        : "Checking & Syncing..."
+                        ? "जाँचा व सिंक किया जा रहा है..."
+                        : "Checking & Reconciling..."
                       : currentLanguage === "hi"
                       ? "सिंक व कनेक्शन पुनः जाँचें"
                       : "Sync & Test Connection"}

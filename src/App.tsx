@@ -125,6 +125,7 @@ import {
 import { hashPassword } from "./utils/auth";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
+import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./utils/offlineQueue";
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
@@ -224,6 +225,93 @@ export default function App() {
       setTabHistory((prev) => [...prev, tab]);
       setActiveTab(tab);
       window.history.pushState({ tab }, "", `#${tab}`);
+    }
+  };
+
+  // Major swipeable primary tabs for mobile OS swipe navigation
+  const SWIPEABLE_MAJOR_TABS: ActiveTab[] = ["home", "tasks", "focus", "abya"];
+  const touchStartPos = useRef<{ x: number; y: number; time: number; valid: boolean } | null>(null);
+  const [swipeFeedback, setSwipeFeedback] = useState<{ direction: "left" | "right"; targetTab: string } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 1) {
+      touchStartPos.current = null;
+      return;
+    }
+
+    const target = e.target as HTMLElement | null;
+    if (
+      !target ||
+      isMoreMenuOpen ||
+      isStudentModalOpen ||
+      isAuthModalOpen ||
+      isSearchOpen ||
+      isNotificationsOpen ||
+      isSavedItemsOpen
+    ) {
+      touchStartPos.current = null;
+      return;
+    }
+
+    // Ignore touches on interactive inputs, sliders, horizontal scroll containers, canvas, code
+    const isInteractive = target.closest(
+      'input, textarea, select, button, [role="slider"], [data-no-swipe], .overflow-x-auto, canvas, pre, code, .monaco-editor, a'
+    );
+    if (isInteractive) {
+      touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now(), valid: false };
+      return;
+    }
+
+    touchStartPos.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now(),
+      valid: true,
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartPos.current || !touchStartPos.current.valid || e.changedTouches.length === 0) {
+      touchStartPos.current = null;
+      return;
+    }
+
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartPos.current.x;
+    const deltaY = touch.clientY - touchStartPos.current.y;
+    const elapsedTime = Date.now() - touchStartPos.current.time;
+    touchStartPos.current = null;
+
+    // Must be quick, predominantly horizontal swipe
+    const isHorizontalSwipe =
+      elapsedTime < 650 &&
+      Math.abs(deltaX) >= 50 &&
+      Math.abs(deltaX) > 1.35 * Math.abs(deltaY);
+
+    if (!isHorizontalSwipe) return;
+
+    if (deltaX < -50) {
+      // Swiping Left (finger moves left -> navigate to next tab)
+      const currentIndex = SWIPEABLE_MAJOR_TABS.indexOf(activeTab);
+      if (currentIndex >= 0 && currentIndex < SWIPEABLE_MAJOR_TABS.length - 1) {
+        const nextTab = SWIPEABLE_MAJOR_TABS[currentIndex + 1];
+        handleNavigate(nextTab);
+        setSwipeFeedback({ direction: "left", targetTab: nextTab });
+        setTimeout(() => setSwipeFeedback(null), 1000);
+      }
+    } else if (deltaX > 50) {
+      // Swiping Right (finger moves right -> navigate to previous tab or back)
+      const currentIndex = SWIPEABLE_MAJOR_TABS.indexOf(activeTab);
+      if (currentIndex > 0) {
+        const prevTab = SWIPEABLE_MAJOR_TABS[currentIndex - 1];
+        handleNavigate(prevTab);
+        setSwipeFeedback({ direction: "right", targetTab: prevTab });
+        setTimeout(() => setSwipeFeedback(null), 1000);
+      } else if (currentIndex === -1) {
+        handleGoBack();
+        setSwipeFeedback({ direction: "right", targetTab: "Back" });
+        setTimeout(() => setSwipeFeedback(null), 1000);
+      }
     }
   };
 
@@ -414,12 +502,26 @@ export default function App() {
     const updated = [newRecord, ...examTestRecords];
     setExamTestRecords(updated);
     saveExamTestRecords(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "SAVE_EXAM_RECORD",
+      entityName: "examTestRecords",
+      action: "create",
+      profileId: activeProfileId,
+      payload: newRecord,
+    });
   };
 
   const handleDeleteExamTestRecord = (testId: string) => {
     const updated = examTestRecords.filter((t) => t.id !== testId);
     setExamTestRecords(updated);
     saveExamTestRecords(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "SAVE_EXAM_RECORD",
+      entityName: "examTestRecords",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id: testId },
+    });
   };
 
   // Attached Note Context for Abya AI
@@ -675,18 +777,39 @@ export default function App() {
     const updated = [created, ...tasks];
     setTasks(updated);
     saveTasks(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "CREATE_TASK",
+      entityName: "tasks",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
     const updated = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updated);
     saveTasks(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_TASK",
+      entityName: "tasks",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedTask,
+    });
   };
 
   const handleDeleteTask = (id: string) => {
     const updated = tasks.filter((t) => t.id !== id);
     setTasks(updated);
     saveTasks(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "DELETE_TASK",
+      entityName: "tasks",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   const handleAddSubject = (
@@ -785,18 +908,39 @@ export default function App() {
     const updated = [created, ...notes];
     setNotes(updated);
     saveNotes(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "CREATE_NOTE",
+      entityName: "notes",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleUpdateNote = (updatedNote: Note) => {
     const updated = notes.map((n) => (n.id === updatedNote.id ? updatedNote : n));
     setNotes(updated);
     saveNotes(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_NOTE",
+      entityName: "notes",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedNote,
+    });
   };
 
   const handleDeleteNote = (id: string) => {
     const updated = notes.filter((n) => n.id !== id);
     setNotes(updated);
     saveNotes(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "DELETE_NOTE",
+      entityName: "notes",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   const handleAddHabit = (
@@ -812,6 +956,13 @@ export default function App() {
     const updated = [...habits, created];
     setHabits(updated);
     saveHabits(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_HABIT",
+      entityName: "habits",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleToggleHabitDate = (habitId: string, dateStr: string) => {
@@ -832,17 +983,38 @@ export default function App() {
     });
     setHabits(updated);
     saveHabits(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_HABIT",
+      entityName: "habits",
+      action: "update",
+      profileId: activeProfileId,
+      payload: { habitId, dateStr },
+    });
   };
 
   const handleDeleteHabit = (id: string) => {
     const updated = habits.filter((h) => h.id !== id);
     setHabits(updated);
     saveHabits(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_HABIT",
+      entityName: "habits",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   const handleUpdateWater = (newWater: WaterLog) => {
     setWater(newWater);
     saveWater(newWater, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: activeProfileId,
+      payload: newWater,
+    });
   };
 
   const handleLogFocusSession = (log: Omit<FocusSessionLog, "id">) => {
@@ -853,6 +1025,13 @@ export default function App() {
     const updated = [created, ...focusLogs];
     setFocusLogs(updated);
     saveFocusSessions(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "LOG_FOCUS",
+      entityName: "focus",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   // Last User Prompt for Abya AI Retry
@@ -1318,18 +1497,39 @@ export default function App() {
     const updated = [created, ...goals];
     setGoals(updated);
     saveGoals(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_GOAL",
+      entityName: "goals",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleUpdateGoal = (updatedGoal: Goal) => {
     const updated = goals.map((g) => (g.id === updatedGoal.id ? updatedGoal : g));
     setGoals(updated);
     saveGoals(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_GOAL",
+      entityName: "goals",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedGoal,
+    });
   };
 
   const handleDeleteGoal = (id: string) => {
     const updated = goals.filter((g) => g.id !== id);
     setGoals(updated);
     saveGoals(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_GOAL",
+      entityName: "goals",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   // Calendar Event Handlers
@@ -1342,18 +1542,39 @@ export default function App() {
     const updated = [created, ...calendarEvents];
     setCalendarEvents(updated);
     saveCalendarEvents(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_EVENT",
+      entityName: "calendarEvents",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleUpdateCalendarEvent = (updatedEvent: CalendarEvent) => {
     const updated = calendarEvents.map((e) => (e.id === updatedEvent.id ? updatedEvent : e));
     setCalendarEvents(updated);
     saveCalendarEvents(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_EVENT",
+      entityName: "calendarEvents",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedEvent,
+    });
   };
 
   const handleDeleteCalendarEvent = (id: string) => {
     const updated = calendarEvents.filter((e) => e.id !== id);
     setCalendarEvents(updated);
     saveCalendarEvents(updated);
+    enqueueOfflineAction({
+      type: "UPDATE_EVENT",
+      entityName: "calendarEvents",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   const handleClearAllOSData = () => {
@@ -1503,11 +1724,20 @@ export default function App() {
   return (
     <div
       className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] transition-[height] duration-150 ease-out overflow-x-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       style={{
         minHeight: visualViewportHeight ? `${visualViewportHeight}px` : "100dvh",
         maxHeight: visualViewportHeight && isKeyboardOpen ? `${visualViewportHeight}px` : undefined,
       }}
     >
+      {/* Mobile Swipe-to-Navigate Gesture Feedback Indicator */}
+      {swipeFeedback && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-slate-900/90 text-emerald-300 text-xs font-bold border border-emerald-500/30 backdrop-blur-md shadow-2xl flex items-center gap-1.5 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+          <span>{swipeFeedback.direction === "left" ? "→" : "←"}</span>
+          <span className="capitalize">{swipeFeedback.targetTab}</span>
+        </div>
+      )}
       {/* Top OS Bar */}
       <StatusBar
         settings={settings}
