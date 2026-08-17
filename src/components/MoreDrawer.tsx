@@ -28,6 +28,8 @@ import {
   BellRing,
   Check,
   Mail,
+  Calendar,
+  Target,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -163,6 +165,22 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
         category: "intelligence",
       },
       // Workspace & Tools
+      {
+        id: "calendar" as ActiveTab,
+        label: t.calendar || "Calendar & Sync",
+        desc: currentLanguage === "hi" ? "गूगल कैलेंडर सिंक, परीक्षा समय-सारणी व इवेंट्स" : "Google Calendar sync, exam timetable & scheduled events",
+        icon: Calendar,
+        color: "from-blue-500 to-indigo-500",
+        category: "tools",
+      },
+      {
+        id: "goals" as ActiveTab,
+        label: t.goals || "Goals & Targets",
+        desc: currentLanguage === "hi" ? "अकादमिक लक्ष्य, ग्रेड लक्ष्य व मील के पत्थर" : "Academic goals, target grades & milestone tracker",
+        icon: Target,
+        color: "from-emerald-500 to-teal-500",
+        category: "tools",
+      },
       {
         id: "gmail" as ActiveTab,
         label: "Gmail Center",

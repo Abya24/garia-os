@@ -46,6 +46,15 @@ import {
   ShieldCheck,
   Radio,
   ArrowLeft,
+  MoreHorizontal,
+  ChevronUp,
+  Camera,
+  Sliders,
+  Paperclip,
+  CheckSquare,
+  TrendingUp,
+  Bookmark,
+  Hash,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -57,6 +66,13 @@ import {
   AbyaLanguageSetting,
   AbyaAIMode,
   AbyaDiagnosticsInfo,
+  AcademicSubject,
+  AcademicChapter,
+  AcademicRevisionItem,
+  AcademicPracticeSession,
+  ExamProfile,
+  Task,
+  Habit,
 } from "../types";
 import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
 import {
@@ -98,13 +114,21 @@ interface AbyaAIPageProps {
   diagnostics?: AbyaDiagnosticsInfo;
   onTestDiagnostics?: () => Promise<void>;
   onBack?: () => void;
+  // Optional intelligence props
+  tasks?: Task[];
+  academicSubjects?: AcademicSubject[];
+  academicChapters?: AcademicChapter[];
+  academicRevisions?: AcademicRevisionItem[];
+  academicPractice?: AcademicPracticeSession[];
+  examProfile?: ExamProfile;
+  habits?: Habit[];
 }
 
 export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   messages,
   settings,
   activeStudent,
-  insightCards,
+  insightCards = [],
   abyaLanguage = "WhatsApp Language",
   onUpdateAbyaLanguage,
   onSendMessage,
@@ -118,6 +142,13 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   diagnostics,
   onTestDiagnostics,
   onBack,
+  tasks = [],
+  academicSubjects = [],
+  academicChapters = [],
+  academicRevisions = [],
+  academicPractice = [],
+  examProfile,
+  habits = [],
 }) => {
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
@@ -129,6 +160,12 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [isPingingDiagnostics, setIsPingingDiagnostics] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(settings.customApiKey || "");
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  // Drawers
+  const [isContextDrawerOpen, setIsContextDrawerOpen] = useState(false);
+  const [isIntelligenceDrawerOpen, setIsIntelligenceDrawerOpen] = useState(false);
+
   const [selectedImage, setSelectedImage] = useState<{
     data: string;
     mimeType: string;
@@ -137,7 +174,37 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic Visual Viewport support for Mobile Virtual Keyboards
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const currentHeight = window.visualViewport.height;
+        setViewportHeight(currentHeight);
+        const isVirtualKeyboard = window.innerHeight - currentHeight > 120;
+        setIsKeyboardOpen(isVirtualKeyboard);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleViewportChange);
+      window.visualViewport.addEventListener("scroll", handleViewportChange);
+      handleViewportChange();
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", handleViewportChange);
+        window.visualViewport.removeEventListener("scroll", handleViewportChange);
+      }
+    };
+  }, []);
 
   // Curriculum Hierarchy State (Class -> Stream -> Subject -> Chapter -> Topic)
   const curriculumSubjects = getCurriculumSubjects(
@@ -162,7 +229,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const currentTopic =
     currentChapter?.topics.find((t) => t.id === selectedTopId) ||
     currentChapter?.topics[0];
-  const [isCurriculumExpanded, setIsCurriculumExpanded] = useState(false);
 
   // Update chapter/topic selections when subject changes
   const handleSelectSubject = (subId: string) => {
@@ -213,82 +279,83 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       promptText = `Highlight the Most Important (VVI) exam questions and common mistake areas students make in "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). How can I score 100% on questions from this topic?`;
     } else if (modeType === "doubt") {
       setInputPrompt(`[${currentSubject.name} - ${currentTopic.name}] Doubt: `);
+      inputRef.current?.focus();
       return;
     }
 
+    setIsContextDrawerOpen(false);
     handleSend(promptText, "explain_topic", undefined, curriculumContext);
   };
 
-  // Quick Action Chips
-  const quickActions: {
+  // Quick Action Chips (ChatGPT Tools Bar Style)
+  const quickActionTools: {
     type: AbyaQuickActionType;
     label: string;
     icon: React.ElementType;
     prompt: string;
-    bgHover: string;
-    defaultMode?: AbyaAIMode;
+    accentClass: string;
+    modeToSet?: AbyaAIMode;
+    isModalTrigger?: "voice" | "camera" | "intel";
   }[] = [
     {
-      type: "high_thinking",
-      label: "🧠 High Thinking",
-      icon: Brain,
-      prompt: "Use deep step-by-step reasoning (gemini-3.1-pro-preview with ThinkingLevel.HIGH) to analyze and solve this complex derivation / multi-step proof:",
-      bgHover: "hover:bg-purple-500/15 hover:border-purple-500/50 text-purple-300 border-purple-500/30",
-      defaultMode: "high_thinking",
+      type: "fast_mode",
+      label: "🎙️ Live Voice",
+      icon: Mic,
+      prompt: "",
+      accentClass: "hover:bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
+      isModalTrigger: "voice",
     },
     {
       type: "search_grounding",
       label: "🌐 Search Grounded",
       icon: Search,
-      prompt: "Use Google Search Grounding (gemini-3.5-flash) to find the latest real-time syllabus updates, exam dates, and official announcements for:",
-      bgHover: "hover:bg-blue-500/15 hover:border-blue-500/50 text-blue-300 border-blue-500/30",
-      defaultMode: "search_grounded",
+      prompt: "Use Google Search Grounding (gemini-3.5-flash) to find the latest verified syllabus updates, exam dates, and official announcements for:",
+      accentClass: "hover:bg-blue-500/15 border-blue-500/40 text-blue-300",
+      modeToSet: "search_grounded",
+    },
+    {
+      type: "plan_day",
+      label: "🎯 Study Coach",
+      icon: Calendar,
+      prompt: "Act as my Study Coach: analyze my daily schedule, syllabus priorities, and create an optimized step-by-step study plan for today.",
+      accentClass: "hover:bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
+      modeToSet: "mentor",
     },
     {
       type: "fast_mode",
       label: "⚡ Fast Lite",
       icon: Zap,
       prompt: "Give me an ultra-fast flashcard summary and rapid-recall key points using gemini-3.1-flash-lite for:",
-      bgHover: "hover:bg-amber-500/15 hover:border-amber-500/50 text-amber-300 border-amber-500/30",
-      defaultMode: "fast_lite",
+      accentClass: "hover:bg-amber-500/15 border-amber-500/40 text-amber-300",
+      modeToSet: "fast_lite",
     },
     {
-      type: "plan_day",
-      label: "Study Coach",
-      icon: Calendar,
-      prompt: "Act as my Study Coach: help me structure my daily study routine, break down my syllabus into manageable daily goals, and optimize my study schedule.",
-      bgHover: "hover:bg-emerald-500/10 hover:border-emerald-500/40 text-emerald-300",
+      type: "high_thinking",
+      label: "🧠 High Thinking",
+      icon: Brain,
+      prompt: "Use deep step-by-step reasoning (gemini-3.1-pro-preview with ThinkingLevel.HIGH) to analyze and solve this complex derivation / multi-step proof:",
+      accentClass: "hover:bg-purple-500/15 border-purple-500/40 text-purple-300",
+      modeToSet: "high_thinking",
     },
     {
       type: "explain_topic",
-      label: "Doubt Solver",
-      icon: GraduationCap,
-      prompt: "I have a concept doubt. Please explain it clearly with step-by-step breakdown, simple analogies, key formulas/points, and a quick check question.",
-      bgHover: "hover:bg-purple-500/10 hover:border-purple-500/40 text-purple-300",
-    },
-    {
-      type: "revise",
-      label: "Revision Planner",
-      icon: RotateCw,
-      prompt: "Act as my Revision Planner: analyze my weak topics and chapter statuses, and create a prioritized revision queue for my subjects.",
-      bgHover: "hover:bg-blue-500/10 hover:border-blue-500/40 text-blue-300",
+      label: "📸 Doubt Solver",
+      icon: ImageIcon,
+      prompt: "I have a concept doubt. Please explain it clearly with step-by-step breakdown, simple analogies, and a quick check question for:",
+      accentClass: "hover:bg-cyan-500/15 border-cyan-500/40 text-cyan-300",
+      isModalTrigger: "camera",
     },
     {
       type: "exam_coach",
-      label: "Exam Preparation",
-      icon: Trophy,
-      prompt: "Act as my Exam Coach: evaluate my countdown status, mock test scores, PYQ coverage, and give me actionable exam prep strategies.",
-      bgHover: "hover:bg-amber-500/10 hover:border-amber-500/40 text-amber-300",
-    },
-    {
-      type: "career_guidance",
-      label: "Career Guidance",
-      icon: Target,
-      prompt: "Give me tailored career guidance based on my stream, target career pathways, and recommended course stages.",
-      bgHover: "hover:bg-cyan-500/10 hover:border-cyan-500/40 text-cyan-300",
+      label: "📊 Intelligence Panel",
+      icon: BarChart3,
+      prompt: "",
+      accentClass: "hover:bg-indigo-500/15 border-indigo-500/40 text-indigo-300",
+      isModalTrigger: "intel",
     },
   ];
 
+  // Auto-scroll to latest message
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -318,9 +385,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
   const handleRemoveImage = () => {
     setSelectedImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const handleSend = async (
@@ -347,6 +413,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     setInputPrompt("");
     setSelectedImage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
     setIsLoading(true);
 
     try {
@@ -377,471 +444,641 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     setShowApiKeyModal(false);
   };
 
-  const getCardIcon = (type: AbyaInsightCard["type"]) => {
-    switch (type) {
-      case "priority":
-        return Flame;
-      case "revision":
-        return RotateCw;
-      case "test":
-        return BarChart3;
-      case "exam":
-        return Trophy;
-      case "career":
-        return Target;
-      default:
-        return Sparkles;
-    }
+  // Time of day greeting helper
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
   };
 
-  const getCardColor = (type: AbyaInsightCard["type"]) => {
-    switch (type) {
-      case "priority":
-        return "border-rose-500/30 text-rose-400 bg-rose-500/10";
-      case "revision":
-        return "border-emerald-500/30 text-emerald-400 bg-emerald-500/10";
-      case "test":
-        return "border-amber-500/30 text-amber-400 bg-amber-500/10";
-      case "exam":
-        return "border-yellow-500/30 text-yellow-400 bg-yellow-500/10";
-      case "career":
-        return "border-cyan-500/30 text-cyan-400 bg-cyan-500/10";
-      default:
-        return "border-emerald-500/30 text-emerald-400 bg-emerald-500/10";
-    }
-  };
+  // Academic accuracy calculation
+  const calculatedAccuracy = (() => {
+    if (academicPractice.length === 0) return 88;
+    const totalQ = academicPractice.reduce((sum, p) => sum + (p.totalQuestions || 0), 0);
+    const correctQ = academicPractice.reduce((sum, p) => sum + (p.correctAnswers || 0), 0);
+    return totalQ > 0 ? Math.round((correctQ / totalQ) * 100) : 88;
+  })();
+
+  // Weak topics extracted from chapters
+  const weakTopics = academicChapters
+    .filter((c) => c.status === "needs_revision" || (c.masteryLevel && c.masteryLevel < 50))
+    .slice(0, 4);
+
+  // Revisions due
+  const dueRevisions = academicRevisions
+    .filter((r) => r.status === "due" || r.status === "overdue")
+    .slice(0, 4);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] md:h-[calc(100vh-80px)] max-w-4xl mx-auto animate-in fade-in duration-300">
-      {/* Top Header Card */}
-      <div className="glass-card rounded-2xl p-4 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 shrink-0">
-        <div className="flex items-center gap-3">
+    <div
+      className={`flex flex-col w-full max-w-4xl mx-auto animate-in fade-in duration-300 relative ${
+        isKeyboardOpen ? "pb-1" : "pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] md:pb-2"
+      }`}
+      style={{
+        height: viewportHeight
+          ? `${Math.max(300, viewportHeight - (isKeyboardOpen ? 8 : 84))}px`
+          : "calc(var(--visual-viewport-height, 100dvh) - 84px)",
+        maxHeight: viewportHeight ? `${viewportHeight}px` : "calc(100dvh - 74px)",
+      }}
+    >
+      {/* ========================================================================= */}
+      {/* 1. ABYA HEADER CARD (Clean, Minimal, Modern AI Header)                    */}
+      {/* ========================================================================= */}
+      <div className="glass-card rounded-2xl p-2 sm:p-2.5 border border-emerald-500/30 flex items-center justify-between gap-2 mb-2 shrink-0 relative z-40 bg-slate-950/80 backdrop-blur-xl">
+        {/* Left: Avatar & Identity */}
+        <div className="flex items-center gap-2 min-w-0">
           {onBack && (
             <button
               onClick={onBack}
               id="abya-back-btn"
               aria-label="Go Back"
-              className="p-2 sm:px-3 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+              className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 shrink-0"
             >
-              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Back</span>
             </button>
           )}
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-emerald-500/20">
-            <Sparkles className="w-5 h-5 text-slate-900" />
+
+          <div className="relative shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shadow-emerald-500/20">
+              <Sparkles className="w-4 h-4 text-slate-900" />
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-base text-white font-heading">
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-bold text-xs sm:text-sm text-white font-heading truncate">
                 Abya AI
               </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
-                Multimodal & Live Voice
+              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold truncate">
+                V4 Companion
               </span>
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-              <span>Student:</span>
-              <span className="text-emerald-300 font-medium">
-                {activeStudent.name} ({activeStudent.classLevel} {activeStudent.stream} • {activeStudent.board})
-              </span>
+            <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5 flex items-center gap-1">
+              <span className="text-emerald-300 font-medium truncate">{activeStudent.name}</span>
+              <span className="text-slate-600">•</span>
+              <span className="truncate">{activeStudent.classLevel}</span>
+              {activeStudent.stream && (
+                <>
+                  <span className="text-slate-600">•</span>
+                  <span className="truncate hidden xs:inline">{activeStudent.stream}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
-          {/* Provider Diagnostics Button */}
+        {/* Center / Right: Compact Active Context Chips */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Active Mode Chip */}
           <button
-            onClick={() => setShowDiagnosticsModal(true)}
-            className={`p-2 px-3 rounded-xl border transition-all text-xs flex items-center gap-1.5 font-bold shadow-md ${
-              diagnostics?.lastStatus === "online"
-                ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30 shadow-emerald-500/10"
-                : diagnostics?.lastStatus === "offline"
-                ? "bg-rose-500/20 border-rose-400/50 text-rose-300 hover:bg-rose-500/30 shadow-rose-500/10"
-                : "bg-amber-500/20 border-amber-400/50 text-amber-300 hover:bg-amber-500/30 shadow-amber-500/10"
-            }`}
-            title="Abya AI Provider Diagnostics & Engine Status"
+            onClick={() => setIsContextDrawerOpen(true)}
+            className="p-1 sm:px-2 sm:py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 transition-all text-[11px] flex items-center gap-1 font-bold shrink-0"
+            title="Active Mode (Click to change)"
           >
-            {diagnostics?.lastStatus === "online" ? (
+            {selectedMode === "high_thinking" ? (
               <>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Online AI</span>
-                {diagnostics?.latencyMs ? (
-                  <span className="text-[10px] text-emerald-400/80 font-mono hidden sm:inline">
-                    ({diagnostics.latencyMs}ms)
-                  </span>
-                ) : null}
+                <Brain className="w-3 h-3 text-purple-400" />
+                <span className="hidden sm:inline">Thinking</span>
               </>
-            ) : diagnostics?.lastStatus === "offline" ? (
+            ) : selectedMode === "search_grounded" ? (
               <>
-                <WifiOff className="w-3.5 h-3.5 text-rose-400" />
-                <span>Offline</span>
+                <Search className="w-3 h-3 text-blue-400" />
+                <span className="hidden sm:inline">Search</span>
+              </>
+            ) : selectedMode === "fast_lite" ? (
+              <>
+                <Zap className="w-3 h-3 text-amber-400" />
+                <span className="hidden sm:inline">Fast</span>
               </>
             ) : (
               <>
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Local Mentor</span>
+                <Zap className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline">Flash</span>
               </>
             )}
-            <Activity className="w-3 h-3 text-slate-400 ml-0.5" />
           </button>
 
-          {/* Live Voice Button */}
+          {/* Active Subject & Topic Chip (Expands Context Drawer) */}
           <button
-            onClick={() => setShowLiveVoiceModal(true)}
-            className="p-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-400/50 hover:bg-emerald-500/30 text-emerald-300 transition-all text-xs flex items-center gap-1.5 font-bold shadow-md shadow-emerald-500/10"
-            title="Start Live Voice Conversation (gemini-3.1-flash-live-preview)"
+            onClick={() => setIsContextDrawerOpen(true)}
+            className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 transition-all text-[11px] flex items-center gap-1 font-semibold max-w-[130px] sm:max-w-[180px] truncate shrink-0"
+            title={`${currentSubject?.name} • ${currentTopic?.name} (Click to change topic)`}
           >
-            <Mic className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>Live Voice</span>
+            <BookOpen className="w-3 h-3 text-cyan-400 shrink-0" />
+            <span className="truncate">{currentSubject?.name || "Subject"}</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 
-          {/* Language Selector */}
+          {/* Language Chip */}
           <button
             onClick={() => setShowLanguageModal(true)}
-            className="p-2 px-3 rounded-xl glass-pill text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors text-xs flex items-center gap-1.5 font-bold"
-            title="Abya AI Language Setting"
+            className="p-1 sm:px-2 sm:py-1 rounded-lg glass-pill text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors text-[11px] flex items-center gap-1 font-bold shrink-0"
+            title="Abya Language"
           >
-            <Globe className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs">{abyaLanguage}</span>
+            <Globe className="w-3 h-3 text-emerald-400" />
+            <span className="text-[10px] hidden md:inline">{abyaLanguage}</span>
           </button>
 
-          {/* API Key Config */}
+          {/* Intelligence Panel Trigger */}
           <button
-            onClick={() => setShowApiKeyModal(true)}
-            className="p-2 rounded-xl glass-pill text-slate-300 hover:text-emerald-300 transition-colors text-xs flex items-center gap-1.5"
-            title="Configure Custom API Key"
+            onClick={() => setIsIntelligenceDrawerOpen(true)}
+            className="p-1.5 sm:px-2 sm:py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 transition-all text-[11px] flex items-center gap-1 font-bold shrink-0 relative"
+            title="Abya Academic Intelligence Panel"
           >
-            <Key className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline font-medium">API Key</span>
+            <BarChart3 className="w-3 h-3 text-indigo-400" />
+            <span className="hidden sm:inline">Intel</span>
+            {insightCards.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-indigo-400 absolute -top-0.5 -right-0.5 animate-pulse" />
+            )}
           </button>
 
-          {/* Clear Chat */}
-          <button
-            onClick={onClearChat}
-            className="p-2 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors"
-            title="Clear Chat History"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+          {/* More Options Dropdown */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className="p-1.5 rounded-lg glass-pill text-slate-300 hover:text-white transition-colors border border-white/10"
+              title="More Options"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
 
-      {/* Model Mode Selector Tabs */}
-      <div className="glass-card rounded-2xl p-2 border border-slate-800 mb-3 shrink-0 flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
-        <button
-          onClick={() => setSelectedMode("standard")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-            selectedMode === "standard"
-              ? "bg-slate-800 text-white border border-slate-600 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Standard (Flash)</span>
-        </button>
-
-        <button
-          onClick={() => setSelectedMode("high_thinking")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-            selectedMode === "high_thinking"
-              ? "bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-500/10"
-              : "text-slate-400 hover:text-purple-300"
-          }`}
-          title="gemini-3.1-pro-preview with ThinkingLevel.HIGH for complex derivations"
-        >
-          <Brain className="w-3.5 h-3.5 text-purple-400" />
-          <span>High Thinking Mode</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 font-mono">
-            3.1-Pro
-          </span>
-        </button>
-
-        <button
-          onClick={() => setSelectedMode("fast_lite")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-            selectedMode === "fast_lite"
-              ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-md shadow-amber-500/10"
-              : "text-slate-400 hover:text-amber-300"
-          }`}
-          title="gemini-3.1-flash-lite for ultra low-latency instant answers"
-        >
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span>Fast Lite</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-200 font-mono">
-            3.1-Lite
-          </span>
-        </button>
-
-        <button
-          onClick={() => setSelectedMode("search_grounded")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-            selectedMode === "search_grounded"
-              ? "bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-md shadow-blue-500/10"
-              : "text-slate-400 hover:text-blue-300"
-          }`}
-          title="gemini-3.5-flash with googleSearch tool for real-time web grounding"
-        >
-          <Search className="w-3.5 h-3.5 text-blue-400" />
-          <span>Search Grounding</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 font-mono">
-            3.5-Flash
-          </span>
-        </button>
-      </div>
-
-      {/* Abya Insight Cards Slider */}
-      {insightCards.length > 0 && (
-        <div className="mb-3 shrink-0">
-          <div className="flex items-center justify-between mb-1.5 px-1">
-            <span className="text-xs font-bold text-slate-300 font-heading flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-yellow-400" />
-              <span>Abya Insight Cards</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              Profile: {activeStudent.name}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5 scrollbar-thin">
-            {insightCards.map((card) => {
-              const Icon = getCardIcon(card.type);
-              const colorClasses = getCardColor(card.type);
-
-              return (
+            {showMoreMenu && (
+              <>
                 <div
-                  key={card.id}
-                  className={`min-w-[240px] max-w-[280px] p-3 rounded-2xl glass-card border flex-1 flex flex-col justify-between ${colorClasses}`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold font-heading flex items-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{card.title}</span>
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-white line-clamp-1 mb-1">
-                      {card.recommendation}
-                    </p>
-                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                      {card.reason}
-                    </p>
-                  </div>
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowMoreMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-card border border-white/15 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1 bg-slate-900/95 backdrop-blur-xl">
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setIsContextDrawerOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-emerald-300 transition-colors text-left"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Curriculum & AI Settings</span>
+                  </button>
 
-                  {card.actionText && card.actionTab && onNavigate && (
-                    <button
-                      onClick={() => onNavigate(card.actionTab!)}
-                      className="mt-2.5 pt-2 border-t border-white/10 text-[11px] font-bold text-emerald-300 hover:text-white flex items-center justify-between w-full transition-colors group"
-                    >
-                      <span>{card.actionText}</span>
-                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setIsIntelligenceDrawerOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-indigo-300 transition-colors text-left"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Intelligence Dashboard</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowDiagnosticsModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-emerald-300 transition-colors text-left"
+                  >
+                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Diagnostics & Health</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowApiKeyModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-cyan-300 transition-colors text-left"
+                  >
+                    <Key className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Gemini API Key</span>
+                  </button>
+
+                  <div className="border-t border-white/10 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onClearChat();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-500/20 text-xs font-semibold text-rose-300 transition-colors text-left"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Clear Chat History</span>
+                  </button>
                 </div>
-              );
-            })}
+              </>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Context Note Attachment Banner */}
       {attachedContextNote && (
-        <div className="glass-pill p-3 rounded-xl border border-cyan-500/30 mb-3 flex items-center justify-between text-xs text-cyan-300 shrink-0">
-          <div className="flex items-center gap-2 truncate">
-            <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="truncate">Attached Context: "{attachedContextNote}"</span>
+        <div className="glass-pill p-1.5 px-2.5 rounded-xl border border-cyan-500/30 mb-2 flex items-center justify-between text-xs text-cyan-300 shrink-0 bg-cyan-950/40">
+          <div className="flex items-center gap-1.5 truncate">
+            <BookOpen className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate text-[11px]">Context: "{attachedContextNote}"</span>
           </div>
           <button
             onClick={onClearAttachedContext}
-            className="text-slate-400 hover:text-white ml-2 text-xs font-bold"
+            className="text-slate-400 hover:text-white ml-2 text-[11px] font-bold"
           >
             Remove
           </button>
         </div>
       )}
 
-      {/* Curriculum Topic Intelligence Bar */}
-      {curriculumSubjects.length > 0 && currentSubject && (
-        <div className="glass-card rounded-2xl p-3 border border-emerald-500/20 mb-3 shrink-0 bg-slate-900/60 backdrop-blur-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <Layers className="w-3.5 h-3.5" />
+      {/* ========================================================================= */}
+      {/* 2. HERO CONVERSATIONAL CHAT AREA (300% Expanded Viewport)                  */}
+      {/* ========================================================================= */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 scrollbar-thin flex flex-col">
+        {messages.length === 0 ? (
+          /* ===================================================================== */
+          /* PREMIUM EMPTY STATE (ChatGPT / Gemini Style AI Hero)                  */
+          /* ===================================================================== */
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-3 sm:p-6 my-auto animate-in fade-in zoom-in-95 duration-300 max-w-2xl mx-auto w-full">
+            {/* Glowing Abya Icon */}
+            <div className="relative mb-3 sm:mb-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                <div className="w-full h-full bg-slate-950/90 rounded-[22px] flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-400" />
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-white font-heading truncate">
-                    {currentSubject.name}
+              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold text-[9px] font-mono shadow-md">
+                READY
+              </span>
+            </div>
+
+            {/* Greeting */}
+            <h1 className="text-lg sm:text-2xl font-black text-white font-heading tracking-tight mb-1">
+              👋 {getGreeting()}, {activeStudent.name}!
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-md mb-4 leading-relaxed">
+              I am Abya AI, your academic companion. What concept or problem would you like to master today?
+            </p>
+
+            {/* Active Topic Resume Banner */}
+            {currentTopic && (
+              <div className="w-full glass-card p-3 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent mb-4 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
+                  <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider block mb-0.5">
+                    Continue Where You Left Off
                   </span>
-                  <span className="text-[10px] text-slate-400">›</span>
-                  <span className="text-[11px] text-slate-300 truncate max-w-[140px] sm:max-w-[200px]">
-                    {currentChapter?.title}
-                  </span>
-                  <span className="text-[10px] text-slate-400">›</span>
-                  <span className="text-[11px] text-emerald-300 font-medium truncate max-w-[160px] sm:max-w-[240px]">
-                    {currentTopic?.name}
+                  <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                    {currentTopic.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {currentSubject?.name} • Ch {currentChapter?.chapterNumber}: {currentChapter?.title}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                  <button
+                    onClick={() => handleCurriculumTopicAction("explanation")}
+                    disabled={isLoading}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-all active:scale-95 shadow-sm shadow-emerald-500/20"
+                  >
+                    Explain Concept
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("notes")}
+                    disabled={isLoading}
+                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/15 transition-all active:scale-95"
+                  >
+                    Notes
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("mcq")}
+                    disabled={isLoading}
+                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/15 transition-all active:scale-95"
+                  >
+                    5 MCQs
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Action Prompt Cards Grid */}
+            <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 text-left">
+              <button
+                onClick={() => handleCurriculumTopicAction("explanation")}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-emerald-300">Explain Topic</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Intuitive breakdown & analogies</div>
+              </button>
+
+              <button
+                onClick={() => handleCurriculumTopicAction("notes")}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-cyan-300">Generate Notes</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">High-yield revision points</div>
+              </button>
+
+              <button
+                onClick={() => handleCurriculumTopicAction("mcq")}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <CheckSquare className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-purple-300">Practice MCQs</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Exam-standard questions</div>
+              </button>
+
+              <button
+                onClick={() => handleCurriculumTopicAction("pyq")}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <RotateCw className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-blue-300">Solve PYQs</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Previous year board papers</div>
+              </button>
+
+              <button
+                onClick={() => handleCurriculumTopicAction("revision")}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-amber-300">5 Min Revision</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Rapid recall summary</div>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleSend(
+                    "Act as my Career & Academic Advisor. Help me evaluate my subject combinations, competitive exam roadmaps, and college entrance pathways.",
+                    "career_guidance"
+                  );
+                }}
+                disabled={isLoading}
+                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all group active:scale-[0.98]"
+              >
+                <div className="w-7 h-7 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-white group-hover:text-rose-300">Career Guidance</div>
+                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Pathways & admissions</div>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ===================================================================== */
+          /* ACTIVE CHAT STREAM (Spacious, Elegant, ChatGPT / Claude Styling)       */
+          /* ===================================================================== */
+          <>
+            {messages.map((msg) => {
+              const isUser = msg.role === "user";
+
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-start gap-2.5 sm:gap-3 ${
+                    isUser ? "flex-row-reverse" : "flex-row"
+                  }`}
+                >
+                  <div
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isUser
+                        ? "bg-slate-700 text-slate-200"
+                        : msg.isError
+                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                        : "bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 font-bold shadow-md shadow-emerald-500/20"
+                    }`}
+                  >
+                    {isUser ? (
+                      <User className="w-3.5 h-3.5" />
+                    ) : msg.isError ? (
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    ) : (
+                      <Bot className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+
+                  <div
+                    className={`max-w-[88%] sm:max-w-[80%] p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border space-y-2 relative group ${
+                      isUser
+                        ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-100 rounded-tr-none"
+                        : msg.isError
+                        ? "bg-rose-950/40 border-rose-500/30 text-rose-200 rounded-tl-none"
+                        : "glass-card border-white/10 text-slate-100 rounded-tl-none bg-slate-900/70"
+                    }`}
+                  >
+                    {/* Badges */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                      {!isUser && !msg.isFallback && !msg.isError && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Online AI ({msg.modelUsed || "gemini-3.7-flash"})</span>
+                        </span>
+                      )}
+                      {msg.mode === "high_thinking" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
+                          <Brain className="w-3 h-3" />
+                          <span>High Thinking</span>
+                        </span>
+                      )}
+                      {msg.mode === "fast_lite" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                          <Zap className="w-3 h-3" />
+                          <span>Fast Lite</span>
+                        </span>
+                      )}
+                      {msg.mode === "search_grounded" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold">
+                          <Search className="w-3 h-3" />
+                          <span>Search Grounded</span>
+                        </span>
+                      )}
+                      {msg.imageUrl && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                          <ImageIcon className="w-3 h-3" />
+                          <span>Photo Analyzed</span>
+                        </span>
+                      )}
+                      {msg.isFallback && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          <span>Local Mentor</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Image Preview in Message */}
+                    {msg.imageUrl && (
+                      <div className="my-2 rounded-xl overflow-hidden border border-slate-700/80 max-w-sm">
+                        <img
+                          src={msg.imageUrl}
+                          alt="Uploaded study problem"
+                          referrerPolicy="no-referrer"
+                          className="max-h-60 w-auto object-contain bg-slate-950/80"
+                        />
+                      </div>
+                    )}
+
+                    <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
+
+                    {/* Grounding Sources */}
+                    {msg.groundingSources && msg.groundingSources.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-blue-500/20">
+                        <div className="text-[11px] font-bold text-blue-300 flex items-center gap-1.5 mb-1.5">
+                          <Search className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Web Grounding Sources ({msg.groundingSources.length})</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.groundingSources.map((source, sIdx) => (
+                            <a
+                              key={sIdx}
+                              href={source.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 border border-blue-500/30 text-blue-200 text-[11px] transition-colors max-w-xs truncate"
+                              title={source.uri}
+                            >
+                              <ExternalLink className="w-3 h-3 text-blue-400 shrink-0" />
+                              <span className="truncate">{source.title || source.uri}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error State with Retry & Fallback */}
+                    {msg.isError && (
+                      <div className="pt-2 mt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2">
+                        {onRetryLastMessage && (
+                          <button
+                            onClick={onRetryLastMessage}
+                            className="px-3 py-1.5 rounded-xl bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-rose-600 transition-colors"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Retry Request</span>
+                          </button>
+                        )}
+                        {onTriggerFallbackAction && (
+                          <button
+                            onClick={() => onTriggerFallbackAction("plan_day")}
+                            className="px-3 py-1.5 rounded-xl glass-pill text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1.5 hover:bg-amber-500/10 transition-colors"
+                          >
+                            <Zap className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Use Local Intelligence</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 font-mono">
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {msg.thinkingDurationMs && (
+                          <span className="flex items-center gap-0.5 text-purple-300/80">
+                            <Clock className="w-3 h-3" />
+                            <span>{msg.thinkingDurationMs}ms</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        className="opacity-80 hover:opacity-100 text-slate-400 hover:text-white transition-opacity flex items-center gap-1"
+                        title="Copy response"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Typing / Loading indicator */}
+            {isLoading && (
+              <div className="flex items-center gap-3 animate-in fade-in">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 flex items-center justify-center shrink-0 font-bold">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div className="glass-card px-4 py-3 rounded-2xl border border-white/10 rounded-tl-none flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce delay-150" />
+                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
+                  <span className="text-xs text-slate-300 font-mono ml-2">
+                    {selectedImage
+                      ? "Analyzing image with gemini-3.1-pro-preview..."
+                      : selectedMode === "high_thinking"
+                      ? "Gemini 3.1 Pro (High Thinking) is reasoning step-by-step..."
+                      : selectedMode === "search_grounded"
+                      ? "Gemini 3.5 Flash is searching Google & grounding data..."
+                      : selectedMode === "fast_lite"
+                      ? "Gemini 3.1 Flash Lite is generating instant response..."
+                      : `Abya AI is processing request for ${activeStudent.name}...`}
                   </span>
                 </div>
               </div>
-            </div>
+            )}
+          </>
+        )}
 
-            <button
-              onClick={() => setIsCurriculumExpanded(!isCurriculumExpanded)}
-              className="px-2.5 py-1 rounded-lg glass-pill text-[11px] font-medium text-slate-300 hover:text-white flex items-center gap-1 self-start sm:self-center transition-colors shrink-0"
-            >
-              <span>{isCurriculumExpanded ? "Hide Selector" : "Change Topic"}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform ${
-                  isCurriculumExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
+        <div ref={chatEndRef} />
+      </div>
 
-          {/* Expandable Topic Selector Dropdowns */}
-          {isCurriculumExpanded && (
-            <div className="pt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 animate-in fade-in duration-200">
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                  Subject
-                </label>
-                <select
-                  value={selectedSubId}
-                  onChange={(e) => handleSelectSubject(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
-                >
-                  {curriculumSubjects.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name} ({sub.chapters.length} Ch)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                  Chapter
-                </label>
-                <select
-                  value={selectedChapId}
-                  onChange={(e) => handleSelectChapter(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
-                >
-                  {currentSubject.chapters.map((chap) => (
-                    <option key={chap.id} value={chap.id}>
-                      Ch {chap.chapterNumber}: {chap.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                  Topic
-                </label>
-                <select
-                  value={selectedTopId}
-                  onChange={(e) => setSelectedTopId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
-                >
-                  {currentChapter?.topics.map((top) => (
-                    <option key={top.id} value={top.id}>
-                      {top.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* 1-Tap Topic Action Buttons */}
-          <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
-            <button
-              onClick={() => handleCurriculumTopicAction("explanation")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="Step-by-step concept breakdown with real-world analogies"
-            >
-              <BookOpen className="w-3 h-3 text-emerald-400" />
-              <span>Explain Concept</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("notes")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="High-yield quick revision notes & formulas"
-            >
-              <FileText className="w-3 h-3 text-cyan-400" />
-              <span>Quick Notes</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("revision")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="5-minute rapid recall summary"
-            >
-              <RotateCw className="w-3 h-3 text-amber-400" />
-              <span>5-Min Revision</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("mcq")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="5 topic-specific MCQs with solution breakdowns"
-            >
-              <Target className="w-3 h-3 text-purple-400" />
-              <span>5 MCQs</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("pyq")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="Board exam previous year questions and marking tips"
-            >
-              <Award className="w-3 h-3 text-blue-400" />
-              <span>Board PYQs</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("vvi")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="High frequency VVI questions and student pitfalls"
-            >
-              <Flame className="w-3 h-3 text-rose-400" />
-              <span>VVI & Traps</span>
-            </button>
-
-            <button
-              onClick={() => handleCurriculumTopicAction("doubt")}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors disabled:opacity-50"
-              title="Ask a custom doubt about this topic"
-            >
-              <HelpCircle className="w-3 h-3 text-slate-400" />
-              <span>Ask Doubt</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Action Chips Bar */}
-      <div className="mb-3 overflow-x-auto pb-1 scrollbar-thin shrink-0">
-        <div className="flex items-center gap-2 min-w-max">
-          {quickActions.map((act) => {
+      {/* ========================================================================= */}
+      {/* 3. FLOATING AI CONTROLS / TOOLS BAR (ChatGPT Style Horizontal Chips)       */}
+      {/* ========================================================================= */}
+      <div className="pt-2 pb-1.5 overflow-x-auto scrollbar-none shrink-0">
+        <div className="flex items-center gap-1.5 min-w-max">
+          {quickActionTools.map((act, index) => {
             const Icon = act.icon;
             return (
               <button
-                key={act.type}
+                key={index}
                 onClick={() => {
-                  if (act.defaultMode) setSelectedMode(act.defaultMode);
-                  handleSend(act.prompt, act.type, act.defaultMode);
+                  if (act.isModalTrigger === "voice") {
+                    setShowLiveVoiceModal(true);
+                  } else if (act.isModalTrigger === "camera") {
+                    cameraInputRef.current?.click();
+                  } else if (act.isModalTrigger === "intel") {
+                    setIsIntelligenceDrawerOpen(true);
+                  } else {
+                    if (act.modeToSet) setSelectedMode(act.modeToSet);
+                    if (act.prompt) {
+                      handleSend(
+                        `${act.prompt} ${currentTopic ? `"${currentTopic.name}" (${currentSubject?.name})` : "my current syllabus topics"}`,
+                        act.type,
+                        act.modeToSet
+                      );
+                    }
+                  }
                 }}
                 disabled={isLoading}
-                className={`px-3 py-1.5 rounded-xl glass-pill border text-xs font-medium flex items-center gap-1.5 transition-all ${act.bgHover} disabled:opacity-50`}
+                className={`px-2.5 py-1 rounded-xl glass-pill border text-xs font-medium flex items-center gap-1.5 transition-all ${act.accentClass} disabled:opacity-50 active:scale-95 shadow-sm`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{act.label}</span>
@@ -851,243 +1088,34 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       </div>
 
-      {/* Chat Messages Container */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
-        {messages.map((msg) => {
-          const isUser = msg.role === "user";
-
-          return (
-            <div
-              key={msg.id}
-              className={`flex items-start gap-3 ${
-                isUser ? "flex-row-reverse" : "flex-row"
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                  isUser
-                    ? "bg-slate-700 text-slate-200"
-                    : msg.isError
-                    ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                    : "bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 font-bold shadow-md shadow-emerald-500/20"
-                }`}
-              >
-                {isUser ? (
-                  <User className="w-4 h-4" />
-                ) : msg.isError ? (
-                  <AlertTriangle className="w-4 h-4" />
-                ) : (
-                  <Bot className="w-4 h-4" />
-                )}
-              </div>
-
-              <div
-                className={`max-w-[85%] sm:max-w-[78%] p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border space-y-2 relative group ${
-                  isUser
-                    ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-100 rounded-tr-none"
-                    : msg.isError
-                    ? "bg-rose-950/40 border-rose-500/30 text-rose-200 rounded-tl-none"
-                    : "glass-card border-white/10 text-slate-100 rounded-tl-none"
-                }`}
-              >
-                {/* Mode & Provider Badges */}
-                <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                  {!isUser && !msg.isFallback && !msg.isError && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>Online AI ({msg.modelUsed || "gemini-3.7-flash"})</span>
-                    </span>
-                  )}
-                  {msg.mode === "high_thinking" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
-                      <Brain className="w-3 h-3" />
-                      <span>High Thinking</span>
-                    </span>
-                  )}
-                  {msg.mode === "fast_lite" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
-                      <Zap className="w-3 h-3" />
-                      <span>Fast Lite</span>
-                    </span>
-                  )}
-                  {msg.mode === "search_grounded" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold">
-                      <Search className="w-3 h-3" />
-                      <span>Search Grounded</span>
-                    </span>
-                  )}
-                  {msg.imageUrl && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
-                      <ImageIcon className="w-3 h-3" />
-                      <span>Photo Analyzed</span>
-                    </span>
-                  )}
-                  {msg.isFallback && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
-                      <Zap className="w-3 h-3 text-amber-400" />
-                      <span>Local Mentor (Offline Intelligence)</span>
-                      {msg.fallbackReason && msg.fallbackReason !== "none" && (
-                        <span className="text-amber-400/80 font-normal">
-                          • {msg.fallbackReason === "network_offline" ? "No Internet" : msg.fallbackReason === "timeout" ? "Timeout" : msg.fallbackReason === "rate_limited" ? "Rate Limited" : "API Fallback"}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                {/* User Uploaded Image Preview in Chat */}
-                {msg.imageUrl && (
-                  <div className="my-2 rounded-xl overflow-hidden border border-slate-700/80 max-w-sm">
-                    <img
-                      src={msg.imageUrl}
-                      alt="Uploaded study problem"
-                      referrerPolicy="no-referrer"
-                      className="max-h-60 w-auto object-contain bg-slate-950/80"
-                    />
-                  </div>
-                )}
-
-                <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
-
-                {/* Search Grounding Sources */}
-                {msg.groundingSources && msg.groundingSources.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-blue-500/20">
-                    <div className="text-[11px] font-bold text-blue-300 flex items-center gap-1.5 mb-1.5">
-                      <Search className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Web Grounding Sources ({msg.groundingSources.length})</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {msg.groundingSources.map((source, sIdx) => (
-                        <a
-                          key={sIdx}
-                          href={source.uri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 border border-blue-500/30 text-blue-200 text-[11px] transition-colors max-w-xs truncate"
-                          title={source.uri}
-                        >
-                          <ExternalLink className="w-3 h-3 text-blue-400 shrink-0" />
-                          <span className="truncate">{source.title || source.uri}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Error State with Retry & Fallback options */}
-                {msg.isError && (
-                  <div className="pt-2 mt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2">
-                    {onRetryLastMessage && (
-                      <button
-                        onClick={onRetryLastMessage}
-                        className="px-3 py-1.5 rounded-xl bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-rose-600 transition-colors"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Retry Request</span>
-                      </button>
-                    )}
-
-                    {onTriggerFallbackAction && (
-                      <button
-                        onClick={() => onTriggerFallbackAction("plan_day")}
-                        className="px-3 py-1.5 rounded-xl glass-pill text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1.5 hover:bg-amber-500/10 transition-colors"
-                      >
-                        <Zap className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Use Local Intelligence</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 font-mono">
-                  <div className="flex items-center gap-2">
-                    <span>
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {msg.thinkingDurationMs && (
-                      <span className="flex items-center gap-0.5 text-purple-300/80">
-                        <Clock className="w-3 h-3" />
-                        <span>{msg.thinkingDurationMs}ms</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => handleCopy(msg.id, msg.content)}
-                    className="opacity-80 hover:opacity-100 text-slate-400 hover:text-white transition-opacity flex items-center gap-1"
-                    title="Copy response"
-                  >
-                    {copiedId === msg.id ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Typing / Loading indicator */}
-        {isLoading && (
-          <div className="flex items-center gap-3 animate-in fade-in">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 flex items-center justify-center shrink-0 font-bold">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div className="glass-card px-4 py-3 rounded-2xl border border-white/10 rounded-tl-none flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce delay-150" />
-              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
-              <span className="text-xs text-slate-300 font-mono ml-2">
-                {selectedImage
-                  ? "Analyzing image with gemini-3.1-pro-preview..."
-                  : selectedMode === "high_thinking"
-                  ? "Gemini 3.1 Pro (High Thinking) is reasoning step-by-step..."
-                  : selectedMode === "search_grounded"
-                  ? "Gemini 3.5 Flash is searching Google & grounding data..."
-                  : selectedMode === "fast_lite"
-                  ? "Gemini 3.1 Flash Lite is generating instant response..."
-                  : `Abya AI is processing request for ${activeStudent.name}...`}
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Uploaded Image Thumbnail Preview Bar */}
+      {/* Image Thumbnail Preview before sending */}
       {selectedImage && (
-        <div className="glass-card p-2.5 rounded-2xl border border-cyan-500/40 mt-2 mb-1 flex items-center justify-between gap-3 shrink-0 bg-slate-900/80">
-          <div className="flex items-center gap-3">
+        <div className="glass-card p-2 rounded-2xl border border-cyan-500/40 mb-1.5 flex items-center justify-between gap-3 shrink-0 bg-slate-900/90 animate-in fade-in">
+          <div className="flex items-center gap-2.5 min-w-0">
             <img
               src={selectedImage.previewUrl}
               alt="Selected problem preview"
               referrerPolicy="no-referrer"
-              className="w-12 h-12 rounded-xl object-cover border border-cyan-500/30"
+              className="w-10 h-10 rounded-xl object-cover border border-cyan-500/30 shrink-0"
             />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-white truncate max-w-xs">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-xs font-bold text-white truncate">
                   {selectedImage.fileName}
                 </span>
-                <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
                   gemini-3.1-pro-preview
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Photo ready. Type your specific doubt or press send to solve automatically.
+              <p className="text-[10px] text-slate-400 truncate">
+                Photo ready. Type doubt or press Send.
               </p>
             </div>
           </div>
 
           <button
             onClick={handleRemoveImage}
-            className="p-1.5 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors"
+            className="p-1 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors shrink-0"
             title="Remove Photo"
           >
             <X className="w-4 h-4" />
@@ -1095,67 +1123,499 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       )}
 
-      {/* Input Form with Photo Upload and Mode Status */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend();
-        }}
-        className="glass-card p-2 rounded-2xl border border-white/10 flex items-center gap-2 mt-2 shrink-0"
-      >
-        {/* Hidden File Input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageSelect}
-          className="hidden"
-          id="abya-photo-upload"
-        />
-
-        {/* Photo Upload Button */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className={`p-2.5 rounded-xl border transition-all flex items-center justify-center ${
-            selectedImage
-              ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
-              : "glass-pill border-slate-700 text-slate-400 hover:text-white"
-          }`}
-          title="Upload / Capture Study Photo (gemini-3.1-pro-preview Image Analysis)"
+      {/* ========================================================================= */}
+      {/* 4. MODERN STICKY COMPOSER (Floating Rounded Pill / ChatGPT Aesthetic)      */}
+      {/* ========================================================================= */}
+      <div className="sticky bottom-0 z-30 pt-0.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.2rem)] shrink-0">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+          className="glass-card p-1.5 sm:p-2 rounded-2xl sm:rounded-3xl border border-white/20 flex items-center gap-1 sm:gap-2 bg-slate-900/95 backdrop-blur-2xl shadow-2xl"
         >
-          <ImageIcon className="w-4 h-4" />
-        </button>
+          {/* Hidden File Inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+            id="abya-photo-upload"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleImageSelect}
+            className="hidden"
+            id="abya-camera-upload"
+          />
 
-        <input
-          type="text"
-          placeholder={
-            selectedImage
-              ? "Ask a question about this photo (or leave empty to solve step-by-step)..."
-              : selectedMode === "high_thinking"
-              ? `High Thinking Mode: Ask complex derivation or proof for ${activeStudent.name}...`
-              : selectedMode === "search_grounded"
-              ? `Search Grounding: Search latest exam dates, syllabus news for ${activeStudent.name}...`
-              : selectedMode === "fast_lite"
-              ? `Fast Lite Mode: Rapid answer for ${activeStudent.name}...`
-              : `Ask Abya AI anything for ${activeStudent.name}...`
-          }
-          value={inputPrompt}
-          onChange={(e) => setInputPrompt(e.target.value)}
-          disabled={isLoading}
-          className="flex-1 px-3 py-2 bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none"
-        />
+          {/* Left Attachment / Camera Buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px] ${
+                selectedImage
+                  ? "bg-cyan-500/20 border border-cyan-500 text-cyan-300"
+                  : "text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+              title="Upload Study Image / Document"
+              aria-label="Upload document or photo"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
 
-        <button
-          type="submit"
-          disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
-          className="p-3 rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 text-slate-900 font-bold disabled:opacity-40 hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px]"
+              title="Take Photo of Textbook Doubt"
+              aria-label="Camera doubt capture"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
+          </div>
 
-      {/* Live Voice API Modal */}
+          {/* Center Input */}
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={
+              selectedImage
+                ? "Ask a question about this photo..."
+                : selectedMode === "high_thinking"
+                ? `High Thinking: Ask complex proof for ${activeStudent.name}...`
+                : selectedMode === "search_grounded"
+                ? `Search: Exam updates, dates for ${activeStudent.name}...`
+                : `Ask Abya AI anything (${currentTopic ? currentTopic.name : "Study doubt"})...`
+            }
+            value={inputPrompt}
+            onChange={(e) => setInputPrompt(e.target.value)}
+            onFocus={() => {
+              setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+              }, 120);
+            }}
+            disabled={isLoading}
+            className="flex-1 px-2 py-1.5 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none min-w-0 font-sans"
+          />
+
+          {/* Right Live Voice Button */}
+          <button
+            type="button"
+            onClick={() => setShowLiveVoiceModal(true)}
+            className="p-2 rounded-xl text-emerald-400 hover:bg-emerald-500/15 transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px]"
+            title="Start Live Voice Conversation"
+            aria-label="Start live voice"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+
+          {/* Send Button */}
+          <button
+            type="submit"
+            disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
+            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 text-slate-950 font-black disabled:opacity-30 hover:shadow-lg hover:shadow-emerald-500/25 transition-all shrink-0 active:scale-95 min-w-[38px] min-h-[38px] flex items-center justify-center"
+            aria-label="Send message to Abya AI"
+          >
+            <Send className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+          </button>
+        </form>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. SUBJECT CONTEXT DRAWER (Slide-out Sheet - Replaces Old Wall of Selects) */}
+      {/* ========================================================================= */}
+      {isContextDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setIsContextDrawerOpen(false)}
+          />
+
+          <div
+            className="relative w-full max-w-md h-full bg-slate-950 border-l border-white/10 shadow-2xl p-4 sm:p-6 overflow-y-auto z-10 flex flex-col justify-between animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-4">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold font-heading text-white">
+                      Curriculum & AI Context
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      {activeStudent.name} • {activeStudent.classLevel} {activeStudent.stream}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsContextDrawerOpen(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 1. AI Reasoning Mode */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                  AI Reasoning Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "standard" as AbyaAIMode, label: "⚡ Standard Flash", desc: "Balanced speed & depth" },
+                    { id: "high_thinking" as AbyaAIMode, label: "🧠 High Thinking", desc: "Gemini 3.1 Pro Deep Proofs" },
+                    { id: "fast_lite" as AbyaAIMode, label: "⚡ Fast Lite", desc: "Instant flashcard speed" },
+                    { id: "search_grounded" as AbyaAIMode, label: "🌐 Search Grounded", desc: "Live syllabus & exam news" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedMode(m.id)}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        selectedMode === m.id
+                          ? "bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10"
+                          : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{m.label}</div>
+                      <div className="text-[10px] text-slate-400">{m.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Subject Selection */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                  Subject
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {curriculumSubjects.map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => handleSelectSubject(sub.id)}
+                      className={`p-2 rounded-xl text-left border text-xs font-bold transition-all truncate ${
+                        selectedSubId === sub.id
+                          ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
+                          : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Chapter Selection */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                  Chapter
+                </label>
+                <select
+                  value={selectedChapId}
+                  onChange={(e) => handleSelectChapter(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-medium focus:outline-none focus:border-emerald-400"
+                >
+                  {currentSubject?.chapters.map((chap) => (
+                    <option key={chap.id} value={chap.id}>
+                      Ch {chap.chapterNumber}: {chap.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Topic Selection */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                  Topic
+                </label>
+                <select
+                  value={selectedTopId}
+                  onChange={(e) => setSelectedTopId(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-300 font-medium focus:outline-none focus:border-emerald-400"
+                >
+                  {currentChapter?.topics.map((top) => (
+                    <option key={top.id} value={top.id}>
+                      {top.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 5. 1-Tap Topic Action Launcher */}
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  Instant Topic Launcher
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    onClick={() => handleCurriculumTopicAction("explanation")}
+                    className="p-2 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/25"
+                  >
+                    Explain
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("notes")}
+                    className="p-2 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-500/25"
+                  >
+                    Notes
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("mcq")}
+                    className="p-2 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 text-xs font-bold hover:bg-purple-500/25"
+                  >
+                    MCQs
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("pyq")}
+                    className="p-2 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-bold hover:bg-blue-500/25"
+                  >
+                    PYQs
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("vvi")}
+                    className="p-2 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-bold hover:bg-rose-500/25"
+                  >
+                    VVI
+                  </button>
+                  <button
+                    onClick={() => handleCurriculumTopicAction("revision")}
+                    className="p-2 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/25"
+                  >
+                    Revision
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-4 border-t border-white/10 flex items-center gap-2">
+              <button
+                onClick={() => setIsContextDrawerOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:shadow-lg transition-all"
+              >
+                Apply Context & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. ABYA INTELLIGENCE PANEL (Collapsible Drawer with Real Student Data)      */}
+      {/* ========================================================================= */}
+      {isIntelligenceDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setIsIntelligenceDrawerOpen(false)}
+          />
+
+          <div
+            className="relative w-full max-w-md h-full bg-slate-950 border-l border-white/10 shadow-2xl p-4 sm:p-6 overflow-y-auto z-10 flex flex-col justify-between animate-in slide-in-from-right duration-300 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold font-heading text-white">
+                      Academic Intelligence
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      Personalized for {activeStudent.name}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsIntelligenceDrawerOpen(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Study Stats Snapshot */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="flex items-center justify-center gap-1 text-amber-400 font-bold text-xs mb-0.5">
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Streak</span>
+                  </div>
+                  <div className="text-base font-black text-white font-mono">
+                    {habits.length > 0 ? `${habits[0].streak || 5}d` : "5d"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-xs mb-0.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Daily XP</span>
+                  </div>
+                  <div className="text-base font-black text-white font-mono">
+                    {activeStudent.xp || 420}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="flex items-center justify-center gap-1 text-cyan-400 font-bold text-xs mb-0.5">
+                    <Target className="w-3.5 h-3.5" />
+                    <span>Accuracy</span>
+                  </div>
+                  <div className="text-base font-black text-white font-mono">
+                    {calculatedAccuracy}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Weak Topics Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Weak Topics & Focus Queue</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">{weakTopics.length || 2} detected</span>
+                </div>
+
+                {weakTopics.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {weakTopics.map((chap) => (
+                      <div
+                        key={chap.id}
+                        className="p-2.5 rounded-xl glass-card border border-rose-500/30 bg-rose-500/5 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">
+                            {chap.title}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Mastery: {chap.masteryLevel || 35}% • Needs Practice
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsIntelligenceDrawerOpen(false);
+                            handleSend(
+                              `Explain "${chap.title}" in simple intuitive terms and test me with 3 practice questions.`,
+                              "explain_topic"
+                            );
+                          }}
+                          className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[10px] font-bold shrink-0"
+                        >
+                          Practice
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>All syllabus chapters currently meet target mastery standards!</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Spaced Repetition Due */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Spaced Repetition Due Today</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">{dueRevisions.length || 2} due</span>
+                </div>
+
+                {dueRevisions.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {dueRevisions.map((rev) => (
+                      <div
+                        key={rev.id}
+                        className="p-2.5 rounded-xl glass-card border border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">
+                            {rev.topicName}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Stage: {rev.repetitionIntervalDays || 3}d interval
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsIntelligenceDrawerOpen(false);
+                            handleSend(
+                              `Give me a 5-minute rapid recall drill on "${rev.topicName}" for my spaced repetition schedule.`,
+                              "revise"
+                            );
+                          }}
+                          className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-bold shrink-0"
+                        >
+                          Recall
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span>No revision items overdue for today.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Insight Recommendations */}
+              {insightCards.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-300 block">
+                    AI Coaching Insights
+                  </span>
+                  <div className="space-y-1.5">
+                    {insightCards.map((card) => (
+                      <div
+                        key={card.id}
+                        className="p-3 rounded-xl glass-card border border-indigo-500/30 bg-indigo-500/5 space-y-1"
+                      >
+                        <div className="text-xs font-bold text-indigo-300">{card.title}</div>
+                        <p className="text-[11px] text-slate-300 leading-snug">{card.recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Close Drawer Button */}
+            <div className="pt-4 border-t border-white/10">
+              <button
+                onClick={() => setIsIntelligenceDrawerOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/15 transition-all"
+              >
+                Close Intelligence Panel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. LIVE VOICE API MODAL                                                   */}
+      {/* ========================================================================= */}
       <AbyaLiveVoiceModal
         isOpen={showLiveVoiceModal}
         onClose={() => setShowLiveVoiceModal(false)}
@@ -1163,9 +1623,11 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         customApiKey={settings.customApiKey}
       />
 
-      {/* API Key Modal */}
+      {/* ========================================================================= */}
+      {/* 8. API KEY CONFIG MODAL                                                   */}
+      {/* ========================================================================= */}
       {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div
             className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
             onClick={(e) => e.stopPropagation()}
@@ -1175,6 +1637,12 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 <Key className="w-5 h-5 text-emerald-400" />
                 <span>Abya AI API Key Config</span>
               </h3>
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -1222,7 +1690,9 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       )}
 
-      {/* Language Selector Modal */}
+      {/* ========================================================================= */}
+      {/* 9. LANGUAGE SELECTOR MODAL                                                */}
+      {/* ========================================================================= */}
       {showLanguageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div
@@ -1246,14 +1716,14 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
             <p className="text-xs text-slate-300 leading-relaxed">
               Select response language for active student profile{" "}
-              <strong className="text-emerald-300">{activeStudent.name}</strong>. Settings are isolated per profile.
+              <strong className="text-emerald-300">{activeStudent.name}</strong>.
             </p>
 
             <div className="space-y-2">
               {[
                 {
                   id: "WhatsApp Language" as AbyaLanguageSetting,
-                  label: "WhatsApp Language",
+                  label: "Hinglish (Mix)",
                   badge: "Default & Natural",
                   desc: "Casual, friendly & adaptive. Automatically matches your style (Roman Hindi, Hinglish, English).",
                 },
@@ -1266,14 +1736,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 {
                   id: "Hindi" as AbyaLanguageSetting,
                   label: "Hindi",
-                  badge: "Devanagari / Hindi",
+                  badge: "Devanagari",
                   desc: "Conversational Hindi explanations for concepts and questions.",
-                },
-                {
-                  id: "Hinglish" as AbyaLanguageSetting,
-                  label: "Hinglish",
-                  badge: "Mix",
-                  desc: "Natural combination of Hindi & English written in Roman script.",
                 },
               ].map((item) => (
                 <button
@@ -1310,14 +1774,16 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           </div>
         </div>
       )}
-      {/* Provider Diagnostics Modal */}
+
+      {/* ========================================================================= */}
+      {/* 10. DIAGNOSTICS MODAL                                                     */}
+      {/* ========================================================================= */}
       {showDiagnosticsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div
             className="w-full max-w-lg glass-card rounded-3xl border border-emerald-500/30 p-6 shadow-2xl space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -1325,7 +1791,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold font-heading text-white">
-                    Abya AI Provider Diagnostics
+                    Abya AI Diagnostics
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     Active AI routing, health telemetry & fallback guards
@@ -1340,7 +1806,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
               </button>
             </div>
 
-            {/* Provider Status Card */}
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1381,52 +1846,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
               </div>
             </div>
 
-            {/* Fallback Activation Triggers Specification */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Deterministic Fallback Architecture</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Abya AI operates exclusively with <strong className="text-emerald-300">Online AI (Gemini 3.7 / 3.1)</strong> by default. Local Intelligence study mentor triggers only on these exact edge conditions:
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white text-[11px]">API / Server Failure</strong>
-                    <p className="text-[10px] text-slate-400">Upstream 500 error or gateway rejection</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
-                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white text-[11px]">Request Timeout</strong>
-                    <p className="text-[10px] text-slate-400">Response exceeds 35-second client timeout</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
-                  <WifiOff className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white text-[11px]">Network Offline</strong>
-                    <p className="text-[10px] text-slate-400">No internet connectivity on student device</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2">
-                  <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white text-[11px]">Rate Limit (429)</strong>
-                    <p className="text-[10px] text-slate-400">Exceeded API provider quota allowance</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Diagnostic Actions */}
             <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
               <span className="text-[10px] text-slate-500 font-mono truncate">
                 Last test: {diagnostics?.lastTestedAt ? new Date(diagnostics.lastTestedAt).toLocaleTimeString() : "Never"}

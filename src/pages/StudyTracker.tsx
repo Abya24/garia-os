@@ -423,6 +423,15 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     return matchesSearch && matchesSubject;
   });
 
+  const [selectedGoalType, setSelectedGoalType] = useState<string>("ALL");
+  const [selectedChapterFilter, setSelectedChapterFilter] = useState<string>("ALL");
+
+  // Available chapters for selected subject
+  const currentTrackerChapters = React.useMemo(() => {
+    if (sessionSubjectFilter === "ALL") return academicChapters;
+    return academicChapters.filter((ch) => ch.subjectId === sessionSubjectFilter);
+  }, [academicChapters, sessionSubjectFilter]);
+
   const studyMilestones = getStudyMilestones(studySessions, subjects);
 
   return (
@@ -498,6 +507,81 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
             <Plus className="w-4 h-4" />
             <span>New Subject</span>
           </button>
+        </div>
+      </div>
+
+      {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
+      <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Subject Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Subject:</span>
+            <select
+              id="tracker-subject-dropdown"
+              value={sessionSubjectFilter}
+              onChange={(e) => {
+                setSessionSubjectFilter(e.target.value);
+                setSelectedChapterFilter("ALL");
+              }}
+              className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer max-w-[160px] truncate"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">All Subjects ({subjects.length})</option>
+              {subjects.map((sub) => (
+                <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chapter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Chapter:</span>
+            <select
+              id="tracker-chapter-dropdown"
+              value={selectedChapterFilter}
+              onChange={(e) => setSelectedChapterFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer max-w-[170px] truncate"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">All Chapters ({currentTrackerChapters.length})</option>
+              {currentTrackerChapters.map((ch) => (
+                <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                  {ch.chapterNumber ? `Ch ${ch.chapterNumber}: ` : ""}{ch.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Goal Type Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Award className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Goal Type:</span>
+            <select
+              id="tracker-goaltype-dropdown"
+              value={selectedGoalType}
+              onChange={(e) => setSelectedGoalType(e.target.value)}
+              className="bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">All Goal Types</option>
+              <option value="weekly_hours" className="bg-slate-900 text-white">Weekly Target (Hours)</option>
+              <option value="daily_streak" className="bg-slate-900 text-white">Daily Streak</option>
+              <option value="chapter_mastery" className="bg-slate-900 text-white">Chapter Completion</option>
+              <option value="exam_revision" className="bg-slate-900 text-white">Exam Revision</option>
+            </select>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[220px] ml-auto">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search sessions, topics..."
+              value={sessionSearch}
+              onChange={(e) => setSessionSearch(e.target.value)}
+              className="w-full bg-slate-950/80 text-xs text-white placeholder-slate-500 pl-9 pr-4 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500 min-h-[38px]"
+            />
+          </div>
         </div>
       </div>
 

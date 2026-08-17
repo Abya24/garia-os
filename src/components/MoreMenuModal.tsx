@@ -107,6 +107,20 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       badge: `v${APP_VERSION}`,
     },
     {
+      id: "calendar" as ActiveTab,
+      label: t.calendar || "Calendar & Sync",
+      desc: currentLanguage === "hi" ? "गूगल कैलेंडर सिंक, परीक्षा समय-सारणी व इवेंट्स" : "Google Calendar sync, exam timetable & scheduled events",
+      icon: Calendar,
+      color: "from-blue-500 to-indigo-500",
+    },
+    {
+      id: "goals" as ActiveTab,
+      label: t.goals || "Goals & Targets",
+      desc: currentLanguage === "hi" ? "अकादमिक लक्ष्य, ग्रेड लक्ष्य व मील के पत्थर" : "Academic goals, target grades & milestone tracker",
+      icon: Target,
+      color: "from-emerald-500 to-teal-500",
+    },
+    {
       id: "gmail" as ActiveTab,
       label: "Gmail Center",
       desc: currentLanguage === "hi" ? "गूगल ईमेल, लीव एप्लिकेशन, डाउट्स व नोटिफिकेशन्स" : "Google Workspace mail, academic letters & teacher inbox",

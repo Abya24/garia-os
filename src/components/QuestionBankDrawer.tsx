@@ -31,6 +31,7 @@ export type QuestionBankDrawerAction =
   | "browse_vvi"
   // Practice
   | "practice_mcq"
+  | "practice_flashcards"
   | "practice_pyq"
   | "practice_assertion"
   | "practice_case_based"
@@ -44,6 +45,7 @@ export type QuestionBankDrawerAction =
   | "analytics_wrong_answers"
   | "analytics_weak_topics"
   | "analytics_history"
+  | "audit_matrix"
   // Quick Access
   | "quick_continue"
   | "quick_bookmarked"
@@ -119,6 +121,15 @@ export const QuestionBankDrawer: React.FC<QuestionBankDrawerProps> = ({
         icon: HelpCircle,
         badge: "Active",
         color: "from-purple-400 to-indigo-500",
+      },
+      {
+        id: "practice_flashcards" as QuestionBankDrawerAction,
+        section: "practice",
+        label: "Interactive Flashcards",
+        desc: "High-yield revision flashcards with formulas, concepts & mastery tracking",
+        icon: Sparkles,
+        badge: "New",
+        color: "from-purple-400 to-pink-500",
       },
       {
         id: "practice_pyq" as QuestionBankDrawerAction,
@@ -218,6 +229,15 @@ export const QuestionBankDrawer: React.FC<QuestionBankDrawerProps> = ({
         desc: "Complete log of attempted mock tests and scorecards",
         icon: History,
         color: "from-cyan-400 to-blue-500",
+      },
+      {
+        id: "audit_matrix" as QuestionBankDrawerAction,
+        section: "analytics",
+        label: "Question Bank Audit",
+        desc: "Complete subject isolation & coverage gap matrix report",
+        icon: CheckCircle2,
+        badge: "100% Green",
+        color: "from-emerald-400 to-teal-500",
       },
 
       // Quick Access

@@ -31,20 +31,27 @@ import {
   ChapterPYQ,
   PracticeQuestion,
   QuestionBankProfileProgress,
+  FlashcardItem,
 } from "../types";
 import {
   SEED_MCQS,
   SEED_PYQS,
   SEED_PRACTICE_QUESTIONS,
   getQuestionsForCurriculum,
+  getFlashcardsForCurriculum,
+  getVVIQuestionsForCurriculum,
   recordMCQAttempt,
   toggleQuestionBookmark,
   toggleItemCompleted,
+  toggleFlashcardMastered,
+  toggleFlashcardBookmark,
 } from "../utils/questionBankEngine";
 import { AppLanguage, translations } from "../utils/i18n";
 import { APP_VERSION } from "../constants/version";
 import { MockTestEngine } from "../components/MockTestEngine";
 import { QuestionBankDrawer, QuestionBankDrawerAction } from "../components/QuestionBankDrawer";
+import { FlashcardDeckPlayer } from "../components/FlashcardDeckPlayer";
+import { QuestionBankAuditView } from "../components/QuestionBankAuditView";
 
 interface QuestionBankPageProps {
   activeStudent?: StudentProfile;
@@ -59,11 +66,13 @@ interface QuestionBankPageProps {
 type QuestionBankTab =
   | "mcq"
   | "quiz"
+  | "flashcards"
   | "pyq"
   | "practice"
   | "vvi"
-  | "revision"
-  | "test";
+  | "test"
+  | "audit"
+  | "revision";
 
 export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
   activeStudent,
@@ -103,6 +112,9 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
       case "practice_mcq":
         setActiveTab("mcq");
         break;
+      case "practice_flashcards":
+        setActiveTab("flashcards");
+        break;
       case "practice_pyq":
         setActiveTab("pyq");
         break;
@@ -117,6 +129,9 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         break;
       case "tests_speed":
         setActiveTab("quiz");
+        break;
+      case "audit_matrix":
+        setActiveTab("audit");
         break;
       case "analytics_accuracy":
       case "analytics_wrong_answers":
@@ -139,7 +154,10 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
   // Profile-driven filters with strict class & stream isolation
   const defaultClass = activeStudent?.classLevel || "Class 10";
   const [selectedClass, setSelectedClass] = useState<string>(defaultClass);
+  const [selectedStream, setSelectedStream] = useState<string>(activeStudent?.stream || "Commerce");
   const [selectedSubject, setSelectedSubject] = useState<string>("ALL");
+  const [selectedChapter, setSelectedChapter] = useState<string>("ALL");
+  const [selectedTopic, setSelectedTopic] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Compute available subjects strictly based on active student stream & class
@@ -157,7 +175,7 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
       ];
     }
 
-    const stream = activeStudent?.stream || "Science";
+    const stream = selectedStream || activeStudent?.stream || "Commerce";
     if (stream === "Science") {
       return [
         { label: "All Science Subjects", value: "ALL" },
@@ -189,7 +207,7 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         { label: "English Core", value: "English" },
       ];
     }
-  }, [activeStudent, selectedClass]);
+  }, [activeStudent, selectedClass, selectedStream]);
 
   // Storage state
   const profileId = activeStudent?.id || "default";
@@ -235,29 +253,58 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
     return getQuestionsForCurriculum(selectedClass, selectedSubject);
   }, [selectedClass, selectedSubject]);
 
+  // Derived available chapters from current question pool
+  const availableChapters = useMemo(() => {
+    const chaptersSet = new Set<string>();
+    curriculumPool.mcqs.forEach((q) => q.chapterTitle && chaptersSet.add(q.chapterTitle));
+    curriculumPool.pyqs.forEach((p) => p.chapterTitle && chaptersSet.add(p.chapterTitle));
+    curriculumPool.practice.forEach((pr) => pr.chapterTitle && chaptersSet.add(pr.chapterTitle));
+    return Array.from(chaptersSet);
+  }, [curriculumPool]);
+
+  // Derived available topics for selected chapter
+  const availableTopics = useMemo(() => {
+    const topicsSet = new Set<string>();
+    curriculumPool.mcqs.forEach((q) => {
+      if ((selectedChapter === "ALL" || q.chapterTitle === selectedChapter) && q.topicName) {
+        topicsSet.add(q.topicName);
+      }
+    });
+    return Array.from(topicsSet);
+  }, [curriculumPool, selectedChapter]);
+
+  // Dynamic Flashcards Pool
+  const curriculumFlashcards = useMemo(() => {
+    return getFlashcardsForCurriculum(selectedClass, selectedSubject);
+  }, [selectedClass, selectedSubject]);
+
   // Filtered Question lists
   const filteredMCQs = useMemo(() => {
     return curriculumPool.mcqs.filter((q) => {
+      const matchChapter = selectedChapter === "ALL" || q.chapterTitle === selectedChapter;
+      const matchTopic = selectedTopic === "ALL" || q.topicName === selectedTopic;
       const matchSearch = !searchQuery || q.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || q.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchSearch;
+      return matchChapter && matchTopic && matchSearch;
     });
-  }, [curriculumPool, searchQuery]);
+  }, [curriculumPool, selectedChapter, selectedTopic, searchQuery]);
 
   const filteredPYQs = useMemo(() => {
     return curriculumPool.pyqs.filter((p) => {
+      const matchChapter = selectedChapter === "ALL" || p.chapterTitle === selectedChapter;
       const matchYear = selectedYear === "ALL" || p.year.toString() === selectedYear;
       const matchBoard = selectedBoard === "ALL" || (p.board && p.board.toLowerCase() === selectedBoard.toLowerCase());
       const matchSearch = !searchQuery || p.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || p.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchYear && matchBoard && matchSearch;
+      return matchChapter && matchYear && matchBoard && matchSearch;
     });
-  }, [curriculumPool, selectedYear, selectedBoard, searchQuery]);
+  }, [curriculumPool, selectedChapter, selectedYear, selectedBoard, searchQuery]);
 
   const filteredPractice = useMemo(() => {
     return curriculumPool.practice.filter((pr) => {
+      const matchChapter = selectedChapter === "ALL" || pr.chapterTitle === selectedChapter;
       const matchSearch = !searchQuery || pr.questionText.toLowerCase().includes(searchQuery.toLowerCase()) || pr.chapterTitle.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchSearch;
+      return matchChapter && matchSearch;
     });
-  }, [curriculumPool, searchQuery]);
+  }, [curriculumPool, selectedChapter, searchQuery]);
 
   // Handle MCQ Answer Submission
   const handleAnswerSelect = (optionIdx: number, mcq: TopicMCQ) => {
@@ -366,80 +413,198 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
           </div>
         </div>
 
-        {/* Global Controls & Filters */}
-        <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+        {/* Global Controls & Universal Dropdown Ribbon (Rule 1) */}
+        <div className="mt-5 pt-4 border-t border-white/10 space-y-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               id="open-qbank-drawer-btn"
               onClick={() => setIsQBankDrawerOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] min-h-[44px]"
             >
               <Layers className="w-4 h-4 text-cyan-400" />
               <span>Q-Bank Drawer</span>
             </button>
 
-            <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
-              <Filter className="w-4 h-4 text-indigo-400" />
+            {/* Class Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+              <Filter className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[11px] font-semibold text-slate-400">Class:</span>
               <select
+                id="qbank-class-dropdown"
                 value={selectedClass}
                 onChange={(e) => {
                   setSelectedClass(e.target.value);
                   setSelectedSubject("ALL");
+                  setSelectedChapter("ALL");
+                  setSelectedTopic("ALL");
                 }}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer pr-1"
               >
                 {activeStudent?.classLevel === "Class 10" ? (
-                  <option value="Class 10" className="bg-slate-900">Class 10 (Direct Syllabus)</option>
+                  <option value="Class 10" className="bg-slate-900 text-white">Class 10 (Direct Syllabus)</option>
                 ) : (
                   <>
-                    <option value="ALL" className="bg-slate-900">All Classes</option>
-                    <option value="Class 10" className="bg-slate-900">Class 10</option>
-                    <option value="Class 11" className="bg-slate-900">Class 11</option>
-                    <option value="Class 12" className="bg-slate-900">Class 12</option>
+                    <option value="ALL" className="bg-slate-900 text-white">All Classes</option>
+                    <option value="Class 10" className="bg-slate-900 text-white">Class 10</option>
+                    <option value="Class 11" className="bg-slate-900 text-white">Class 11</option>
+                    <option value="Class 12" className="bg-slate-900 text-white">Class 12</option>
                   </>
                 )}
               </select>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/10">
-              <BookOpen className="w-4 h-4 text-cyan-400" />
+            {/* Stream Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+              <span className="text-[11px] font-semibold text-slate-400">Stream:</span>
               <select
+                id="qbank-stream-dropdown"
+                value={selectedStream}
+                onChange={(e) => {
+                  setSelectedStream(e.target.value);
+                  setSelectedSubject("ALL");
+                  setSelectedChapter("ALL");
+                  setSelectedTopic("ALL");
+                }}
+                className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="Commerce" className="bg-slate-900 text-white">Commerce</option>
+                <option value="Science" className="bg-slate-900 text-white">Science</option>
+                <option value="Arts" className="bg-slate-900 text-white">Arts / Humanities</option>
+              </select>
+            </div>
+
+            {/* Subject Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[11px] font-semibold text-slate-400">Subject:</span>
+              <select
+                id="qbank-subject-dropdown"
                 value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                onChange={(e) => {
+                  setSelectedSubject(e.target.value);
+                  setSelectedChapter("ALL");
+                  setSelectedTopic("ALL");
+                }}
+                className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer max-w-[150px] truncate"
               >
                 {availableSubjects.map((sub) => (
-                  <option key={sub.value} value={sub.value} className="bg-slate-900">
+                  <option key={sub.value} value={sub.value} className="bg-slate-900 text-white">
                     {sub.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Chapter Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+              <span className="text-[11px] font-semibold text-slate-400">Chapter:</span>
+              <select
+                id="qbank-chapter-dropdown"
+                value={selectedChapter}
+                onChange={(e) => {
+                  setSelectedChapter(e.target.value);
+                  setSelectedTopic("ALL");
+                }}
+                className="bg-transparent text-xs font-bold text-amber-300 focus:outline-none cursor-pointer max-w-[160px] truncate"
+              >
+                <option value="ALL" className="bg-slate-900 text-white">All Chapters ({availableChapters.length})</option>
+                {availableChapters.map((ch) => (
+                  <option key={ch} value={ch} className="bg-slate-900 text-white">
+                    {ch}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Topic Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+              <span className="text-[11px] font-semibold text-slate-400">Topic:</span>
+              <select
+                id="qbank-topic-dropdown"
+                value={selectedTopic}
+                onChange={(e) => setSelectedTopic(e.target.value)}
+                className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer max-w-[140px] truncate"
+              >
+                <option value="ALL" className="bg-slate-900 text-white">All Topics</option>
+                {availableTopics.map((top) => (
+                  <option key={top} value={top} className="bg-slate-900 text-white">
+                    {top}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Question Type Dropdown (Rule 1) */}
+            <div className="flex items-center gap-1.5 bg-indigo-600/30 px-3 py-2 rounded-2xl border border-indigo-500/40 min-h-[44px] ml-auto">
+              <Zap className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[11px] font-semibold text-indigo-300">Question Type:</span>
+              <select
+                id="qbank-type-dropdown"
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as QuestionBankTab)}
+                className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="mcq" className="bg-slate-900 text-white">MCQ ({filteredMCQs.length})</option>
+                <option value="pyq" className="bg-slate-900 text-white">PYQ ({filteredPYQs.length})</option>
+                <option value="practice" className="bg-slate-900 text-white">Practice ({filteredPractice.length})</option>
+                <option value="vvi" className="bg-slate-900 text-white">VVI (High-Yield)</option>
+                <option value="flashcards" className="bg-slate-900 text-white">Flashcards ({curriculumFlashcards.length})</option>
+                <option value="test" className="bg-slate-900 text-white">Chapter Test</option>
+                <option value="quiz" className="bg-slate-900 text-white">Speed Quiz</option>
+                <option value="audit" className="bg-slate-900 text-white">Audit & Gap Report</option>
+                <option value="revision" className="bg-slate-900 text-white">Rapid Revision</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search chapters, topics, formulas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950/60 text-xs text-white placeholder-slate-500 pl-9 pr-4 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-indigo-500"
-            />
+          {/* Breadcrumbs & Search */}
+          <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-400 flex-wrap font-mono text-[11px]">
+              <span className="text-indigo-400 font-bold">{selectedClass}</span>
+              <ChevronRight className="w-3 h-3 text-slate-600" />
+              <span className="text-cyan-400 font-semibold">{selectedStream}</span>
+              <ChevronRight className="w-3 h-3 text-slate-600" />
+              <span className="text-white font-semibold">{selectedSubject === "ALL" ? "All Subjects" : selectedSubject}</span>
+              {selectedChapter !== "ALL" && (
+                <>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                  <span className="text-amber-300 truncate max-w-[140px]">{selectedChapter}</span>
+                </>
+              )}
+              {selectedTopic !== "ALL" && (
+                <>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                  <span className="text-emerald-300 truncate max-w-[120px]">{selectedTopic}</span>
+                </>
+              )}
+            </div>
+
+            <div className="relative min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search chapters, topics, formulas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-950/80 text-xs text-white placeholder-slate-500 pl-9 pr-4 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-indigo-500 min-h-[38px]"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 7 Question Bank Modes Tabs */}
+      {/* 9 Question Bank Modes Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
           { id: "mcq" as QuestionBankTab, label: t.tabMCQ, icon: HelpCircle, count: filteredMCQs.length },
+          { id: "flashcards" as QuestionBankTab, label: "Flashcards", icon: Sparkles, count: curriculumFlashcards.length, badge: "Interactive" },
           { id: "quiz" as QuestionBankTab, label: t.tabQuiz, icon: Clock, count: "5-15 Qs" },
           { id: "pyq" as QuestionBankTab, label: t.tabPYQ, icon: FileCheck2, count: filteredPYQs.length },
           { id: "practice" as QuestionBankTab, label: t.tabPractice, icon: BookOpen, count: filteredPractice.length },
           { id: "vvi" as QuestionBankTab, label: t.tabVVI, icon: Flame, badge: "High-Yield" },
-          { id: "revision" as QuestionBankTab, label: t.tabRevision, icon: Zap, badge: "Rapid" },
           { id: "test" as QuestionBankTab, label: t.tabChapterTest, icon: Award, badge: "Full" },
+          { id: "audit" as QuestionBankTab, label: "Audit & Gap Report", icon: CheckCircle2, badge: "100% Green" },
+          { id: "revision" as QuestionBankTab, label: t.tabRevision, icon: Zap, badge: "Rapid" },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -792,6 +957,25 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
         </div>
       )}
 
+      {/* Mode 2: High-Yield Interactive Flashcards */}
+      {activeTab === "flashcards" && (
+        <FlashcardDeckPlayer
+          flashcards={curriculumFlashcards}
+          profileId={profileId}
+          masteredIds={progress.masteredFlashcards || []}
+          bookmarkedIds={progress.flashcardBookmarks || []}
+          onToggleMastered={(id) => {
+            const updated = toggleFlashcardMastered(profileId, id);
+            setProgress({ ...updated });
+          }}
+          onToggleBookmark={(id) => {
+            const updated = toggleFlashcardBookmark(profileId, id);
+            setProgress({ ...updated });
+          }}
+          onAskTutor={handleAskTutor}
+        />
+      )}
+
       {/* Mode 3: PYQ Previous Year Papers */}
       {activeTab === "pyq" && (
         <div className="space-y-4">
@@ -1075,6 +1259,20 @@ export const QuestionBankPage: React.FC<QuestionBankPageProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Mode 8: Live Question Bank Audit & Multi-Stream Gap Matrix */}
+      {activeTab === "audit" && (
+        <QuestionBankAuditView
+          initialClass={selectedClass}
+          initialStream={activeStudent?.stream || "Science"}
+          onSelectTopicForPractice={(cLevel, sName, chapTitle, topName) => {
+            setSelectedClass(cLevel);
+            setSelectedSubject(sName);
+            setSearchQuery(topName);
+            setActiveTab("mcq");
+          }}
+        />
       )}
 
       {/* Mode 7: Comprehensive Examination Environment (Mock Test System) */}

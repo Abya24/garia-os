@@ -78,6 +78,8 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<AnalyticsSubTab>("intelligence");
   const [timeframe, setTimeframe] = useState<Timeframe>("daily");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
+  const [selectedMetric, setSelectedMetric] = useState<string>("all");
   const todayStr = getTodayString();
 
   const handleBack = () => {
@@ -263,32 +265,81 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
           </div>
         </div>
 
-        {/* Sub-Tabs */}
-        <div className="flex items-center gap-1 glass-card p-1.5 rounded-2xl border border-white/10 self-start sm:self-auto overflow-x-auto">
-          {[
-            { id: "intelligence" as AnalyticsSubTab, label: "Intelligence Hub", icon: Brain },
-            { id: "productivity" as AnalyticsSubTab, label: "Productivity Score", icon: Award },
-            { id: "subjects" as AnalyticsSubTab, label: "Subject Breakdown", icon: BookOpen },
-            { id: "habits" as AnalyticsSubTab, label: "Habits & Routine", icon: Flame },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeSubTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+      {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
+      <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Subject Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Subject:</span>
+            <select
+              id="analytics-subject-dropdown"
+              value={selectedSubjectId}
+              onChange={(e) => setSelectedSubjectId(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Subjects ({academicSubjects.length})</option>
+              {academicSubjects.map((sub) => (
+                <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Metric Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Award className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Metric:</span>
+            <select
+              id="analytics-metric-dropdown"
+              value={selectedMetric}
+              onChange={(e) => setSelectedMetric(e.target.value)}
+              className="bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Metrics</option>
+              <option value="productivity" className="bg-slate-900 text-white">Productivity Score</option>
+              <option value="accuracy" className="bg-slate-900 text-white">MCQ & Test Accuracy</option>
+              <option value="syllabus" className="bg-slate-900 text-white">Syllabus Completion</option>
+              <option value="study_time" className="bg-slate-900 text-white">Focus & Study Time</option>
+              <option value="habits" className="bg-slate-900 text-white">Habit Consistency</option>
+            </select>
+          </div>
+
+          {/* Date Range Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Date Range:</span>
+            <select
+              id="analytics-daterange-dropdown"
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+              className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="daily" className="bg-slate-900 text-white">Daily (Today)</option>
+              <option value="weekly" className="bg-slate-900 text-white">Weekly (Past 7 Days)</option>
+              <option value="monthly" className="bg-slate-900 text-white">Monthly (Past 30 Days)</option>
+            </select>
+          </div>
+
+          {/* View Tab Dropdown */}
+          <div className="flex items-center gap-1.5 bg-indigo-600/30 px-3 py-2 rounded-2xl border border-indigo-500/40 min-h-[44px] ml-auto">
+            <BarChart2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-[11px] font-semibold text-indigo-300">View:</span>
+            <select
+              id="analytics-view-dropdown"
+              value={activeSubTab}
+              onChange={(e) => setActiveSubTab(e.target.value as AnalyticsSubTab)}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="intelligence" className="bg-slate-900 text-white">Intelligence Hub</option>
+              <option value="productivity" className="bg-slate-900 text-white">Productivity Score</option>
+              <option value="subjects" className="bg-slate-900 text-white">Subject Breakdown</option>
+              <option value="habits" className="bg-slate-900 text-white">Habits & Routine</option>
+            </select>
+          </div>
         </div>
+      </div>
       </div>
 
       {/* Intelligence Hub Tab */}

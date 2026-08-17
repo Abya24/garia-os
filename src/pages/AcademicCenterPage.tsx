@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   GraduationCap,
   BookOpen,
@@ -16,6 +16,7 @@ import {
   Award,
   Layers,
   ChevronRight,
+  ChevronDown,
   Info,
   Clock,
   Briefcase,
@@ -24,6 +25,8 @@ import {
   CheckSquare,
   FileText,
   ArrowLeft,
+  Search,
+  Filter,
 } from "lucide-react";
 import {
   AcademicSubject,
@@ -170,6 +173,31 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
         setActiveTab("dashboard");
     }
   };
+
+  // Universal Dropdown System State (Rule 1)
+  const defaultClass = activeStudent?.classLevel || "Class 12";
+  const [selectedClass, setSelectedClass] = useState<string>(defaultClass);
+  const [selectedStream, setSelectedStream] = useState<string>(careerProfile?.stream || "Commerce");
+  const [selectedChapterId, setSelectedChapterId] = useState<string>("all");
+  const [selectedTopicName, setSelectedTopicName] = useState<string>("all");
+  const [academicSearchQuery, setAcademicSearchQuery] = useState<string>("");
+
+  // Get available chapters for selected subject
+  const currentSubjectChapters = useMemo(() => {
+    if (selectedSubjectId === "all") return chapters;
+    return chapters.filter((c) => c.subjectId === selectedSubjectId);
+  }, [chapters, selectedSubjectId]);
+
+  // Get selected chapter object
+  const activeChapterObj = useMemo(() => {
+    return chapters.find((c) => c.id === selectedChapterId) || null;
+  }, [chapters, selectedChapterId]);
+
+  // Get available topics for selected chapter
+  const currentChapterTopics = useMemo(() => {
+    if (!activeChapterObj || !activeChapterObj.topics) return [];
+    return activeChapterObj.topics;
+  }, [activeChapterObj]);
 
   // Modals state
   const [isAuditReportOpen, setIsAuditReportOpen] = useState(false);
@@ -556,38 +584,165 @@ export const AcademicCenterPage: React.FC<AcademicCenterPageProps> = ({
         </div>
       </div>
 
-      {/* Primary Academic Center Sub-Navigation Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-white/10 scrollbar-none">
-        {[
-          { id: "qbank", label: "📚 Question Bank (V2.6)", icon: GraduationCap },
-          { id: "mcq_practice", label: "MCQ Practice", icon: CheckSquare },
-          { id: "practice_qs", label: "Practice Questions", icon: FileText },
-          { id: "pyqs", label: "Chapter PYQs", icon: Award },
-          { id: "roadmap", label: "Academic Roadmap", icon: GraduationCap },
-          { id: "dashboard", label: "Subject Dashboard", icon: Layers },
-          { id: "chapters", label: "Chapter & Topics", icon: BookOpen },
-          { id: "vvi", label: "🔥 VVI Topics", icon: Flame },
-          { id: "revision", label: "Revision Planner", icon: RotateCcw },
-          { id: "tests", label: "Test Performance", icon: TrendingUp },
-          { id: "plan", label: "Daily Study Generator", icon: Clock },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                isActive
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-              }`}
+      {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
+      <div className="bg-slate-900/90 p-4 rounded-3xl border border-white/10 backdrop-blur-xl shadow-xl space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Class Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Class:</span>
+            <select
+              id="academic-class-dropdown"
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="bg-transparent text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer pr-1"
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : ""}`} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+              <option value="Class 10" className="bg-slate-900 text-white">Class 10</option>
+              <option value="Class 11" className="bg-slate-900 text-white">Class 11</option>
+              <option value="Class 12" className="bg-slate-900 text-white">Class 12</option>
+              <option value="Competitive" className="bg-slate-900 text-white">Competitive / Foundation</option>
+            </select>
+          </div>
+
+          {/* Stream Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Stream:</span>
+            <select
+              id="academic-stream-dropdown"
+              value={selectedStream}
+              onChange={(e) => setSelectedStream(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-400 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="Commerce" className="bg-slate-900 text-white">Commerce</option>
+              <option value="Science" className="bg-slate-900 text-white">Science (PCM/PCB)</option>
+              <option value="Arts" className="bg-slate-900 text-white">Arts / Humanities</option>
+              <option value="General" className="bg-slate-900 text-white">General / Applied</option>
+            </select>
+          </div>
+
+          {/* Subject Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Subject:</span>
+            <select
+              id="academic-subject-dropdown"
+              value={selectedSubjectId}
+              onChange={(e) => {
+                setSelectedSubjectId(e.target.value);
+                setSelectedChapterId("all");
+                setSelectedTopicName("all");
+              }}
+              className="bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Subjects ({subjects.length})</option>
+              {subjects.map((sub) => (
+                <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chapter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Chapter:</span>
+            <select
+              id="academic-chapter-dropdown"
+              value={selectedChapterId}
+              onChange={(e) => {
+                setSelectedChapterId(e.target.value);
+                setSelectedTopicName("all");
+              }}
+              className="bg-transparent text-xs font-bold text-amber-300 focus:outline-none cursor-pointer max-w-[170px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Chapters ({currentSubjectChapters.length})</option>
+              {currentSubjectChapters.map((ch) => (
+                <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                  {ch.chapterNumber ? `Ch ${ch.chapterNumber}: ` : ""}{ch.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Topic Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Topic:</span>
+            <select
+              id="academic-topic-dropdown"
+              value={selectedTopicName}
+              onChange={(e) => setSelectedTopicName(e.target.value)}
+              className="bg-transparent text-xs font-bold text-rose-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Topics</option>
+              {currentChapterTopics.map((topic, idx) => (
+                <option key={`${topic}-${idx}`} value={topic} className="bg-slate-900 text-white">
+                  {topic}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* View Module Dropdown (Converted from >5 Tabs into Standard Dropdown) */}
+          <div className="flex items-center gap-1.5 bg-emerald-500/15 px-3 py-2 rounded-2xl border border-emerald-500/30 min-h-[44px] ml-auto">
+            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-emerald-300">View:</span>
+            <select
+              id="academic-view-dropdown"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as any)}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="qbank" className="bg-slate-900 text-white">📚 Question Bank (V2.6)</option>
+              <option value="mcq_practice" className="bg-slate-900 text-white">MCQ Practice</option>
+              <option value="practice_qs" className="bg-slate-900 text-white">Practice Questions</option>
+              <option value="pyqs" className="bg-slate-900 text-white">Chapter PYQs</option>
+              <option value="roadmap" className="bg-slate-900 text-white">Academic Roadmap</option>
+              <option value="dashboard" className="bg-slate-900 text-white">Subject Dashboard</option>
+              <option value="chapters" className="bg-slate-900 text-white">Chapter & Topics</option>
+              <option value="vvi" className="bg-slate-900 text-white">🔥 VVI Topics</option>
+              <option value="revision" className="bg-slate-900 text-white">Revision Planner</option>
+              <option value="tests" className="bg-slate-900 text-white">Test Performance</option>
+              <option value="plan" className="bg-slate-900 text-white">Daily Study Generator</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Breadcrumbs & Quick Search Row */}
+        <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          {/* Breadcrumb Path */}
+          <div className="flex items-center gap-1.5 text-slate-400 flex-wrap font-mono text-[11px]">
+            <span className="text-emerald-400 font-bold">{selectedClass}</span>
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className="text-cyan-400 font-semibold">{selectedStream}</span>
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className="text-purple-300 font-semibold">
+              {selectedSubjectId === "all" ? "All Subjects" : subjects.find((s) => s.id === selectedSubjectId)?.name || "Subject"}
+            </span>
+            {selectedChapterId !== "all" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-amber-300 truncate max-w-[140px]">{activeChapterObj?.title || "Chapter"}</span>
+              </>
+            )}
+            {selectedTopicName !== "all" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-rose-300 truncate max-w-[120px]">{selectedTopicName}</span>
+              </>
+            )}
+          </div>
+
+          {/* Quick Search */}
+          <div className="relative min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Quick search curriculum..."
+              value={academicSearchQuery}
+              onChange={(e) => setAcademicSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/80 text-xs text-white placeholder-slate-500 pl-8 pr-3 py-1.5 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500 min-h-[36px]"
+            />
+          </div>
+        </div>
       </div>
 
       {/* QUESTION BANK SECTION */}

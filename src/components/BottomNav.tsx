@@ -17,6 +17,7 @@ interface BottomNavProps {
   onOpenProfile?: () => void;
   activeStudent?: StudentProfile;
   currentLanguage?: AppLanguage;
+  isHidden?: boolean;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -27,8 +28,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenProfile,
   activeStudent,
   currentLanguage = "en",
+  isHidden = false,
 }) => {
   const t = translations[currentLanguage] || translations.en;
+
+  if (isHidden) {
+    return null;
+  }
 
   const coreNavItems = [
     {

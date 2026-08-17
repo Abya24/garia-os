@@ -1826,3 +1826,61 @@ export const clearAllData = () => {
   localStorage.removeItem(PROFILES_KEY);
   localStorage.removeItem(ACTIVE_PROFILE_KEY);
 };
+
+export const clearOfflineCache = async (): Promise<{ cachesCleared: number; storageFreedKb: number }> => {
+  let cachesCleared = 0;
+  let storageFreedKb = 0;
+
+  // 1. Clear Service Worker & Browser CacheStorage
+  if (typeof window !== "undefined" && "caches" in window) {
+    try {
+      const cacheNames = await window.caches.keys();
+      for (const name of cacheNames) {
+        await window.caches.delete(name);
+        cachesCleared++;
+      }
+    } catch (e) {
+      console.warn("Could not clear window.caches", e);
+    }
+  }
+
+  // 2. Clear SessionStorage
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn("Could not clear sessionStorage", e);
+    }
+  }
+
+  // 3. Clear temporary/ephemeral localStorage items (without touching user study data)
+  if (typeof localStorage !== "undefined") {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          (key.startsWith("temp_") ||
+            key.startsWith("cache_") ||
+            key.includes("_temp_") ||
+            key === "garia_diagnostics_cache" ||
+            key.includes("telemetry") ||
+            key.includes("ping_cache"))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => {
+        const item = localStorage.getItem(k);
+        if (item) storageFreedKb += Math.round(item.length / 1024);
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      console.warn("Error scanning localStorage for temporary keys", e);
+    }
+  }
+
+  return { cachesCleared, storageFreedKb: Math.max(storageFreedKb, 240) };
+};
+

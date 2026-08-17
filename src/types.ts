@@ -89,7 +89,14 @@ export interface CalendarEvent {
   createdAt: number;
 }
 
-export type AbyaAIMode = "standard" | "high_thinking" | "fast_lite" | "search_grounded";
+export type AbyaAIMode =
+  | "standard"
+  | "high_thinking"
+  | "fast_lite"
+  | "search_grounded"
+  | "exam_coach"
+  | "career_coach"
+  | "mentor";
 export type AbyaProvider = "online_ai" | "local_fallback";
 export type AbyaFallbackReason =
   | "api_error"
@@ -655,6 +662,78 @@ export interface TopicMCQ {
   tags?: string[];
 }
 
+export interface FlashcardItem {
+  id: string;
+  classLevel: string; // "Class 10" | "Class 11" | "Class 12"
+  subjectName: string;
+  chapterTitle: string;
+  topicName: string;
+  front: string;
+  back: string;
+  category: "Formula" | "Definition" | "Theorem/Law" | "High-Yield Point" | "Concept";
+  mastered?: boolean;
+  tags?: string[];
+}
+
+export interface ChapterTest {
+  id: string;
+  classLevel: string;
+  subjectName: string;
+  chapterTitle: string;
+  durationMinutes: number;
+  totalMarks: number;
+  questions: TopicMCQ[];
+  passingPercentage: number;
+}
+
+export interface TopicAuditGapItem {
+  classLevel: string;
+  stream: StreamType;
+  subjectName: string;
+  chapterTitle: string;
+  topicName: string;
+  hasNotes: boolean;
+  mcqCount: number;
+  pyqCount: number;
+  practiceCount: number;
+  vviCount: number;
+  flashcardCount: number;
+  hasChapterTest: boolean;
+  isSubjectIsolated: boolean;
+  status: "Complete" | "Partial" | "Missing";
+}
+
+export interface SubjectGapSummary {
+  subjectName: string;
+  classLevel: string;
+  stream: StreamType;
+  totalChapters: number;
+  totalTopics: number;
+  completeTopics: number;
+  totalMCQs: number;
+  totalPYQs: number;
+  totalPractice: number;
+  totalFlashcards: number;
+  hasAllTests: boolean;
+  isIsolated: boolean;
+}
+
+export interface QuestionBankGapReport {
+  totalSubjects: number;
+  totalChapters: number;
+  totalTopics: number;
+  totalMCQs: number;
+  totalPYQs: number;
+  totalPractice: number;
+  totalFlashcards: number;
+  totalTests: number;
+  coveragePercentage: number;
+  subjectGaps: SubjectGapSummary[];
+  topicGaps: TopicAuditGapItem[];
+  isAuditClean: boolean;
+  auditedAt: number;
+}
+
 export interface ChapterPYQ {
   id: string;
   classLevel: string; // "Class 10" | "Class 11" | "Class 12"
@@ -702,6 +781,9 @@ export interface QuestionBankProfileProgress {
   practiceBookmarks: string[];
   pyqCompleted: string[];
   pyqBookmarks: string[];
+  masteredFlashcards?: string[];
+  flashcardBookmarks?: string[];
+  testScores?: Record<string, { marksObtained: number; maxMarks: number; completedAt: number }>;
   updatedAt: number;
 }
 

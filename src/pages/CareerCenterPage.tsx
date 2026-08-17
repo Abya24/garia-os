@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Compass,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Plus,
   Trash2,
   BarChart3,
@@ -277,6 +278,11 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     },
   ]);
 
+  // Universal Dropdown Filters for Career Center (Rule 1)
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedExam, setSelectedExam] = useState<string>("All");
+  const [selectedRole, setSelectedRole] = useState<string>("All");
+
   // Expanded card IDs
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [expandedGovtJobId, setExpandedGovtJobId] = useState<string | null>(null);
@@ -342,6 +348,39 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     subjects
   );
 
+  // Derived available filter options for Career Center
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    matchResults.forEach((res) => {
+      if (res.career.category) set.add(res.career.category);
+    });
+    return Array.from(set);
+  }, [matchResults]);
+
+  const availableExams = useMemo(() => {
+    const set = new Set<string>();
+    matchResults.forEach((res) => {
+      if ((res.career as any).entranceExams) {
+        (res.career as any).entranceExams.forEach((e: string) => set.add(e));
+      } else if (res.career.courseStages) {
+        res.career.courseStages.forEach((stage) => {
+          if (stage.toLowerCase().includes("entrance") || stage.toLowerCase().includes("exam") || stage.toLowerCase().includes("jee") || stage.toLowerCase().includes("neet") || stage.toLowerCase().includes("cuet") || stage.toLowerCase().includes("foundation") || stage.toLowerCase().includes("cat") || stage.toLowerCase().includes("clat")) {
+            set.add(stage);
+          }
+        });
+      }
+    });
+    return Array.from(set);
+  }, [matchResults]);
+
+  const availableRoles = useMemo(() => {
+    const set = new Set<string>();
+    matchResults.forEach((res) => {
+      if (res.career.title) set.add(res.career.title);
+    });
+    return Array.from(set);
+  }, [matchResults]);
+
   // Filter match results for catalog view
   const filteredMatches = matchResults.filter((res) => {
     const matchesStream =
@@ -349,11 +388,19 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
       res.career.stream === selectedCatalogStream ||
       ((selectedCatalogStream === "Arts" || selectedCatalogStream === "Arts / Humanities") &&
         (res.career.stream === "Arts" || res.career.stream === "Arts / Humanities"));
+    const matchesCategory =
+      selectedCategory === "All" || res.career.category === selectedCategory;
+    const matchesExam =
+      selectedExam === "All" ||
+      ((res.career as any).entranceExams && (res.career as any).entranceExams.includes(selectedExam)) ||
+      (res.career.courseStages && res.career.courseStages.includes(selectedExam));
+    const matchesRole =
+      selectedRole === "All" || res.career.title === selectedRole;
     const matchesQuery =
       res.career.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       res.career.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       res.career.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStream && matchesQuery;
+    return matchesStream && matchesCategory && matchesExam && matchesRole && matchesQuery;
   });
 
   const handleSelectTargetCareer = (career: CareerOption) => {
@@ -576,79 +623,149 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
         </div>
       </div>
 
-      {/* Sub Navigation Tabs */}
-      <div className="flex items-center gap-2 p-1.5 glass-card rounded-2xl border border-white/10 overflow-x-auto">
-        {[
-          {
-            id: "matches",
-            label: "Stream Careers",
-            icon: Compass,
-            badge: `${filteredMatches.length} Careers`,
-          },
-          {
-            id: "govt_jobs",
-            label: "Govt Jobs & UPSC",
-            icon: Landmark,
-            badge: "6 Sectors",
-          },
-          {
-            id: "scholarships",
-            label: "Scholarships Hub",
-            icon: Award,
-            badge: "Top 6",
-          },
-          {
-            id: "study_abroad",
-            label: "Study Abroad",
-            icon: Globe,
-            badge: "5 Countries",
-          },
-          {
-            id: "ai_advisor",
-            label: "Career AI Advisor",
-            icon: Bot,
-            badge: "AI Powered",
-          },
-          {
-            id: "roadmap",
-            label: "Personal Roadmap",
-            icon: FileCheck,
-            badge: `${roadmapProgress}%`,
-          },
-          {
-            id: "assessment",
-            label: "Know Yourself",
-            icon: Sliders,
-          },
-          {
-            id: "compare",
-            label: "Compare Careers",
-            icon: Layers,
-          },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSubTab === tab.id;
-
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                isActive
-                  ? "bg-gradient-to-r from-emerald-500/20 via-cyan-500/20 to-transparent text-emerald-300 border border-emerald-500/40 shadow-md font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
-              }`}
+      {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
+      <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Stream Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Compass className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Stream:</span>
+            <select
+              id="career-stream-dropdown"
+              value={selectedCatalogStream}
+              onChange={(e) => {
+                const s = e.target.value as "Commerce" | "Science" | "Arts / Humanities" | "All";
+                setSelectedCatalogStream(s);
+                if (s !== "All") {
+                  setStream(s as StreamType);
+                  onUpdateProfile({
+                    ...profile,
+                    stream: s as StreamType,
+                    updatedAt: Date.now(),
+                  });
+                }
+              }}
+              className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer pr-1"
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : ""}`} />
-              <span>{tab.label}</span>
-              {tab.badge && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+              <option value="All" className="bg-slate-900 text-white">All Streams</option>
+              <option value="Commerce" className="bg-slate-900 text-white">Commerce</option>
+              <option value="Science" className="bg-slate-900 text-white">Science</option>
+              <option value="Arts / Humanities" className="bg-slate-900 text-white">Arts / Humanities</option>
+            </select>
+          </div>
+
+          {/* Career Category Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Category:</span>
+            <select
+              id="career-category-dropdown"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="All" className="bg-slate-900 text-white">All Categories ({availableCategories.length})</option>
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Exam Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Award className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Exam:</span>
+            <select
+              id="career-exam-dropdown"
+              value={selectedExam}
+              onChange={(e) => setSelectedExam(e.target.value)}
+              className="bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer max-w-[140px] truncate"
+            >
+              <option value="All" className="bg-slate-900 text-white">All Entrance Exams</option>
+              {availableExams.map((ex) => (
+                <option key={ex} value={ex} className="bg-slate-900 text-white">
+                  {ex}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Role Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Role:</span>
+            <select
+              id="career-role-dropdown"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="bg-transparent text-xs font-bold text-amber-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="All" className="bg-slate-900 text-white">All Career Roles ({availableRoles.length})</option>
+              {availableRoles.map((role) => (
+                <option key={role} value={role} className="bg-slate-900 text-white">
+                  {role}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* View / Sub-Tab Dropdown (Converted from >5 Tabs into Standard Dropdown) */}
+          <div className="flex items-center gap-1.5 bg-emerald-500/20 px-3 py-2 rounded-2xl border border-emerald-500/40 min-h-[44px] ml-auto">
+            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-emerald-300">View:</span>
+            <select
+              id="career-view-dropdown"
+              value={activeSubTab}
+              onChange={(e) => setActiveSubTab(e.target.value as any)}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="matches" className="bg-slate-900 text-white">Stream Careers ({filteredMatches.length})</option>
+              <option value="govt_jobs" className="bg-slate-900 text-white">Govt Jobs & UPSC</option>
+              <option value="scholarships" className="bg-slate-900 text-white">Scholarships Hub</option>
+              <option value="study_abroad" className="bg-slate-900 text-white">Study Abroad</option>
+              <option value="ai_advisor" className="bg-slate-900 text-white">Career AI Advisor</option>
+              <option value="roadmap" className="bg-slate-900 text-white">Personal Roadmap</option>
+              <option value="assessment" className="bg-slate-900 text-white">Know Yourself</option>
+              <option value="compare" className="bg-slate-900 text-white">Compare Careers</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Breadcrumbs & Quick Search Row */}
+        <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-400 flex-wrap font-mono text-[11px]">
+            <span className="text-emerald-400 font-bold">{selectedCatalogStream === "All" ? "All Streams" : selectedCatalogStream}</span>
+            {selectedCategory !== "All" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-cyan-300 font-semibold truncate max-w-[130px]">{selectedCategory}</span>
+              </>
+            )}
+            {selectedExam !== "All" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-purple-300 font-semibold truncate max-w-[120px]">{selectedExam}</span>
+              </>
+            )}
+            {selectedRole !== "All" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-amber-300 font-semibold truncate max-w-[140px]">{selectedRole}</span>
+              </>
+            )}
+          </div>
+
+          <div className="relative min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search careers, skills, eligibility..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/80 text-xs text-white placeholder-slate-500 pl-9 pr-4 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500 min-h-[38px]"
+            />
+          </div>
+        </div>
       </div>
 
       {/* TAB 1: CAREER CATALOG & MATCH ENGINE */}

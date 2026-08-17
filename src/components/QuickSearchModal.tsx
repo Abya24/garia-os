@@ -19,6 +19,8 @@ import {
   BookOpen,
   ArrowRight,
   Mail,
+  Calendar,
+  Target,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -112,6 +114,24 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       description: "Google Workspace emails, leave applications, teacher doubt letters & inbox sync",
       icon: Mail,
       tags: ["gmail", "email", "mail", "google", "leave", "application", "inbox", "sent", "teacher", "workspace", "message"],
+    },
+    {
+      id: "nav-calendar",
+      tab: "calendar",
+      title: "Calendar & Schedule Sync",
+      category: "Tools & Productivity",
+      description: "Google Calendar sync, exam timetables, study schedule & academic events",
+      icon: Calendar,
+      tags: ["calendar", "schedule", "events", "sync", "timetable", "google calendar", "reminder", "dates"],
+    },
+    {
+      id: "nav-goals",
+      tab: "goals",
+      title: "Goals & Target Scores",
+      category: "Tools & Productivity",
+      description: "Academic targets, exam score goals, deadlines & milestone tracker",
+      icon: Target,
+      tags: ["goal", "target", "milestone", "score", "grades", "percentage"],
     },
     {
       id: "nav-study",

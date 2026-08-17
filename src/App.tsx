@@ -285,6 +285,37 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [isSearchOpen, isAuthModalOpen, isStudentModalOpen, isMoreMenuOpen, tabHistory, activeTab]);
 
+  // Visual Viewport API Tracking for Mobile Virtual Keyboards (Android / iOS / PWA / Webview)
+  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleViewportChange = () => {
+      if (typeof window !== "undefined" && window.visualViewport) {
+        const height = window.visualViewport.height;
+        const offsetTop = window.visualViewport.offsetTop;
+        setVisualViewportHeight(height);
+        const keyboardActive = window.innerHeight - height > 100;
+        setIsKeyboardOpen(keyboardActive);
+        document.documentElement.style.setProperty("--visual-viewport-height", `${height}px`);
+        document.documentElement.style.setProperty("--visual-viewport-offset-top", `${offsetTop}px`);
+      }
+    };
+
+    if (typeof window !== "undefined" && window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleViewportChange);
+      window.visualViewport.addEventListener("scroll", handleViewportChange);
+      handleViewportChange();
+    }
+
+    return () => {
+      if (typeof window !== "undefined" && window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", handleViewportChange);
+        window.visualViewport.removeEventListener("scroll", handleViewportChange);
+      }
+    };
+  }, []);
+
   // Multi-Student Profiles State (v1.5)
   const [profiles, setProfiles] = useState<StudentProfile[]>(loadProfiles);
   const [activeProfileId, setActiveProfileId] = useState<string>(loadActiveProfileId);
@@ -1470,11 +1501,24 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)]">
+    <div
+      className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] transition-[height] duration-150 ease-out overflow-x-hidden"
+      style={{
+        minHeight: visualViewportHeight ? `${visualViewportHeight}px` : "100dvh",
+        maxHeight: visualViewportHeight && isKeyboardOpen ? `${visualViewportHeight}px` : undefined,
+      }}
+    >
       {/* Top OS Bar */}
       <StatusBar
         settings={settings}
         activeStudent={activeStudent}
+        profiles={profiles}
+        onSwitchProfile={handleSwitchProfile}
+        onLogout={() => setIsStudentModalOpen(true)}
+        tasks={tasks}
+        revisions={academicRevisions}
+        goals={goals}
+        habits={habits}
         currentLanguage={currentLanguage}
         onUpdateLanguage={handleUpdateLanguage}
         onOpenProfile={() => {
@@ -1495,7 +1539,7 @@ export default function App() {
         activeTab={activeTab}
       />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto min-h-0">
         {/* Desktop Sidebar Navigation */}
         <DesktopSidebar
           activeTab={activeTab}
@@ -1511,7 +1555,13 @@ export default function App() {
         />
 
         {/* Main Content Stage */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+        <main
+          className={`flex-1 min-w-0 ${
+            activeTab === "abya"
+              ? "p-2 sm:p-4 lg:p-6 flex flex-col min-h-0"
+              : "p-4 sm:p-6 lg:p-8"
+          }`}
+        >
           {activeTab === "home" && (
             <HomeDashboard
               tasks={tasks}
@@ -1789,6 +1839,13 @@ export default function App() {
               diagnostics={abyaDiagnostics}
               onTestDiagnostics={handleTestAbyaDiagnostics}
               onBack={handleGoBack}
+              tasks={tasks}
+              academicSubjects={academicSubjects}
+              academicChapters={academicChapters}
+              academicRevisions={academicRevisions}
+              academicPractice={academicPractice}
+              examProfile={examProfile}
+              habits={habits}
             />
           )}
 
@@ -1863,6 +1920,7 @@ export default function App() {
           setIsMoreMenuOpen(false);
         }}
         activeStudent={activeStudent}
+        isHidden={isKeyboardOpen && activeTab === "abya"}
       />
 
       {/* More Apps & Modules Slide Drawer (V3) */}

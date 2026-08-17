@@ -31,6 +31,7 @@ import {
   Database,
   Cloud,
   ArrowLeft,
+  HardDrive,
 } from "lucide-react";
 import {
   UserSettings,
@@ -42,7 +43,13 @@ import {
   CalendarEvent,
   Goal,
 } from "../types";
-import { exportStudentProfileJSON, importStudentProfileJSON, getWorkspaceSnapshot, restoreWorkspaceSnapshot } from "../utils/storage";
+import {
+  exportStudentProfileJSON,
+  importStudentProfileJSON,
+  getWorkspaceSnapshot,
+  restoreWorkspaceSnapshot,
+  clearOfflineCache,
+} from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
@@ -230,12 +237,34 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3000);
+    }, 3500);
+  };
+
+  const handleClearOfflineCache = async () => {
+    setIsClearingCache(true);
+    try {
+      const res = await clearOfflineCache();
+      showToast(
+        currentLanguage === "hi"
+          ? `ऑफ़लाइन कैश सफलतापूर्वक साफ़ किया गया! (~${res.storageFreedKb} KB मेमोरी मुक्त)`
+          : `Offline cache cleared successfully! (~${res.storageFreedKb} KB freed)`
+      );
+    } catch (e) {
+      console.error(e);
+      showToast(
+        currentLanguage === "hi"
+          ? "ऑफ़लाइन कैश साफ़ करने में विफल।"
+          : "Failed to clear offline cache."
+      );
+    } finally {
+      setIsClearingCache(false);
+    }
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -1018,6 +1047,42 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             onChange={handleImportFileChange}
             className="hidden"
           />
+        </div>
+
+        {/* Offline Cache Cleanup Feature */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-amber-400" />
+              <h4 className="text-sm font-bold text-white font-heading">
+                {currentLanguage === "hi" ? "ऑफ़लाइन कैश साफ़ करें" : "Clear Offline Cache"}
+              </h4>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                {currentLanguage === "hi" ? "सुरक्षित सफ़ाई" : "Safe Cleanup"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              {currentLanguage === "hi"
+                ? "अस्थायी ब्राउज़र कैश, सर्विस वर्कर रिस्पॉन्स और नेटवर्क कैश को साफ़ करके स्टोरेज खाली करता है। आपका छात्र डेटा (नोट्स, टास्क, स्कोर) पूरी तरह सुरक्षित रहता है।"
+                : "Frees up local browser cache, service worker assets, and temporary diagnostic queries without deleting your saved tasks, notes, habits, or student profile data."}
+            </p>
+          </div>
+          <button
+            onClick={handleClearOfflineCache}
+            disabled={isClearingCache}
+            className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 card-press"
+          >
+            <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? "animate-spin" : ""}`} />
+            <span>
+              {isClearingCache
+                ? currentLanguage === "hi"
+                  ? "सफ़ाई जारी..."
+                  : "Clearing..."
+                : currentLanguage === "hi"
+                ? "ऑफ़लाइन कैश साफ़ करें"
+                : "Clear Offline Cache"}
+            </span>
+          </button>
         </div>
 
         <div className="pt-4 border-t border-white/10 flex items-center justify-between">

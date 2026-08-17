@@ -39,7 +39,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   onBack,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<string>("all"); // all, today, upcoming, high, study, personal
+  const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>("all");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -113,13 +115,17 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (selectedFilter === "today") return task.date === todayStr && !task.completed;
-    if (selectedFilter === "upcoming") return task.date > todayStr && !task.completed;
-    if (selectedFilter === "completed") return task.completed;
-    if (selectedFilter === "high") return task.priority === "high";
-    if (selectedFilter === "study") return task.category === "study";
-    if (selectedFilter === "personal") return task.category === "personal";
-    if (selectedFilter === "work") return task.category === "work";
+    // Status filter
+    if (selectedStatusFilter === "today" && (task.date !== todayStr || task.completed)) return false;
+    if (selectedStatusFilter === "upcoming" && (task.date <= todayStr || task.completed)) return false;
+    if (selectedStatusFilter === "completed" && !task.completed) return false;
+    if (selectedStatusFilter === "pending" && task.completed) return false;
+
+    // Priority filter
+    if (selectedPriorityFilter !== "all" && task.priority !== selectedPriorityFilter) return false;
+
+    // Category filter
+    if (selectedCategoryFilter !== "all" && task.category !== selectedCategoryFilter) return false;
 
     return true;
   });
@@ -202,38 +208,69 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         defaultExpanded={true}
       />
 
-      {/* Search and Filters Bar */}
+      {/* Universal Dropdown Filter Ribbon */}
       <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          {/* Search Input */}
-          <div className="relative w-full sm:flex-1">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Status Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Filter className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Status:</span>
+            <select
+              id="tasks-status-dropdown"
+              value={selectedStatusFilter}
+              onChange={(e) => setSelectedStatusFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Tasks ({tasks.length})</option>
+              <option value="pending" className="bg-slate-900 text-white">Pending</option>
+              <option value="today" className="bg-slate-900 text-white">Due Today</option>
+              <option value="upcoming" className="bg-slate-900 text-white">Upcoming</option>
+              <option value="completed" className="bg-slate-900 text-white">Completed</option>
+            </select>
+          </div>
+
+          {/* Priority Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Priority:</span>
+            <select
+              id="tasks-priority-dropdown"
+              value={selectedPriorityFilter}
+              onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-rose-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Priorities</option>
+              <option value="high" className="bg-slate-900 text-white">High Priority 🔥</option>
+              <option value="medium" className="bg-slate-900 text-white">Medium Priority</option>
+              <option value="low" className="bg-slate-900 text-white">Low Priority</option>
+            </select>
+          </div>
+
+          {/* Category Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Category:</span>
+            <select
+              id="tasks-category-dropdown"
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Categories</option>
+              <option value="study" className="bg-slate-900 text-white">Study</option>
+              <option value="personal" className="bg-slate-900 text-white">Personal</option>
+              <option value="work" className="bg-slate-900 text-white">Work</option>
+            </select>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[220px] flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Search tasks by title or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-pill text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10"
+              className="w-full pl-10 pr-4 py-2 rounded-2xl glass-pill text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 border border-white/10 min-h-[44px]"
             />
-          </div>
-
-          {/* Filter Dropdown Selector */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-            <select
-              value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-2xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
-            >
-              <option value="all" className="bg-slate-900 text-white">All Tasks ({tasks.length})</option>
-              <option value="today" className="bg-slate-900 text-white">Due Today</option>
-              <option value="upcoming" className="bg-slate-900 text-white">Upcoming</option>
-              <option value="completed" className="bg-slate-900 text-white">Completed</option>
-              <option value="high" className="bg-slate-900 text-white">High Priority Only</option>
-              <option value="study" className="bg-slate-900 text-white">Study Category</option>
-              <option value="personal" className="bg-slate-900 text-white">Personal Category</option>
-              <option value="work" className="bg-slate-900 text-white">Work Category</option>
-            </select>
           </div>
         </div>
       </div>

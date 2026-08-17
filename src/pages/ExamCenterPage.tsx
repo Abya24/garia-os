@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ShieldAlert,
   Calendar,
@@ -26,6 +26,9 @@ import {
   Edit2,
   Trash2,
   ArrowLeft,
+  Search,
+  Filter,
+  Layers,
 } from "lucide-react";
 import {
   ExamProfile,
@@ -68,7 +71,7 @@ import {
   exportStudyPlanIcs,
   exportSubjectExamDatesIcs,
 } from "../utils/icsExport";
-import { Layers, Download } from "lucide-react";
+import { Download } from "lucide-react";
 
 interface ExamCenterPageProps {
   examProfile: ExamProfile;
@@ -172,6 +175,19 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   const [showRecordLoggerModal, setShowRecordLoggerModal] = useState(false);
   const [editingTestRecord, setEditingTestRecord] = useState<ExamTestRecord | null>(null);
   const [selectedSubjectDetail, setSelectedSubjectDetail] = useState<string | null>(null);
+
+  // Universal Dropdown System Filters (Rule 1)
+  const [selectedExam, setSelectedExam] = useState<string>(examProfile.examName || "Class 12 Board Exams");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
+  const [selectedChapterId, setSelectedChapterId] = useState<string>("all");
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>("30d");
+  const [examSearchQuery, setExamSearchQuery] = useState<string>("");
+
+  // Filtered chapters based on selected subject
+  const currentExamChapters = useMemo(() => {
+    if (selectedSubjectId === "all") return academicChapters;
+    return academicChapters.filter((ch) => ch.subjectId === selectedSubjectId);
+  }, [academicChapters, selectedSubjectId]);
 
   // Profile Form state
   const [profileForm, setProfileForm] = useState<ExamProfile>(examProfile);
@@ -526,39 +542,139 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
         </div>
       </div>
 
-      {/* Sub Tab Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-white/10">
-        {[
-          { id: "overview", label: "Dashboard", icon: ShieldAlert },
-          { id: "syllabus", label: "Syllabus Planner", icon: BookOpen },
-          { id: "queue", label: "Prep Queue", icon: Zap, badge: prepQueue.filter((q) => q.score >= 50).length },
-          { id: "revision", label: "Revision Scheduler", icon: RotateCcw, badge: revisionQueue.length },
-          { id: "tests", label: "Mock Tests & Analytics", icon: TrendingUp },
-          { id: "plan", label: "Exam Study Plan", icon: Calendar },
-          { id: "milestones", label: "Milestones", icon: CheckSquare },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as any)}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 text-cyan-300 border border-cyan-500/40 shadow-md"
-                  : "glass-pill text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
-              }`}
+      {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
+      <div className="glass-card p-4 rounded-3xl border border-cyan-500/30 space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Exam Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Exam:</span>
+            <select
+              id="exam-name-dropdown"
+              value={selectedExam}
+              onChange={(e) => setSelectedExam(e.target.value)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer pr-1"
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
-              {tab.label}
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-cyan-500/30 text-cyan-200 font-mono font-bold">
-                  {tab.badge}
+              <option value="Class 12 Board Exams" className="bg-slate-900 text-white">Class 12 Board Exams ({examProfile.board})</option>
+              <option value="Class 10 Board Exams" className="bg-slate-900 text-white">Class 10 Board Exams</option>
+              <option value="JEE Main / Advanced" className="bg-slate-900 text-white">JEE Main & Advanced</option>
+              <option value="NEET UG" className="bg-slate-900 text-white">NEET UG</option>
+              <option value="CUET UG" className="bg-slate-900 text-white">CUET UG</option>
+              <option value="CA Foundation" className="bg-slate-900 text-white">CA Foundation</option>
+              <option value="NDA / Defence" className="bg-slate-900 text-white">NDA / Defence Exam</option>
+            </select>
+          </div>
+
+          {/* Subject Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Subject:</span>
+            <select
+              id="exam-subject-dropdown"
+              value={selectedSubjectId}
+              onChange={(e) => {
+                setSelectedSubjectId(e.target.value);
+                setSelectedChapterId("all");
+              }}
+              className="bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Subjects ({academicSubjects.length})</option>
+              {academicSubjects.map((sub) => (
+                <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chapter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <span className="text-[11px] font-semibold text-slate-400">Chapter:</span>
+            <select
+              id="exam-chapter-dropdown"
+              value={selectedChapterId}
+              onChange={(e) => setSelectedChapterId(e.target.value)}
+              className="bg-transparent text-xs font-bold text-amber-300 focus:outline-none cursor-pointer max-w-[160px] truncate"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Chapters ({currentExamChapters.length})</option>
+              {currentExamChapters.map((ch) => (
+                <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                  {ch.chapterNumber ? `Ch ${ch.chapterNumber}: ` : ""}{ch.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Time Range Dropdown (Rule 1) */}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+            <Clock className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-slate-400">Time:</span>
+            <select
+              id="exam-timerange-dropdown"
+              value={selectedTimeRange}
+              onChange={(e) => setSelectedTimeRange(e.target.value)}
+              className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="7d" className="bg-slate-900 text-white">Next 7 Days</option>
+              <option value="30d" className="bg-slate-900 text-white">Next 30 Days</option>
+              <option value="60d" className="bg-slate-900 text-white">Next 60 Days</option>
+              <option value="90d" className="bg-slate-900 text-white">Next 90 Days</option>
+              <option value="all" className="bg-slate-900 text-white">Full Exam Span</option>
+            </select>
+          </div>
+
+          {/* View / Sub-Tab Dropdown (Converted from >5 Tabs into Standard Dropdown) */}
+          <div className="flex items-center gap-1.5 bg-cyan-500/20 px-3 py-2 rounded-2xl border border-cyan-500/40 min-h-[44px] ml-auto">
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] font-semibold text-cyan-300">View:</span>
+            <select
+              id="exam-view-dropdown"
+              value={activeSubTab}
+              onChange={(e) => setActiveSubTab(e.target.value as any)}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="overview" className="bg-slate-900 text-white">Dashboard</option>
+              <option value="syllabus" className="bg-slate-900 text-white">Syllabus Planner</option>
+              <option value="queue" className="bg-slate-900 text-white">Prep Queue ({prepQueue.filter((q) => q.score >= 50).length})</option>
+              <option value="revision" className="bg-slate-900 text-white">Revision Scheduler ({revisionQueue.length})</option>
+              <option value="tests" className="bg-slate-900 text-white">Mock Tests & Analytics</option>
+              <option value="plan" className="bg-slate-900 text-white">Exam Study Plan</option>
+              <option value="milestones" className="bg-slate-900 text-white">Milestones</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Breadcrumbs & Quick Search Row */}
+        <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-400 flex-wrap font-mono text-[11px]">
+            <span className="text-cyan-400 font-bold">{selectedExam}</span>
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className="text-purple-300 font-semibold">
+              {selectedSubjectId === "all" ? "All Subjects" : academicSubjects.find((s) => s.id === selectedSubjectId)?.name || "Subject"}
+            </span>
+            {selectedChapterId !== "all" && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-amber-300 truncate max-w-[140px]">
+                  {currentExamChapters.find((c) => c.id === selectedChapterId)?.title || "Chapter"}
                 </span>
-              )}
-            </button>
-          );
-        })}
+              </>
+            )}
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className="text-emerald-300 font-semibold">{selectedTimeRange} range</span>
+          </div>
+
+          <div className="relative min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search exam syllabus, topics..."
+              value={examSearchQuery}
+              onChange={(e) => setExamSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/80 text-xs text-white placeholder-slate-500 pl-9 pr-4 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500 min-h-[38px]"
+            />
+          </div>
+        </div>
       </div>
 
       {/* ==========================================
