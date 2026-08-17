@@ -204,6 +204,26 @@ export type AppTheme =
   | "forest"
   | "system";
 
+export type HomeWidgetId =
+  | "quick_actions"
+  | "todays_tasks"
+  | "study_progress"
+  | "water_intake"
+  | "quick_access"
+  | "gamification_card"
+  | "quote_card"
+  | "continue_learning"
+  | "focus_timer"
+  | "revision_due"
+  | "abya_suggestions"
+  | "habit_tracker";
+
+export interface DashboardWidgetConfig {
+  id: HomeWidgetId;
+  enabled: boolean;
+  order: number;
+}
+
 export interface UserSettings {
   userName: string;
   theme: AppTheme;
@@ -215,6 +235,7 @@ export interface UserSettings {
   defaultFocusDuration: number;
   defaultBreakDuration: number;
   language?: AbyaLanguageSetting;
+  dashboardWidgets?: DashboardWidgetConfig[];
 }
 
 export interface StudentProfile {

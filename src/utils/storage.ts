@@ -75,6 +75,7 @@ const STORAGE_KEYS = {
   EXAM_TESTS_V19: "exam_tests_v1",
   EXAM_ANALYSIS_V19: "exam_analysis_v1",
   EXAM_PLAN: "garia_exam_plan_v1",
+  DASHBOARD_WIDGETS: "garia_dashboard_widgets_v1",
 };
 
 export const getTodayString = (): string => {
