@@ -360,11 +360,19 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   const availableExams = useMemo(() => {
     const set = new Set<string>();
     matchResults.forEach((res) => {
-      if ((res.career as any).entranceExams) {
-        (res.career as any).entranceExams.forEach((e: string) => set.add(e));
-      } else if (res.career.courseStages) {
-        res.career.courseStages.forEach((stage) => {
-          if (stage.toLowerCase().includes("entrance") || stage.toLowerCase().includes("exam") || stage.toLowerCase().includes("jee") || stage.toLowerCase().includes("neet") || stage.toLowerCase().includes("cuet") || stage.toLowerCase().includes("foundation") || stage.toLowerCase().includes("cat") || stage.toLowerCase().includes("clat")) {
+      const exams = (res.career as any)?.entranceExams;
+      if (Array.isArray(exams)) {
+        exams.forEach((e: string) => {
+          if (typeof e === "string") set.add(e);
+        });
+      } else if (typeof exams === "string") {
+        set.add(exams);
+      }
+
+      const stages = res.career?.courseStages;
+      if (Array.isArray(stages)) {
+        stages.forEach((stage) => {
+          if (typeof stage === "string" && (stage.toLowerCase().includes("entrance") || stage.toLowerCase().includes("exam") || stage.toLowerCase().includes("jee") || stage.toLowerCase().includes("neet") || stage.toLowerCase().includes("cuet") || stage.toLowerCase().includes("foundation") || stage.toLowerCase().includes("cat") || stage.toLowerCase().includes("clat"))) {
             set.add(stage);
           }
         });

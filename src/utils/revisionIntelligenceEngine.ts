@@ -91,6 +91,7 @@ export function categorizeRevisions(
   revisions: AcademicRevisionItem[],
   todayStr: string = getTodayString()
 ): RevisionCategorizedBuckets {
+  const safeRevisions = Array.isArray(revisions) ? revisions : [];
   const today = new Date(todayStr);
   const weekLater = new Date(today);
   weekLater.setDate(weekLater.getDate() + 7);
@@ -102,7 +103,8 @@ export function categorizeRevisions(
   const upcomingRevisions: AcademicRevisionItem[] = [];
   const completedRevisions: AcademicRevisionItem[] = [];
 
-  revisions.forEach((rev) => {
+  safeRevisions.forEach((rev) => {
+    if (!rev) return;
     if (rev.completed) {
       completedRevisions.push(rev);
       return;
@@ -149,11 +151,17 @@ export function generateComprehensiveRevisionPlan(
   examTests: ExamTestRecord[] = [],
   activeStudent?: StudentProfile
 ): ComprehensiveRevisionPlan {
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const safeVVITopics = Array.isArray(vviTopics) ? vviTopics : [];
+  const safeRevisions = Array.isArray(revisions) ? revisions : [];
+  const safeExamTests = Array.isArray(examTests) ? examTests : [];
+
   const dailySuggested: SuggestedRevisionItem[] = [];
   const weeklyFocus: string[] = [];
 
   // 1. Weak chapters from recent tests
-  examTests.forEach((t) => {
+  safeExamTests.forEach((t) => {
+    if (!t) return;
     const accuracy = t.maxMarks > 0 ? Math.round((t.marksObtained / t.maxMarks) * 100) : 0;
     const testTopic = t.testName || "Core Topic";
     if (accuracy < 65) {
@@ -172,9 +180,10 @@ export function generateComprehensiveRevisionPlan(
   });
 
   // 2. High priority VVI topics not revised recently
-  vviTopics.forEach((vvi) => {
-    const isScheduled = revisions.some(
-      (r) => !r.completed && r.chapterTitle.toLowerCase().includes(vvi.topicName.toLowerCase())
+  safeVVITopics.forEach((vvi) => {
+    if (!vvi) return;
+    const isScheduled = safeRevisions.some(
+      (r) => r && !r.completed && r.chapterTitle && vvi.topicName && r.chapterTitle.toLowerCase().includes(vvi.topicName.toLowerCase())
     );
     if (!isScheduled) {
       const existing = dailySuggested.some((s) => s.chapterTitle === vvi.topicName);
@@ -191,7 +200,8 @@ export function generateComprehensiveRevisionPlan(
   });
 
   // 3. Unrevised completed chapters (revisionCount === 0)
-  chapters.forEach((ch) => {
+  safeChapters.forEach((ch) => {
+    if (!ch) return;
     if (ch.status === "Completed" && (ch.revisionCount === 0 || ch.isWeak)) {
       const existing = dailySuggested.some((s) => s.chapterTitle === ch.title);
       if (!existing && dailySuggested.length < 10) {

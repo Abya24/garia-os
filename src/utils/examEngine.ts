@@ -327,9 +327,11 @@ export function generateExamRevisionQueue(
   subjects: AcademicSubject[],
   chapters: AcademicChapter[]
 ): ExamRevisionItem[] {
-  const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
+  const safeSubjects = Array.isArray(subjects) ? subjects : [];
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const subjectMap = new Map(safeSubjects.map((s) => [s.id, s.name]));
 
-  return chapters
+  return safeChapters
     .map((chap) => {
       let status: ExamRevisionItem["status"] = "✅ Not due";
 
@@ -376,7 +378,9 @@ export function detectWeaknessTopics(
   chapters: AcademicChapter[],
   tests: (AcademicTest | ExamMockTest)[]
 ) {
-  const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
+  const safeSubjects = Array.isArray(subjects) ? subjects : [];
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const subjectMap = new Map(safeSubjects.map((s) => [s.id, s.name]));
 
   const weakTopics: {
     chapterId: string;
@@ -386,7 +390,8 @@ export function detectWeaknessTopics(
     recommendation: string;
   }[] = [];
 
-  chapters.forEach((chap) => {
+  safeChapters.forEach((chap) => {
+    if (!chap) return;
     if (chap.isWeak) {
       weakTopics.push({
         chapterId: chap.id,

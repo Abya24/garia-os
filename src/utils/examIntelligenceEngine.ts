@@ -138,18 +138,26 @@ export function generateExamIntelligenceReport(
   practiceSessions: AcademicPracticeSession[],
   careerProfile?: CareerProfile
 ): ExamIntelligenceReport {
+  const safeTests = Array.isArray(tests) ? tests : [];
+  const safeSubjects = Array.isArray(subjects) ? subjects : [];
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const safeVVITopics = Array.isArray(vviTopics) ? vviTopics : [];
+  const safeRevisions = Array.isArray(revisions) ? revisions : [];
+  const safePracticeSessions = Array.isArray(practiceSessions) ? practiceSessions : [];
+
   const careerPriorityNames = getCareerPrioritySubjectNames(
-    profile.stream || examProfile.stream || "Commerce",
+    profile?.stream || examProfile?.stream || "Commerce",
     careerProfile?.selectedCareerId
   );
 
   // 1. Analyze each subject
-  const subjectAnalyses: SubjectPerformanceAnalysis[] = subjects.map((sub) => {
+  const subjectAnalyses: SubjectPerformanceAnalysis[] = safeSubjects.map((sub) => {
     // Match tests for this subject
-    const subTests = tests.filter(
+    const subTests = safeTests.filter(
       (t) =>
-        t.subjectId === sub.id ||
-        t.subjectName.toLowerCase().trim() === sub.name.toLowerCase().trim()
+        t &&
+        (t.subjectId === sub.id ||
+        (t.subjectName && sub.name && t.subjectName.toLowerCase().trim() === sub.name.toLowerCase().trim()))
     );
 
     // Sort ascending by date / createdAt
@@ -158,22 +166,22 @@ export function generateExamIntelligenceReport(
     const testCount = subTests.length;
 
     // Matching chapters, VVI, Revisions
-    const subChapters = chapters.filter(
-      (c) => c.subjectId === sub.id || c.title.toLowerCase().includes(sub.name.toLowerCase())
+    const subChapters = safeChapters.filter(
+      (c) => c && (c.subjectId === sub.id || (c.title && sub.name && c.title.toLowerCase().includes(sub.name.toLowerCase())))
     );
     const completedChaps = subChapters.filter((c) => c.status === "Completed").length;
     const syllabusCoverage = subChapters.length > 0 ? Math.round((completedChaps / subChapters.length) * 100) : 0;
 
-    const subVVI = vviTopics.filter((v) => v.subjectId === sub.id || v.subjectName.toLowerCase() === sub.name.toLowerCase());
+    const subVVI = safeVVITopics.filter((v) => v && (v.subjectId === sub.id || (v.subjectName && sub.name && v.subjectName.toLowerCase() === sub.name.toLowerCase())));
     const completedVVI = subVVI.filter((v) => v.status === "Completed").length;
     const vviCompletionRate = subVVI.length > 0 ? Math.round((completedVVI / subVVI.length) * 100) : 0;
 
-    const subRevisions = revisions.filter((r) => r.subjectId === sub.id || r.subjectName.toLowerCase() === sub.name.toLowerCase());
+    const subRevisions = safeRevisions.filter((r) => r && (r.subjectId === sub.id || (r.subjectName && sub.name && r.subjectName.toLowerCase() === sub.name.toLowerCase())));
     const completedRev = subRevisions.filter((r) => r.completed).length;
     const revisionCompletionRate = subRevisions.length > 0 ? Math.round((completedRev / subRevisions.length) * 100) : 0;
 
     const isCareerPriority = careerPriorityNames.some((pName) =>
-      sub.name.toLowerCase().includes(pName)
+      sub.name && sub.name.toLowerCase().includes(pName)
     );
 
     if (testCount === 0) {

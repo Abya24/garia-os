@@ -319,11 +319,17 @@ export function compileSyncableItems(
   goals: Goal[],
   settings: GoogleCalendarSyncSettings
 ): SyncableAcademicItem[] {
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeStudySessions = Array.isArray(studySessions) ? studySessions : [];
+  const safeEvents = Array.isArray(events) ? events : [];
+  const safeGoals = Array.isArray(goals) ? goals : [];
+
   const result: SyncableAcademicItem[] = [];
 
   // 1. Tasks
   if (settings.syncTasks) {
-    tasks.forEach((t) => {
+    safeTasks.forEach((t) => {
+      if (!t) return;
       if (settings.tasksFilter === "high_only" && t.priority !== "high") return;
       if (settings.tasksFilter === "pending_only" && t.completed) return;
 
@@ -343,8 +349,9 @@ export function compileSyncableItems(
 
   // 2. Study Sessions
   if (settings.syncStudySessions) {
-    studySessions.forEach((s) => {
-      const minutes = Math.round(s.durationSeconds / 60);
+    safeStudySessions.forEach((s) => {
+      if (!s) return;
+      const minutes = Math.round((s.durationSeconds || 0) / 60);
       const timeStr = s.timestamp
         ? new Date(s.timestamp).toTimeString().slice(0, 5)
         : undefined;
@@ -352,7 +359,7 @@ export function compileSyncableItems(
       result.push({
         id: `session-${s.id}`,
         type: "session",
-        title: `${s.subjectName} Session (${minutes}m)`,
+        title: `${s.subjectName || "Study"} Session (${minutes}m)`,
         description: s.notes || `Focus time logged: ${minutes} minutes`,
         date: s.date,
         time: timeStr,
@@ -365,7 +372,8 @@ export function compileSyncableItems(
 
   // 3. Calendar Events & Exams
   if (settings.syncExams) {
-    events.forEach((ev) => {
+    safeEvents.forEach((ev) => {
+      if (!ev) return;
       result.push({
         id: `event-${ev.id}`,
         type: ev.category === "exam" ? "exam" : "event",
@@ -381,7 +389,8 @@ export function compileSyncableItems(
 
   // 4. Goals Target
   if (settings.syncGoals) {
-    goals.forEach((g) => {
+    safeGoals.forEach((g) => {
+      if (!g) return;
       result.push({
         id: `goal-${g.id}`,
         type: "goal",

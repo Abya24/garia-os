@@ -131,6 +131,7 @@ import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./util
 import { StatusBar } from "./components/StatusBar";
 import { BottomNav } from "./components/BottomNav";
 import { DesktopSidebar } from "./components/DesktopSidebar";
+import { SliderMenu } from "./components/SliderMenu";
 import { MoreDrawer } from "./components/MoreDrawer";
 import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
@@ -153,11 +154,8 @@ import { AbyaAIPage } from "./pages/AbyaAIPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CareerCenterPage } from "./pages/CareerCenterPage";
-import { AcademicCenterPage } from "./pages/AcademicCenterPage";
-import { QuestionBankPage } from "./pages/QuestionBankPage";
 import { ExamCenterPage } from "./pages/ExamCenterPage";
 import { DownloadPage } from "./pages/DownloadPage";
-import { GmailCenter } from "./pages/GmailCenter";
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -201,6 +199,7 @@ export default function App() {
     }
     return ["home"];
   });
+  const [isSliderMenuOpen, setIsSliderMenuOpen] = useState<boolean>(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -1746,7 +1745,6 @@ export default function App() {
         onSwitchProfile={handleSwitchProfile}
         onLogout={() => setIsStudentModalOpen(true)}
         tasks={tasks}
-        revisions={academicRevisions}
         goals={goals}
         habits={habits}
         currentLanguage={currentLanguage}
@@ -1761,6 +1759,7 @@ export default function App() {
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenSavedItems={() => setIsSavedItemsOpen(true)}
         onGoBack={handleGoBack}
+        onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
         onUpdateSettings={handleUpdateSettings}
         onNavigate={(tab) => {
           handleNavigate(tab);
@@ -1803,25 +1802,18 @@ export default function App() {
               water={water}
               goals={goals}
               events={calendarEvents}
-              academicSubjects={academicSubjects}
-              chapters={academicChapters}
-              roadmap={academicRoadmap}
-              vviTopics={vviTopics}
-              revisions={academicRevisions}
               examTestRecords={examTestRecords}
               examProfile={examProfile}
               careerProfile={careerProfile}
-              practiceSessions={academicPractice}
               settings={settings}
               activeStudent={activeStudent}
               currentLanguage={currentLanguage}
-              onOpenStudentModal={() => setIsStudentModalOpen(true)}
               onNavigate={(tab) => {
-                setActiveTab(tab);
+                handleNavigate(tab);
                 setIsMoreMenuOpen(false);
               }}
-              onQuickAddTask={() => setActiveTab("tasks")}
-              onQuickAddNote={() => setActiveTab("notes")}
+              onQuickAddTask={() => handleNavigate("tasks")}
+              onAddTask={handleAddTask}
               onAddWaterGlass={() =>
                 handleUpdateWater({ ...water, glasses: water.glasses + 1 })
               }
@@ -1834,6 +1826,7 @@ export default function App() {
               onToggleHabit={(habitId, dateStr) =>
                 handleToggleHabitDate(habitId, dateStr)
               }
+              onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
             />
           )}
 
@@ -1897,50 +1890,9 @@ export default function App() {
               onUpdateChapters={handleUpdateAcademicChapters}
               onAskAbyaWithContext={handleAskAbyaWithContext}
               onNavigate={(tab) => {
-                setActiveTab(tab);
-                setIsMoreMenuOpen(false);
-              }}
-              onBack={handleGoBack}
-            />
-          )}
-
-          {activeTab === "academic" && (
-            <AcademicCenterPage
-              activeStudent={activeStudent}
-              careerProfile={careerProfile}
-              careerRoadmap={careerRoadmap}
-              subjects={academicSubjects}
-              chapters={academicChapters}
-              tests={academicTests}
-              smartPlan={academicPlan}
-              roadmap={academicRoadmap}
-              vviTopics={vviTopics}
-              revisions={academicRevisions}
-              practiceSessions={academicPractice}
-              onUpdateSubjects={handleUpdateAcademicSubjects}
-              onUpdateChapters={handleUpdateAcademicChapters}
-              onUpdateTests={handleUpdateAcademicTests}
-              onUpdatePlan={handleUpdateAcademicPlan}
-              onUpdateVVITopics={handleUpdateVVITopics}
-              onUpdateRevisions={handleUpdateAcademicRevisions}
-              onUpdatePracticeSessions={handleUpdateAcademicPractice}
-              onUpdateRoadmap={handleUpdateAcademicRoadmap}
-              onAskAbyaWithContext={handleAskAbyaWithContext}
-              onBack={handleGoBack}
-            />
-          )}
-
-          {activeTab === "questionbank" && (
-            <QuestionBankPage
-              activeStudent={activeStudent}
-              currentLanguage={currentLanguage}
-              onAskAbyaAI={(prompt) => handleAskAbyaWithContext(prompt)}
-              onAskAbyaWithContext={handleAskAbyaWithContext}
-              onNavigate={(tab) => {
                 handleNavigate(tab);
                 setIsMoreMenuOpen(false);
               }}
-              onSaveExamTestRecord={handleSaveExamTestRecord}
               onBack={handleGoBack}
             />
           )}
@@ -1957,7 +1909,7 @@ export default function App() {
               onUpdateAssessment={handleUpdateCareerAssessment}
               onUpdateRoadmap={handleUpdateCareerRoadmap}
               onUpdateQuiz={handleUpdateCareerQuiz}
-              onNavigateToAbya={() => setActiveTab("abya")}
+              onNavigateToAbya={() => handleNavigate("abya")}
               onBack={handleGoBack}
             />
           )}
@@ -1995,19 +1947,6 @@ export default function App() {
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
               onAskAbyaWithContext={handleAskAbyaWithContext}
-              onBack={handleGoBack}
-            />
-          )}
-
-          {activeTab === "gmail" && (
-            <GmailCenter
-              activeStudent={activeStudent}
-              onAddTask={(newTask) => handleAddTask(newTask)}
-              onAddCalendarEvent={(newEvent) => handleAddCalendarEvent(newEvent)}
-              onNavigateAbya={() => {
-                setActiveTab("abya");
-                setIsMoreMenuOpen(false);
-              }}
               onBack={handleGoBack}
             />
           )}
@@ -2061,7 +2000,7 @@ export default function App() {
               attachedContextNote={attachedContextNote}
               onClearAttachedContext={() => setAttachedContextNote("")}
               onNavigate={(tab) => {
-                setActiveTab(tab);
+                handleNavigate(tab);
                 setIsMoreMenuOpen(false);
               }}
               onTriggerFallbackAction={handleTriggerAbyaFallback}
@@ -2153,6 +2092,32 @@ export default function App() {
         isHidden={isKeyboardOpen && activeTab === "abya"}
       />
 
+      {/* Slide-Over Panel (SliderMenu for Abya AI & System Settings) */}
+      <SliderMenu
+        isOpen={isSliderMenuOpen}
+        onClose={() => setIsSliderMenuOpen(false)}
+        activeStudent={activeStudent}
+        profiles={profiles}
+        onSwitchProfile={handleSwitchProfile}
+        onOpenStudentModal={() => {
+          setIsSliderMenuOpen(false);
+          setIsStudentModalOpen(true);
+        }}
+        currentLanguage={currentLanguage}
+        onUpdateLanguage={handleUpdateLanguage}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        onNavigate={(tab) => {
+          handleNavigate(tab);
+          setIsSliderMenuOpen(false);
+        }}
+        onClearAllData={handleClearAllOSData}
+        onLogout={() => {
+          setIsSliderMenuOpen(false);
+          setIsStudentModalOpen(true);
+        }}
+      />
+
       {/* More Apps & Modules Slide Drawer (V3) */}
       <MoreDrawer
         isOpen={isMoreMenuOpen}
@@ -2166,6 +2131,9 @@ export default function App() {
         }}
         activeTab={activeTab}
         activeStudent={activeStudent}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        onClearAllData={handleClearAllOSData}
       />
 
       {/* Quick Search Overlay (Cmd+K / Search trigger) */}
@@ -2202,7 +2170,6 @@ export default function App() {
           setIsSavedItemsOpen(false);
         }}
         notes={notes}
-        qbankProgress={activeStudent ? loadQuestionBankProgress(activeStudent.id) : undefined}
       />
 
       {/* Multi-Student Profile Management Modal (v1.5) */}

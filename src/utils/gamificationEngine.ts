@@ -341,39 +341,48 @@ export function calculateGamificationState(
   practiceSessions: AcademicPracticeSession[] = [],
   qbankProgress?: QuestionBankProfileProgress
 ): GamificationState {
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeStudySessions = Array.isArray(studySessions) ? studySessions : [];
+  const safeFocusLogs = Array.isArray(focusLogs) ? focusLogs : [];
+  const safeHabits = Array.isArray(habits) ? habits : [];
+  const safeGoals = Array.isArray(goals) ? goals : [];
+  const safeTestRecords = Array.isArray(testRecords) ? testRecords : [];
+  const safePracticeSessions = Array.isArray(practiceSessions) ? practiceSessions : [];
+
   // 1. Calculate XP Sources
-  const completedTasksCount = tasks.filter((t) => t.completed).length;
+  const completedTasksCount = safeTasks.filter((t) => t && t.completed).length;
   const taskXP = completedTasksCount * 15;
 
   const totalStudyMinutes = Math.round(
-    studySessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0) / 60
+    safeStudySessions.reduce((acc, s) => acc + (s?.durationSeconds || 0), 0) / 60
   );
-  const studySessionXP = Math.round(totalStudyMinutes * 0.8) + studySessions.length * 10;
+  const studySessionXP = Math.round(totalStudyMinutes * 0.8) + safeStudySessions.length * 10;
 
-  const focusSessionXP = focusLogs.filter((f) => f.type === "focus").length * 20;
+  const focusSessionXP = safeFocusLogs.filter((f) => f && f.type === "focus").length * 20;
 
   let totalHabitCompletions = 0;
   let maxStreak = 0;
-  habits.forEach((h) => {
-    totalHabitCompletions += (h.completedDates || []).length;
-    if (h.streak > maxStreak) maxStreak = h.streak;
+  safeHabits.forEach((h) => {
+    if (!h) return;
+    totalHabitCompletions += (Array.isArray(h.completedDates) ? h.completedDates : []).length;
+    if ((h.streak || 0) > maxStreak) maxStreak = h.streak || 0;
   });
   const habitXP = totalHabitCompletions * 10;
 
-  const completedGoalsCount = goals.filter((g) => g.completed).length;
+  const completedGoalsCount = safeGoals.filter((g) => g && g.completed).length;
   const goalXP = completedGoalsCount * 30;
 
-  const testXP = testRecords.length * 50;
-  const practiceXP = practiceSessions.length * 25;
+  const testXP = safeTestRecords.length * 50;
+  const practiceXP = safePracticeSessions.length * 25;
 
   // Question Bank XP
   let mcqXP = 0;
   let pyqXP = 0;
   if (qbankProgress) {
     const attempts = Object.values(qbankProgress.mcqAttempts || {});
-    const correctCount = attempts.filter((a) => a.isCorrect).length;
+    const correctCount = attempts.filter((a: any) => a && a.isCorrect).length;
     mcqXP = correctCount * 10 + (attempts.length - correctCount) * 3;
-    pyqXP = (qbankProgress.pyqCompleted || []).length * 20;
+    pyqXP = (Array.isArray(qbankProgress.pyqCompleted) ? qbankProgress.pyqCompleted : []).length * 20;
   }
 
   const totalXP =

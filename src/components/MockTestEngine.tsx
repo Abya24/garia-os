@@ -107,41 +107,46 @@ export const MockTestEngine: React.FC<MockTestEngineProps> = ({
   };
 
   // Extract unique subjects, chapters, topics from availableMCQs
+  const safeAvailableMCQs = useMemo(() => {
+    return Array.isArray(availableMCQs) ? availableMCQs : [];
+  }, [availableMCQs]);
+
   const subjectsList = useMemo(() => {
     const set = new Set<string>();
-    availableMCQs.forEach((m) => {
-      if (m.subjectName) set.add(m.subjectName);
+    safeAvailableMCQs.forEach((m) => {
+      if (m && m.subjectName) set.add(m.subjectName);
     });
     return Array.from(set);
-  }, [availableMCQs]);
+  }, [safeAvailableMCQs]);
 
   const chaptersList = useMemo(() => {
     const set = new Set<string>();
-    availableMCQs
-      .filter((m) => selectedSubject === "ALL" || m.subjectName === selectedSubject)
+    safeAvailableMCQs
+      .filter((m) => m && (selectedSubject === "ALL" || m.subjectName === selectedSubject))
       .forEach((m) => {
-        if (m.chapterTitle) set.add(m.chapterTitle);
+        if (m && m.chapterTitle) set.add(m.chapterTitle);
       });
     return Array.from(set);
-  }, [availableMCQs, selectedSubject]);
+  }, [safeAvailableMCQs, selectedSubject]);
 
   const topicsList = useMemo(() => {
     const set = new Set<string>();
-    availableMCQs
+    safeAvailableMCQs
       .filter(
         (m) =>
+          m &&
           (selectedSubject === "ALL" || m.subjectName === selectedSubject) &&
           (selectedChapter === "ALL" || m.chapterTitle === selectedChapter)
       )
       .forEach((m) => {
-        if (m.topicName) set.add(m.topicName);
+        if (m && m.topicName) set.add(m.topicName);
       });
     return Array.from(set);
-  }, [availableMCQs, selectedSubject, selectedChapter]);
+  }, [safeAvailableMCQs, selectedSubject, selectedChapter]);
 
   // Launch Test Logic
   const handleStartTest = () => {
-    let pool = [...availableMCQs];
+    let pool = [...safeAvailableMCQs];
     if (pool.length === 0) {
       pool = [...SEED_MCQS];
     }

@@ -79,6 +79,14 @@ export function generateStudentIntelligenceReport(
   studySessionsTotalMinutes: number = 0,
   streakDays: number = 1
 ): StudentIntelligenceReport {
+  const safeSubjects = Array.isArray(subjects) ? subjects : [];
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const safeVVITopics = Array.isArray(vviTopics) ? vviTopics : [];
+  const safeRevisions = Array.isArray(revisions) ? revisions : [];
+  const safePracticeSessions = Array.isArray(practiceSessions) ? practiceSessions : [];
+  const safeExamRecords = Array.isArray(examRecords) ? examRecords : [];
+  const safeQBank = qbankProgress || { mcqAttempts: {}, pyqAttempts: {} };
+
   const todayStr = getTodayString();
 
   // 1. Calculate per-subject analytics
@@ -89,11 +97,11 @@ export function generateStudentIntelligenceReport(
   let totalMCQAttempts = 0;
   let totalMCQCorrect = 0;
   let totalPYQCompletedAll = 0;
-  let totalTestsAll = examRecords.length;
+  let totalTestsAll = safeExamRecords.length;
   let sumTestPercentages = 0;
 
-  const subjectsAnalytics: SubjectAnalyticsItem[] = subjects.map((subj) => {
-    const subjChapters = chapters.filter((c) => c.subjectId === subj.id);
+  const subjectsAnalytics: SubjectAnalyticsItem[] = safeSubjects.map((subj) => {
+    const subjChapters = safeChapters.filter((c) => c && c.subjectId === subj.id);
     const compChapters = subjChapters.filter((c) => c.status === "Completed").length;
     const inProgChapters = subjChapters.filter((c) => c.status === "In Progress").length;
 
@@ -103,13 +111,13 @@ export function generateStudentIntelligenceReport(
     // Count topics inside chapters
     let subjTopicsCount = 0;
     subjChapters.forEach((c) => {
-      subjTopicsCount += (c.topics && c.topics.length > 0) ? c.topics.length : 3;
+      subjTopicsCount += (c.topics && Array.isArray(c.topics) && c.topics.length > 0) ? c.topics.length : 3;
     });
     totalTopicsAll += subjTopicsCount;
     // Approximated completed topics based on chapter status
     const compTopics = Math.round(
       subjChapters.reduce((acc, c) => {
-        const tCount = (c.topics && c.topics.length > 0) ? c.topics.length : 3;
+        const tCount = (c.topics && Array.isArray(c.topics) && c.topics.length > 0) ? c.topics.length : 3;
         if (c.status === "Completed") return acc + tCount;
         if (c.status === "In Progress") return acc + Math.floor(tCount * 0.5);
         return acc;
@@ -118,20 +126,20 @@ export function generateStudentIntelligenceReport(
     completedTopicsAll += compTopics;
 
     // MCQ accuracy from qbank progress
-    const attemptsList = Object.values(qbankProgress.mcqAttempts || {});
+    const attemptsList = Object.values(safeQBank.mcqAttempts || {}) as { mcqId: string; isCorrect: boolean }[];
     // Filter attempts for this subject if matches
     const subjAttempts = attemptsList.filter((att) => {
-      // In qbank mcqId format mcq-c10-math... or matches
-      const subLower = subj.name.toLowerCase();
+      if (!att || !att.mcqId) return false;
+      const subLower = (subj.name || "").toLowerCase();
       return (
         att.mcqId.toLowerCase().includes(subLower.slice(0, 4)) ||
-        att.mcqId.toLowerCase().includes(subj.id.toLowerCase().replace("sub-", ""))
+        att.mcqId.toLowerCase().includes((subj.id || "").toLowerCase().replace("sub-", ""))
       );
     });
 
     const mcqAtt = subjAttempts.length > 0 ? subjAttempts.length : Math.min(compChapters * 3, 10);
     const mcqCorr = subjAttempts.length > 0
-      ? subjAttempts.filter((a) => a.isCorrect).length
+      ? subjAttempts.filter((a) => a && a.isCorrect).length
       : Math.round(mcqAtt * (compChapters > 0 ? 0.75 : 0.5));
 
     totalMCQAttempts += mcqAtt;
@@ -146,8 +154,8 @@ export function generateStudentIntelligenceReport(
     const pyqCompPct = Math.round((pyqCompCount / pyqTotCount) * 100);
 
     // Tests recorded for this subject
-    const subjTests = examRecords.filter(
-      (r) => r.subjectId === subj.id || r.subjectName.toLowerCase() === subj.name.toLowerCase()
+    const subjTests = safeExamRecords.filter(
+      (r) => r && (r.subjectId === subj.id || (r.subjectName && r.subjectName.toLowerCase() === (subj.name || "").toLowerCase()))
     );
     const avgTestPct =
       subjTests.length > 0
@@ -195,7 +203,7 @@ export function generateStudentIntelligenceReport(
       pyqCompletionPct: pyqCompPct,
       testsRecordedCount: subjTests.length,
       avgTestScorePct: avgTestPct,
-      studyTimeMinutes: Math.round(studySessionsTotalMinutes / Math.max(subjects.length, 1)),
+      studyTimeMinutes: Math.round(studySessionsTotalMinutes / Math.max(safeSubjects.length, 1)),
       status,
     };
   });
@@ -222,8 +230,9 @@ export function generateStudentIntelligenceReport(
   const weakTopics: TopicIntelligenceItem[] = [];
   const strongTopics: TopicIntelligenceItem[] = [];
 
-  chapters.forEach((ch) => {
-    const sub = subjects.find((s) => s.id === ch.subjectId);
+  safeChapters.forEach((ch) => {
+    if (!ch) return;
+    const sub = safeSubjects.find((s) => s.id === ch.subjectId);
     const subName = sub ? sub.name : "Subject";
     const isVVI = ch.priority === "VVI";
 
