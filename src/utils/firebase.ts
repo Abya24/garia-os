@@ -185,7 +185,7 @@ export async function uploadWorkspaceToCloud(
     const payload: CloudBackupState = {
       userId,
       lastSyncedAt: timestamp,
-      version: "2.8.3",
+      version: "3.0.0",
       activeProfileId: snapshot.activeProfileId,
       profiles: snapshot.profiles,
       payloadJson: JSON.stringify(snapshot.fullStorageDump),

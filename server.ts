@@ -565,6 +565,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
 
   if (!isProduction) {
     console.log("[Garia OS Server] Starting in DEVELOPMENT mode with Vite middleware...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

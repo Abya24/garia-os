@@ -15,6 +15,7 @@ import {
   Users,
   Settings,
   Cloud,
+  CloudOff,
   LogOut,
   ChevronDown,
   Check,
@@ -110,12 +111,21 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const [lastSyncTime, setLastSyncTime] = useState<string>("Just now");
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
+  const [recentlySyncedToast, setRecentlySyncedToast] = useState<{ message: string; count?: number; timestamp: number } | null>(null);
+  const prevReconcilingRef = useRef<boolean>(false);
+  const prevPendingCountRef = useRef<number>(0);
 
   // Offline Pending Queue State
   const [offlineQueueState, setOfflineQueueState] = useState<OfflineQueueState>(() => ({
     pendingActions: [],
     pendingCount: 0,
     isReconciling: false,
+    syncProgress: {
+      total: 0,
+      current: 0,
+      percentage: 0,
+      stage: "idle",
+    },
     lastReconciledAt: null,
     lastReconciliationStatus: "idle",
     isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -127,6 +137,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
   useEffect(() => {
     const unsub = subscribeToOfflineQueue((qState) => {
+      // Detect when pending actions were successfully reconciled/pushed to Firestore
+      if (
+        (prevReconcilingRef.current && !qState.isReconciling && qState.lastReconciliationStatus === "success") ||
+        (qState.lastReconciliationStatus === "success" && qState.syncProgress.stage === "complete" && prevPendingCountRef.current > 0)
+      ) {
+        const syncedCount = prevPendingCountRef.current || 1;
+        setRecentlySyncedToast({
+          message: `${syncedCount} offline change${syncedCount > 1 ? "s" : ""} synced to Firestore`,
+          count: syncedCount,
+          timestamp: Date.now(),
+        });
+        setTimeout(() => {
+          setRecentlySyncedToast(null);
+        }, 4500);
+      }
+      prevReconcilingRef.current = qState.isReconciling;
+      if (qState.pendingCount > 0) {
+        prevPendingCountRef.current = qState.pendingCount;
+      }
+
       setOfflineQueueState(qState);
       if (qState.lastReconciledAt) {
         setLastSyncTime(
@@ -370,6 +400,67 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
         {/* Right Section: Interactive Indicators & Action Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5">
+          {/* 0. DEDICATED SYNC STATUS INDICATOR PILL */}
+          <button
+            onClick={() => {
+              setIsNetworkMenuOpen(true);
+              setIsProfileMenuOpen(false);
+              setIsNotificationMenuOpen(false);
+            }}
+            id="statusbar-sync-status-indicator"
+            title={
+              offlineQueueState.isReconciling
+                ? `Syncing ${offlineQueueState.pendingCount} offline actions to Firestore (${offlineQueueState.syncProgress.percentage}%)`
+                : recentlySyncedToast
+                ? "All offline changes successfully pushed to Firestore!"
+                : !isOnline
+                ? `Offline: ${offlineQueueState.pendingCount} actions queued locally`
+                : offlineQueueState.pendingCount > 0
+                ? `${offlineQueueState.pendingCount} offline actions queued for Firestore sync`
+                : "Firestore Cloud Synced"
+            }
+            className={`hidden xs:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all card-press ${
+              offlineQueueState.isReconciling
+                ? "bg-cyan-950/70 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)] ring-1 ring-cyan-400/30"
+                : recentlySyncedToast
+                ? "bg-emerald-950/80 border-emerald-500/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-in fade-in"
+                : !isOnline
+                ? "bg-amber-950/60 border-amber-500/40 text-amber-300"
+                : offlineQueueState.pendingCount > 0
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                : "bg-slate-800/60 border-white/10 text-slate-300 hover:border-emerald-500/30 hover:text-emerald-300"
+            }`}
+          >
+            {offlineQueueState.isReconciling ? (
+              <>
+                <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin" />
+                <span className="font-mono font-bold text-cyan-200">
+                  Syncing {offlineQueueState.syncProgress.percentage}%
+                </span>
+              </>
+            ) : recentlySyncedToast ? (
+              <>
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span className="font-semibold text-emerald-200">Synced to Cloud</span>
+              </>
+            ) : !isOnline ? (
+              <>
+                <CloudOff className="w-3 h-3 text-amber-400" />
+                <span>{offlineQueueState.pendingCount > 0 ? `${offlineQueueState.pendingCount} Queued` : "Offline"}</span>
+              </>
+            ) : offlineQueueState.pendingCount > 0 ? (
+              <>
+                <Zap className="w-3 h-3 text-amber-400 animate-pulse" />
+                <span className="font-semibold">{offlineQueueState.pendingCount} Pending</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline font-medium">Synced</span>
+              </>
+            )}
+          </button>
+
           {/* 1. INTERACTIVE ONLINE STATUS INDICATOR (Critical Issue 3 + Offline Queue) */}
           <div className="relative" ref={networkMenuRef}>
             <button
@@ -381,7 +472,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               id="header-network-status-indicator"
               aria-label={isOnline ? "Online status" : "Offline status"}
               title={
-                isOnline
+                offlineQueueState.isReconciling
+                  ? `Syncing ${offlineQueueState.syncProgress.percentage}% to Firestore...`
+                  : isOnline
                   ? offlineQueueState.pendingCount > 0
                     ? `Online - ${offlineQueueState.pendingCount} actions reconciling with Firestore`
                     : currentLanguage === "hi"
@@ -394,12 +487,21 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   : "Offline: Local safe mode - Click for details"
               }
               className={`p-1.5 rounded-full border transition-all text-xs min-h-[32px] min-w-[32px] sm:min-h-[34px] sm:min-w-[34px] flex items-center justify-center gap-1 card-press shadow-sm ${
-                isOnline
+                offlineQueueState.isReconciling
+                  ? "bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/40 text-cyan-300 ring-2 ring-cyan-500/20"
+                  : isOnline
                   ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
                   : "bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-300 animate-pulse"
               }`}
             >
-              {isOnline ? (
+              {offlineQueueState.isReconciling ? (
+                <span className="flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin" />
+                  <span className="text-[10px] font-mono font-bold text-cyan-300">
+                    {offlineQueueState.syncProgress.percentage}%
+                  </span>
+                </span>
+              ) : isOnline ? (
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
@@ -411,7 +513,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               )}
 
               {/* Pending Queue Count Badge */}
-              {offlineQueueState.pendingCount > 0 && (
+              {!offlineQueueState.isReconciling && offlineQueueState.pendingCount > 0 && (
                 <span className="flex items-center text-[10px] font-bold px-1 py-0.2 rounded-full bg-amber-500/30 text-amber-300 border border-amber-500/40">
                   <Zap className="w-2.5 h-2.5 mr-0.5 text-amber-400" />
                   {offlineQueueState.pendingCount}
@@ -435,14 +537,59 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                      isOnline
+                      offlineQueueState.isReconciling
+                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 animate-pulse"
+                        : isOnline
                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                         : "bg-amber-500/20 text-amber-300 border-amber-500/40"
                     }`}
                   >
-                    {isOnline ? "● Live Online" : "▲ Offline Mode"}
+                    {offlineQueueState.isReconciling
+                      ? `↻ Syncing (${offlineQueueState.syncProgress.percentage}%)`
+                      : isOnline
+                      ? "● Live Online"
+                      : "▲ Offline Mode"}
                   </span>
                 </div>
+
+                {/* Live Sync Progress Bar Widget */}
+                {offlineQueueState.isReconciling && (
+                  <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-cyan-300">
+                      <span className="flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                        <span>Flushing Offline Queue to Firestore...</span>
+                      </span>
+                      <span className="font-mono text-[10px] bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                        {offlineQueueState.syncProgress.percentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-cyan-500/20">
+                      <div
+                        className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${offlineQueueState.syncProgress.percentage}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-cyan-400/80">
+                      <span className="capitalize">Stage: {offlineQueueState.syncProgress.stage}</span>
+                      <span>{offlineQueueState.pendingCount} actions remaining</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Successful Sync Reconnection Banner */}
+                {recentlySyncedToast && (
+                  <div className="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 flex items-center justify-between text-xs text-emerald-200 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <p className="font-bold text-[11px] text-emerald-300">Sync Complete</p>
+                        <p className="text-[10px] text-emerald-400/90">{recentlySyncedToast.message}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-emerald-400/80 font-mono">Just now</span>
+                  </div>
+                )}
 
                 {/* Status Explanation Card */}
                 <div
