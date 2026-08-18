@@ -113,6 +113,7 @@ function setItem<T>(key: string, value: T): void {
 const defaultSettings: UserSettings = {
   userName: "Student",
   theme: "dark",
+  autoSolarTheme: false,
   customApiKey: "",
   notificationsEnabled: true,
   notifications: {

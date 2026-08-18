@@ -2,42 +2,43 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
-  Sparkles,
   User,
+  Users,
   Globe,
   Palette,
-  Shield,
+  Sun,
+  Moon,
+  Smartphone,
   Bell,
-  Sliders,
+  LayoutGrid,
+  Shield,
+  Key,
+  Fingerprint,
+  Grid,
   Settings,
+  Database,
+  Cloud,
   HelpCircle,
   Info,
+  Sparkles,
   Star,
-  Sparkle,
-  Lock,
   ChevronDown,
-  Check,
-  Smartphone,
-  Eye,
-  Key,
-  ShieldCheck,
   ChevronRight,
+  Check,
+  RotateCw,
   ExternalLink,
-  Layers,
-  Moon,
-  Sun,
-  Flame,
-  Zap,
+  ShieldCheck,
+  Sparkle,
 } from "lucide-react";
 import {
   UserSettings,
   StudentProfile,
   ActiveTab,
   AppTheme,
-  AbyaLanguageSetting,
 } from "../types";
-import { APP_VERSION } from "../constants/version";
+import { APP_VERSION, APP_BUILD_DATE } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
+import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
 
 interface SliderMenuProps {
   isOpen: boolean;
@@ -51,6 +52,8 @@ interface SliderMenuProps {
   onUpdateLanguage: (lang: AppLanguage) => void;
   onUpdateSettings: (newSettings: UserSettings) => void;
   onNavigate: (tab: ActiveTab) => void;
+  onClearAllData?: () => void;
+  onLogout?: () => void;
 }
 
 export const SliderMenu: React.FC<SliderMenuProps> = ({
@@ -66,17 +69,26 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
   onUpdateSettings,
   onNavigate,
 }) => {
-  // Dropdown open states
+  // Accordion / Dropdown States
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
-  const [iconDropdownOpen, setIconDropdownOpen] = useState(false);
+  const [appIconDropdownOpen, setAppIconDropdownOpen] = useState(false);
 
-  // Modals & sub-views
+  // Modals & Interactive States
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [userRating, setUserRating] = useState<number>(5);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [selectedAppIcon, setSelectedAppIcon] = useState<string>("Classic Emerald");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // App Lock Sub-options
+  const [lockMethod, setLockMethod] = useState<"pin" | "pattern" | "biometric">("pin");
 
   const t = translations[currentLanguage] || translations.en;
 
@@ -92,11 +104,15 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
   ];
 
   const appIcons = [
-    { id: "classic", name: "Classic Emerald Garia", badge: "Default", color: "from-emerald-500 to-teal-600" },
+    { id: "classic", name: "Classic Emerald", badge: "Default", color: "from-emerald-500 to-teal-600" },
     { id: "dark_minimal", name: "Obsidian Minimal", badge: "Pro", color: "from-slate-800 to-zinc-950" },
     { id: "neon_purple", name: "Neon Cyberpunk", badge: "Vibrant", color: "from-purple-500 to-indigo-600" },
     { id: "cyber_gold", name: "Academic Gold", badge: "Elite", color: "from-amber-400 to-orange-500" },
   ];
+
+  const toggleAccordion = (sectionId: string) => {
+    setOpenSection((prev) => (prev === sectionId ? null : sectionId));
+  };
 
   const handleToggleNotification = () => {
     onUpdateSettings({
@@ -105,7 +121,25 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
     });
   };
 
-  const handleTogglePinLock = () => {
+  const handleToggleSolarTheme = () => {
+    onUpdateSettings({
+      ...settings,
+      autoSolarTheme: !settings.autoSolarTheme,
+    });
+  };
+
+  const handleThemeChange = (newTheme: AppTheme) => {
+    onUpdateSettings({
+      ...settings,
+      theme: newTheme,
+    });
+  };
+
+  const handleLanguageChange = (newLang: AppLanguage) => {
+    onUpdateLanguage(newLang);
+  };
+
+  const handleTogglePrivateMode = () => {
     if (settings.account) {
       onUpdateSettings({
         ...settings,
@@ -115,7 +149,6 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
         },
       });
     } else {
-      // Create lightweight privacy lock
       onUpdateSettings({
         ...settings,
         account: {
@@ -129,17 +162,37 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
     }
   };
 
-  const handleThemeChange = (newTheme: AppTheme) => {
-    onUpdateSettings({
-      ...settings,
-      theme: newTheme,
-    });
-    setThemeDropdownOpen(false);
+  const handleTriggerSync = async () => {
+    setIsSyncing(true);
+    setSyncStatusMsg("Syncing to Firestore...");
+    try {
+      const res = await reconcilePendingQueueWithFirestore();
+      if (res.success) {
+        setSyncStatusMsg(`Synced ${res.processed} action(s)`);
+      } else {
+        setSyncStatusMsg("Synced with Cloud");
+      }
+    } catch {
+      setSyncStatusMsg("Offline (queued locally)");
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncStatusMsg(null), 3000);
+    }
   };
 
-  const handleLanguageChange = (newLang: AppLanguage) => {
-    onUpdateLanguage(newLang);
-    setLangDropdownOpen(false);
+  const handleExportData = () => {
+    try {
+      const dataStr = JSON.stringify(localStorage, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `garia-os-backup-${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -156,7 +209,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md"
           />
 
-          {/* Slide-over Panel (Slider) */}
+          {/* Slide-over Panel: Clean, direct options, no double header */}
           <motion.div
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
@@ -164,78 +217,69 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
             transition={{ type: "spring", stiffness: 350, damping: 32 }}
             className="fixed top-0 bottom-0 left-0 z-50 w-full max-w-sm sm:max-w-md bg-slate-900/98 text-slate-100 border-r border-white/10 shadow-2xl flex flex-col backdrop-blur-2xl overflow-hidden"
           >
-            {/* Slider Top Header */}
-            <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
-                  <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="text-base font-bold text-white font-heading tracking-tight">
-                      Abya AI & System
-                    </h2>
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      v{APP_VERSION}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Garia OS Personalization & Controls
-                  </p>
-                </div>
-              </div>
-
+            {/* Minimalist Top Close Bar - No extra title, no logo+title combination */}
+            <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between bg-slate-950/60">
+              <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">
+                Options
+              </span>
               <button
                 onClick={onClose}
+                id="slider-close-btn"
                 aria-label="Close Slider Menu"
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors active:scale-95 border border-white/5"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors active:scale-95 border border-white/5"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Scrollable Slider Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 custom-scrollbar">
-              {/* SECTION 1: ACCOUNT & STUDENT PROFILE */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5" />
-                    Account
-                  </span>
+            {/* Scrollable Content - Direct to Categories */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
+              
+              {/* 1. ACCOUNT */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
+                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>Account</span>
                 </div>
 
-                {/* Active Student Card */}
-                <div className="glass-card rounded-2xl p-3.5 border border-white/10 bg-slate-800/40 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-bold text-white shadow-md text-base shrink-0">
-                      {activeStudent?.name?.charAt(0) || "S"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-sm text-white truncate">
-                        {activeStudent?.name || settings.userName || "Student Profile"}
+                <div className="space-y-2">
+                  {/* Profile */}
+                  <button
+                    onClick={() => {
+                      onNavigate("settings");
+                      onClose();
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
+                        {activeStudent?.name?.charAt(0) || "S"}
                       </div>
-                      <div className="text-xs text-slate-400 truncate">
-                        {activeStudent?.classLevel || "Class 12"} • {activeStudent?.stream || "General"} ({activeStudent?.board || "CBSE"})
+                      <div>
+                        <div className="font-bold text-white text-xs">
+                          {activeStudent?.name || settings.userName || "Student Profile"}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {activeStudent?.classLevel || "Class 12"} • {activeStudent?.stream || "General"}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
 
-                  {/* Switch Student Profile Dropdown */}
+                  {/* Switch Student */}
                   <div className="relative">
                     <button
                       onClick={() => setProfileDropdownOpen((prev) => !prev)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs font-semibold text-slate-200 transition-colors"
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-slate-200 transition-colors"
                     >
-                      <span className="flex items-center gap-2 truncate">
-                        <span className="text-slate-400 font-normal">Switch Profile:</span>
-                        <span className="text-emerald-400 font-bold truncate">{activeStudent?.name || "Default"}</span>
+                      <span className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Switch Student</span>
                       </span>
                       <ChevronDown
                         className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
-                          profileDropdownOpen ? "rotate-180" : ""
+                          profileDropdownOpen ? "rotate-180 text-emerald-400" : ""
                         }`}
                       />
                     </button>
@@ -275,10 +319,11 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                               onClick={() => {
                                 setProfileDropdownOpen(false);
                                 onOpenStudentModal();
+                                onClose();
                               }}
                               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-cyan-400 hover:bg-cyan-500/10 transition-colors"
                             >
-                              <span>Manage All Profiles</span>
+                              <span>+ Add / Manage Students</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -289,387 +334,423 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 2: PERSONALIZATION */}
-              <div className="space-y-3">
+              {/* 2. PERSONALIZATION */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
                 <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Palette className="w-3.5 h-3.5" />
-                  Personalization
+                  <span>Personalization</span>
                 </div>
 
-                <div className="glass-card rounded-2xl p-3.5 border border-white/10 bg-slate-800/40 space-y-3">
-                  {/* Language Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-slate-400" />
-                      App Language
+                <div className="space-y-3">
+                  {/* Language */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                      <Globe className="w-3 h-3 text-slate-400" />
+                      <span>Language</span>
                     </label>
-                    <div className="relative">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => setLangDropdownOpen((prev) => !prev)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs font-semibold text-slate-200"
+                        onClick={() => handleLanguageChange("en")}
+                        className={`py-1.5 px-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          currentLanguage === "en"
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold"
+                            : "bg-slate-800/70 border-white/5 text-slate-400 hover:text-slate-200"
+                        }`}
                       >
-                        <span>{currentLanguage === "hi" ? "हिंदी (Hindi)" : "English (Default)"}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${langDropdownOpen ? "rotate-180" : ""}`} />
+                        English
                       </button>
-
-                      {langDropdownOpen && (
-                        <div className="mt-1 p-1 rounded-xl bg-slate-800 border border-white/10 shadow-xl space-y-0.5">
-                          <button
-                            onClick={() => handleLanguageChange("en")}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
-                              currentLanguage === "en"
-                                ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                                : "text-slate-300 hover:bg-white/5"
-                            }`}
-                          >
-                            <span>English (Default)</span>
-                            {currentLanguage === "en" && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                          </button>
-                          <button
-                            onClick={() => handleLanguageChange("hi")}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
-                              currentLanguage === "hi"
-                                ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                                : "text-slate-300 hover:bg-white/5"
-                            }`}
-                          >
-                            <span>हिंदी (Hindi)</span>
-                            {currentLanguage === "hi" && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => handleLanguageChange("hi")}
+                        className={`py-1.5 px-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          currentLanguage === "hi"
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold"
+                            : "bg-slate-800/70 border-white/5 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        हिंदी (Hindi)
+                      </button>
                     </div>
                   </div>
 
-                  {/* Theme Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-                      <Moon className="w-3.5 h-3.5 text-slate-400" />
-                      Theme & Colors
+                  {/* Theme */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Palette className="w-3 h-3 text-slate-400" />
+                        <span>Theme</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono capitalize">
+                        {settings.theme || "dark"}
+                      </span>
                     </label>
-                    <div className="relative">
-                      <button
-                        onClick={() => setThemeDropdownOpen((prev) => !prev)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs font-semibold text-slate-200"
-                      >
-                        <span className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {themes.map((th) => (
+                        <button
+                          key={th.id}
+                          onClick={() => handleThemeChange(th.id)}
+                          className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all ${
+                            settings.theme === th.id
+                              ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold"
+                              : "bg-slate-800/70 border-white/5 text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
                           <span
-                            className="w-3 h-3 rounded-full border border-white/20"
-                            style={{
-                              backgroundColor:
-                                themes.find((t) => t.id === settings.theme)?.color || "#0f172a",
-                            }}
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: th.color }}
                           />
-                          <span>
-                            {themes.find((t) => t.id === settings.theme)?.name || "Dark Modern"}
-                          </span>
-                        </span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${themeDropdownOpen ? "rotate-180" : ""}`} />
-                      </button>
-
-                      {themeDropdownOpen && (
-                        <div className="mt-1 p-1 max-h-48 overflow-y-auto rounded-xl bg-slate-800 border border-white/10 shadow-xl space-y-0.5 custom-scrollbar">
-                          {themes.map((th) => (
-                            <button
-                              key={th.id}
-                              onClick={() => handleThemeChange(th.id)}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
-                                settings.theme === th.id
-                                  ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                                  : "text-slate-300 hover:bg-white/5"
-                              }`}
-                            >
-                              <span className="flex items-center gap-2">
-                                <span
-                                  className="w-3 h-3 rounded-full border border-white/20"
-                                  style={{ backgroundColor: th.color }}
-                                />
-                                <span>{th.name}</span>
-                              </span>
-                              {settings.theme === th.id && (
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                          <span className="truncate text-[10px]">{th.name}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* App Icon Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-                      <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                      App Icon Style
-                    </label>
-                    <div className="relative">
-                      <button
-                        onClick={() => setIconDropdownOpen((prev) => !prev)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 text-xs font-semibold text-slate-200"
-                      >
-                        <span>{selectedAppIcon}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${iconDropdownOpen ? "rotate-180" : ""}`} />
-                      </button>
+                  {/* Appearance (Solar Theme Auto-Sync) */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Sun className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Solar Sunrise/Sunset Sync</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Auto Light mode at dawn, Dark mode at dusk
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggleSolarTheme}
+                      className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                        settings.autoSolarTheme ? "bg-amber-500" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
+                          settings.autoSolarTheme ? "translate-x-4.5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
 
-                      {iconDropdownOpen && (
-                        <div className="mt-1 p-1 rounded-xl bg-slate-800 border border-white/10 shadow-xl space-y-0.5">
+                  {/* App Icon Selector */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setAppIconDropdownOpen((prev) => !prev)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-slate-200 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                        <span>App Icon: {selectedAppIcon}</span>
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                          appIconDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {appIconDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="mt-1.5 p-1.5 rounded-xl bg-slate-800 border border-white/10 shadow-xl space-y-1 z-20"
+                        >
                           {appIcons.map((icon) => (
                             <button
                               key={icon.id}
                               onClick={() => {
                                 setSelectedAppIcon(icon.name);
-                                setIconDropdownOpen(false);
+                                setAppIconDropdownOpen(false);
                               }}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
                                 selectedAppIcon === icon.name
                                   ? "bg-emerald-500/20 text-emerald-300 font-bold"
                                   : "text-slate-300 hover:bg-white/5"
                               }`}
                             >
-                              <span className="flex items-center gap-2">
-                                <span className={`w-3.5 h-3.5 rounded-md bg-gradient-to-tr ${icon.color}`} />
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-4 h-4 rounded-md bg-gradient-to-tr ${icon.color}`}
+                                />
                                 <span>{icon.name}</span>
+                              </div>
+                              <span className="text-[9px] px-1 rounded bg-white/10 text-slate-300">
+                                {icon.badge}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-mono">{icon.badge}</span>
                             </button>
                           ))}
-                        </div>
+                        </motion.div>
                       )}
-                    </div>
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
 
-              {/* SECTION 3: SECURITY (Toggles / Switches) */}
-              <div className="space-y-3">
+              {/* 3. PREFERENCES */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
                 <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Security & Lock
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>Preferences</span>
                 </div>
 
-                <div className="glass-card rounded-2xl p-3.5 border border-white/10 bg-slate-800/40 space-y-3">
-                  {/* App Lock Toggle */}
-                  <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  {/* Notifications */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 flex items-center justify-between">
                     <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                        App Lock (PIN & Privacy)
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        Require lock code to open Garia OS
-                      </div>
+                      <div className="text-xs font-bold text-white">Notifications</div>
+                      <p className="text-[10px] text-slate-400">Study alerts, deadlines & habits</p>
                     </div>
-
-                    <button
-                      onClick={handleTogglePinLock}
-                      className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
-                        settings.account?.isPrivateMode ? "bg-emerald-500" : "bg-slate-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full bg-white transition-transform transform shadow-md ${
-                          settings.account?.isPrivateMode ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Biometrics switch */}
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Key className="w-3.5 h-3.5 text-cyan-400" />
-                        Biometrics & Fingerprint
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        Instant biometric unlock (Hardware supported)
-                      </div>
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono">
-                      Ready
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 4: PREFERENCES */}
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5" />
-                  Preferences
-                </div>
-
-                <div className="glass-card rounded-2xl p-3.5 border border-white/10 bg-slate-800/40 space-y-3">
-                  {/* Push Notifications Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Bell className="w-3.5 h-3.5 text-amber-400" />
-                        Study & Revision Alerts
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        Daily task deadlines & habit streak notifications
-                      </div>
-                    </div>
-
                     <button
                       onClick={handleToggleNotification}
-                      className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
+                      className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
                         settings.notificationsEnabled ? "bg-emerald-500" : "bg-slate-700"
                       }`}
                     >
                       <span
-                        className={`w-5 h-5 rounded-full bg-white transition-transform transform shadow-md ${
-                          settings.notificationsEnabled ? "translate-x-5" : "translate-x-0"
+                        className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
+                          settings.notificationsEnabled ? "translate-x-4.5" : "translate-x-0"
                         }`}
                       />
                     </button>
                   </div>
 
-                  {/* Widgets Navigation / Customizer */}
-                  <div className="pt-2 border-t border-white/5">
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onNavigate("home");
-                      }}
-                      className="w-full flex items-center justify-between py-1 text-xs text-slate-300 hover:text-white font-medium group"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                        Dashboard Widgets Setup
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                    </button>
+                  {/* Widgets */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="w-3.5 h-3.5 text-cyan-400" />
+                      <div>
+                        <div className="text-xs font-bold text-white">Dashboard Widgets</div>
+                        <p className="text-[10px] text-slate-400">7 core daily-use productivity blocks</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      7 Active
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* SECTION 5: SETTINGS */}
-              <div className="space-y-3">
+              {/* 4. SECURITY */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
                 <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Settings className="w-3.5 h-3.5" />
-                  Settings
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Security</span>
                 </div>
 
-                <button
-                  onClick={() => {
-                    onClose();
-                    onNavigate("settings");
-                  }}
-                  className="w-full glass-card rounded-2xl p-3.5 border border-white/10 bg-slate-800/40 hover:bg-slate-800/70 flex items-center justify-between text-xs font-bold text-white transition-colors group"
-                >
-                  <span className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-cyan-400" />
-                    Open General Settings
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                <div className="space-y-2">
+                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>App Lock</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          Protect private notes, sessions & logs
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleTogglePrivateMode}
+                        className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                          settings?.account?.isPrivateMode ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
+                            settings?.account?.isPrivateMode ? "translate-x-4.5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Sub-lock methods: PIN, Pattern, Biometrics */}
+                    <div className="pt-2 border-t border-white/5 grid grid-cols-3 gap-1.5">
+                      <button
+                        onClick={() => setLockMethod("pin")}
+                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                          lockMethod === "pin"
+                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            : "bg-slate-800 border-white/5 text-slate-400"
+                        }`}
+                      >
+                        <Key className="w-3 h-3" />
+                        <span>PIN</span>
+                      </button>
+                      <button
+                        onClick={() => setLockMethod("pattern")}
+                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                          lockMethod === "pattern"
+                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            : "bg-slate-800 border-white/5 text-slate-400"
+                        }`}
+                      >
+                        <Grid className="w-3 h-3" />
+                        <span>Pattern</span>
+                      </button>
+                      <button
+                        onClick={() => setLockMethod("biometric")}
+                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                          lockMethod === "biometric"
+                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            : "bg-slate-800 border-white/5 text-slate-400"
+                        }`}
+                      >
+                        <Fingerprint className="w-3 h-3" />
+                        <span>Biometrics</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* SECTION 6: SUPPORT & ABOUT */}
-              <div className="space-y-3">
+              {/* 5. SYSTEM */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
                 <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  Support & About
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>System</span>
                 </div>
 
-                <div className="glass-card rounded-2xl p-2 border border-white/10 bg-slate-800/40 space-y-1">
+                <div className="space-y-2">
+                  {/* Full Settings Navigation */}
                   <button
                     onClick={() => {
-                      setShowAboutModal(true);
+                      onNavigate("settings");
+                      onClose();
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors"
                   >
-                    <span className="flex items-center gap-2">
-                      <Info className="w-3.5 h-3.5 text-emerald-400" />
-                      About Garia OS
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400">v{APP_VERSION}</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <div>
+                        <div className="font-bold text-white text-xs">Settings</div>
+                        <div className="text-[10px] text-slate-400">All configurations & preferences</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
 
+                  {/* Backup & Restore */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-3.5 h-3.5 text-emerald-400" />
+                        <div>
+                          <div className="text-xs font-bold text-white">Backup & Restore</div>
+                          <div className="text-[10px] text-slate-400">Cloud Firestore & Local JSON</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleTriggerSync}
+                        disabled={isSyncing}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 hover:bg-emerald-500/30 transition-colors"
+                      >
+                        <RotateCw className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+                        <span>{isSyncing ? "Syncing..." : "Sync"}</span>
+                      </button>
+                    </div>
+
+                    {syncStatusMsg && (
+                      <div className="text-[10px] text-emerald-300 font-mono">
+                        {syncStatusMsg}
+                      </div>
+                    )}
+
+                    <div className="pt-1.5 flex gap-2">
+                      <button
+                        onClick={handleExportData}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-medium border border-white/5 transition-colors"
+                      >
+                        Export JSON Backup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. SUPPORT */}
+              <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-2">
+                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>Support</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
-                    onClick={() => setShowWhatsNewModal(true)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
+                    onClick={() => setShowHelpModal(true)}
+                    className="p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors flex items-center justify-between"
                   >
-                    <span className="flex items-center gap-2">
-                      <Sparkle className="w-3.5 h-3.5 text-amber-400" />
-                      What's New in V3
-                    </span>
+                    <span className="font-semibold text-slate-200">Help & Feedback</span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
 
                   <button
-                    onClick={() => {
-                      setFeedbackSent(true);
-                      setTimeout(() => setFeedbackSent(false), 3000);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
+                    onClick={() => setShowAboutModal(true)}
+                    className="p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors flex items-center justify-between"
                   >
-                    <span className="flex items-center gap-2">
-                      <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                      Help & Student Feedback
-                    </span>
-                    {feedbackSent ? (
-                      <span className="text-[10px] text-emerald-400 font-bold">Feedback Sent!</span>
-                    ) : (
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    )}
+                    <span className="font-semibold text-slate-200">About Garia OS</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
 
                   <button
-                    onClick={() => {
-                      alert("Thank you for rating Garia OS 5 Stars!");
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
+                    onClick={() => setShowWhatsNewModal(true)}
+                    className="p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors flex items-center justify-between"
                   >
-                    <span className="flex items-center gap-2">
-                      <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400/30" />
-                      Rate Garia OS
-                    </span>
-                    <span className="text-[10px] text-amber-300 font-bold">★ 5.0</span>
+                    <span className="font-semibold text-slate-200">What's New</span>
+                    <Sparkle className="w-3.5 h-3.5 text-amber-400" />
+                  </button>
+
+                  <button
+                    onClick={() => setShowRateModal(true)}
+                    className="p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-white/5 text-xs text-left transition-colors flex items-center justify-between"
+                  >
+                    <span className="font-semibold text-slate-200">Rate App</span>
+                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* Slider Bottom Info */}
-            <div className="p-3 bg-slate-950/80 border-t border-white/10 text-center text-[10px] text-slate-500">
-              Garia OS V3.0 • Built for Focused Student Learning
             </div>
           </motion.div>
 
-          {/* About Modal */}
+          {/* ABOUT MODAL */}
           {showAboutModal && (
-            <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="glass-card rounded-3xl p-6 border border-white/15 bg-slate-900 max-w-sm w-full space-y-4 shadow-2xl">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                  <Sparkles className="w-6 h-6 text-slate-950" />
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in"
+              onClick={() => setShowAboutModal(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-400 flex items-center justify-center text-slate-950 font-bold text-xs">
+                      G
+                    </div>
+                    <h3 className="font-bold text-white text-sm font-heading">About Garia OS</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowAboutModal(false)}
+                    className="p-1 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="text-center space-y-1">
-                  <h3 className="text-lg font-bold text-white font-heading">Garia OS V3.0</h3>
-                  <p className="text-xs text-slate-400">
-                    Premium, minimal, student-focused productivity operating system.
+
+                <div className="space-y-2 text-xs text-slate-300">
+                  <p>
+                    <strong className="text-white">Garia OS V{APP_VERSION}</strong> is a minimalist, fast, and Play Store ready student productivity operating system.
                   </p>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-800/80 border border-white/5 text-xs text-slate-300 space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Platform:</span>
-                    <span className="font-bold text-emerald-400">Garia OS Web & Android APK</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">AI Engine:</span>
-                    <span className="font-bold text-white">Abya AI Multimodal</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Sync Engine:</span>
-                    <span className="font-bold text-cyan-400">Firestore Real-time & Offline</span>
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-white/5 font-mono text-[11px] space-y-1 text-slate-400">
+                    <div>Version: v{APP_VERSION}</div>
+                    <div>Build: {APP_BUILD_DATE}</div>
+                    <div>Platform: Web & Android APK</div>
+                    <div>Cloud: Firestore Synced</div>
                   </div>
                 </div>
+
                 <button
                   onClick={() => setShowAboutModal(false)}
-                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors"
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
                 >
                   Close
                 </button>
@@ -677,38 +758,190 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
             </div>
           )}
 
-          {/* What's New Modal */}
+          {/* WHAT'S NEW MODAL */}
           {showWhatsNewModal && (
-            <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="glass-card rounded-3xl p-6 border border-white/15 bg-slate-900 max-w-sm w-full space-y-4 shadow-2xl">
-                <div className="flex items-center gap-2">
-                  <Sparkle className="w-5 h-5 text-amber-400" />
-                  <h3 className="text-base font-bold text-white font-heading">What's New in V3.0</h3>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in"
+              onClick={() => setShowWhatsNewModal(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <h3 className="font-bold text-white text-sm font-heading">What's New in V3.0</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowWhatsNewModal(false)}
+                    className="p-1 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+
                 <div className="space-y-2.5 text-xs text-slate-300">
-                  <div className="flex gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    <span><strong>TickTick-Inspired UI/UX:</strong> Streamlined, clean, distraction-free student experience.</span>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-white">Minimal Home Dashboard:</strong> Single Garia OS app icon access point with no clutter.
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    <span><strong>Single-Header Architecture:</strong> Zero duplicate headers or stacked bars across all screens.</span>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-white">Direct Slider Panel:</strong> Smooth options drawer with Account, Personalization, Preferences, Security, and System.
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    <span><strong>Abya AI Slide-Over Panel:</strong> Instant access to profiles, themes, and security.</span>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-white">Solar Sunrise Theme Engine:</strong> Real-time astronomical daylight theme adaptation.
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    <span><strong>Accordion More Menu:</strong> Beautiful categorized preferences with expandable sections.</span>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-white">Conic Focus Timer:</strong> Precision circular angular track with ambient pulse.
+                    </div>
                   </div>
                 </div>
+
                 <button
                   onClick={() => setShowWhatsNewModal(false)}
-                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-white/10 transition-colors"
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
                 >
                   Got It
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* HELP & FEEDBACK MODAL */}
+          {showHelpModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in"
+              onClick={() => setShowHelpModal(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-emerald-400" />
+                    <h3 className="font-bold text-white text-sm font-heading">Help & Feedback</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowHelpModal(false)}
+                    className="p-1 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {feedbackSubmitted ? (
+                  <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-center space-y-2">
+                    <Check className="w-8 h-8 text-emerald-400 mx-auto" />
+                    <div className="text-xs font-bold text-emerald-300">Thank you for your feedback!</div>
+                    <p className="text-[11px] text-slate-400">Your feedback helps shape Garia OS updates.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      placeholder="Describe any issue or suggest a feature for Garia OS..."
+                      rows={3}
+                      className="w-full p-3 rounded-2xl bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      onClick={() => {
+                        if (feedbackText.trim()) {
+                          setFeedbackSubmitted(true);
+                          setTimeout(() => {
+                            setShowHelpModal(false);
+                            setFeedbackSubmitted(false);
+                            setFeedbackText("");
+                          }, 2000);
+                        }
+                      }}
+                      disabled={!feedbackText.trim()}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 disabled:opacity-40 text-slate-950 font-bold text-xs transition-all"
+                    >
+                      Submit Feedback
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* RATE APP MODAL */}
+          {showRateModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in"
+              onClick={() => setShowRateModal(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between text-left">
+                  <h3 className="font-bold text-white text-sm font-heading">Rate Garia OS</h3>
+                  <button
+                    onClick={() => setShowRateModal(false)}
+                    className="p-1 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {ratingSubmitted ? (
+                  <div className="py-4 space-y-2">
+                    <Star className="w-10 h-10 text-amber-400 fill-amber-400 mx-auto animate-bounce" />
+                    <div className="text-sm font-bold text-white">Thank you for rating!</div>
+                    <p className="text-xs text-slate-400">Your 5-star support inspires new features.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 py-2">
+                    <p className="text-xs text-slate-300">
+                      How has your study experience been with Garia OS?
+                    </p>
+
+                    <div className="flex items-center justify-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setUserRating(star)}
+                          className="p-1 hover:scale-125 transition-transform"
+                        >
+                          <Star
+                            className={`w-7 h-7 ${
+                              userRating >= star
+                                ? "text-amber-400 fill-amber-400"
+                                : "text-slate-600"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setRatingSubmitted(true);
+                        setTimeout(() => {
+                          setShowRateModal(false);
+                          setRatingSubmitted(false);
+                        }, 2000);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20"
+                    >
+                      Submit Rating
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

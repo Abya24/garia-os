@@ -32,6 +32,10 @@ import {
   Cloud,
   ArrowLeft,
   HardDrive,
+  Sunrise,
+  Sunset,
+  MapPin,
+  Compass,
 } from "lucide-react";
 import {
   UserSettings,
@@ -43,6 +47,12 @@ import {
   CalendarEvent,
   Goal,
 } from "../types";
+import {
+  getSolarInfo,
+  requestDeviceLocation,
+  getCachedSolarCoordinates,
+  SolarInfo,
+} from "../utils/solarTheme";
 import {
   exportStudentProfileJSON,
   importStudentProfileJSON,
@@ -279,6 +289,50 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleThemeChange = (theme: AppTheme) => {
     onUpdateSettings({ ...settings, theme });
+  };
+
+  // Solar Theme State and Handlers
+  const [solarInfo, setSolarInfo] = useState<SolarInfo>(() => getSolarInfo());
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSolarInfo(getSolarInfo());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleToggleAutoSolar = (enabled: boolean) => {
+    onUpdateSettings({
+      ...settings,
+      autoSolarTheme: enabled,
+    });
+    if (enabled && !solarInfo.isUsingGeolocation) {
+      handleDetectLocation();
+    }
+  };
+
+  const handleDetectLocation = async () => {
+    setIsLocating(true);
+    try {
+      const coords = await requestDeviceLocation();
+      if (coords) {
+        setSolarInfo(getSolarInfo(new Date(), coords));
+        showToast(
+          currentLanguage === "hi"
+            ? "सटीक सूर्योदय/सूर्यास्त के लिए स्थान अपडेट किया गया!"
+            : "GPS location calibrated for precise sunrise/sunset times!"
+        );
+      } else {
+        showToast(
+          currentLanguage === "hi"
+            ? "स्थान अनुमति नहीं मिली। मानक सौर समय का उपयोग किया जा रहा है।"
+            : "Location unavailable. Using regional solar approximation."
+        );
+      }
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -851,7 +905,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* 4. Appearance & Multi-Theme System */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
             <Sun className="w-5 h-5 text-amber-400" />
@@ -866,6 +920,140 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             ? "अपनी पसंद के अनुसार तुरंत थीम स्विच करें। आंखों के तनाव को कम करने और फोकस बढ़ाने के लिए तैयार।"
             : "Switch instantly between 8 high-contrast student-focused themes designed for focus and low eye strain."}
         </p>
+
+        {/* Sunrise / Sunset Automatic Toggle Option */}
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/20 space-y-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                {solarInfo.isDaytime ? (
+                  <Sunrise className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <Sunset className="w-5 h-5 text-indigo-400" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-white font-heading">
+                    {currentLanguage === "hi"
+                      ? "सूर्योदय / सूर्यास्त ऑटो-थीम टॉगल"
+                      : "Automatic Sunrise / Sunset Theme"}
+                  </h4>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                    Day & Night
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {currentLanguage === "hi"
+                    ? "दिन में लाइट मोड और शाम के बाद डार्क मोड में स्वचालित रूप से स्विच करें।"
+                    : "Automatically switches to Light mode during daylight hours and Dark mode at dusk."}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Button */}
+            <button
+              onClick={() => handleToggleAutoSolar(!settings.autoSolarTheme)}
+              id="auto-solar-theme-toggle"
+              aria-label="Toggle Auto Solar Theme"
+              className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-200 ease-in-out shrink-0 focus:outline-none flex items-center ${
+                settings.autoSolarTheme ? "bg-amber-500" : "bg-slate-700"
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out flex items-center justify-center text-[10px] text-slate-900 font-bold ${
+                  settings.autoSolarTheme ? "translate-x-5.5" : "translate-x-0"
+                }`}
+              >
+                {settings.autoSolarTheme ? "☀️" : "🌙"}
+              </div>
+            </button>
+          </div>
+
+          {/* Solar Live Status Banner */}
+          {settings.autoSolarTheme && (
+            <div className="pt-2 border-t border-white/10 space-y-2.5 animate-in fade-in duration-300">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                      solarInfo.isDaytime ? "bg-amber-400" : "bg-indigo-400"
+                    }`}
+                  />
+                  <span className="font-semibold text-white">
+                    {solarInfo.isDaytime
+                      ? currentLanguage === "hi"
+                        ? "☀️ दिन का समय सक्रिय: लाइट मोड लागू है"
+                        : "☀️ Daytime Active: Light Mode is currently active"
+                      : currentLanguage === "hi"
+                      ? "🌙 रात का समय सक्रिय: डार्क मोड लागू है"
+                      : "🌙 Nighttime Active: Dark Mode is currently active"}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-lg bg-white/10 text-slate-300">
+                  {solarInfo.nextTransitionLabel}
+                </span>
+              </div>
+
+              {/* Sunrise & Sunset Times & Location */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                  <Sunrise className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-400">Sunrise</div>
+                    <div className="font-bold font-mono text-white text-xs">
+                      {solarInfo.sunriseFormatted}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                  <Sunset className="w-4 h-4 text-orange-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-400">Sunset</div>
+                    <div className="font-bold font-mono text-white text-xs">
+                      {solarInfo.sunsetFormatted}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1 p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-[11px] text-slate-300 truncate">
+                      {solarInfo.isUsingGeolocation ? "GPS Calibrated" : "Regional Solar"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleDetectLocation}
+                    disabled={isLocating}
+                    className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition-all shrink-0 active:scale-95"
+                  >
+                    {isLocating
+                      ? currentLanguage === "hi"
+                        ? "खोज रहा है..."
+                        : "Detecting..."
+                      : currentLanguage === "hi"
+                      ? "स्थान अपडेट"
+                      : "Sync GPS"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-2">
+          <h4 className="text-xs font-bold text-slate-300 mb-2">
+            {settings.autoSolarTheme
+              ? currentLanguage === "hi"
+                ? "रात के लिए पसंदीदा डार्क थीम चुनें:"
+                : "Select your preferred Dark Theme for nighttime:"
+              : currentLanguage === "hi"
+              ? "मैन्युअल थीम चयन:"
+              : "Manual Theme Palette:"}
+          </h4>
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
           {[

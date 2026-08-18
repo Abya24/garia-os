@@ -56,7 +56,7 @@ export const generateAbyaInsightCards = (
         ? "Marked as weak topic requiring extra conceptual practice."
         : "VVI High-Weightage Chapter in your syllabus.",
       actionText: "Study Topic",
-      actionTab: "academic",
+      actionTab: "study",
     });
   } else {
     cards.push({
@@ -65,8 +65,8 @@ export const generateAbyaInsightCards = (
       title: "🔥 Daily Priority",
       recommendation: "All chapters currently on track!",
       reason: "Continue maintaining regular chapter completion and practice.",
-      actionText: "Academic Center",
-      actionTab: "academic",
+      actionText: "Study Tracker",
+      actionTab: "study",
     });
   }
 
@@ -84,8 +84,8 @@ export const generateAbyaInsightCards = (
         overdueChapter.revisionCount === 0
           ? "No revision logged yet for this chapter."
           : "Needs spaced repetition to reinforce concepts.",
-      actionText: "Mark Revised",
-      actionTab: "academic",
+      actionText: "Study Session",
+      actionTab: "study",
     });
   }
 

@@ -61,7 +61,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
       message: `${rev.subjectName || "Subject"}: ${rev.chapterTitle || rev.topicName || "Topic"} is scheduled for memory retention cycle.`,
       timeAgo: "Today",
       priority: "high" as const,
-      actionTab: "questionbank" as const,
+      actionTab: "study" as const,
       actionText: "Practice Topic",
     })),
     // 2. Goal Deadlines

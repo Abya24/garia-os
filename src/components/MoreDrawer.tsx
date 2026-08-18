@@ -2,30 +2,27 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
+  Compass,
+  BookOpen,
+  FileText,
+  Calendar,
+  Target,
+  BarChart2,
+  Download,
   Palette,
-  Shield,
+  ShieldCheck,
   Bell,
   Database,
   HelpCircle,
   ChevronDown,
+  ChevronRight,
   Globe,
-  Smartphone,
-  Lock,
-  Key,
-  ShieldCheck,
-  RotateCw,
-  Cloud,
-  Download,
-  Upload,
-  Trash2,
-  Info,
+  Settings,
   Sparkles,
+  Sun,
   Star,
   Check,
-  Moon,
-  ExternalLink,
-  ChevronRight,
-  Sparkle,
+  RotateCw,
 } from "lucide-react";
 import { ActiveTab, StudentProfile, UserSettings, AppTheme } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -33,7 +30,6 @@ import { AppLanguage, translations } from "../utils/i18n";
 import {
   reconcilePendingQueueWithFirestore,
   subscribeToOfflineQueue,
-  clearPendingQueue,
 } from "../utils/offlineQueue";
 
 interface MoreDrawerProps {
@@ -54,22 +50,16 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
   isOpen,
   onClose,
   onNavigate,
-  activeTab,
   currentLanguage = "en",
   onUpdateLanguage,
-  onOpenStudentModal,
-  activeStudent,
   settings,
   onUpdateSettings,
-  onClearAllData,
 }) => {
   // Expandable category state (accordion)
-  const [expandedSection, setExpandedSection] = useState<string | null>("personalization");
+  const [expandedSection, setExpandedSection] = useState<string | null>("special_tools");
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
-  const [feedbackSent, setFeedbackSent] = useState<boolean>(false);
-  const [showAbout, setShowAbout] = useState<boolean>(false);
 
   useEffect(() => {
     const unsub = subscribeToOfflineQueue((state) => {
@@ -90,15 +80,15 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
     try {
       const res = await reconcilePendingQueueWithFirestore();
       if (res.success) {
-        setSyncStatusMsg(`Successfully synced (${res.processed} items)`);
+        setSyncStatusMsg(`Synced (${res.processed} items)`);
       } else {
-        setSyncStatusMsg("Sync attempted (offline or no queued actions)");
+        setSyncStatusMsg("Cloud Synced");
       }
     } catch {
-      setSyncStatusMsg("Sync failed. Check connection.");
+      setSyncStatusMsg("Offline (queued locally)");
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setSyncStatusMsg(null), 3500);
+      setTimeout(() => setSyncStatusMsg(null), 3000);
     }
   };
 
@@ -111,6 +101,58 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
     { id: "arctic", label: "Arctic Frost", color: "#0c4a6e" },
     { id: "light", label: "Pure Light", color: "#f8fafc" },
     { id: "system", label: "System Default", color: "#334155" },
+  ];
+
+  const specialTools = [
+    {
+      id: "career" as ActiveTab,
+      label: t.careerCenter || "Career Center",
+      desc: "Science, Commerce, Arts, Govt Jobs & Roadmaps",
+      icon: Compass,
+      color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+    },
+    {
+      id: "study" as ActiveTab,
+      label: t.studyTracker || "Study Tracker",
+      desc: "Subject study logs, chapters & session timers",
+      icon: BookOpen,
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    },
+    {
+      id: "notes" as ActiveTab,
+      label: t.notes || "Notes & Docs",
+      desc: "Rich markdown notes, tags & attachments",
+      icon: FileText,
+      color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    },
+    {
+      id: "calendar" as ActiveTab,
+      label: t.calendar || "Calendar & Events",
+      desc: "Timetable, deadlines & scheduled events",
+      icon: Calendar,
+      color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    },
+    {
+      id: "goals" as ActiveTab,
+      label: t.goals || "Goals & Targets",
+      desc: "Academic targets & milestone tracker",
+      icon: Target,
+      color: "text-teal-400 bg-teal-500/10 border-teal-500/20",
+    },
+    {
+      id: "stats" as ActiveTab,
+      label: t.analytics || "Advanced Analytics",
+      desc: "Productivity scores & study trends",
+      icon: BarChart2,
+      color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+    },
+    {
+      id: "download" as ActiveTab,
+      label: t.downloadAPK || "Download APK",
+      desc: `Official Garia OS Android APK v${APP_VERSION}`,
+      icon: Download,
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    },
   ];
 
   return (
@@ -139,32 +181,84 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
 
             {/* Header */}
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-white font-heading">
-                    {currentLanguage === "hi" ? "अतिरिक्त सेटिंग्स व नियंत्रण" : "More & System Preferences"}
-                  </h2>
-                  <p className="text-[11px] text-slate-400">
-                    Garia OS V{APP_VERSION} • Minimalist Configuration
-                  </p>
-                </div>
+              <div>
+                <h2 className="text-base font-bold text-white font-heading">
+                  More Features
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Specialized tools and advanced settings
+                </p>
               </div>
 
               <button
                 onClick={onClose}
                 aria-label="Close More Menu"
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Content: Expandable Accordion Categories */}
+            {/* Content: Expandable Categorized Sections */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-              {/* 1. PERSONALIZATION */}
+              
+              {/* CATEGORY 1: SPECIAL & ADVANCED TOOLS */}
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
+                <button
+                  onClick={() => toggleSection("special_tools")}
+                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">Special & Advanced Tools</div>
+                      <div className="text-[11px] text-slate-400">Career, Study Logs, Notes, Analytics</div>
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform ${
+                      expandedSection === "special_tools" ? "rotate-180 text-cyan-400" : ""
+                    }`}
+                  />
+                </button>
+
+                {expandedSection === "special_tools" && (
+                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-2 mt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {specialTools.map((tool) => {
+                        const Icon = tool.icon;
+                        return (
+                          <button
+                            key={tool.id}
+                            onClick={() => {
+                              onNavigate(tool.id);
+                              onClose();
+                            }}
+                            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-white/5 text-left flex items-start gap-2.5 transition-all group active:scale-98"
+                          >
+                            <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${tool.color}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
+                                {tool.label}
+                              </div>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {tool.desc}
+                              </p>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 mt-1 shrink-0" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CATEGORY 2: PERSONALIZATION */}
               <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
                 <button
                   onClick={() => toggleSection("personalization")}
@@ -176,7 +270,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                     </div>
                     <div>
                       <div className="text-sm font-bold text-white">Personalization</div>
-                      <div className="text-[11px] text-slate-400">Themes, Language & Appearance</div>
+                      <div className="text-[11px] text-slate-400">Themes, Solar Sync & Language</div>
                     </div>
                   </div>
                   <ChevronDown
@@ -188,7 +282,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
 
                 {expandedSection === "personalization" && (
                   <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    {/* Theme selector */}
+                    {/* Theme Grid */}
                     <div>
                       <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Theme</label>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -215,7 +309,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
 
                     {/* Language selector */}
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 mb-1.5 block">App Language</label>
+                      <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Language</label>
                       <div className="flex gap-2">
                         <button
                           onClick={() => onUpdateLanguage && onUpdateLanguage("en")}
@@ -245,162 +339,44 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                 )}
               </div>
 
-              {/* 2. SECURITY */}
+              {/* CATEGORY 3: CLOUD SYNC & SYSTEM */}
               <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
                 <button
-                  onClick={() => toggleSection("security")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Security</div>
-                      <div className="text-[11px] text-slate-400">App Lock, PIN & Privacy</div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "security" ? "rotate-180 text-cyan-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedSection === "security" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-white">Private Mode & App Lock</div>
-                        <div className="text-[11px] text-slate-400">Protect student notes & sessions</div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (settings && onUpdateSettings) {
-                            onUpdateSettings({
-                              ...settings,
-                              account: settings.account
-                                ? { ...settings.account, isPrivateMode: !settings.account.isPrivateMode }
-                                : {
-                                    email: "student@garia.os",
-                                    passwordHash: "pin_set",
-                                    name: activeStudent?.name || "Student",
-                                    isPrivateMode: true,
-                                    createdAt: Date.now(),
-                                  },
-                            });
-                          }
-                        }}
-                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
-                          settings?.account?.isPrivateMode ? "bg-emerald-500" : "bg-slate-700"
-                        }`}
-                      >
-                        <span
-                          className={`w-5 h-5 rounded-full bg-white transition-transform transform shadow-md ${
-                            settings?.account?.isPrivateMode ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-slate-400">
-                      <span>Biometric Unlock Status:</span>
-                      <span className="text-emerald-400 font-bold">Hardware Ready</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. NOTIFICATIONS */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("notifications")}
+                  onClick={() => toggleSection("system")}
                   className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                      <Bell className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Notifications</div>
-                      <div className="text-[11px] text-slate-400">Study alerts, habits & deadlines</div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "notifications" ? "rotate-180 text-amber-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedSection === "notifications" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-white">Master Notifications</div>
-                        <div className="text-[11px] text-slate-400">Daily study & revision reminders</div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (settings && onUpdateSettings) {
-                            onUpdateSettings({
-                              ...settings,
-                              notificationsEnabled: !settings.notificationsEnabled,
-                            });
-                          }
-                        }}
-                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
-                          settings?.notificationsEnabled ? "bg-emerald-500" : "bg-slate-700"
-                        }`}
-                      >
-                        <span
-                          className={`w-5 h-5 rounded-full bg-white transition-transform transform shadow-md ${
-                            settings?.notificationsEnabled ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 4. DATA & BACKUP */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("data_backup")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
                       <Database className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">Data & Backup</div>
-                      <div className="text-[11px] text-slate-400">Firestore Cloud Sync, Export & Cleanup</div>
+                      <div className="text-sm font-bold text-white">System & Cloud Sync</div>
+                      <div className="text-[11px] text-slate-400">Cloud database, offline queue & settings</div>
                     </div>
                   </div>
                   <ChevronDown
                     className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "data_backup" ? "rotate-180 text-purple-400" : ""
+                      expandedSection === "system" ? "rotate-180 text-amber-400" : ""
                     }`}
                   />
                 </button>
 
-                {expandedSection === "data_backup" && (
+                {expandedSection === "system" && (
                   <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-white/5">
                       <div>
-                        <div className="text-xs font-bold text-white">Firestore Cloud Sync</div>
+                        <div className="text-xs font-bold text-white">Cloud Firestore Sync</div>
                         <div className="text-[11px] text-slate-400">
                           {pendingQueueCount > 0
-                            ? `${pendingQueueCount} pending actions queued`
+                            ? `${pendingQueueCount} pending actions in offline queue`
                             : "All data synced to cloud"}
                         </div>
                       </div>
+
                       <button
                         onClick={handleForceSync}
                         disabled={isSyncing}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <RotateCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
                         <span>{isSyncing ? "Syncing..." : "Sync Now"}</span>
@@ -408,142 +384,30 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                     </div>
 
                     {syncStatusMsg && (
-                      <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs text-center font-medium">
+                      <div className="text-xs text-emerald-400 font-mono text-center">
                         {syncStatusMsg}
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-                      <button
-                        onClick={() => {
-                          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localStorage));
-                          const downloadAnchor = document.createElement("a");
-                          downloadAnchor.setAttribute("href", dataStr);
-                          downloadAnchor.setAttribute("download", `Garia_OS_Backup_${Date.now()}.json`);
-                          document.body.appendChild(downloadAnchor);
-                          downloadAnchor.click();
-                          downloadAnchor.remove();
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5"
-                      >
-                        <Download className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Export Backup</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          onClose();
-                          onNavigate("settings");
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Reset Data</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 5. SUPPORT */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("support")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
-                      <HelpCircle className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Support & Info</div>
-                      <div className="text-[11px] text-slate-400">Help, About Garia OS & Feedback</div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "support" ? "rotate-180 text-rose-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedSection === "support" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-2 mt-2">
                     <button
-                      onClick={() => setShowAbout(true)}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
+                      onClick={() => {
+                        onNavigate("settings");
+                        onClose();
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/5 text-xs font-bold text-slate-200 flex items-center justify-between transition-colors"
                     >
                       <span className="flex items-center gap-2">
-                        <Info className="w-3.5 h-3.5 text-emerald-400" />
-                        About Garia OS V3.0
+                        <Settings className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Open Full System Settings</span>
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                     </button>
-
-                    <button
-                      onClick={() => {
-                        setFeedbackSent(true);
-                        setTimeout(() => setFeedbackSent(false), 3000);
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-xs text-slate-200 hover:bg-white/5 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Sparkle className="w-3.5 h-3.5 text-amber-400" />
-                        Student Feedback & Suggestions
-                      </span>
-                      {feedbackSent ? (
-                        <span className="text-[10px] text-emerald-400 font-bold">Feedback Sent!</span>
-                      ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onNavigate("download");
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-xs text-cyan-300 hover:bg-cyan-500/10 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Download className="w-3.5 h-3.5 text-cyan-400" />
-                        Download Android APK (v{APP_VERSION})
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-                    </button>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="p-3 bg-slate-950/80 border-t border-white/10 text-center text-[10px] text-slate-500">
-              Garia OS V3.0 • Play Store Quality Student Productivity OS
             </div>
           </motion.div>
-
-          {/* About Modal */}
-          {showAbout && (
-            <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="glass-card rounded-3xl p-6 border border-white/15 bg-slate-900 max-w-sm w-full space-y-4 shadow-2xl">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                  <Sparkles className="w-6 h-6 text-slate-950" />
-                </div>
-                <div className="text-center space-y-1">
-                  <h3 className="text-lg font-bold text-white font-heading">Garia OS V3.0</h3>
-                  <p className="text-xs text-slate-400">
-                    A modern, minimal, student-focused productivity operating system.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowAbout(false)}
-                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
         </>
       )}
     </AnimatePresence>

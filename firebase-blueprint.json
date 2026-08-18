@@ -143,6 +143,68 @@
         "payloadJson": { "type": "string", "maxLength": 500000 }
       },
       "required": ["userId", "lastSyncedAt", "version"]
+    },
+    "SharedWorkspace": {
+      "title": "SharedWorkspace",
+      "description": "Collaborative shared task lists and notes documents with role-based permissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["tasks", "notes"] },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "joinCode": { "type": "string", "maxLength": 32 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "ownerName": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 256 },
+        "members": { "type": "object" },
+        "memberIds": { "type": "array" },
+        "allowInviteLink": { "type": "boolean" },
+        "tasks": { "type": "array" },
+        "noteContent": { "type": "string", "maxLength": 50000 },
+        "noteTags": { "type": "array" },
+        "isLocked": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "type", "title", "joinCode", "ownerId", "memberIds", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit trail log of actions taken in a shared workspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "workspaceId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "action": { "type": "string", "maxLength": 64 },
+        "details": { "type": "string", "maxLength": 500 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "workspaceId", "userId", "userName", "action", "details", "timestamp"]
+    },
+    "CollaborationNotification": {
+      "title": "CollaborationNotification",
+      "description": "User notification for shared task assignments, invites, and updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "fromUserId": { "type": "string", "maxLength": 128 },
+        "fromUserName": { "type": "string", "maxLength": 128 },
+        "workspaceId": { "type": "string", "maxLength": 128 },
+        "workspaceTitle": { "type": "string", "maxLength": 256 },
+        "workspaceType": { "type": "string", "maxLength": 32 },
+        "type": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 256 },
+        "message": { "type": "string", "maxLength": 500 },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "fromUserName", "workspaceId", "title", "message", "timestamp"]
     }
   },
   "firestore": {
@@ -181,6 +243,18 @@
     "/users/{userId}/sync/cloud_backup": {
       "schema": "CloudSyncState",
       "description": "Full cross-device cloud sync state document"
+    },
+    "/shared_workspaces/{workspaceId}": {
+      "schema": "SharedWorkspace",
+      "description": "Collaborative shared workspaces for tasks and notes"
+    },
+    "/shared_workspaces/{workspaceId}/activities/{activityId}": {
+      "schema": "ActivityLog",
+      "description": "Workspace chronological audit activity logs"
+    },
+    "/users/{userId}/collaboration_notifications/{notifId}": {
+      "schema": "CollaborationNotification",
+      "description": "Notifications on shared workspaces, invites, and assignments"
     }
   }
 }

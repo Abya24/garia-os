@@ -1,5 +1,5 @@
 export type Priority = "high" | "medium" | "low";
-export type TaskCategory = "study" | "personal" | "work" | "other";
+export type TaskCategory = "study" | "personal" | "work" | "urgent" | "other" | (string & {});
 
 export interface Task {
   id: string;
@@ -50,6 +50,9 @@ export interface Habit {
   streak: number;
   completedDates: string[]; // YYYY-MM-DD strings
   createdAt: number;
+  streakGoal?: number; // Target streak count (e.g. 7, 14, 21, 30, 60, 100 days)
+  streakGoalReward?: string; // Optional reward / motivation text
+  streakGoalStartDate?: string; // YYYY-MM-DD
 }
 
 export interface WaterLog {
@@ -227,6 +230,7 @@ export interface DashboardWidgetConfig {
 export interface UserSettings {
   userName: string;
   theme: AppTheme;
+  autoSolarTheme?: boolean;
   customApiKey: string;
   notificationsEnabled: boolean;
   notifications?: NotificationSettings;
@@ -840,10 +844,7 @@ export interface AcademicEmailTemplate {
 export type ActiveTab =
   | "home"
   | "exam"
-  | "academic"
-  | "questionbank"
   | "career"
-  | "gmail"
   | "tasks"
   | "study"
   | "notes"
@@ -856,3 +857,117 @@ export type ActiveTab =
   | "stats"
   | "settings"
   | "download";
+
+export type CollaborationRole = "owner" | "editor" | "viewer";
+export type WorkspaceType = "tasks" | "notes";
+
+export interface WorkspaceMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: CollaborationRole;
+  avatarColor?: string;
+  joinedAt: number;
+}
+
+export interface SharedTask {
+  id: string;
+  title: string;
+  description?: string;
+  date: string; // YYYY-MM-DD
+  time?: string;
+  priority: Priority;
+  category: TaskCategory;
+  completed: boolean;
+  completedBy?: {
+    userId: string;
+    name: string;
+    timestamp: number;
+  };
+  assigneeId?: string;
+  assigneeName?: string;
+  assigneeEmail?: string;
+  assigneeAvatarColor?: string;
+  createdBy: {
+    userId: string;
+    name: string;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ActivityActionType =
+  | "created_workspace"
+  | "joined_workspace"
+  | "member_invited"
+  | "member_role_changed"
+  | "member_removed"
+  | "task_created"
+  | "task_assigned"
+  | "task_completed"
+  | "task_uncompleted"
+  | "task_deleted"
+  | "task_updated"
+  | "notes_updated"
+  | "link_shared";
+
+export interface ActivityLogItem {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  action: ActivityActionType;
+  details: string;
+  targetId?: string;
+  timestamp: number;
+}
+
+export interface SharedWorkspace {
+  id: string;
+  type: WorkspaceType;
+  title: string;
+  description?: string;
+  joinCode: string;
+  ownerId: string;
+  ownerName: string;
+  ownerEmail: string;
+  members: Record<string, WorkspaceMember>;
+  memberIds: string[];
+  allowInviteLink: boolean;
+  tasks?: SharedTask[];
+  noteContent?: string;
+  noteTags?: string[];
+  isLocked?: boolean;
+  createdAt: number;
+  updatedAt: number;
+  lastModifiedBy?: {
+    userId: string;
+    name: string;
+    email: string;
+  };
+}
+
+export type CollaborationNotificationType =
+  | "invite"
+  | "task_assigned"
+  | "task_completed"
+  | "note_updated"
+  | "member_joined"
+  | "role_updated";
+
+export interface CollaborationNotification {
+  id: string;
+  userId: string;
+  fromUserId: string;
+  fromUserName: string;
+  workspaceId: string;
+  workspaceTitle: string;
+  workspaceType: WorkspaceType;
+  type: CollaborationNotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  timestamp: number;
+}
+

@@ -123,9 +123,11 @@ import {
 } from "./utils/abyaFallbackEngine";
 
 import { hashPassword } from "./utils/auth";
+import { auth } from "./utils/firebase";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
 import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./utils/offlineQueue";
+import { getSolarInfo } from "./utils/solarTheme";
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
@@ -140,6 +142,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { QuickSearchModal } from "./components/QuickSearchModal";
 import { NotificationsModal } from "./components/NotificationsModal";
 import { SavedItemsModal } from "./components/SavedItemsModal";
+import { OfflineSyncToast } from "./components/OfflineSyncToast";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -654,11 +657,35 @@ export default function App() {
   // Sync Multi-Theme System with DOM
   useEffect(() => {
     const root = document.documentElement;
-    const themeClasses = ["light", "amoled", "ocean", "forest", "purple", "sunset"];
+    const themeClasses = [
+      "light",
+      "arctic",
+      "amoled",
+      "ocean",
+      "midnight",
+      "forest",
+      "emerald",
+      "purple",
+      "sunset",
+      "graphite",
+      "frost",
+    ];
 
     const applyTheme = () => {
       let active = settings.theme || "dark";
-      if (active === "system") {
+
+      if (settings.autoSolarTheme) {
+        const solar = getSolarInfo(new Date());
+        if (solar.isDaytime) {
+          active = "light";
+        } else {
+          // Nighttime: use user's chosen dark theme or default to dark
+          active =
+            settings.theme === "light" || settings.theme === "arctic" || !settings.theme
+              ? "dark"
+              : settings.theme;
+        }
+      } else if (active === "system") {
         active = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
       }
 
@@ -670,16 +697,30 @@ export default function App() {
 
     applyTheme();
 
-    if (settings.theme === "system") {
+    let intervalId: any = null;
+    if (settings.autoSolarTheme) {
+      // Re-evaluate every 60 seconds so transitions across sunrise/sunset are instantaneous
+      intervalId = setInterval(() => {
+        applyTheme();
+      }, 60000);
+    }
+
+    let mediaQueryCleanup: (() => void) | null = null;
+    if (settings.theme === "system" && !settings.autoSolarTheme) {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: light)");
       const listener = () => applyTheme();
       mediaQuery.addEventListener("change", listener);
-      return () => mediaQuery.removeEventListener("change", listener);
+      mediaQueryCleanup = () => mediaQuery.removeEventListener("change", listener);
     }
 
     if (activeProfileId && activeStudent) {
       saveSettings(settings, activeProfileId);
     }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (mediaQueryCleanup) mediaQueryCleanup();
+    };
   }, [settings, activeProfileId, activeStudent]);
 
   // Sync Data Save Handlers
@@ -988,6 +1029,19 @@ export default function App() {
       action: "update",
       profileId: activeProfileId,
       payload: { habitId, dateStr },
+    });
+  };
+
+  const handleUpdateHabit = (updatedHabit: Habit) => {
+    const updated = habits.map((h) => (h.id === updatedHabit.id ? updatedHabit : h));
+    setHabits(updated);
+    saveHabits(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_HABIT",
+      entityName: "habits",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedHabit,
     });
   };
 
@@ -1837,6 +1891,9 @@ export default function App() {
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
               onBack={handleGoBack}
+              currentUserId={activeStudent.id}
+              currentUserName={activeStudent.name}
+              currentUserEmail={auth.currentUser?.email || undefined}
             />
           )}
 
@@ -1948,6 +2005,9 @@ export default function App() {
               onDeleteNote={handleDeleteNote}
               onAskAbyaWithContext={handleAskAbyaWithContext}
               onBack={handleGoBack}
+              currentUserId={activeStudent.id}
+              currentUserName={activeStudent.name}
+              currentUserEmail={auth.currentUser?.email || undefined}
             />
           )}
 
@@ -1963,6 +2023,7 @@ export default function App() {
             <HabitsPage
               habits={habits}
               onAddHabit={handleAddHabit}
+              onUpdateHabit={handleUpdateHabit}
               onToggleHabitDate={handleToggleHabitDate}
               onDeleteHabit={handleDeleteHabit}
               onBack={handleGoBack}
@@ -2197,6 +2258,9 @@ export default function App() {
         onUpdateSettings={handleUpdateSettings}
         onReloadData={handleReloadData}
       />
+
+      {/* Real-Time Offline Queue Firestore Flush Toast Notification */}
+      <OfflineSyncToast currentLanguage={currentLanguage} />
     </div>
   );
 }
