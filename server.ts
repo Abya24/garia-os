@@ -3,12 +3,19 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { createServer as createViteServer } from "vite";
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Garia OS Server] Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[Garia OS Server] Uncaught Exception:", err);
+});
 
 async function startServer() {
   const app = express();
@@ -21,7 +28,7 @@ async function startServer() {
     res.json({
       status: "ok",
       app: "Garia OS",
-      version: "2.8.3",
+      version: "3.0.0",
       geminiFeatures: [
         "high_thinking (gemini-3.1-pro-preview)",
         "image_analysis (gemini-3.1-pro-preview)",
@@ -551,15 +558,23 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
     }
   });
 
-  // Vite Middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  // Static asset serving & SPA routing in production / Vite middleware in development
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    fs.existsSync(path.join(process.cwd(), "dist", "index.html"));
+
+  if (!isProduction) {
+    console.log("[Garia OS Server] Starting in DEVELOPMENT mode with Vite middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
+    console.log("[Garia OS Server] Starting in PRODUCTION mode with static dist assets...");
     const distPath = path.join(process.cwd(), "dist");
+    const indexPath = path.join(distPath, "index.html");
+
     app.use((req, res, next) => {
       if (req.path === "/sw.js" || req.path === "/index.html" || req.path === "/") {
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -569,7 +584,11 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.sendFile(path.join(distPath, "index.html"));
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Garia OS</title></head><body><div id='root'></div></body></html>");
+      }
     });
   }
 
