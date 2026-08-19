@@ -18,27 +18,7 @@ if ("serviceWorker" in navigator) {
     }
   });
 
-  window.addEventListener("load", async () => {
-    // Proactively clear any cached APK binaries from browser Cache Storage
-    if ("caches" in window) {
-      try {
-        const cacheKeys = await caches.keys();
-        for (const key of cacheKeys) {
-          const cache = await caches.open(key);
-          const requests = await cache.keys();
-          for (const req of requests) {
-            const url = req.url.toLowerCase();
-            if (url.endsWith(".apk") || url.includes(".apk") || url.includes("/downloads/") || url.includes("/api/download")) {
-              console.log("[App Init] Purging cached APK asset from cache storage:", req.url);
-              await cache.delete(req);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("[App Init] Cache inspection warning:", e);
-      }
-    }
-
+  window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {

@@ -160,7 +160,6 @@ export interface TranslationStrings {
   habits: string;
   waterTracker: string;
   analytics: string;
-  downloadAPK: string;
   settings: string;
   profile: string;
   studentProfiles: string;
@@ -332,7 +331,6 @@ export const translations: Record<AppLanguage, TranslationStrings> = {
     habits: "Habits Tracker",
     waterTracker: "Water Tracker",
     analytics: "Analytics",
-    downloadAPK: "Download APK",
     settings: "Settings",
     profile: "Profile",
     studentProfiles: "Student Profiles",
@@ -502,7 +500,6 @@ export const translations: Record<AppLanguage, TranslationStrings> = {
     habits: "आदत ट्रैकर",
     waterTracker: "जल ट्रैकर",
     analytics: "एनालिटिक्स",
-    downloadAPK: "एपीके डाउनलोड",
     settings: "सेटिंग्स",
     profile: "प्रोफ़ाइल",
     studentProfiles: "विद्यार्थी प्रोफ़ाइल",

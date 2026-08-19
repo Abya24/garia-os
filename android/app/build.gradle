@@ -422,9 +422,9 @@ tasks.register('generateResourceManifest') {
 }
 
 // Hook resource validation, cache purges, metadata injection, and checksum verification into preBuild and resource merge tasks
-preBuild.dependsOn('cleanResourceCache', 'cleanArtifacts', 'injectBuildMetadata', 'optimizePngResources', 'checkAssetChecksums', 'validatePngResources', 'verifyAssetsBeforeMerge', 'generateResourceManifest')
+preBuild.dependsOn('cleanResourceCache', 'cleanArtifacts', 'injectBuildMetadata', 'optimizePngResources', 'checkAssetChecksums', 'validatePngResources', 'verifyAssetsBeforeMerge', 'generateResourceManifest', 'verifyManifestActivities')
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Resources") }.configureEach {
-    dependsOn 'cleanResourceCache', 'injectBuildMetadata', 'optimizePngResources', 'checkAssetChecksums', 'validatePngResources', 'verifyAssetsBeforeMerge', 'generateResourceManifest'
+    dependsOn 'cleanResourceCache', 'injectBuildMetadata', 'optimizePngResources', 'checkAssetChecksums', 'validatePngResources', 'verifyAssetsBeforeMerge', 'generateResourceManifest', 'verifyManifestActivities'
 }
 
 // Task: Scans mipmap folders for any non-PNG content or corrupted assets before resource merging
@@ -520,9 +520,9 @@ tasks.register('cleanArtifacts', Delete) {
     }
 }
 
-// Ensure cleanArtifacts runs before assembleRelease and bundleRelease
+// Ensure cleanArtifacts and verifyManifestActivities run before assembleRelease and bundleRelease
 tasks.matching { it.name in ['assembleRelease', 'bundleRelease', 'assemble'] }.configureEach {
-    dependsOn 'cleanArtifacts'
+    dependsOn 'cleanArtifacts', 'verifyManifestActivities'
 }
 
 // Post-build APK Integrity & Resource Header Diagnostic Verification
@@ -1027,4 +1027,88 @@ tasks.register('verifyApkSigningInfo') {
         logger.lifecycle("==========================================================================================")
     }
 }
+
+// Task: Parses AndroidManifest.xml to ensure no android:exported="true" is set on activities that lack intent filters
+tasks.register('verifyManifestActivities') {
+    group = 'verification'
+    description = 'Parses AndroidManifest.xml to ensure no android:exported="true" is set on activities without intent filters.'
+
+    doLast {
+        def manifestFiles = []
+        def intermediatesDir = file("build/intermediates/merged_manifests")
+        if (intermediatesDir.exists()) {
+            intermediatesDir.eachFileRecurse { f ->
+                if (f.isFile() && f.name == "AndroidManifest.xml") manifestFiles.add(f)
+            }
+        }
+        def packagedManifestsDir = file("build/intermediates/packaged_manifests")
+        if (packagedManifestsDir.exists()) {
+            packagedManifestsDir.eachFileRecurse { f ->
+                if (f.isFile() && f.name == "AndroidManifest.xml") manifestFiles.add(f)
+            }
+        }
+        manifestFiles.add(file("src/main/AndroidManifest.xml"))
+
+        logger.lifecycle("==========================================================================================")
+        logger.lifecycle("[verifyManifestActivities] Auditing exported activities and intent-filter security across ${manifestFiles.size()} manifest(s)...")
+
+        def violations = []
+        int auditedActivitiesCount = 0
+
+        manifestFiles.each { manifestFile ->
+            if (!manifestFile.exists()) return
+
+            try {
+                def xmlText = manifestFile.text
+                // Matches both <activity ...>...</activity> and self-closing <activity ... />
+                def activityMatcher = xmlText =~ /(?s)<activity\b([^>]*?)>(.*?)<\/activity>|(?s)<activity\b([^>]*?)\/>/
+                while (activityMatcher.find()) {
+                    auditedActivitiesCount++
+                    String attributes = activityMatcher.group(1) ?: activityMatcher.group(3) ?: ""
+                    String body = activityMatcher.group(2) ?: ""
+
+                    // Extract activity name
+                    def nameMatch = (attributes =~ /android:name\s*=\s*["']([^"']+)["']/)
+                    String activityName = nameMatch.find() ? nameMatch.group(1) : "UnknownActivity"
+
+                    // Check if android:exported is explicitly set to "true"
+                    boolean isExportedTrue = (attributes =~ /android:exported\s*=\s*["']true["']/).find()
+
+                    // Check if intent-filter is present in body
+                    boolean hasIntentFilter = (body =~ /<intent-filter\b/).find()
+
+                    logger.lifecycle("  - Activity: ${activityName} (source: ${manifestFile.name})")
+                    logger.lifecycle("    * exported: ${isExportedTrue}, has intent-filter: ${hasIntentFilter}")
+
+                    if (isExportedTrue && !hasIntentFilter) {
+                        violations.add([
+                            activity: activityName,
+                            file: manifestFile.absolutePath,
+                            reason: "Security Risk: android:exported=\"true\" is set on activity '${activityName}' which does NOT define an <intent-filter>."
+                        ])
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("[verifyManifestActivities] Error parsing ${manifestFile.name}: ${e.message}")
+            }
+        }
+
+        logger.lifecycle("[verifyManifestActivities] Audited ${auditedActivitiesCount} activity declaration(s).")
+
+        if (!violations.isEmpty()) {
+            logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            logger.error("MANIFEST ACTIVITY SECURITY AUDIT FAILURE: Insecure exported activities detected:")
+            violations.each { v ->
+                logger.error("  - [SECURITY VIOLATION] ${v.activity} in ${v.file}:")
+                logger.error("    ${v.reason}")
+            }
+            logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            throw new GradleException("verifyManifestActivities failed: ${violations.size()} insecure activity export violation(s) found.")
+        } else {
+            logger.lifecycle("[verifyManifestActivities] SUCCESS: All exported activities properly declare intent-filters. Security verified.")
+            logger.lifecycle("==========================================================================================")
+        }
+    }
+}
+
 

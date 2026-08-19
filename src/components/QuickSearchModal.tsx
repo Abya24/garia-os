@@ -170,15 +170,6 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       tags: ["stats", "analytics", "graph", "productivity", "score", "charts"],
     },
     {
-      id: "nav-download",
-      tab: "download",
-      title: `Download Official APK (v${APP_VERSION})`,
-      category: "Navigation",
-      description: `Download Garia OS Android release package for offline use`,
-      icon: Download,
-      tags: ["apk", "download", "android", "app", "install", "offline", "release"],
-    },
-    {
       id: "nav-settings",
       tab: "settings",
       title: "Student Profile & OS Settings",

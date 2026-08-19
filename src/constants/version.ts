@@ -3,7 +3,6 @@ export const APP_VERSION = "3.0.0";
 export const APP_VERSION_CODE = 30001;
 export const APP_VERSION_STRING = `Garia OS V${APP_VERSION}`;
 export const APP_BUILD_DATE = "2026.08.17";
-export const APP_RELEASE_FILENAME = "GariaOS_v3.0.0_release.apk";
 export const APP_BUILD_NAME = "Garia OS V3.0 Final Production";
 export const APP_RELEASE_DATE = "2026-08-17";
 export const APP_PACKAGE_NAME = "com.gariaos.app";

@@ -762,7 +762,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                   <div className="p-3 rounded-2xl bg-slate-950 border border-white/5 font-mono text-[11px] space-y-1 text-slate-400">
                     <div>Version: v{APP_VERSION}</div>
                     <div>Build: {APP_BUILD_DATE}</div>
-                    <div>Platform: Web & Android APK</div>
+                    <div>Platform: Web & Mobile</div>
                     <div>Cloud: Firestore Synced</div>
                   </div>
                 </div>

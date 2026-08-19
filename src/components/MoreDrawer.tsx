@@ -146,13 +146,6 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
       icon: BarChart2,
       color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
     },
-    {
-      id: "download" as ActiveTab,
-      label: t.downloadAPK || "Download APK",
-      desc: `Official Garia OS Android APK v${APP_VERSION}`,
-      icon: Download,
-      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    },
   ];
 
   return (

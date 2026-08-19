@@ -40,6 +40,18 @@ interface DesktopSidebarProps {
   onOpenStudentModal?: () => void;
 }
 
+interface SidebarNavItem {
+  id: ActiveTab;
+  label: string;
+  icon: any;
+  badge?: string;
+}
+
+interface NavGroup {
+  title: string;
+  items: SidebarNavItem[];
+}
+
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   activeTab,
   onNavigate,
@@ -76,14 +88,14 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const isCompact = sidebarMode === "compact";
   const isIconsOnly = sidebarMode === "icons_only";
 
-  const coreNavItems = [
+  const coreNavItems: SidebarNavItem[] = [
     { id: "home" as ActiveTab, label: t.homeDashboard || "Home", icon: Home },
     { id: "tasks" as ActiveTab, label: t.taskManager || "Tasks", icon: CheckSquare },
     { id: "focus" as ActiveTab, label: t.focusTimer || "Focus", icon: Timer },
     { id: "abya" as ActiveTab, label: t.abyaAICoach || "Abya AI", icon: Sparkles, badge: "AI" },
   ];
 
-  const modularDrawers = [
+  const modularDrawers: NavGroup[] = [
     {
       title: currentLanguage === "hi" ? "अध्ययन उपकरण" : "Productivity",
       items: [
@@ -101,7 +113,6 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     {
       title: currentLanguage === "hi" ? "सिस्टम" : "System",
       items: [
-        { id: "download" as ActiveTab, label: t.downloadAPK || "Download APK", icon: Download, badge: `v${APP_VERSION}` },
         { id: "settings" as ActiveTab, label: t.settings || "Settings", icon: Settings },
       ],
     },

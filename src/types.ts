@@ -855,8 +855,7 @@ export type ActiveTab =
   | "water"
   | "habits"
   | "stats"
-  | "settings"
-  | "download";
+  | "settings";
 
 export type CollaborationRole = "owner" | "editor" | "viewer";
 export type WorkspaceType = "tasks" | "notes";

@@ -118,13 +118,6 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
       color: "from-purple-500 to-indigo-500",
     },
     {
-      id: "download" as ActiveTab,
-      label: t.downloadAPK || "Download APK",
-      desc: `Get Garia OS Android app v${APP_VERSION}`,
-      icon: Download,
-      color: "from-emerald-500 to-teal-400",
-    },
-    {
       id: "settings" as ActiveTab,
       label: t.settings || "Settings",
       desc: currentLanguage === "hi" ? "थीम, भाषा, एपीआई कॉन्फ़िगरेशन और डेटा बैकअप" : "Theme, Language, API config & data backup",

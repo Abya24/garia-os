@@ -1282,7 +1282,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 7. About & APK Download Section */}
+      {/* 7. About & System Information Section */}
       <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
         <h3 className="text-lg font-bold font-heading text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1310,33 +1310,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <p>
             <strong>Storage Engine:</strong> Profile-Isolated Storage Engine
           </p>
-        </div>
-
-        {/* APK Download Banner */}
-        <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/20">
-          <div>
-            <h4 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
-              <span>{currentLanguage === "hi" ? "आधिकारिक एंड्रॉइड एपीके डाउनलोड" : "Official Android APK Download"}</span>
-            </h4>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {currentLanguage === "hi"
-                ? `Android 8.0+ / 14 / 15 उपकरणों के लिए Garia OS v${APP_VERSION} एपीके डाउनलोड करें`
-                : `Download Garia OS v${APP_VERSION} release APK for Android 8.0+ / 14 / 15 devices`}
-            </p>
-          </div>
-          <a
-            href="/download"
-            onClick={(e) => {
-              if (onNavigate) {
-                e.preventDefault();
-                onNavigate("download");
-              }
-            }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-950/40 shrink-0"
-          >
-            <Download className="w-4 h-4" />
-            {t.downloadAPK}
-          </a>
         </div>
       </div>
 

@@ -69,8 +69,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         return t.analytics || "Analytics";
       case "settings":
         return t.settings || "Settings";
-      case "download":
-        return "APK Download";
       default:
         return "Garia OS";
     }

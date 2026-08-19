@@ -158,7 +158,6 @@ import { StatisticsPage } from "./pages/StatisticsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CareerCenterPage } from "./pages/CareerCenterPage";
 import { ExamCenterPage } from "./pages/ExamCenterPage";
-import { DownloadPage } from "./pages/DownloadPage";
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -171,20 +170,11 @@ export default function App() {
     if (typeof window !== "undefined") {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
-      if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
-        return "download";
-      }
       if (path === "/questionbank" || hash === "#questionbank" || hash === "#mcq" || hash === "#pyq") {
-        return "questionbank";
-      }
-      if (path === "/academic" || hash === "#academic") {
-        return "academic";
+        return "exam";
       }
       if (path === "/career" || hash === "#career") {
         return "career";
-      }
-      if (path === "/gmail" || hash === "#gmail" || hash === "#mail") {
-        return "gmail";
       }
     }
     return "home";
@@ -193,11 +183,8 @@ export default function App() {
     if (typeof window !== "undefined") {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
-      if (path === "/download" || path === "/apk" || hash === "#download" || hash === "#apk") {
-        return ["home", "download"];
-      }
-      if (path === "/questionbank" || hash === "#questionbank") {
-        return ["home", "questionbank"];
+      if (path === "/career" || hash === "#career") {
+        return ["home", "career"];
       }
     }
     return ["home"];
@@ -1756,14 +1743,6 @@ export default function App() {
     reloadAllDataForProfile(newProf.id);
   };
 
-  if (activeTab === "download") {
-    return (
-      <DownloadPage
-        onBackToApp={() => setActiveTab("home")}
-      />
-    );
-  }
-
   if (profiles.length === 0 || !activeStudent) {
     return (
       <WelcomeScreen
@@ -2100,12 +2079,6 @@ export default function App() {
                 setIsMoreMenuOpen(false);
               }}
               onBack={handleGoBack}
-            />
-          )}
-
-          {activeTab === "download" && (
-            <DownloadPage
-              onBackToApp={handleGoBack}
             />
           )}
 
