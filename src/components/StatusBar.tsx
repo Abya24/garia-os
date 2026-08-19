@@ -1,8 +1,9 @@
 import React from "react";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { AppLanguage, translations } from "../utils/i18n";
 import { motion } from "motion/react";
+import { GariaLogo } from "./GariaLogo";
 
 interface StatusBarProps {
   settings: UserSettings;
@@ -32,6 +33,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   currentLanguage = "en",
 }) => {
   const t = translations[currentLanguage] || translations.en;
+
+  // On Home Dashboard, HomeDashboard's own Side-Aligned Hero Banner acts as the unified, definitive top header
+  if (activeTab === "home") {
+    return null;
+  }
 
   const getTabLabel = (tab: ActiveTab): string => {
     switch (tab) {
@@ -70,42 +76,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     }
   };
 
-  // 1. HOME DASHBOARD: Minimalist header keeping ONLY the official Garia OS App Icon
-  if (activeTab === "home") {
-    return (
-      <header
-        id="home-minimal-header"
-        className="sticky top-0 z-40 w-full py-3 px-4 flex items-center justify-center backdrop-blur-xl bg-slate-950/60 border-b border-white/5"
-      >
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onOpenSliderMenu}
-          id="header-garia-os-app-icon"
-          title="Open Garia OS Settings & Navigation Slider"
-          aria-label="Open Garia OS Menu"
-          className="group relative flex items-center justify-center p-1 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-        >
-          {/* Ambient Glow */}
-          <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500/30 via-teal-500/30 to-cyan-500/30 blur-md opacity-70 group-hover:opacity-100 transition-opacity" />
-
-          {/* Official Garia OS Squircle App Icon */}
-          <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1.5px] shadow-lg shadow-emerald-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center overflow-hidden">
-              <div className="relative flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-emerald-400 fill-emerald-400/20 transition-transform group-hover:rotate-12 duration-300" />
-                <span className="absolute text-[8px] font-black text-white/90 font-mono select-none pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                  G
-                </span>
-              </div>
-            </div>
-          </div>
-        </motion.button>
-      </header>
-    );
-  }
-
-  // 2. NON-HOME SUB-SCREENS: Clean Single Top Bar (Back button, Title, App Icon)
+  // NON-HOME SUB-SCREENS: Clean Single Top Bar (Back button, Title, Official Garia OS Logo)
   return (
     <header
       id="subscreen-header"
@@ -141,13 +112,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           aria-label="Open Garia OS Menu"
           className="p-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all card-press group flex items-center gap-1.5"
         >
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-md shadow-emerald-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-          </div>
+          <GariaLogo size="sm" variant="icon" withGlow={true} />
         </motion.button>
       </div>
     </header>
   );
 };
+

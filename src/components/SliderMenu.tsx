@@ -566,9 +566,10 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                     <div className="pt-2 border-t border-white/5 grid grid-cols-3 gap-1.5">
                       <button
                         onClick={() => setLockMethod("pin")}
+                        id="lock-method-pin"
                         className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
                           lockMethod === "pin"
-                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300 shadow-sm"
                             : "bg-slate-800 border-white/5 text-slate-400"
                         }`}
                       >
@@ -576,26 +577,44 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                         <span>PIN</span>
                       </button>
                       <button
-                        onClick={() => setLockMethod("pattern")}
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                        onClick={() => {
+                          setLockMethod("pattern");
+                          setSyncStatusMsg("Pattern Lock: Coming Soon in Android Native build");
+                          setTimeout(() => setSyncStatusMsg(null), 3000);
+                        }}
+                        id="lock-method-pattern"
+                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex flex-col items-center justify-center transition-all ${
                           lockMethod === "pattern"
-                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
                             : "bg-slate-800 border-white/5 text-slate-400"
                         }`}
+                        title="Pattern Lock (Coming Soon in Native Android)"
                       >
-                        <Grid className="w-3 h-3" />
-                        <span>Pattern</span>
+                        <div className="flex items-center gap-1">
+                          <Grid className="w-3 h-3" />
+                          <span>Pattern</span>
+                        </div>
+                        <span className="text-[8px] font-mono text-purple-400/80">Coming Soon</span>
                       </button>
                       <button
-                        onClick={() => setLockMethod("biometric")}
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                        onClick={() => {
+                          setLockMethod("biometric");
+                          setSyncStatusMsg("Biometrics: Coming Soon in Android Native build");
+                          setTimeout(() => setSyncStatusMsg(null), 3000);
+                        }}
+                        id="lock-method-biometric"
+                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex flex-col items-center justify-center transition-all ${
                           lockMethod === "biometric"
-                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
                             : "bg-slate-800 border-white/5 text-slate-400"
                         }`}
+                        title="Biometric Fingerprint (Coming Soon in Native Android)"
                       >
-                        <Fingerprint className="w-3 h-3" />
-                        <span>Biometrics</span>
+                        <div className="flex items-center gap-1">
+                          <Fingerprint className="w-3 h-3" />
+                          <span>Biometrics</span>
+                        </div>
+                        <span className="text-[8px] font-mono text-purple-400/80">Coming Soon</span>
                       </button>
                     </div>
                   </div>

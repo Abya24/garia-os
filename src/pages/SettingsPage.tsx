@@ -367,17 +367,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     <div className="space-y-6 pb-24 md:pb-8 max-w-3xl mx-auto animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center gap-3">
-        {onBack && (
-          <button
-            onClick={onBack}
-            id="settings-back-btn"
-            aria-label="Go Back"
-            className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
-          >
-            <ArrowLeft className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline">Back</span>
-          </button>
-        )}
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
             {t.settings}

@@ -488,18 +488,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       <div className="glass-card rounded-2xl p-2 sm:p-2.5 border border-emerald-500/30 flex items-center justify-between gap-2 mb-2 shrink-0 relative z-40 bg-slate-950/80 backdrop-blur-xl">
         {/* Left: Avatar & Identity */}
         <div className="flex items-center gap-2 min-w-0">
-          {onBack && (
-            <button
-              onClick={onBack}
-              id="abya-back-btn"
-              aria-label="Go Back"
-              className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 shrink-0"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Back</span>
-            </button>
-          )}
-
           <div className="relative shrink-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shadow-emerald-500/20">
               <Sparkles className="w-4 h-4 text-slate-900" />
@@ -530,79 +518,41 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           </div>
         </div>
 
-        {/* Center / Right: Compact Active Context Chips */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {/* Active Mode Chip */}
-          <button
-            onClick={() => setIsContextDrawerOpen(true)}
-            className="p-1 sm:px-2 sm:py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 transition-all text-[11px] flex items-center gap-1 font-bold shrink-0"
-            title="Active Mode (Click to change)"
-          >
-            {selectedMode === "high_thinking" ? (
-              <>
-                <Brain className="w-3 h-3 text-purple-400" />
-                <span className="hidden sm:inline">Thinking</span>
-              </>
-            ) : selectedMode === "search_grounded" ? (
-              <>
-                <Search className="w-3 h-3 text-blue-400" />
-                <span className="hidden sm:inline">Search</span>
-              </>
-            ) : selectedMode === "fast_lite" ? (
-              <>
-                <Zap className="w-3 h-3 text-amber-400" />
-                <span className="hidden sm:inline">Fast</span>
-              </>
-            ) : (
-              <>
-                <Zap className="w-3 h-3 text-emerald-400" />
-                <span className="hidden sm:inline">Flash</span>
-              </>
-            )}
-          </button>
-
-          {/* Active Subject & Topic Chip (Expands Context Drawer) */}
-          <button
-            onClick={() => setIsContextDrawerOpen(true)}
-            className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 transition-all text-[11px] flex items-center gap-1 font-semibold max-w-[130px] sm:max-w-[180px] truncate shrink-0"
-            title={`${currentSubject?.name} • ${currentTopic?.name} (Click to change topic)`}
-          >
-            <BookOpen className="w-3 h-3 text-cyan-400 shrink-0" />
-            <span className="truncate">{currentSubject?.name || "Subject"}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-          </button>
-
-          {/* Language Chip */}
+        {/* Center / Right: Clean High-Value Actions (Language Switcher, Voice Chat, More) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Prominent Language Switcher at Top */}
           <button
             onClick={() => setShowLanguageModal(true)}
-            className="p-1 sm:px-2 sm:py-1 rounded-lg glass-pill text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors text-[11px] flex items-center gap-1 font-bold shrink-0"
-            title="Abya Language"
+            id="abya-language-switcher-btn"
+            className="px-2.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 transition-all text-xs flex items-center gap-1.5 font-bold shrink-0 shadow-sm"
+            title="Switch Language (Hinglish, English, Hindi, etc.)"
           >
-            <Globe className="w-3 h-3 text-emerald-400" />
-            <span className="text-[10px] hidden md:inline">{abyaLanguage}</span>
+            <Globe className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-xs font-semibold">{abyaLanguage}</span>
+            <ChevronDown className="w-3 h-3 text-purple-300 opacity-70" />
           </button>
 
-          {/* Intelligence Panel Trigger */}
+          {/* Live Voice Chat Launcher */}
           <button
-            onClick={() => setIsIntelligenceDrawerOpen(true)}
-            className="p-1.5 sm:px-2 sm:py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 transition-all text-[11px] flex items-center gap-1 font-bold shrink-0 relative"
-            title="Abya Academic Intelligence Panel"
+            onClick={() => setShowLiveVoiceModal(true)}
+            id="abya-live-voice-btn"
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 transition-all text-xs flex items-center gap-1.5 font-bold shrink-0 shadow-sm animate-in fade-in"
+            title="Start Live Voice Interaction"
           >
-            <BarChart3 className="w-3 h-3 text-indigo-400" />
-            <span className="hidden sm:inline">Intel</span>
-            {insightCards.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-indigo-400 absolute -top-0.5 -right-0.5 animate-pulse" />
-            )}
+            <Mic className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden xs:inline">Voice</span>
           </button>
 
-          {/* More Options Dropdown */}
+          {/* More Options Dropdown (Curriculum, Intelligence, Diagnostics, Settings) */}
           <div className="relative shrink-0">
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className="p-1.5 rounded-lg glass-pill text-slate-300 hover:text-white transition-colors border border-white/10"
-              title="More Options"
+              id="abya-more-options-btn"
+              className="p-1.5 sm:px-2 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors border border-white/10 text-xs flex items-center gap-1"
+              title="More Options & Settings"
             >
-              <MoreHorizontal className="w-3.5 h-3.5" />
+              <MoreHorizontal className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs">More</span>
             </button>
 
             {showMoreMenu && (
@@ -611,18 +561,25 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                   className="fixed inset-0 z-40"
                   onClick={() => setShowMoreMenu(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-card border border-white/15 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1 bg-slate-900/95 backdrop-blur-xl">
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card border border-white/15 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1 bg-slate-900/95 backdrop-blur-xl">
+                  {/* Curriculum & AI Context */}
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
                       setIsContextDrawerOpen(true);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-emerald-300 transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-purple-300 transition-colors text-left"
                   >
-                    <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Curriculum & AI Settings</span>
+                    <Sliders className="w-3.5 h-3.5 text-purple-400" />
+                    <div>
+                      <div className="text-white">Curriculum & AI Context</div>
+                      <div className="text-[10px] text-slate-400 font-normal">
+                        {currentSubject?.name || "Subject"} • {currentTopic?.name || "Topic"}
+                      </div>
+                    </div>
                   </button>
 
+                  {/* Academic Intelligence Dashboard */}
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
@@ -631,9 +588,15 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-indigo-300 transition-colors text-left"
                   >
                     <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Intelligence Dashboard</span>
+                    <div>
+                      <div className="text-white">Academic Intelligence</div>
+                      <div className="text-[10px] text-slate-400 font-normal">
+                        Student insights & recommendations
+                      </div>
+                    </div>
                   </button>
 
+                  {/* Diagnostics */}
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
@@ -645,6 +608,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                     <span>Diagnostics & Health</span>
                   </button>
 
+                  {/* Gemini API Key */}
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
@@ -658,6 +622,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
                   <div className="border-t border-white/10 my-1" />
 
+                  {/* Clear Chat */}
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);

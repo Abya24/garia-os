@@ -369,17 +369,6 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
         <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full filter blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            {(onBack || activeSubTab !== "overview") && (
-              <button
-                onClick={handleBack}
-                id="exam-back-btn"
-                aria-label="Go Back"
-                className="mt-1 p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
-              >
-                <ArrowLeft className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Back</span>
-              </button>
-            )}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wide">

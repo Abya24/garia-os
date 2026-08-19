@@ -490,23 +490,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              {onBack && (
-                <button
-                  onClick={() => {
-                    if (activeSubTab !== "matches") {
-                      setActiveSubTab("matches");
-                    } else {
-                      onBack();
-                    }
-                  }}
-                  id="career-back-btn"
-                  aria-label="Go Back"
-                  className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
-                >
-                  <ArrowLeft className="w-4 h-4 text-emerald-400" />
-                  <span>Back</span>
-                </button>
-              )}
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
                 <Compass className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Garia OS v1.4 Feature</span>

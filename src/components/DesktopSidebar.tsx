@@ -24,6 +24,7 @@ import {
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
+import { GariaLogo } from "./GariaLogo";
 
 export type SidebarMode = "expanded" | "compact" | "icons_only";
 
@@ -114,6 +115,21 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         isExpanded ? "w-64 p-3.5" : isCompact ? "w-48 p-2.5" : "w-[68px] p-2 items-center"
       }`}
     >
+      {/* Official Garia OS Top Branding */}
+      <div className={`pb-3 mb-2 border-b border-white/10 flex items-center ${isIconsOnly ? "justify-center w-full" : "justify-between w-full"}`}>
+        {isIconsOnly ? (
+          <GariaLogo size="sm" variant="icon" withGlow={true} onClick={() => onNavigate("home")} className="cursor-pointer" />
+        ) : (
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate("home")}>
+            <GariaLogo size="sm" variant="icon" withGlow={true} />
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-white font-heading tracking-tight">GARIA OS</span>
+              <span className="text-[9px] font-mono text-purple-300">v{APP_VERSION}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 3-Mode Switcher */}
       <div className={`flex items-center mb-3 ${isIconsOnly ? "justify-center w-full" : "justify-between w-full"}`}>
         {!isIconsOnly && (

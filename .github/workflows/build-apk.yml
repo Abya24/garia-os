@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-apk:
-    name: Build Android APK (Garia OS v2.8.3)
+    name: Build Android APK (Garia OS v3.0.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -93,12 +93,12 @@ jobs:
       - name: Verify APK Signature & Package Integrity
         run: |
           RELEASE_DIR="android/app/build/outputs/apk/release"
-          TARGET_APK="$RELEASE_DIR/Garia_OS_v2.8.3_Release_APK.apk"
+          TARGET_APK="$RELEASE_DIR/Garia_OS_v3.0.0_Release_APK.apk"
 
           echo "Checking release APK directory..."
           ls -lh "$RELEASE_DIR"
 
-          BUILT_APK=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.apk" ! -name "*unsigned*" ! -name "Garia_OS_v2.8.3_Release_APK.apk" | head -n 1)
+          BUILT_APK=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.apk" ! -name "*unsigned*" ! -name "Garia_OS_v3.0.0_Release_APK.apk" | head -n 1)
           if [ -z "$BUILT_APK" ]; then
             BUILT_APK=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.apk" | head -n 1)
           fi
@@ -154,6 +154,6 @@ jobs:
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Garia_OS_v2.8.3_Release_APK
-          path: android/app/build/outputs/apk/release/Garia_OS_v2.8.3_Release_APK.apk
+          name: Garia_OS_v3.0.0_Release_APK
+          path: android/app/build/outputs/apk/release/Garia_OS_v3.0.0_Release_APK.apk
           retention-days: 30
