@@ -17,6 +17,8 @@ export interface ApkDiagnosticResult {
   sha256?: string;
   truncated: boolean;
   analysis: string;
+  rawHeaders: Record<string, string>;
+  sampleBodyText?: string;
 }
 
 /**
@@ -54,6 +56,8 @@ export async function diagnoseApkEndpoint(
   let contentType: string | null = null;
   let contentLength: number | null = null;
   let httpStatus: number | null = null;
+  const rawHeaders: Record<string, string> = {};
+  let sampleBodyText = "";
 
   try {
     const probeResponse = await fetch(cacheBustedUrl, {
@@ -75,8 +79,23 @@ export async function diagnoseApkEndpoint(
     if (rawLength) {
       contentLength = parseInt(rawLength, 10);
     }
-  } catch (err) {
+
+    probeResponse.headers.forEach((value, key) => {
+      rawHeaders[key.toLowerCase()] = value;
+    });
+
+    // If text/html or error status, read sample text
+    if (probeResponse.status >= 400 || contentType?.includes("text/html") || contentType?.includes("json")) {
+      try {
+        const text = await probeResponse.text();
+        sampleBodyText = text.slice(0, 300);
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (err: any) {
     console.warn(`[APK Diagnostic] Header probe error:`, err);
+    sampleBodyText = `Probe failed: ${err?.message || "Network Error"}`;
   }
 
   const isBinary =
@@ -85,9 +104,12 @@ export async function diagnoseApkEndpoint(
     false;
 
   const isHtmlError =
+    httpStatus === 404 ||
+    (httpStatus !== null && httpStatus >= 400) ||
     contentType?.includes("text/html") ||
     contentType?.includes("text/plain") ||
-    contentType?.includes("application/json") ||
+    sampleBodyText.toLowerCase().includes("<!doctype html") ||
+    sampleBodyText.toLowerCase().includes("<html") ||
     false;
 
   // Truncated if < 1.0 MB (a full Android compiled release APK is typically >= 2 MB)
@@ -95,11 +117,11 @@ export async function diagnoseApkEndpoint(
 
   let analysis = "";
   if (isHtmlError) {
-    analysis = "SERVER SERVING HTML/ERROR PAGE INSTEAD OF BINARY APK! Check server routes and fallback handlers.";
+    analysis = `SERVER SERVING HTML/ERROR PAGE (HTTP ${httpStatus || "unknown"}) INSTEAD OF BINARY APK! Check server routes and fallback handlers.`;
   } else if (truncated) {
-    analysis = `PAYLOAD TRUNCATED (${contentLength ? (contentLength / 1024).toFixed(1) + " KB" : "Unknown size"}). Expected > 2.0 MB for valid Android APK.`;
+    analysis = `PAYLOAD TRUNCATED (${contentLength ? (contentLength / 1024).toFixed(1) + " KB" : "Unknown size"}). Expected > 1.0 MB for valid Android APK.`;
   } else if (isBinary) {
-    analysis = "Valid Android Package Archive MIME type confirmed. Binary stream active.";
+    analysis = "Valid Android Package Archive MIME type confirmed. Binary stream active with zero HTML encapsulation.";
   } else {
     analysis = `Unknown content type: ${contentType || "None"}.`;
   }
@@ -125,5 +147,8 @@ export async function diagnoseApkEndpoint(
     noCorsStatus,
     truncated,
     analysis,
+    rawHeaders,
+    sampleBodyText,
   };
 }
+

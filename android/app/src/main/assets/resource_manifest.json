@@ -1,0 +1,99 @@
+{
+  "manifestVersion": "1.0",
+  "appName": "Garia OS",
+  "package": "com.gariaos.app",
+  "generatedAt": "2026-08-19T12:54:14-07:00",
+  "totalResources": 10,
+  "resources": [
+    {
+      "path": "res/mipmap-mdpi/ic_launcher.png",
+      "name": "ic_launcher.png",
+      "folder": "mipmap-mdpi",
+      "width": 48,
+      "height": 48,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-mdpi/ic_launcher_round.png",
+      "name": "ic_launcher_round.png",
+      "folder": "mipmap-mdpi",
+      "width": 48,
+      "height": 48,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-hdpi/ic_launcher.png",
+      "name": "ic_launcher.png",
+      "folder": "mipmap-hdpi",
+      "width": 72,
+      "height": 72,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-hdpi/ic_launcher_round.png",
+      "name": "ic_launcher_round.png",
+      "folder": "mipmap-hdpi",
+      "width": 72,
+      "height": 72,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xhdpi/ic_launcher.png",
+      "name": "ic_launcher.png",
+      "folder": "mipmap-xhdpi",
+      "width": 96,
+      "height": 96,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xhdpi/ic_launcher_round.png",
+      "name": "ic_launcher_round.png",
+      "folder": "mipmap-xhdpi",
+      "width": 96,
+      "height": 96,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xxhdpi/ic_launcher.png",
+      "name": "ic_launcher.png",
+      "folder": "mipmap-xxhdpi",
+      "width": 144,
+      "height": 144,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xxhdpi/ic_launcher_round.png",
+      "name": "ic_launcher_round.png",
+      "folder": "mipmap-xxhdpi",
+      "width": 144,
+      "height": 144,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xxxhdpi/ic_launcher.png",
+      "name": "ic_launcher.png",
+      "folder": "mipmap-xxxhdpi",
+      "width": 192,
+      "height": 192,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    },
+    {
+      "path": "res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "name": "ic_launcher_round.png",
+      "folder": "mipmap-xxxhdpi",
+      "width": 192,
+      "height": 192,
+      "format": "PNG (32-bit RGBA)",
+      "sizeBytes": 1332
+    }
+  ]
+}

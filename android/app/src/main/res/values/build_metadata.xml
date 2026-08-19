@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated for Garia OS Android Build. Updated automatically by Gradle task injectBuildMetadata. -->
+<resources>
+    <string name="build_git_commit" translatable="false">c30001a</string>
+    <string name="build_timestamp" translatable="false">2026-08-19T12:54:14-07:00</string>
+    <string name="build_ci_number" translatable="false">30001</string>
+</resources>

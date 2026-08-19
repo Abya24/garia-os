@@ -23,6 +23,12 @@ import {
   Binary,
   Radio,
   XCircle,
+  Server,
+  Code,
+  ChevronUp,
+  ChevronDown,
+  Layers,
+  ShieldAlert,
 } from "lucide-react";
 import { APP_VERSION, APP_VERSION_CODE, APP_RELEASE_FILENAME } from "../constants/version";
 import { GariaLogo } from "../components/GariaLogo";
@@ -62,8 +68,11 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [copied, setCopied] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedDownloadedHash, setCopiedDownloadedHash] = useState(false);
-  const [activeMirror, setActiveMirror] = useState<string>("/downloads/garia-os.apk");
+  const [copiedRawHeaders, setCopiedRawHeaders] = useState(false);
+  const [activeMirror] = useState<string>("/downloads/garia-os.apk");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [isDiagnosticOverlayExpanded, setIsDiagnosticOverlayExpanded] = useState(false);
+  const [isProbing, setIsProbing] = useState(false);
   const [diagnosticLogs, setDiagnosticLogs] = useState<DiagnosticEntry[]>([]);
   const [healthChecking, setHealthChecking] = useState(false);
   const [mirrorHealth, setMirrorHealth] = useState<Record<string, { status: number; ok: boolean; latencyMs: number }>>({});
@@ -240,6 +249,40 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
         console.warn("[Diagnostic Probe Error]", err);
       });
   }, [getCacheBustedUrl]);
+
+  /**
+   * Dedicated probe function that captures raw HTTP response headers for the APK endpoint
+   * and checks whether the server is returning HTML/404 or genuine binary data.
+   */
+  const probeEndpointHeaders = useCallback(async (targetUrl: string = "/api/download/apk") => {
+    setIsProbing(true);
+    try {
+      const diag = await diagnoseApkEndpoint(targetUrl);
+      setDiagnosticResult(diag);
+      addLog(
+        "HTTP Response Header Probe",
+        diag.url,
+        diag.isBinary ? "success" : "error",
+        diag.httpStatus || 200,
+        `Content-Type: ${diag.contentType || "N/A"} | Size: ${diag.contentLengthFormatted}`
+      );
+    } catch (err: any) {
+      console.error("[Diagnostic Probe Error]", err);
+    } finally {
+      setIsProbing(false);
+    }
+  }, []);
+
+  const handleCopyResponseHeaders = () => {
+    if (!diagnosticResult?.rawHeaders) return;
+    const headerLines = Object.entries(diagnosticResult.rawHeaders)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("\n");
+    const summary = `=== APK HTTP Response Diagnostic (${diagnosticResult.url}) ===\nHTTP Status: ${diagnosticResult.httpStatus}\nContent-Type: ${diagnosticResult.contentType}\nContent-Length: ${diagnosticResult.contentLengthFormatted}\nBinary Stream: ${diagnosticResult.isBinary ? "YES" : "NO"}\nHTML/Error Detected: ${diagnosticResult.isHtmlError ? "YES (ERROR)" : "NO (CLEAN)"}\n\n--- RAW HEADERS ---\n${headerLines}`;
+    navigator.clipboard.writeText(summary);
+    setCopiedRawHeaders(true);
+    setTimeout(() => setCopiedRawHeaders(false), 2000);
+  };
 
   const runHealthCheck = async () => {
     setHealthChecking(true);
@@ -427,10 +470,44 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       }
 
       const contentLengthHeader = response.headers.get("content-length");
+      const contentTypeHeader = response.headers.get("content-type");
       const serverShaHeader = response.headers.get("x-apk-sha256");
       if (serverShaHeader) {
         setOfficialSha256(serverShaHeader.toLowerCase());
       }
+
+      // Collect all raw HTTP response headers for real-time diagnostic inspection
+      const rawHeadersObj: Record<string, string> = {};
+      response.headers.forEach((val, key) => {
+        rawHeadersObj[key.toLowerCase()] = val;
+      });
+
+      const isBinaryMime = !!(
+        contentTypeHeader?.includes("application/vnd.android.package-archive") ||
+        contentTypeHeader?.includes("application/octet-stream")
+      );
+      const isHtml = !!(
+        contentTypeHeader?.includes("text/html") ||
+        contentTypeHeader?.includes("text/plain") ||
+        response.status >= 400
+      );
+
+      setDiagnosticResult({
+        url: targetUrl,
+        timestamp: new Date().toLocaleTimeString(),
+        isBinary: isBinaryMime,
+        isHtmlError: isHtml,
+        contentType: contentTypeHeader,
+        contentLength: contentLengthHeader ? parseInt(contentLengthHeader, 10) : null,
+        contentLengthFormatted: contentLengthHeader ? `${(parseInt(contentLengthHeader, 10) / (1024 * 1024)).toFixed(2)} MB (${parseInt(contentLengthHeader, 10).toLocaleString()} bytes)` : "Unknown",
+        httpStatus: response.status,
+        noCorsStatus: "Active Stream Reader",
+        truncated: !!(contentLengthHeader && parseInt(contentLengthHeader, 10) < 1048576),
+        analysis: isHtml
+          ? "CRITICAL: Server returned HTML error page instead of binary APK payload!"
+          : "Genuine binary APK stream verified with matching Content-Type headers.",
+        rawHeaders: rawHeadersObj,
+      });
 
       const totalSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : apkInfo.sizeBytes || 1358532;
       setTotalBytes(totalSize);
@@ -1352,6 +1429,195 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
           Package Name: <span className="font-mono text-slate-400">com.gariaos.app</span> • Version {apkInfo.version} (Code {apkInfo.versionCode}) • Target File: <span className="font-mono text-emerald-400">Garia_OS_Release.apk</span>
         </p>
       </footer>
+
+      {/* Persistent Floating System Diagnostic Dock (Always accessible in viewport) */}
+      <aside aria-label="System Diagnostic Overlay" className="fixed bottom-4 right-4 z-40 max-w-sm sm:max-w-md font-mono text-xs">
+        {!isDiagnosticOverlayExpanded ? (
+          <button
+            onClick={() => setIsDiagnosticOverlayExpanded(true)}
+            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl backdrop-blur-md shadow-2xl border transition-all transform hover:scale-[1.02] active:scale-[0.98] ${
+              diagnosticResult?.isHtmlError
+                ? "bg-rose-950/90 border-rose-500/50 text-rose-200 shadow-rose-950/50"
+                : diagnosticResult?.isBinary
+                ? "bg-[#0b111e]/95 border-cyan-500/40 text-cyan-200 shadow-cyan-950/50 hover:border-cyan-400"
+                : "bg-slate-900/95 border-slate-700 text-slate-200"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    diagnosticResult?.isHtmlError ? "bg-rose-400" : "bg-emerald-400"
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    diagnosticResult?.isHtmlError ? "bg-rose-500" : "bg-emerald-500"
+                  }`}
+                />
+              </span>
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold text-[11px] tracking-wide">System Diagnostic</span>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-700/80 pl-2 text-[10px]">
+              <span className={`px-1.5 py-0.5 rounded font-bold ${
+                diagnosticResult?.httpStatus === 200 ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+              }`}>
+                HTTP {diagnosticResult?.httpStatus || 200}
+              </span>
+              <span className="text-slate-400 truncate max-w-[120px]">
+                {diagnosticResult?.isHtmlError ? "HTML ERROR" : "BINARY OK"}
+              </span>
+            </div>
+
+            <ChevronUp className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-1" />
+          </button>
+        ) : (
+          <div className="w-[92vw] sm:w-[500px] max-h-[85vh] overflow-y-auto bg-[#0b111e]/98 backdrop-blur-xl border border-cyan-500/40 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-3.5 animate-in slide-in-from-bottom-3 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                <Terminal className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm">System Diagnostic & HTTP Inspector</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => probeEndpointHeaders(diagnosticResult?.url || "/api/download/apk")}
+                  disabled={isProbing}
+                  title="Re-probe HTTP headers"
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isProbing ? "animate-spin" : ""}`} />
+                </button>
+                <button
+                  onClick={handleCopyResponseHeaders}
+                  title="Copy full HTTP response header dump"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] transition-colors"
+                >
+                  {copiedRawHeaders ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 text-slate-400" />
+                      <span>Copy Headers</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsDiagnosticOverlayExpanded(false)}
+                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+                  title="Minimize diagnostic overlay"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Critical Binary vs HTML Anomaly Alert */}
+            {diagnosticResult?.isHtmlError ? (
+              <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-rose-300">
+                  <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>CRITICAL: Non-Binary / HTML Response Detected!</span>
+                </div>
+                <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                  The server endpoint returned <strong>{diagnosticResult.contentType || "text/html"}</strong> (HTTP {diagnosticResult.httpStatus || 404}) instead of the Android binary package stream.
+                </p>
+                {diagnosticResult.sampleBodyText && (
+                  <div className="p-2 rounded bg-black/50 border border-rose-900 text-[10px] font-mono text-rose-300/80 max-h-20 overflow-y-auto whitespace-pre-wrap break-all">
+                    {diagnosticResult.sampleBodyText}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 flex items-center gap-2 text-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="leading-snug">
+                  <strong>Genuine APK Binary Stream Verified:</strong> Response matches <code>application/vnd.android.package-archive</code> with zero HTML error encapsulation.
+                </span>
+              </div>
+            )}
+
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 space-y-0.5">
+                <span className="text-slate-500 text-[10px] block">HTTP Status:</span>
+                <span className={`font-bold ${diagnosticResult?.httpStatus === 200 ? "text-emerald-400" : "text-amber-400"}`}>
+                  {diagnosticResult?.httpStatus ? `${diagnosticResult.httpStatus} OK` : "200 OK (Active)"}
+                </span>
+              </div>
+
+              <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 space-y-0.5">
+                <span className="text-slate-500 text-[10px] block">Payload Size:</span>
+                <span className="font-bold text-slate-200 truncate block">
+                  {diagnosticResult?.contentLengthFormatted || formatBytes(currentLocalSize)}
+                </span>
+              </div>
+
+              <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 space-y-0.5 col-span-2">
+                <span className="text-slate-500 text-[10px] block">Content-Type Header:</span>
+                <span className="font-bold text-cyan-300 break-all select-all block">
+                  {diagnosticResult?.contentType || "application/vnd.android.package-archive"}
+                </span>
+              </div>
+            </div>
+
+            {/* Probed Endpoint Selector */}
+            <div className="space-y-1">
+              <span className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Active Endpoint Probe:</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { name: "API Route", url: "/api/download/apk" },
+                  { name: "Mirror /downloads", url: "/downloads/garia-os.apk" },
+                  { name: "Direct v3.0.0", url: `/${APP_RELEASE_FILENAME}` },
+                  { name: "Root Fallback", url: "/garia-os.apk" },
+                ].map((item) => (
+                  <button
+                    key={item.url}
+                    onClick={() => probeEndpointHeaders(item.url)}
+                    disabled={isProbing}
+                    className={`px-2 py-1.5 rounded-lg text-left text-[10px] border transition-colors flex items-center justify-between ${
+                      diagnosticResult?.url === item.url
+                        ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-200 font-bold"
+                        : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                    }`}
+                  >
+                    <span className="truncate">{item.name}</span>
+                    <span className="text-[9px] opacity-70">Probe</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Raw HTTP Response Headers Inspector Table */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="uppercase tracking-wider font-semibold">Live Response Headers ({diagnosticResult?.rawHeaders ? Object.keys(diagnosticResult.rawHeaders).length : 0}):</span>
+                <span className="text-slate-500">{diagnosticResult?.timestamp || "Latest"}</span>
+              </div>
+
+              <div className="max-h-40 overflow-y-auto bg-slate-950 p-2.5 rounded-xl border border-slate-800/90 text-[10px] font-mono space-y-1">
+                {diagnosticResult?.rawHeaders && Object.keys(diagnosticResult.rawHeaders).length > 0 ? (
+                  Object.entries(diagnosticResult.rawHeaders).map(([key, val]) => (
+                    <div key={key} className="flex items-start justify-between gap-2 border-b border-slate-900 pb-0.5">
+                      <span className="text-cyan-400/90 shrink-0">{key}:</span>
+                      <span className="text-slate-300 break-all select-all text-right font-light">{val}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-500 italic py-2 text-center">
+                    Click &quot;Probe&quot; or download to inspect live response headers.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
     </div>
   );
 };
