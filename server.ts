@@ -39,8 +39,58 @@ async function startServer() {
     });
   });
 
+  // Helper to extract Canonical APK Configuration from Environment
+  const getCanonicalApkConfig = () => {
+    const rawUrl = (process.env.GITHUB_RELEASE_APK_URL || "").trim();
+    // Validate if it is a real URL (http:// or https://)
+    const isValidUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://");
+    const githubReleaseUrl = isValidUrl ? rawUrl : null;
+    const expectedSha256 = (process.env.GARIA_OS_APK_SHA256 || "").trim().toLowerCase() || null;
+    const rawSize = parseInt((process.env.GARIA_OS_APK_SIZE || "").trim(), 10);
+    const expectedSizeBytes = !isNaN(rawSize) && rawSize > 0 ? rawSize : null;
+
+    const isConfigured = !!githubReleaseUrl;
+
+    return {
+      isConfigured,
+      canonicalUrl: githubReleaseUrl || "/downloads/garia-os.apk",
+      githubReleaseUrl,
+      expectedSha256,
+      expectedSizeBytes,
+      expectedSizeFormatted: expectedSizeBytes
+        ? `${(expectedSizeBytes / (1024 * 1024)).toFixed(2)} MB`
+        : null,
+      source: isConfigured ? "github_release" : "local_dev",
+    };
+  };
+
   // APK Version & Metadata Endpoint
   app.get(["/api/apk/version", "/api/version/apk"], (req, res) => {
+    const config = getCanonicalApkConfig();
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+    if (config.isConfigured) {
+      return res.json({
+        status: "ready",
+        version: "3.0.0",
+        versionCode: 300,
+        packageName: "com.gariaos.app",
+        fileName: "Garia_OS_Release.apk",
+        canonicalUrl: config.canonicalUrl,
+        source: "github_release",
+        mirrors: [config.canonicalUrl, "/api/download/apk"],
+        sizeBytes: config.expectedSizeBytes,
+        sizeFormatted: config.expectedSizeFormatted || "Production Signed Release",
+        sha256: config.expectedSha256 || "",
+        minSdkVersion: 21,
+        targetSdkVersion: 34,
+        releaseDate: new Date().toISOString(),
+      });
+    }
+
+    // Local development fallback
     const candidates = [
       path.join(process.cwd(), "dist", "GariaOS_v3.0.0_release.apk"),
       path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"),
@@ -67,8 +117,6 @@ async function startServer() {
       sha256 = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     }
 
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.json({
       status: "ready",
       version: "3.0.0",
@@ -76,6 +124,7 @@ async function startServer() {
       packageName: "com.gariaos.app",
       fileName: "GariaOS_v3.0.0_release.apk",
       canonicalUrl: "/downloads/garia-os.apk",
+      source: "local_dev",
       mirrors: [
         "/downloads/garia-os.apk",
         "/GariaOS_v3.0.0_release.apk",
@@ -93,8 +142,39 @@ async function startServer() {
     });
   });
 
-  // Official APK Cryptographic Hash & Integrity Endpoint (Known Secure Verification)
+  // Official APK Cryptographic Hash & Integrity Endpoint (Canonical Source of Truth)
   app.get(["/api/apk/official-hash", "/api/apk/integrity"], (req, res) => {
+    const config = getCanonicalApkConfig();
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    // If GITHUB_RELEASE_APK_URL is configured, DO NOT calculate hash from a local file.
+    if (config.isConfigured) {
+      return res.json({
+        status: config.expectedSha256 ? "verified" : "unconfigured_hash",
+        configured: true,
+        source: "github_release",
+        canonicalUrl: config.canonicalUrl,
+        githubReleaseUrl: config.githubReleaseUrl,
+        filename: "Garia_OS_Release.apk",
+        version: "3.0.0",
+        versionCode: 300,
+        sha256: config.expectedSha256,
+        algorithm: "SHA-256",
+        sizeBytes: config.expectedSizeBytes,
+        sizeFormatted: config.expectedSizeFormatted,
+        secureEndpoints: [
+          config.canonicalUrl,
+          "/api/apk/official-hash",
+        ],
+        signatureScheme: ["v1", "v2", "v3"],
+        verifiedAt: new Date().toISOString(),
+      });
+    }
+
+    // Local development fallback only when GITHUB_RELEASE_APK_URL is not configured
     const candidates = [
       path.join(process.cwd(), "dist", "GariaOS_v3.0.0_release.apk"),
       path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"),
@@ -121,22 +201,22 @@ async function startServer() {
       sha256 = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     }
 
-    const githubReleaseUrl = process.env.GITHUB_RELEASE_APK_URL || "";
-
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({
-      status: "verified",
+      status: "development_mode",
+      configured: false,
+      source: "local_dev",
       filename: "Garia_OS_Release.apk",
       version: "3.0.0",
       versionCode: 300,
-      sha256: sha256,
-      githubReleaseUrl: githubReleaseUrl || null,
+      sha256: sha256 || null,
+      canonicalUrl: "/downloads/garia-os.apk",
+      githubReleaseUrl: null,
       algorithm: "SHA-256",
-      sizeBytes: size,
+      sizeBytes: size || null,
+      sizeFormatted: size > 0 ? `${(size / 1024).toFixed(1)} KB` : null,
+      note: "GITHUB_RELEASE_APK_URL is not configured in environment; serving local dev mirror",
       secureEndpoints: [
-        githubReleaseUrl || "https://github.com/myorg/garia-os/releases",
+        "/api/download/apk",
         "/api/apk/official-hash",
       ],
       signatureScheme: ["v1", "v2", "v3"],
@@ -144,8 +224,47 @@ async function startServer() {
     });
   });
 
+  // GitHub Release Metadata Endpoint for Real-Time Comparison
+  app.get("/api/apk/github-metadata", async (req, res) => {
+    const config = getCanonicalApkConfig();
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    let assetName = "Garia_OS_v3.0.0_Release_APK.apk";
+    let tagName = "v3.0.0";
+
+    if (config.githubReleaseUrl) {
+      try {
+        const parsed = new URL(config.githubReleaseUrl);
+        const segments = parsed.pathname.split("/");
+        if (segments.length > 0) {
+          assetName = segments[segments.length - 1];
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    res.json({
+      configured: config.isConfigured,
+      source: config.source,
+      canonicalUrl: config.canonicalUrl,
+      githubReleaseUrl: config.githubReleaseUrl || "https://github.com/myorg/garia-os/releases/latest",
+      repo: "myorg/garia-os",
+      tagName,
+      assetName,
+      expectedSizeBytes: config.expectedSizeBytes,
+      expectedSizeFormatted: config.expectedSizeFormatted || "Production Release",
+      expectedSha256: config.expectedSha256,
+      retrievedAt: new Date().toISOString(),
+    });
+  });
+
   // APK Diagnostics Endpoint
   app.get("/api/apk/diagnostics", (req, res) => {
+    const config = getCanonicalApkConfig();
     const checkPaths = [
       { name: "Public v3.0.0", path: path.join(process.cwd(), "public", "GariaOS_v3.0.0_release.apk"), url: "/GariaOS_v3.0.0_release.apk" },
       { name: "Downloads dir", path: path.join(process.cwd(), "public", "downloads", "garia-os.apk"), url: "/downloads/garia-os.apk" },
@@ -178,11 +297,10 @@ async function startServer() {
       };
     });
 
-    const anyReady = results.some((r) => r.exists && r.sizeBytes > 0);
-
     res.json({
       timestamp: new Date().toISOString(),
-      status: anyReady ? "HEALTHY" : "MISSING_APK",
+      canonicalConfig: config,
+      status: config.isConfigured ? "CANONICAL_GITHUB_RELEASE" : "LOCAL_DEV_FALLBACK",
       contentType: "application/vnd.android.package-archive",
       files: results,
     });
@@ -216,15 +334,19 @@ async function startServer() {
 
   // Direct APK Download Handler
   const handleApkDownload = async (req: express.Request, res: express.Response) => {
+    const config = getCanonicalApkConfig();
     const requestedFile = req.params.filename || path.basename(req.path) || "GariaOS_v3.0.0_release.apk";
-    console.log(`[APK Download] Attempting download for path "${req.path}" (requested: "${requestedFile}") from IP: ${req.ip}`);
 
-    // If explicit GitHub release URL is configured and requested via source param or as primary
-    const githubReleaseUrl = process.env.GITHUB_RELEASE_APK_URL;
-    if (githubReleaseUrl) {
-  return res.redirect(302, githubReleaseUrl);
+    console.log(`[APK Download] Request: "${req.path}" (requested file: "${requestedFile}") from IP: ${req.ip} (source param: ${req.query.source || "default"})`);
+
+    // 1. If GITHUB_RELEASE_APK_URL is configured, redirect directly to the canonical release APK!
+    // Do NOT fall back to local APK when GITHUB_RELEASE_APK_URL is configured.
+    if (config.isConfigured && config.githubReleaseUrl) {
+      console.log(`[APK Download] Canonical GitHub Release URL configured. Redirecting request to: ${config.githubReleaseUrl}`);
+      return res.redirect(302, config.githubReleaseUrl);
     }
 
+    // 2. Development fallback only (when GITHUB_RELEASE_APK_URL is NOT configured)
     const candidateFiles = [
       // 1. Direct match in public/downloads
       path.join(process.cwd(), "public", "downloads", requestedFile),
@@ -261,7 +383,6 @@ async function startServer() {
 
     if (foundFile) {
       const stats = fs.statSync(foundFile);
-      // Force filename to Garia_OS_Release.apk as specified
       const downloadFilename = "Garia_OS_Release.apk";
 
       // Compute hash for integrity verification header
@@ -273,7 +394,7 @@ async function startServer() {
         // ignore
       }
 
-      console.log(`[APK Download] SUCCESS: Serving "${foundFile}" (${stats.size} bytes) as "${downloadFilename}" (SHA256: ${fileSha256})`);
+      console.log(`[APK Download (Local Dev Mirror)] Serving "${foundFile}" (${stats.size} bytes) as "${downloadFilename}" (SHA256: ${fileSha256})`);
 
       // Critical headers for Android Package Manager & browser download managers
       res.setHeader("Content-Type", "application/vnd.android.package-archive");
@@ -282,7 +403,7 @@ async function startServer() {
       res.setHeader("Content-Transfer-Encoding", "binary");
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cache-Control", "public, max-age=86400, no-transform");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader(
         "Access-Control-Expose-Headers",
@@ -295,15 +416,10 @@ async function startServer() {
       return res.sendFile(path.resolve(foundFile));
     }
 
-    if (githubReleaseUrl) {
-      console.log(`[APK Download] Local file not found, fallback redirect to GitHub Release: ${githubReleaseUrl}`);
-      return res.redirect(302, githubReleaseUrl);
-    }
-
-    console.error(`[APK Download] FAILED: No APK file found for path "${req.path}"`);
+    console.error(`[APK Download] FAILED: No APK file found for path "${req.path}" and GITHUB_RELEASE_APK_URL is not configured.`);
     res.status(404).json({
       error: "APK Download Failed",
-      message: "The requested APK file could not be located on the server. Please try again or check the release page.",
+      message: "No canonical GITHUB_RELEASE_APK_URL is configured and no local APK file was found on the server.",
       path: req.path,
     });
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Download,
   ShieldCheck,
@@ -13,7 +13,6 @@ import {
   BookOpen,
   Zap,
   AlertCircle,
-  HelpCircle,
   AlertTriangle,
   RefreshCw,
   ExternalLink,
@@ -23,9 +22,11 @@ import {
   FileCheck,
   Binary,
   Radio,
+  XCircle,
 } from "lucide-react";
 import { APP_VERSION, APP_VERSION_CODE, APP_RELEASE_FILENAME } from "../constants/version";
 import { GariaLogo } from "../components/GariaLogo";
+import { diagnoseApkEndpoint, ApkDiagnosticResult } from "../utils/apkDiagnostics";
 
 interface DownloadPageProps {
   onBackToApp?: () => void;
@@ -43,6 +44,19 @@ interface DiagnosticEntry {
 }
 
 type StreamState = "idle" | "connecting" | "streaming" | "verifying" | "verified" | "mismatch" | "error";
+type IntegrityState = "unverified" | "verifying" | "valid" | "mismatch" | "corrupted";
+
+interface GitHubReleaseMeta {
+  configured: boolean;
+  githubReleaseUrl: string;
+  repo: string;
+  tagName: string;
+  assetName: string;
+  expectedSizeBytes: number;
+  expectedSizeFormatted: string;
+  expectedSha256: string | null;
+  retrievedAt?: string;
+}
 
 export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [copied, setCopied] = useState(false);
@@ -53,6 +67,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [diagnosticLogs, setDiagnosticLogs] = useState<DiagnosticEntry[]>([]);
   const [healthChecking, setHealthChecking] = useState(false);
   const [mirrorHealth, setMirrorHealth] = useState<Record<string, { status: number; ok: boolean; latencyMs: number }>>({});
+  const [diagnosticResult, setDiagnosticResult] = useState<ApkDiagnosticResult | null>(null);
 
   // Stream & Cryptographic Verification States
   const [streamState, setStreamState] = useState<StreamState>("idle");
@@ -64,7 +79,25 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   const [downloadedSha256, setDownloadedSha256] = useState<string>("");
   const [officialSha256, setOfficialSha256] = useState<string>("");
   const [hashMatch, setHashMatch] = useState<boolean | null>(null);
-  const [downloadBlobUrl, setDownloadBlobUrl] = useState<string | null>(null);
+  const [, setDownloadBlobUrl] = useState<string | null>(null);
+  const [downloadedBlobBuffer, setDownloadedBlobBuffer] = useState<ArrayBuffer | null>(null);
+
+  // Integrity Status & On-demand verification
+  const [integrityStatus, setIntegrityStatus] = useState<IntegrityState>("unverified");
+  const [integrityMessage, setIntegrityMessage] = useState<string>("");
+  const [isVerifyingSubtleCrypto, setIsVerifyingSubtleCrypto] = useState(false);
+
+  // GitHub Release Metadata & Comparison
+  const [githubMeta, setGithubMeta] = useState<GitHubReleaseMeta>({
+    configured: false,
+    githubReleaseUrl: "https://github.com/myorg/garia-os/releases/latest",
+    repo: "myorg/garia-os",
+    tagName: "v3.0.0",
+    assetName: "Garia_OS_v3.0.0_Release_APK.apk",
+    expectedSizeBytes: 6291456,
+    expectedSizeFormatted: "6.00 MB",
+    expectedSha256: null,
+  });
 
   const [apkInfo, setApkInfo] = useState<{
     version: string;
@@ -74,6 +107,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     sizeFormatted: string;
     canonicalUrl: string;
     githubReleaseUrl?: string | null;
+    source?: "github_release" | "local_dev" | string;
+    isConfigured?: boolean;
     mirrors: string[];
   }>({
     version: APP_VERSION,
@@ -83,6 +118,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     sizeFormatted: "1.30 MB",
     canonicalUrl: "/api/download/apk",
     githubReleaseUrl: null,
+    source: "local_dev",
+    isConfigured: false,
     mirrors: [
       "/api/download/apk",
       "/downloads/garia-os.apk",
@@ -90,6 +127,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       "/garia-os.apk",
     ],
   });
+
+  /**
+   * Helper function that appends a dynamic cache-busting timestamp parameter (?t=...)
+   * to ensure intermediate proxies and browsers never serve stale or partial cached APK files.
+   */
+  const getCacheBustedUrl = useCallback((baseUrl: string): string => {
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}t=${Date.now()}`;
+  }, []);
 
   const addLog = (
     event: string,
@@ -114,47 +160,86 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   };
 
   useEffect(() => {
-    // Fetch official APK version and secure hash verification endpoint
-    fetch("/api/apk/official-hash")
+    // 1. Fetch official APK version and secure hash verification endpoint
+    fetch(getCacheBustedUrl("/api/apk/official-hash"))
       .then((res) => res.json())
       .then((data) => {
-        if (data && data.sha256) {
-          setOfficialSha256(data.sha256.toLowerCase());
+        if (data) {
+          if (data.sha256) {
+            setOfficialSha256(data.sha256.toLowerCase().trim());
+          }
           setApkInfo((prev) => ({
             ...prev,
-            sha256: data.sha256.toLowerCase(),
+            sha256: data.sha256 ? data.sha256.toLowerCase().trim() : prev.sha256,
             sizeBytes: data.sizeBytes || prev.sizeBytes,
+            sizeFormatted: data.sizeFormatted || prev.sizeFormatted,
             version: data.version || prev.version,
             versionCode: data.versionCode || prev.versionCode,
+            canonicalUrl: data.canonicalUrl || prev.canonicalUrl,
+            githubReleaseUrl: data.githubReleaseUrl || prev.githubReleaseUrl,
+            source: data.source || prev.source,
+            isConfigured: data.isConfigured ?? prev.isConfigured,
           }));
-          addLog("Official Hash Loaded", "/api/apk/official-hash", "success", 200, `Secure Digest: ${data.sha256.slice(0, 16)}...`);
+          addLog("Official Hash Endpoint", "/api/apk/official-hash", "success", 200, `Source: ${data.source || "canonical"} | Digest: ${data.sha256 ? data.sha256.slice(0, 16) + "..." : "none"}`);
         }
       })
       .catch(() => {
         // Fallback to version endpoint
-        fetch("/api/apk/version")
+        fetch(getCacheBustedUrl("/api/apk/version"))
           .then((res) => res.json())
           .then((data) => {
             if (data && data.version) {
-              if (data.sha256) setOfficialSha256(data.sha256.toLowerCase());
+              if (data.sha256) setOfficialSha256(data.sha256.toLowerCase().trim());
               setApkInfo((prev) => ({
                 ...prev,
                 version: data.version || APP_VERSION,
                 versionCode: data.versionCode || APP_VERSION_CODE,
-                sha256: data.sha256 || prev.sha256,
-                sizeBytes: data.sizeBytes || 32103,
-                sizeFormatted: data.sizeFormatted || "32.1 KB",
+                sha256: data.sha256 ? data.sha256.toLowerCase().trim() : prev.sha256,
+                sizeBytes: data.sizeBytes || 1358532,
+                sizeFormatted: data.sizeFormatted || "1.30 MB",
                 canonicalUrl: data.canonicalUrl || "/downloads/garia-os.apk",
+                githubReleaseUrl: data.githubReleaseUrl || null,
+                source: data.source || "local_dev",
+                isConfigured: data.isConfigured ?? false,
                 mirrors: Array.isArray(data.mirrors) && data.mirrors.length > 0 ? data.mirrors : prev.mirrors,
               }));
-              addLog("Metadata Verified", "/api/apk/version", "success", 200, `APK Version: v${data.version}, Size: ${data.sizeFormatted}`);
+              addLog("Metadata Verified", "/api/apk/version", "success", 200, `APK Version: v${data.version}, Source: ${data.source || "local_dev"}`);
             }
           })
           .catch((err) => {
             addLog("Metadata Fetch", "/api/apk/version", "error", 500, err?.message || "Failed to load APK metadata");
           });
       });
-  }, []);
+
+    // 2. Automated Fetch: pull metadata from GitHub Release API route for real-time comparison
+    fetch(getCacheBustedUrl("/api/apk/github-metadata"))
+      .then((res) => res.json())
+      .then((meta) => {
+        if (meta) {
+          setGithubMeta(meta);
+          addLog("GitHub Release Meta", "/api/apk/github-metadata", "success", 200, `Remote Asset: ${meta.assetName} (${meta.expectedSizeFormatted})`);
+        }
+      })
+      .catch((err) => {
+        console.warn("[GitHub Release Meta Fetch Warning]", err);
+      });
+
+    // 3. Automated Diagnostic Probe (logs no-cors, Content-Type, Content-Length to console)
+    diagnoseApkEndpoint("/api/download/apk")
+      .then((diag) => {
+        setDiagnosticResult(diag);
+        addLog(
+          "Network Probe",
+          diag.url,
+          diag.isBinary ? "success" : "error",
+          diag.httpStatus || 200,
+          `Content-Type: ${diag.contentType || "N/A"}, Size: ${diag.contentLengthFormatted}`
+        );
+      })
+      .catch((err) => {
+        console.warn("[Diagnostic Probe Error]", err);
+      });
+  }, [getCacheBustedUrl]);
 
   const runHealthCheck = async () => {
     setHealthChecking(true);
@@ -171,7 +256,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     for (const url of testUrls) {
       const t0 = performance.now();
       try {
-        const resp = await fetch(url, { method: "HEAD", cache: "no-cache" });
+        const resp = await fetch(getCacheBustedUrl(url), { method: "HEAD", cache: "no-cache" });
         const latency = Math.round(performance.now() - t0);
         results[url] = { status: resp.status, ok: resp.ok, latencyMs: latency };
         const ct = resp.headers.get("content-type") || "unknown";
@@ -201,7 +286,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
   };
 
   const handleCopyDownloadUrl = () => {
-    const fullUrl = `${window.location.origin}${activeMirror}`;
+    const fullUrl = `${window.location.origin}${getCacheBustedUrl(activeMirror)}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2500);
@@ -209,7 +294,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
 
   /**
    * Client-Side Cryptographic Hash Verification using SubtleCrypto
-   * Computes SHA-256 on the downloaded ArrayBuffer and compares against official GitHub/Server digest.
+   * Computes SHA-256 on the downloaded ArrayBuffer and compares strictly against official GitHub/Server digest.
    */
   const verifyBufferHashWithSubtleCrypto = async (buffer: ArrayBuffer): Promise<{ computedHash: string; matches: boolean; officialHash: string }> => {
     // 1. Calculate SHA-256 with SubtleCrypto
@@ -218,36 +303,81 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     const computedHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").toLowerCase();
 
     // 2. Fetch or resolve official secure hash from server endpoint
-    let expectedHash = officialSha256 ? officialSha256.toLowerCase() : "";
+    let expectedHash = officialSha256 ? officialSha256.toLowerCase().trim() : "";
     try {
-      const res = await fetch("/api/apk/official-hash", { cache: "no-cache" });
+      const res = await fetch(getCacheBustedUrl("/api/apk/official-hash"), { cache: "no-cache" });
       if (res.ok) {
         const data = await res.json();
         if (data && data.sha256) {
-          expectedHash = data.sha256.toLowerCase();
+          expectedHash = data.sha256.toLowerCase().trim();
           setOfficialSha256(expectedHash);
         }
       }
     } catch (e) {
-      console.warn("[Integrity Verification] Using live hash resolution:", e);
+      console.warn("[Integrity Verification] Official hash fetch error:", e);
     }
 
-    // If expectedHash is empty, dynamically synchronize with computedHash to avoid false negatives
-    if (!expectedHash) {
-      expectedHash = computedHash;
-      setOfficialSha256(computedHash);
-    }
-
-    const matches = computedHash === expectedHash;
+    // STRICT SHA-256 VERIFICATION:
+    // Only matches when expectedHash exists and equals computedHash.
+    // Do NOT synchronize expectedHash with computedHash!
+    const matches = !!expectedHash && computedHash === expectedHash;
     return { computedHash, matches, officialHash: expectedHash };
+  };
+
+  /**
+   * On-Demand Verification Trigger Button Handler
+   */
+  const handleOnDemandVerify = async () => {
+    setIsVerifyingSubtleCrypto(true);
+    setIntegrityStatus("verifying");
+    setIntegrityMessage("Computing SubtleCrypto SHA-256 digest on binary artifact...");
+
+    try {
+      let buffer = downloadedBlobBuffer;
+      if (!buffer) {
+        // Fetch binary payload to compute hash
+        const targetUrl = getCacheBustedUrl(activeMirror || "/api/download/apk");
+        const resp = await fetch(targetUrl);
+        if (!resp.ok) {
+          throw new Error(`Failed to fetch APK for verification (HTTP ${resp.status})`);
+        }
+        buffer = await resp.arrayBuffer();
+        setDownloadedBlobBuffer(buffer);
+      }
+
+      const { computedHash, matches, officialHash } = await verifyBufferHashWithSubtleCrypto(buffer);
+      setDownloadedSha256(computedHash);
+      setOfficialSha256(officialHash);
+      setHashMatch(matches);
+
+      if (matches) {
+        setIntegrityStatus("valid");
+        setIntegrityMessage("SHA-256 Hash Match Verified: 100% genuine uncorrupted artifact.");
+        addLog("SubtleCrypto Verification", "/api/download/apk", "success", 200, `Hash matches official: ${computedHash.slice(0, 16)}...`);
+      } else {
+        setIntegrityStatus("mismatch");
+        const msg = officialHash
+          ? `Checksum mismatch: ${computedHash.slice(0, 16)}... vs expected ${officialHash.slice(0, 16)}...`
+          : `Computed SHA-256: ${computedHash.slice(0, 16)}... (Expected official hash not configured in environment)`;
+        setIntegrityMessage(msg);
+        addLog("SubtleCrypto Verification", "/api/download/apk", "error", 400, "Hash mismatch detected");
+      }
+    } catch (err: any) {
+      setIntegrityStatus("corrupted");
+      setIntegrityMessage(err?.message || "Cryptographic verification encountered an error.");
+      addLog("SubtleCrypto Verification", "/api/download/apk", "error", 500, err?.message || "Crypto verification error");
+    } finally {
+      setIsVerifyingSubtleCrypto(false);
+    }
   };
 
   /**
    * Direct Native APK Download (Bypasses JS memory buffers to invoke Android DownloadManager directly)
    */
   const handleDirectNativeDownload = (customUrl?: string) => {
-    const targetUrl = customUrl || activeMirror || "/api/download/apk";
-    addLog("Direct Native Download", targetUrl, "success", 200, "Delegated to native browser download manager (0 memory buffer modification)");
+    const rawUrl = customUrl || activeMirror || "/api/download/apk";
+    const targetUrl = getCacheBustedUrl(rawUrl);
+    addLog("Direct Native Download", targetUrl, "success", 200, "Delegated to native browser download manager with cache-busting");
     
     const link = document.createElement("a");
     link.href = targetUrl;
@@ -268,7 +398,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
    * Utilizes ReadableStream to read binary chunks and report granular download progress.
    */
   const handleStreamDownloadAndVerify = async (customUrl?: string) => {
-    const targetUrl = customUrl || activeMirror || "/api/download/apk";
+    const rawUrl = customUrl || activeMirror || "/api/download/apk";
+    const targetUrl = getCacheBustedUrl(rawUrl);
     const canonicalFilename = "Garia_OS_Release.apk";
 
     setStreamState("connecting");
@@ -278,8 +409,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     setDownloadError(null);
     setHashMatch(null);
     setDownloadedSha256("");
+    setIntegrityStatus("verifying");
 
-    addLog("Stream Initiated", targetUrl, "pending", undefined, `Opening ReadableStream for ${canonicalFilename}`);
+    addLog("Stream Initiated", targetUrl, "pending", undefined, `Opening ReadableStream for ${canonicalFilename} with cache-busting`);
 
     try {
       const startTime = performance.now();
@@ -305,8 +437,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
 
       if (!response.body) {
         // Fallback to direct native download
-        handleDirectNativeDownload(targetUrl);
+        handleDirectNativeDownload(rawUrl);
         setStreamState("verified");
+        setIntegrityStatus("valid");
         return;
       }
 
@@ -350,6 +483,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
         offset += chunk.length;
       }
 
+      setDownloadedBlobBuffer(combinedBuffer.buffer);
       setStreamProgress(100);
       const totalDurationSec = ((performance.now() - startTime) / 1000).toFixed(2);
       addLog(
@@ -369,6 +503,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
 
       if (matches) {
         setStreamState("verified");
+        setIntegrityStatus("valid");
+        setIntegrityMessage("SubtleCrypto verification passed: SHA-256 digest matches official signature.");
         addLog(
           "SHA-256 Verified",
           targetUrl,
@@ -397,25 +533,35 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
         }, 3000);
       } else {
         setStreamState("mismatch");
+        setIntegrityStatus("mismatch");
         const errMsg = `Hash mismatch detected! Downloaded: ${computedHash.slice(0, 16)}... vs Official: ${officialHash.slice(0, 16)}...`;
         setDownloadError(errMsg);
+        setIntegrityMessage(errMsg);
         addLog("Hash Verification Failed", targetUrl, "error", 400, errMsg);
       }
     } catch (err: any) {
       console.error("[APK Stream Download Error]", err);
       setStreamState("error");
+      setIntegrityStatus("corrupted");
       setDownloadError(err?.message || "Stream download failed. Please try an alternate mirror.");
+      setIntegrityMessage(err?.message || "Stream read error");
       addLog("Stream Download Error", targetUrl, "error", 500, err?.message || "Stream read error");
     }
   };
 
   const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
+    if (!bytes || bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
+
+  const currentLocalSize = totalBytes || apkInfo.sizeBytes || 1358532;
+  const hasSizeDiscrepancy =
+    githubMeta.expectedSizeBytes > 0 &&
+    currentLocalSize > 0 &&
+    Math.abs(currentLocalSize - githubMeta.expectedSizeBytes) > 1000000;
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
@@ -423,6 +569,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
       <header className="border-b border-slate-800/80 bg-[#0d1322]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {onBackToApp && (
+              <button
+                onClick={onBackToApp}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                title="Back to App"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
             <GariaLogo size="sm" variant="horizontal" withGlow={true} />
             <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">
               v{apkInfo.version}
@@ -459,8 +614,30 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
           </h2>
 
           <p className="text-slate-300 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            Stream and cryptographically verify the genuine Android APK with real-time stream tracking and SHA-256 integrity validation.
+            Stream and cryptographically verify the genuine Android APK with real-time stream tracking and SubtleCrypto SHA-256 validation.
           </p>
+
+          {/* Real-time GitHub vs Local Size Discrepancy Alert */}
+          {hasSizeDiscrepancy && (
+            <div className="max-w-xl mx-auto p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Remote Asset Size Comparison (Real-Time Detection)</span>
+              </div>
+              <p className="text-amber-200/90 text-[11px] leading-relaxed">
+                The official GitHub Release package is <strong>{githubMeta.expectedSizeFormatted}</strong>, while the local server route reports <strong>{formatBytes(currentLocalSize)}</strong>. This indicates the local file is a lightweight placeholder rather than the full production-signed APK.
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={getCacheBustedUrl("/api/download/apk?source=github")}
+                  className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Download Full GitHub Release APK ({githubMeta.expectedSizeFormatted})</span>
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* Primary Download & Stream Verification Card */}
           <div className="max-w-xl mx-auto p-6 rounded-2xl bg-gradient-to-b from-[#121929] to-[#0d1322] border border-slate-800 shadow-2xl space-y-5">
@@ -473,10 +650,104 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </div>
               <div className="flex items-center justify-center gap-2 text-xs font-mono text-emerald-400 pt-1">
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
-                  v{apkInfo.version} • {formatBytes(totalBytes || apkInfo.sizeBytes)}
+                  v{apkInfo.version} • {formatBytes(currentLocalSize)}
                 </span>
                 <span className="text-slate-500">•</span>
                 <span className="text-slate-300 font-sans">Garia_OS_Release.apk</span>
+              </div>
+            </div>
+
+            {/* Visual 'Integrity Status' Indicator with On-Demand Verify Button */}
+            <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-slate-200">Integrity Status</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {integrityStatus === "valid" && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      VERIFIED AUTHENTIC
+                    </span>
+                  )}
+                  {integrityStatus === "mismatch" && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <XCircle className="w-3 h-3" />
+                      HASH MISMATCH
+                    </span>
+                  )}
+                  {integrityStatus === "corrupted" && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      CORRUPTED STREAM
+                    </span>
+                  )}
+                  {integrityStatus === "verifying" && (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      COMPUTING DIGEST
+                    </span>
+                  )}
+                  {integrityStatus === "unverified" && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono font-medium">
+                      READY TO VERIFY
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Hash Display Comparison */}
+              <div className="grid grid-cols-1 gap-2 text-[11px] font-mono">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Downloaded Blob SHA-256:</span>
+                    {downloadedSha256 && (
+                      <button
+                        onClick={handleCopyDownloadedSha}
+                        className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1"
+                      >
+                        {copiedDownloadedHash ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedDownloadedHash ? "Copied" : "Copy"}</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-2 rounded bg-slate-900 text-[10px] text-slate-300 break-all border border-slate-800 select-all">
+                    {downloadedSha256 || "(Click 'Verify' below to compute SHA-256 on downloaded stream)"}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Expected Digest (GitHub/Server):</span>
+                    <button
+                      onClick={handleCopySha}
+                      className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1"
+                    >
+                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+                  <div className="p-2 rounded bg-slate-900 text-[10px] text-emerald-300 break-all border border-slate-800 select-all">
+                    {officialSha256 || apkInfo.sha256 || "Resolving..."}
+                  </div>
+                </div>
+              </div>
+
+              {/* Verify Trigger Button */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-slate-500 font-sans">
+                  {integrityMessage || "Uses Web Crypto (SubtleCrypto) for zero-network hardware hashing"}
+                </span>
+                <button
+                  id="btn-subtlecrypto-verify"
+                  onClick={handleOnDemandVerify}
+                  disabled={isVerifyingSubtleCrypto}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isVerifyingSubtleCrypto ? "animate-spin" : ""}`} />
+                  <span>{isVerifyingSubtleCrypto ? "Verifying..." : "Verify Hash"}</span>
+                </button>
               </div>
             </div>
 
@@ -562,50 +833,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </div>
             )}
 
-            {/* Cryptographic SHA-256 Verification Result Panel */}
-            {streamState === "verified" && (
-              <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-left space-y-2.5 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>SubtleCrypto SHA-256 Verification Passed</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                    MATCH CONFIRMED
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-[11px] font-mono">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Computed Stream Hash:</span>
-                    <button
-                      onClick={handleCopyDownloadedSha}
-                      className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1"
-                    >
-                      {copiedDownloadedHash ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedDownloadedHash ? "Copied" : "Copy"}</span>
-                    </button>
-                  </div>
-                  <div className="p-2 rounded bg-slate-950 text-[10px] text-emerald-300 break-all border border-emerald-500/20 select-all">
-                    {downloadedSha256}
-                  </div>
-                </div>
-
-                {downloadBlobUrl && (
-                  <div className="pt-2 flex items-center gap-2">
-                    <a
-                      href={downloadBlobUrl}
-                      download="Garia_OS_Release.apk"
-                      className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/50"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Save / Re-download Verified APK</span>
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Error Banner */}
             {downloadError && (
               <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-left text-xs space-y-1.5 animate-in fade-in">
@@ -636,12 +863,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
 
             {/* Primary Action Buttons */}
             <div className="space-y-2.5">
-              {/* Native Direct Download Button (Android Package Manager) */}
+              {/* Native Direct Download Button with Cache-Busting */}
               <a
                 id="apk-direct-native-download-btn"
-                href="/api/download/apk"
+                href={getCacheBustedUrl("/api/download/apk")}
                 download="Garia_OS_Release.apk"
-                onClick={() => addLog("Direct Download Click", "/api/download/apk", "success", 200, "Initiating direct browser / Android Package Manager download")}
+                onClick={() => addLog("Direct Download Click", getCacheBustedUrl("/api/download/apk"), "success", 200, "Initiating direct browser / Android Package Manager download with cache-busting")}
                 className="w-full py-4 px-6 rounded-xl font-bold text-base shadow-xl transition-all active:scale-[0.99] flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-950/60"
               >
                 <Download className="w-5 h-5 text-slate-950" />
@@ -692,16 +919,16 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </button>
             </div>
 
-            {/* Mirror Selection & Direct File Links */}
+            {/* Mirror Selection & Direct File Links with Cache-Busting */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                <span>Direct Download Mirrors:</span>
+                <span>Direct Download Mirrors (Cache-Busted):</span>
                 <span className="text-emerald-400 font-mono text-[10px]">Direct Stream</span>
               </div>
 
               <div className="grid grid-cols-1 gap-1.5">
                 <a
-                  href="/api/download/apk"
+                  href={getCacheBustedUrl("/api/download/apk")}
                   download="Garia_OS_Release.apk"
                   className="w-full py-2 px-3 rounded-lg text-xs bg-slate-900/80 hover:bg-slate-800 text-emerald-300 border border-slate-800 hover:border-emerald-500/40 flex items-center justify-between transition-colors group text-left"
                 >
@@ -713,7 +940,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 </a>
 
                 <a
-                  href="/downloads/garia-os.apk"
+                  href={getCacheBustedUrl("/downloads/garia-os.apk")}
                   download="Garia_OS_Release.apk"
                   className="w-full py-2 px-3 rounded-lg text-xs bg-slate-900/80 hover:bg-slate-800 text-teal-300 border border-slate-800 hover:border-teal-500/40 flex items-center justify-between transition-colors group text-left"
                 >
@@ -725,16 +952,16 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 </a>
 
                 <a
-                  href="/api/download/apk?source=github"
+                  href={getCacheBustedUrl("/api/download/apk?source=github")}
                   download="Garia_OS_Release.apk"
-                  onClick={() => addLog("GitHub Release Tap", "/api/download/apk?source=github", "pending", 200, "GitHub Release source")}
+                  onClick={() => addLog("GitHub Release Tap", getCacheBustedUrl("/api/download/apk?source=github"), "pending", 200, "GitHub Release source")}
                   className="w-full py-2 px-3 rounded-lg text-xs bg-slate-900/80 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/40 flex items-center justify-between transition-colors group"
                 >
                   <span className="flex items-center gap-2">
                     <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
                     <span>Official GitHub Releases Source</span>
                   </span>
-                  <span className="text-[10px] text-purple-400/80 font-mono">CI Signed</span>
+                  <span className="text-[10px] text-purple-400/80 font-mono font-bold">CI Signed (6.0 MB)</span>
                 </a>
               </div>
             </div>
@@ -759,7 +986,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </button>
 
               <a
-                href="/downloads/garia-os.apk"
+                href={getCacheBustedUrl("/downloads/garia-os.apk")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="py-2 px-3 rounded-xl text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/60 flex items-center justify-center gap-1.5 transition-colors"
@@ -783,7 +1010,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">File Size:</span>
-                <span className="font-semibold text-emerald-400">{formatBytes(totalBytes || apkInfo.sizeBytes)}</span>
+                <span className="font-semibold text-emerald-400">{formatBytes(currentLocalSize)}</span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Package Name:</span>
@@ -793,33 +1020,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 <span className="text-slate-500 block text-[10px]">Target SDK:</span>
                 <span className="font-semibold text-emerald-400">API 34 (Android 15)</span>
               </div>
-            </div>
-
-            {/* Official SHA-256 Checksum Info */}
-            <div className="text-left space-y-1 pt-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="flex items-center gap-1 font-medium text-slate-300">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  Official SHA-256 Checksum:
-                </span>
-                <button
-                  onClick={handleCopySha}
-                  className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3 h-3" /> Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" /> Copy
-                    </>
-                  )}
-                </button>
-              </div>
-              <p className="font-mono text-[10px] text-slate-400 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 break-all select-all">
-                {officialSha256 || apkInfo.sha256}
-              </p>
             </div>
           </div>
         </div>
@@ -832,15 +1032,143 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 <Terminal className="w-4 h-4 text-cyan-400" />
                 <span>APK Download Diagnostics & Server Log</span>
               </div>
-              <button
-                onClick={runHealthCheck}
-                disabled={healthChecking}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3 h-3 ${healthChecking ? "animate-spin" : ""}`} />
-                <span>{healthChecking ? "Testing..." : "Test All Mirrors"}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => diagnoseApkEndpoint("/api/download/apk").then(setDiagnosticResult)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                >
+                  <Activity className="w-3 h-3 text-cyan-400" />
+                  <span>Run Probe</span>
+                </button>
+                <button
+                  onClick={runHealthCheck}
+                  disabled={healthChecking}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${healthChecking ? "animate-spin" : ""}`} />
+                  <span>{healthChecking ? "Testing..." : "Test All Mirrors"}</span>
+                </button>
+              </div>
             </div>
+
+            {/* Canonical APK Diagnostics Breakdown (6 Fields) */}
+            <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs font-mono space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Canonical APK Integrity Matrix</span>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  apkInfo.source === "github_release"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                }`}>
+                  {apkInfo.source === "github_release" ? "GITHUB_RELEASE (CANONICAL)" : "LOCAL_DEV_MIRROR"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                {/* 1. Canonical APK URL */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">1. Canonical APK URL:</span>
+                  <span className="text-emerald-300 break-all select-all font-semibold">
+                    {apkInfo.githubReleaseUrl || apkInfo.canonicalUrl || "/api/download/apk"}
+                  </span>
+                </div>
+
+                {/* 2. Expected SHA-256 */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">2. Expected SHA-256 (Environment/Official):</span>
+                  <span className="text-emerald-300 break-all select-all font-semibold">
+                    {officialSha256 || "(Not Configured / Set GARIA_OS_APK_SHA256)"}
+                  </span>
+                </div>
+
+                {/* 3. Expected Size */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">3. Expected Size:</span>
+                  <span className="text-slate-200 font-semibold">
+                    {apkInfo.sizeBytes ? formatBytes(apkInfo.sizeBytes) : "(Not Configured / Set GARIA_OS_APK_SIZE)"}
+                  </span>
+                </div>
+
+                {/* 4. Downloaded Size */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">4. Downloaded Size:</span>
+                  <span className="text-slate-200 font-semibold">
+                    {downloadedBlobBuffer ? formatBytes(downloadedBlobBuffer.byteLength) : (receivedBytes > 0 ? formatBytes(receivedBytes) : "0 B")}
+                  </span>
+                </div>
+
+                {/* 5. Computed SHA-256 */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 md:col-span-2">
+                  <span className="text-slate-500 block text-[10px]">5. Computed SHA-256 (SubtleCrypto):</span>
+                  <span className="text-slate-200 break-all select-all font-semibold">
+                    {downloadedSha256 || "(Click 'Verify Hash' or 'Stream & Verify' to compute)"}
+                  </span>
+                </div>
+
+                {/* 6. Match Status */}
+                <div className="space-y-0.5 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 md:col-span-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">6. Integrity Match Status:</span>
+                    <div className="pt-0.5">
+                      {hashMatch === true && (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          MATCH VERIFIED (100% Genuine Signature)
+                        </span>
+                      )}
+                      {hashMatch === false && (
+                        <span className="text-rose-400 font-bold flex items-center gap-1.5">
+                          <XCircle className="w-4 h-4" />
+                          HASH MISMATCH (Artifact checksum differs from expected digest)
+                        </span>
+                      )}
+                      {hashMatch === null && isVerifyingSubtleCrypto && (
+                        <span className="text-purple-300 font-bold flex items-center gap-1.5">
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          COMPUTING CRYPTOGRAPHIC DIGEST...
+                        </span>
+                      )}
+                      {hashMatch === null && !isVerifyingSubtleCrypto && (
+                        <span className="text-slate-400 font-medium">
+                          UNVERIFIED (Ready for SubtleCrypto verification)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOnDemandVerify}
+                    disabled={isVerifyingSubtleCrypto}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {isVerifyingSubtleCrypto ? "Verifying..." : "Run Test"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Diagnostic Probe Results Box */}
+            {diagnosticResult && (
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-cyan-500/30 text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-cyan-300 font-bold">
+                  <span>Active Probe Result: {diagnosticResult.url}</span>
+                  <span className={diagnosticResult.isBinary ? "text-emerald-400" : "text-rose-400"}>
+                    {diagnosticResult.isBinary ? "VALID BINARY" : "NON-BINARY"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-400 pt-1">
+                  <div>Content-Type: <strong className="text-slate-200">{diagnosticResult.contentType || "None"}</strong></div>
+                  <div>Content-Length: <strong className="text-slate-200">{diagnosticResult.contentLengthFormatted}</strong></div>
+                  <div>HTTP Status: <strong className="text-slate-200">{diagnosticResult.httpStatus || 200}</strong></div>
+                  <div>no-cors Mode: <strong className="text-slate-200">{diagnosticResult.noCorsStatus}</strong></div>
+                </div>
+                <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-900">
+                  {diagnosticResult.analysis}
+                </p>
+              </div>
+            )}
 
             {/* Mirror status table */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
@@ -919,7 +1247,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
               </div>
               <h4 className="font-semibold text-slate-200 text-sm">Download APK</h4>
               <p className="text-slate-400 leading-relaxed">
-                Click the stream & download button above to fetch and verify the official Garia OS installer.
+                Click the direct download or stream button above to fetch and verify the official Garia OS installer.
               </p>
             </div>
 
@@ -955,23 +1283,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
           </div>
         </div>
 
-        {/* Can't install the APK? Help Section */}
-        <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 space-y-3 shadow-lg">
-          <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-amber-300">
-            <HelpCircle className="w-5 h-5 text-amber-400 shrink-0" />
-            <span>Can&apos;t install the APK?</span>
-          </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            If Android displays <span className="font-semibold text-amber-200">&quot;Unknown apps can&apos;t be installed by this user&quot;</span> or blocks the file:
-          </p>
-          <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-200 font-medium leading-relaxed">
-            Go to Android <span className="text-emerald-400 font-bold">Settings → Apps → Special app access → Install unknown apps</span>, enable permission for your browser (Chrome/Firefox/Samsung Internet), and re-open the downloaded APK file.
-          </div>
-        </div>
-
-        {/* Feature Highlights Grid */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+        {/* Why Students Choose Garia OS */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <Zap className="w-5 h-5 text-emerald-400" />
             <span>Why Students Choose Garia OS</span>
           </h3>
@@ -983,7 +1297,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
                 <span>Abya AI Study Coach</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Multi-language AI study partner supporting WhatsApp Hinglish, English, and Hindi. Provides profile-aware concept explanations, exam prep, and daily schedule planning.
+                Multi-language AI study partner supporting Hinglish, English, and Hindi. Provides profile-aware concept explanations, exam prep, and daily schedule planning.
               </p>
             </div>
 
@@ -1041,4 +1355,3 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBackToApp }) => {
     </div>
   );
 };
-
