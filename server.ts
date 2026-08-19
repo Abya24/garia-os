@@ -221,9 +221,8 @@ async function startServer() {
 
     // If explicit GitHub release URL is configured and requested via source param or as primary
     const githubReleaseUrl = process.env.GITHUB_RELEASE_APK_URL;
-    if (req.query.source === "github" && githubReleaseUrl) {
-      console.log(`[APK Download] Redirecting to GitHub Release APK: ${githubReleaseUrl}`);
-      return res.redirect(302, githubReleaseUrl);
+    if (githubReleaseUrl) {
+  return res.redirect(302, githubReleaseUrl);
     }
 
     const candidateFiles = [
