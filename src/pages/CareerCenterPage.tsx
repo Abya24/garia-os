@@ -46,7 +46,6 @@ import {
 } from "../types";
 import { CAREER_CATALOG, GOVT_JOBS_CATALOG, SCHOLARSHIPS_CATALOG, STUDY_ABROAD_CATALOG, calculateCareerMatches, generateDefaultRoadmap } from "../utils/careerEngine";
 import { CareerQuizModal } from "../components/CareerQuizModal";
-import { CareerCenterDrawer, CareerDrawerAction } from "../components/CareerCenterDrawer";
 
 interface CareerCenterPageProps {
   profile: CareerProfile;
@@ -145,8 +144,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     "matches" | "govt_jobs" | "scholarships" | "study_abroad" | "ai_advisor" | "assessment" | "compare" | "roadmap"
   >("matches");
 
-  const [isCareerDrawerOpen, setIsCareerDrawerOpen] = useState(false);
-
   const [stream, setStream] = useState<StreamType>(profile.stream || "Commerce");
   const [currentClass, setCurrentClass] = useState<string>(
     profile.currentClass || "Class 12"
@@ -197,51 +194,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
       }
     }
   }, [profile.stream]);
-
-  const handleCareerDrawerAction = (action: CareerDrawerAction) => {
-    switch (action) {
-      case "career_commerce":
-        setStream("Commerce");
-        setSelectedCatalogStream("Commerce");
-        setActiveSubTab("matches");
-        break;
-      case "career_science":
-        setStream("Science");
-        setSelectedCatalogStream("Science");
-        setActiveSubTab("matches");
-        break;
-      case "career_arts":
-        setStream("Arts / Humanities");
-        setSelectedCatalogStream("Arts / Humanities");
-        setActiveSubTab("matches");
-        break;
-      case "career_class10":
-        setCurrentClass("Class 10");
-        setActiveSubTab("matches");
-        break;
-      case "exam_jee":
-      case "exam_neet":
-      case "exam_cuet":
-      case "exam_ca":
-        setActiveSubTab("matches");
-        break;
-      case "exam_nda":
-      case "exam_ssc":
-      case "exam_banking":
-        setActiveSubTab("govt_jobs");
-        break;
-      case "roadmap_eligibility":
-      case "roadmap_skills":
-      case "roadmap_future_scope":
-        setActiveSubTab("roadmap");
-        break;
-      case "roadmap_salary":
-        setActiveSubTab("compare");
-        break;
-      default:
-        setActiveSubTab("matches");
-    }
-  };
 
   const [showQuizModal, setShowQuizModal] = useState(false);
 
@@ -504,15 +456,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              id="open-career-drawer-btn"
-              onClick={() => setIsCareerDrawerOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-xs flex items-center gap-2 border border-purple-500/40 shadow-lg transition-all"
-            >
-              <Layers className="w-4 h-4 text-purple-400" />
-              <span>Career Drawer</span>
-            </button>
-
             <button
               onClick={() => setShowQuizModal(true)}
               className="px-4 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-2 border border-emerald-500/40 shadow-lg transition-all"
@@ -2087,16 +2030,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
           Career match scores and recommendations are transparent, rule-based academic advisory tools designed to foster self-discovery and structured preparation. Real-world success depends on individual exam performance, continuous dedication, and evolving market dynamics.
         </div>
       </div>
-
-      {/* Dedicated Career Intelligence Drawer */}
-      <CareerCenterDrawer
-        isOpen={isCareerDrawerOpen}
-        onClose={() => setIsCareerDrawerOpen(false)}
-        onSelectAction={handleCareerDrawerAction}
-        activeAction={activeSubTab}
-        studentStream={profile.stream || "Commerce"}
-        targetCareerTitle={selectedCareerObj.title}
-      />
     </div>
   );
 };
