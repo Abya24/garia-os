@@ -108,9 +108,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           id="header-garia-os-app-icon-sub"
           title="Open Garia OS Slider Menu"
           aria-label="Open Garia OS Menu"
-          className="p-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all card-press group flex items-center gap-1.5"
+          className="p-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all card-press group flex items-center justify-center gap-1.5 overflow-visible shrink-0"
         >
-          <GariaLogo size="sm" variant="icon" withGlow={true} />
+          <GariaLogo size="sm" variant="icon" withGlow={true} className="overflow-visible" />
         </motion.button>
       </div>
     </header>

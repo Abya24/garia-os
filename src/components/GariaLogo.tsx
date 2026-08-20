@@ -56,16 +56,17 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
 
   const iconSvg = (
     <div
-      className={`relative inline-flex items-center justify-center shrink-0 ${
+      className={`relative inline-flex items-center justify-center shrink-0 overflow-visible p-0.5 ${
         withGlow ? "filter drop-shadow-[0_0_16px_rgba(168,85,247,0.45)]" : ""
       } ${animate ? "hover:scale-105 transition-transform duration-300" : ""}`}
       style={{ width: pxSize, height: pxSize }}
     >
       <svg
         viewBox="0 0 512 512"
+        preserveAspectRatio="xMidYMid meet"
         width={pxSize}
         height={pxSize}
-        className="w-full h-full select-none"
+        className="w-full h-full select-none overflow-visible block"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
@@ -112,86 +113,89 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
           </filter>
         </defs>
 
-        {/* Outer Rounded Container with subtle border */}
-        <rect
-          width="512"
-          height="512"
-          rx="128"
-          fill={`url(#bgGrad_${uid})`}
-        />
-        <rect
-          width="508"
-          height="508"
-          x="2"
-          y="2"
-          rx="126"
-          fill="none"
-          stroke="rgba(192, 132, 252, 0.25)"
-          strokeWidth="4"
-        />
-
-        {/* Ambient Glow */}
-        <circle cx="256" cy="240" r="170" fill="#7c3aed" opacity="0.18" filter="blur(28px)" />
-
-        {/* Orbital Ring Arc */}
-        <path
-          d="M 125 330 A 185 185 0 1 1 405 165"
-          fill="none"
-          stroke={`url(#ringGrad_${uid})`}
-          strokeWidth="8"
-          strokeLinecap="round"
-        />
-
-        {/* 4-Pointed Sparkle Star at Top-Right of Orbital Arch */}
-        <g transform="translate(415, 160)" filter={`url(#starGlow_${uid})`}>
-          <path
-            d="M 0 -22 Q 0 0 -22 0 Q 0 0 0 22 Q 0 0 22 0 Q 0 0 0 -22 Z"
-            fill="#f3e8ff"
+        {/* Artwork Group with internal breathing space / padding */}
+        <g transform="translate(24, 24) scale(0.90625)">
+          {/* Outer Rounded Container with subtle border */}
+          <rect
+            width="512"
+            height="512"
+            rx="128"
+            fill={`url(#bgGrad_${uid})`}
           />
-          <circle cx="0" cy="0" r="4.5" fill="#ffffff" />
-        </g>
-
-        {/* Stylized 3D "R" Symbol */}
-        <g filter={`url(#rShadow_${uid})`}>
-          {/* Vertical Stem */}
-          <path
-            d="M 172 150
-               C 172 142, 180 136, 190 136
-               L 226 136
-               C 236 136, 242 142, 242 152
-               L 242 350
-               C 242 360, 234 366, 222 366
-               L 190 366
-               C 180 366, 172 358, 172 348
-               Z"
-            fill={`url(#rGradMain_${uid})`}
+          <rect
+            width="508"
+            height="508"
+            x="2"
+            y="2"
+            rx="126"
+            fill="none"
+            stroke="rgba(192, 132, 252, 0.25)"
+            strokeWidth="4"
           />
 
-          {/* Upper Loop Ribbon */}
+          {/* Ambient Glow */}
+          <circle cx="256" cy="240" r="170" fill="#7c3aed" opacity="0.18" filter="blur(28px)" />
+
+          {/* Orbital Ring Arc */}
           <path
-            d="M 226 136
-               C 290 136, 348 155, 348 215
-               C 348 268, 298 285, 238 285
-               L 220 285
-               L 220 236
-               L 238 236
-               C 270 236, 295 228, 295 210
-               C 295 192, 270 184, 226 184
-               Z"
-            fill={`url(#rGradLoop_${uid})`}
+            d="M 125 330 A 185 185 0 1 1 405 165"
+            fill="none"
+            stroke={`url(#ringGrad_${uid})`}
+            strokeWidth="8"
+            strokeLinecap="round"
           />
 
-          {/* Diagonal Leg */}
-          <path
-            d="M 236 260
-               L 310 355
-               C 316 363, 326 366, 338 366
-               L 358 366
-               C 368 366, 372 356, 365 348
-               L 285 248
-               Z"
-            fill={`url(#rGradMain_${uid})`}
-          />
+          {/* 4-Pointed Sparkle Star at Top-Right of Orbital Arch */}
+          <g transform="translate(415, 160)" filter={`url(#starGlow_${uid})`}>
+            <path
+              d="M 0 -22 Q 0 0 -22 0 Q 0 0 0 22 Q 0 0 22 0 Q 0 0 0 -22 Z"
+              fill="#f3e8ff"
+            />
+            <circle cx="0" cy="0" r="4.5" fill="#ffffff" />
+          </g>
+
+          {/* Stylized 3D "R" Symbol */}
+          <g filter={`url(#rShadow_${uid})`}>
+            {/* Vertical Stem */}
+            <path
+              d="M 172 150
+                 C 172 142, 180 136, 190 136
+                 L 226 136
+                 C 236 136, 242 142, 242 152
+                 L 242 350
+                 C 242 360, 234 366, 222 366
+                 L 190 366
+                 C 180 366, 172 358, 172 348
+                 Z"
+              fill={`url(#rGradMain_${uid})`}
+            />
+
+            {/* Upper Loop Ribbon */}
+            <path
+              d="M 226 136
+                 C 290 136, 348 155, 348 215
+                 C 348 268, 298 285, 238 285
+                 L 220 285
+                 L 220 236
+                 L 238 236
+                 C 270 236, 295 228, 295 210
+                 C 295 192, 270 184, 226 184
+                 Z"
+              fill={`url(#rGradLoop_${uid})`}
+            />
+
+            {/* Diagonal Leg */}
+            <path
+              d="M 236 260
+                 L 310 355
+                 C 316 363, 326 366, 338 366
+                 L 358 366
+                 C 368 366, 372 356, 365 348
+                 L 285 248
+                 Z"
+              fill={`url(#rGradMain_${uid})`}
+            />
+          </g>
         </g>
       </svg>
     </div>
@@ -199,7 +203,7 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
 
   if (variant === "icon") {
     return (
-      <div id={id} className={`inline-flex items-center ${className}`} onClick={onClick}>
+      <div id={id} className={`inline-flex items-center justify-center overflow-visible ${className}`} onClick={onClick}>
         {iconSvg}
       </div>
     );
@@ -209,15 +213,15 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
     return (
       <div
         id={id}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 backdrop-blur-md ${className}`}
+        className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 backdrop-blur-md overflow-visible ${className}`}
         onClick={onClick}
       >
         {iconSvg}
-        <div className="flex flex-col text-left">
-          <span className="font-heading font-black text-xs tracking-tight text-white flex items-center gap-1">
+        <div className="flex flex-col text-left justify-center select-none">
+          <span className="font-heading font-black text-xs tracking-tight text-white flex items-center gap-1 leading-tight">
             GARIA <span className="text-purple-400">OS</span>
           </span>
-          <span className="text-[9px] font-mono text-purple-300/80">v3.0.0</span>
+          <span className="text-[9px] font-mono text-purple-300/80 leading-tight">v3.0.0</span>
         </div>
       </div>
     );
@@ -226,21 +230,21 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
   return (
     <div
       id={id}
-      className={`inline-flex items-center gap-3 text-left ${className} ${onClick ? "cursor-pointer" : ""}`}
+      className={`inline-flex items-center justify-center gap-3 text-left overflow-visible ${className} ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
       {iconSvg}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5">
-          <span className="font-heading font-black text-base sm:text-lg tracking-tight text-white">
+      <div className="flex flex-col justify-center select-none">
+        <div className="flex items-center gap-1.5 leading-none">
+          <span className="font-heading font-black text-base sm:text-lg tracking-tight text-white leading-none">
             GARIA
           </span>
-          <span className="font-heading font-black text-base sm:text-lg tracking-tight bg-gradient-to-r from-purple-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent">
+          <span className="font-heading font-black text-base sm:text-lg tracking-tight bg-gradient-to-r from-purple-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent leading-none">
             OS
           </span>
         </div>
         {showTagline && (
-          <span className="text-[10px] sm:text-[11px] font-medium tracking-wide text-purple-300/80 uppercase">
+          <span className="text-[10px] sm:text-[11px] font-medium tracking-wide text-purple-300/80 uppercase mt-1 leading-none">
             Plan • Grow • Achieve
           </span>
         )}

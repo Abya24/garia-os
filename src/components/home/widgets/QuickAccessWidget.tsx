@@ -26,7 +26,7 @@ export const QuickAccessWidget: React.FC<QuickAccessWidgetProps> = ({ onNavigate
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {/* 1. Academic Center */}
         <button
-          onClick={() => onNavigate("academic")}
+          onClick={() => onNavigate("study")}
           id="quick-access-academic"
           className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-blue-500/30 hover:border-blue-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
         >
@@ -45,7 +45,7 @@ export const QuickAccessWidget: React.FC<QuickAccessWidgetProps> = ({ onNavigate
 
         {/* 2. Question Bank */}
         <button
-          onClick={() => onNavigate("questionbank")}
+          onClick={() => onNavigate("exam")}
           id="quick-access-questionbank"
           className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-cyan-500/30 hover:border-cyan-400/60 text-left flex flex-col justify-between transition-all card-press group min-h-[95px] shadow-sm"
         >

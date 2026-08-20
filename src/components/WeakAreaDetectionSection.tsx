@@ -91,7 +91,7 @@ export const WeakAreaDetectionSection: React.FC<WeakAreaDetectionSectionProps> =
             </div>
 
             <button
-              onClick={() => onNavigate(item.targetTab || "academic")}
+              onClick={() => onNavigate(item.targetTab === "academic" ? "study" : (item.targetTab || "study"))}
               className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shrink-0 ${
                 item.priority === "HIGH"
                   ? "bg-rose-500 text-white hover:bg-rose-400 shadow-rose-500/20"

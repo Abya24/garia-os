@@ -56,7 +56,7 @@ export const ContinueLearningWidget: React.FC<ContinueLearningWidgetProps> = ({
 
         <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0 pt-2 md:pt-0">
           <button
-            onClick={() => onNavigate("academic")}
+            onClick={() => onNavigate("study")}
             id="hero-resume-study-btn"
             className="flex-1 md:flex-none px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
@@ -65,7 +65,7 @@ export const ContinueLearningWidget: React.FC<ContinueLearningWidgetProps> = ({
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => onNavigate("questionbank")}
+            onClick={() => onNavigate("exam")}
             id="hero-qbank-btn"
             className="flex-1 md:flex-none px-4 py-3 rounded-2xl glass-pill hover:bg-white/10 text-cyan-300 border border-cyan-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
           >

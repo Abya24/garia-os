@@ -351,26 +351,26 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         <div className="absolute bottom-0 left-10 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 space-y-5">
-          {/* Top Bar: Left-Aligned Official Garia OS Logo + Right-Aligned Date/Time/Menu */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-            {/* Left: Prominent Official Brand Logo */}
-            <div className="flex items-center gap-3">
+          {/* Top Bar: Centered on Mobile, Balanced & Vertically Centered on Desktop */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-white/10 overflow-visible w-full">
+            {/* Branding Container: Centered on mobile, vertically centered with controls on desktop */}
+            <div className="flex items-center justify-center sm:justify-start overflow-visible w-full sm:w-auto py-1">
               <GariaLogo
                 size="md"
                 variant="horizontal"
                 showTagline={true}
                 withGlow={true}
                 onClick={onOpenSliderMenu}
-                className="cursor-pointer hover:opacity-95 transition-opacity"
+                className="cursor-pointer hover:opacity-95 transition-opacity overflow-visible"
               />
             </div>
 
             {/* Right: Live Time, Date, and Menu Trigger */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center justify-center sm:justify-end gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto overflow-visible">
               {/* Live Digital Clock Badge */}
               <div
                 id="home-live-clock"
-                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-purple-500/30 text-purple-200 text-xs font-mono font-bold flex items-center gap-2 shadow-inner"
+                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-purple-500/30 text-purple-200 text-xs font-mono font-bold flex items-center gap-2 shadow-inner shrink-0"
                 title="Current Local Time"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
@@ -381,7 +381,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               {/* Current Date Badge */}
               <div
                 id="home-current-date"
-                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-slate-300 text-xs font-medium flex items-center gap-1.5 shadow-inner"
+                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-slate-300 text-xs font-medium flex items-center gap-1.5 shadow-inner shrink-0"
                 title="Today's Date"
               >
                 <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -394,7 +394,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   onClick={onOpenSliderMenu}
                   id="home-menu-trigger"
                   title="Open Garia OS Settings & Navigation"
-                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all card-press"
+                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all card-press shrink-0"
                 >
                   <Menu className="w-4 h-4 text-emerald-400" />
                   <span className="hidden sm:inline text-xs">Menu</span>

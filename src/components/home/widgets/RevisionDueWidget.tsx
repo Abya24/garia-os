@@ -37,7 +37,7 @@ export const RevisionDueWidget: React.FC<RevisionDueWidgetProps> = ({
         </div>
 
         <button
-          onClick={() => onNavigate("questionbank")}
+          onClick={() => onNavigate("exam")}
           className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold transition-all flex items-center gap-1 border border-amber-500/30 shrink-0 active:scale-95"
         >
           <Zap className="w-3.5 h-3.5" />
@@ -65,9 +65,9 @@ export const RevisionDueWidget: React.FC<RevisionDueWidgetProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate("questionbank")}
+                onClick={() => onNavigate("exam")}
                 className="p-2 rounded-xl bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 transition-colors shrink-0"
-                title="Practice topic in Question Bank"
+                title="Practice topic in Exam Center"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

@@ -127,15 +127,15 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       }`}
     >
       {/* Official Garia OS Top Branding */}
-      <div className={`pb-3 mb-2 border-b border-white/10 flex items-center ${isIconsOnly ? "justify-center w-full" : "justify-between w-full"}`}>
+      <div className={`pb-3 mb-2 border-b border-white/10 flex items-center overflow-visible ${isIconsOnly ? "justify-center w-full" : "justify-between w-full"}`}>
         {isIconsOnly ? (
-          <GariaLogo size="sm" variant="icon" withGlow={true} onClick={() => onNavigate("home")} className="cursor-pointer" />
+          <GariaLogo size="sm" variant="icon" withGlow={true} onClick={() => onNavigate("home")} className="cursor-pointer overflow-visible" />
         ) : (
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate("home")}>
-            <GariaLogo size="sm" variant="icon" withGlow={true} />
-            <div className="flex flex-col">
-              <span className="text-xs font-black text-white font-heading tracking-tight">GARIA OS</span>
-              <span className="text-[9px] font-mono text-purple-300">v{APP_VERSION}</span>
+          <div className="flex items-center gap-2.5 cursor-pointer overflow-visible" onClick={() => onNavigate("home")}>
+            <GariaLogo size="sm" variant="icon" withGlow={true} className="overflow-visible" />
+            <div className="flex flex-col justify-center select-none">
+              <span className="text-xs font-black text-white font-heading tracking-tight leading-tight">GARIA OS</span>
+              <span className="text-[9px] font-mono text-purple-300 leading-tight">v{APP_VERSION}</span>
             </div>
           </div>
         )}
