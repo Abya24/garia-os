@@ -221,10 +221,13 @@ export type HomeWidgetId =
   | "abya_suggestions"
   | "habit_tracker";
 
+export type WidgetColSpan = "full" | "half" | "third" | "two-thirds";
+
 export interface DashboardWidgetConfig {
   id: HomeWidgetId;
   enabled: boolean;
   order: number;
+  colSpan?: WidgetColSpan;
 }
 
 export interface UserSettings {

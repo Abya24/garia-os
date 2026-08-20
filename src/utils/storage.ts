@@ -31,6 +31,9 @@ import {
   ExamDailyPlan,
   ExamTestRecord,
   ExamIntelligenceReport,
+  DashboardWidgetConfig,
+  HomeWidgetId,
+  WidgetColSpan,
 } from "../types";
 import {
   DEFAULT_COMMERCE_SUBJECTS,
@@ -75,7 +78,8 @@ const STORAGE_KEYS = {
   EXAM_TESTS_V19: "exam_tests_v1",
   EXAM_ANALYSIS_V19: "exam_analysis_v1",
   EXAM_PLAN: "garia_exam_plan_v1",
-  DASHBOARD_WIDGETS: "garia_dashboard_widgets_v1",
+  DASHBOARD_WIDGETS: "garia_dashboard_widgets_v2",
+  DASHBOARD_WIDGETS_LEGACY: "garia_dashboard_widgets_v1",
 };
 
 export const getTodayString = (): string => {
@@ -862,6 +866,8 @@ export const deleteStudentProfile = (profileId: string): StudentProfile[] => {
     const profKey = getProfileKey(profileId, baseKey);
     localStorage.removeItem(profKey);
   });
+  localStorage.removeItem(getWidgetsKey(profileId));
+  localStorage.removeItem(`garia_p_${profileId}_dashboard_widgets_v1`);
 
   const activeId = loadActiveProfileId();
   if (activeId === profileId) {
@@ -1026,6 +1032,9 @@ Use this space to write formulas, key terms, or daily notes.`,
   };
   saveExamProfile(examProf, profId);
   saveExamMilestones(DEFAULT_EXAM_MILESTONES, profId);
+
+  // Dashboard Widgets
+  saveDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS, profId);
 }
 
 // =========================================================================
@@ -1628,6 +1637,146 @@ export const saveExamAnalysis = (analysis: ExamIntelligenceReport | null, profil
 };
 
 // =========================================================================
+// DASHBOARD WIDGETS PERSISTENCE ENGINE
+// =========================================================================
+
+export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
+  { id: "gamification_card", enabled: true, order: 0, colSpan: "full" },
+  { id: "quote_card", enabled: true, order: 1, colSpan: "full" },
+  { id: "quick_access", enabled: true, order: 2, colSpan: "full" },
+  { id: "quick_actions", enabled: true, order: 3, colSpan: "full" },
+  { id: "continue_learning", enabled: true, order: 4, colSpan: "full" },
+  { id: "todays_tasks", enabled: true, order: 5, colSpan: "half" },
+  { id: "study_progress", enabled: true, order: 6, colSpan: "half" },
+  { id: "water_intake", enabled: true, order: 7, colSpan: "half" },
+  { id: "focus_timer", enabled: true, order: 8, colSpan: "half" },
+  { id: "revision_due", enabled: true, order: 9, colSpan: "half" },
+  { id: "abya_suggestions", enabled: true, order: 10, colSpan: "half" },
+  { id: "habit_tracker", enabled: true, order: 11, colSpan: "half" },
+];
+
+export const getWidgetsKey = (profileId?: string): string => {
+  const pId = profileId || loadActiveProfileId() || "default";
+  return `garia_p_${pId}_dashboard_widgets_v2`;
+};
+
+export const loadDashboardWidgets = (profileId?: string): DashboardWidgetConfig[] => {
+  const pId = profileId || loadActiveProfileId() || "default";
+  const primaryKey = getWidgetsKey(pId);
+  const profileKey = getProfileKey(pId, STORAGE_KEYS.DASHBOARD_WIDGETS);
+
+  // 1. Primary per-profile key
+  let saved = getItem<DashboardWidgetConfig[] | null>(primaryKey, null);
+
+  // 2. Standard profile key fallback
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    saved = getItem<DashboardWidgetConfig[] | null>(profileKey, null);
+  }
+
+  // 3. Legacy profile v1 key
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    saved = getItem<DashboardWidgetConfig[] | null>(`garia_p_${pId}_dashboard_widgets_v1`, null);
+  }
+
+  // 4. Global keys fallback
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    saved = getItem<DashboardWidgetConfig[] | null>("garia_dashboard_widgets_v2", null);
+  }
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    saved = getItem<DashboardWidgetConfig[] | null>("garia_dashboard_widgets_v1", null);
+  }
+
+  // 5. Settings-embedded widgets fallback
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    try {
+      const st = loadSettings(pId);
+      if (st?.dashboardWidgets && Array.isArray(st.dashboardWidgets) && st.dashboardWidgets.length > 0) {
+        saved = st.dashboardWidgets;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!saved || !Array.isArray(saved) || saved.length === 0) {
+    return DEFAULT_DASHBOARD_WIDGETS.map((w) => ({ ...w }));
+  }
+
+  // Ensure all configured widgets are accounted for, valid, and missing defaults are appended
+  const existingMap = new Map<string, DashboardWidgetConfig>();
+  saved.forEach((w) => {
+    if (w && w.id) {
+      existingMap.set(w.id, w);
+    }
+  });
+
+  const result: DashboardWidgetConfig[] = [];
+  saved.forEach((w) => {
+    if (w && w.id) {
+      const def = DEFAULT_DASHBOARD_WIDGETS.find((d) => d.id === w.id);
+      result.push({
+        id: w.id as HomeWidgetId,
+        enabled: typeof w.enabled === "boolean" ? w.enabled : true,
+        order: result.length,
+        colSpan: w.colSpan || def?.colSpan || "half",
+      });
+    }
+  });
+
+  DEFAULT_DASHBOARD_WIDGETS.forEach((def) => {
+    if (!existingMap.has(def.id)) {
+      result.push({
+        id: def.id,
+        enabled: def.enabled,
+        order: result.length,
+        colSpan: def.colSpan || "half",
+      });
+    }
+  });
+
+  return result;
+};
+
+export const saveDashboardWidgets = (
+  widgets: DashboardWidgetConfig[],
+  profileId?: string
+): void => {
+  const pId = profileId || loadActiveProfileId() || "default";
+  if (!pId) return;
+
+  const normalized: DashboardWidgetConfig[] = widgets.map((w, idx) => {
+    const def = DEFAULT_DASHBOARD_WIDGETS.find((d) => d.id === w.id);
+    return {
+      id: w.id,
+      enabled: typeof w.enabled === "boolean" ? w.enabled : true,
+      order: idx,
+      colSpan: w.colSpan || def?.colSpan || "half",
+    };
+  });
+
+  const primaryKey = getWidgetsKey(pId);
+  const profileKey = getProfileKey(pId, STORAGE_KEYS.DASHBOARD_WIDGETS);
+  setItem(primaryKey, normalized);
+  setItem(profileKey, normalized);
+
+  // Redundant sync inside settings to guarantee durability across sessions
+  try {
+    const st = loadSettings(pId);
+    if (st) {
+      saveSettings({ ...st, dashboardWidgets: normalized }, pId);
+    }
+  } catch (e) {
+    console.warn("Could not sync dashboardWidgets to settings:", e);
+  }
+};
+
+export const resetDashboardWidgets = (profileId?: string): DashboardWidgetConfig[] => {
+  const defaults = DEFAULT_DASHBOARD_WIDGETS.map((w) => ({ ...w }));
+  saveDashboardWidgets(defaults, profileId);
+  return defaults;
+};
+
+// =========================================================================
 // STUDENT-SPECIFIC EXPORT & IMPORT
 // =========================================================================
 
@@ -1650,6 +1799,7 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     abyaChat: loadAbyaChat(pId),
     abyaLanguage: loadAbyaLanguage(pId),
     settings: loadSettings(pId),
+    dashboardWidgets: loadDashboardWidgets(pId),
     careerProfile: loadCareerProfile(pId),
     careerAssessment: loadCareerAssessment(pId),
     careerRoadmap: loadCareerRoadmap(pId),
@@ -1723,6 +1873,7 @@ export const importStudentProfileJSON = (
     if (data.abyaChat) saveAbyaChat(data.abyaChat, newProfileId);
     if (data.abyaLanguage) saveAbyaLanguage(data.abyaLanguage, newProfileId);
     if (data.settings) saveSettings({ ...data.settings, userName: newStudentProfile.name }, newProfileId);
+    if (data.dashboardWidgets) saveDashboardWidgets(data.dashboardWidgets, newProfileId);
     if (data.careerProfile) saveCareerProfile(data.careerProfile, newProfileId);
     if (data.careerAssessment) saveCareerAssessment(data.careerAssessment, newProfileId);
     if (data.careerRoadmap) saveCareerRoadmap(data.careerRoadmap, newProfileId);
@@ -1823,8 +1974,12 @@ export const clearAllData = () => {
     Object.values(STORAGE_KEYS).forEach((baseKey) => {
       localStorage.removeItem(getProfileKey(p.id, baseKey));
     });
+    localStorage.removeItem(getWidgetsKey(p.id));
+    localStorage.removeItem(`garia_p_${p.id}_dashboard_widgets_v1`);
   });
   Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem("garia_dashboard_widgets_v2");
+  localStorage.removeItem("garia_dashboard_widgets_v1");
   localStorage.removeItem(PROFILES_KEY);
   localStorage.removeItem(ACTIVE_PROFILE_KEY);
 };

@@ -3,6 +3,10 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
   signOut as fbSignOut,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -114,30 +118,130 @@ export async function validateFirestoreConnection(): Promise<boolean> {
 }
 
 /**
+ * Upserts the root user document in Firestore to store authenticated profile metadata
+ */
+export async function upsertUserProfileDoc(user: FirebaseUser, displayName?: string): Promise<void> {
+  if (!user || !user.uid) return;
+  const userRef = doc(db, "users", user.uid);
+  try {
+    await setDoc(
+      userRef,
+      {
+        userId: user.uid,
+        email: user.email || "",
+        displayName: displayName || user.displayName || "Student",
+        photoURL: user.photoURL || "",
+        updatedAt: Date.now(),
+        createdAt: Date.now(),
+      },
+      { merge: true }
+    );
+  } catch (e) {
+    console.warn("Could not upsert user root document:", e);
+  }
+}
+
+/**
+ * Formats Firebase Auth errors into clear, friendly student messages
+ */
+export function getFriendlyAuthErrorMessage(error: any): string {
+  if (!error) return "An unexpected error occurred.";
+  const code = error.code || "";
+  const msg = error.message || "";
+
+  switch (code) {
+    case "auth/email-already-in-use":
+      return "This email is already registered. Please log in instead or use another email.";
+    case "auth/invalid-email":
+      return "The email address is not valid. Please check and try again.";
+    case "auth/weak-password":
+      return "Password is too weak. Please use at least 6 characters with letters and numbers.";
+    case "auth/user-not-found":
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+      return "Incorrect email or password. Please verify your credentials.";
+    case "auth/user-disabled":
+      return "This account has been disabled. Please contact support.";
+    case "auth/too-many-requests":
+      return "Too many failed attempts. Please wait a few minutes and try again.";
+    case "auth/popup-closed-by-user":
+      return "Sign-in popup was closed before completing.";
+    case "auth/network-request-failed":
+      return "Network error. Please check your internet connection.";
+    default:
+      if (msg.includes("auth/")) {
+        return msg.replace(/^Firebase:\s*/, "");
+      }
+      return msg || "Authentication failed. Please try again.";
+  }
+}
+
+/**
+ * Sign Up with Email and Password using Firebase Auth
+ */
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  displayName: string
+): Promise<UserCredential> {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    if (cred.user && displayName.trim()) {
+      try {
+        await updateProfile(cred.user, { displayName: displayName.trim() });
+      } catch (profileErr) {
+        console.warn("Could not update display name in auth profile:", profileErr);
+      }
+    }
+    if (cred.user) {
+      await upsertUserProfileDoc(cred.user, displayName.trim());
+    }
+    return cred;
+  } catch (error) {
+    console.error("Error signing up with email:", error);
+    throw error;
+  }
+}
+
+/**
+ * Sign In with Email and Password using Firebase Auth
+ */
+export async function signInWithEmail(
+  email: string,
+  password: string
+): Promise<UserCredential> {
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+    if (cred.user) {
+      await upsertUserProfileDoc(cred.user);
+    }
+    return cred;
+  } catch (error) {
+    console.error("Error signing in with email:", error);
+    throw error;
+  }
+}
+
+/**
+ * Send password reset email
+ */
+export async function resetPassword(email: string): Promise<void> {
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    throw error;
+  }
+}
+
+/**
  * Google Sign-In via Firebase Auth
  */
 export async function signInWithGoogle(): Promise<UserCredential> {
   try {
     const cred = await signInWithPopup(auth, googleAuthProvider);
-    // Upsert root user record
     if (cred.user) {
-      const userRef = doc(db, "users", cred.user.uid);
-      try {
-        await setDoc(
-          userRef,
-          {
-            userId: cred.user.uid,
-            email: cred.user.email || "",
-            displayName: cred.user.displayName || "Student",
-            photoURL: cred.user.photoURL || "",
-            updatedAt: Date.now(),
-            createdAt: Date.now(),
-          },
-          { merge: true }
-        );
-      } catch (e) {
-        console.warn("Could not upsert user root document immediately:", e);
-      }
+      await upsertUserProfileDoc(cred.user);
     }
     return cred;
   } catch (error) {

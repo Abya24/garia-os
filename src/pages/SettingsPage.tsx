@@ -279,12 +279,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateSettings({
+    const updatedSettings = {
       ...settings,
       userName: userName.trim() || activeStudent?.name || "Student",
       customApiKey: apiKey.trim(),
-    });
-    showToast(currentLanguage === "hi" ? "सेटिंग्स सफलतापूर्वक सहेजी गईं!" : "Settings saved successfully!");
+    };
+    onUpdateSettings(updatedSettings);
+    if (fbUser) {
+      const snap = getWorkspaceSnapshot();
+      uploadWorkspaceToCloud(fbUser.uid, {
+        activeProfileId: snap.activeProfileId,
+        profiles: snap.profiles,
+        fullStorageDump: {
+          ...snap.fullStorageDump,
+          garia_os_settings: JSON.stringify(updatedSettings),
+        },
+      })
+        .then((res) => {
+          setFbLastSynced(new Date(res.timestamp).toLocaleTimeString());
+        })
+        .catch((err) => console.warn("Background cloud sync on settings update:", err));
+    }
+    showToast(
+      currentLanguage === "hi"
+        ? "सेटिंग्स और एपीआई कुंजी सुरक्षित रूप से सहेजी गईं!"
+        : "Settings & API key saved securely!"
+    );
   };
 
   const handleThemeChange = (theme: AppTheme) => {

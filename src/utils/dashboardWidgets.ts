@@ -1,5 +1,20 @@
-import { HomeWidgetId, DashboardWidgetConfig } from "../types";
-import { loadActiveProfileId } from "./storage";
+import { HomeWidgetId, DashboardWidgetConfig, WidgetColSpan } from "../types";
+import {
+  loadActiveProfileId,
+  DEFAULT_DASHBOARD_WIDGETS,
+  getWidgetsKey,
+  loadDashboardWidgets,
+  saveDashboardWidgets,
+  resetDashboardWidgets,
+} from "./storage";
+
+export {
+  DEFAULT_DASHBOARD_WIDGETS,
+  getWidgetsKey,
+  loadDashboardWidgets,
+  saveDashboardWidgets,
+  resetDashboardWidgets,
+};
 
 export interface WidgetMeta {
   id: HomeWidgetId;
@@ -10,24 +25,9 @@ export interface WidgetMeta {
   category: "productivity" | "academic" | "wellness" | "core";
   iconName: string;
   defaultEnabled: boolean;
-  defaultColSpan: "full" | "half" | "third" | "two-thirds";
+  defaultColSpan: WidgetColSpan;
   tags: string[];
 }
-
-export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
-  { id: "gamification_card", enabled: true, order: 0 },
-  { id: "quote_card", enabled: true, order: 1 },
-  { id: "quick_access", enabled: true, order: 2 },
-  { id: "quick_actions", enabled: true, order: 3 },
-  { id: "continue_learning", enabled: true, order: 4 },
-  { id: "todays_tasks", enabled: true, order: 5 },
-  { id: "study_progress", enabled: true, order: 6 },
-  { id: "water_intake", enabled: true, order: 7 },
-  { id: "focus_timer", enabled: true, order: 8 },
-  { id: "revision_due", enabled: true, order: 9 },
-  { id: "abya_suggestions", enabled: true, order: 10 },
-  { id: "habit_tracker", enabled: true, order: 11 },
-];
 
 export const WIDGET_METADATA: Record<HomeWidgetId, WidgetMeta> = {
   quick_actions: {
@@ -277,78 +277,22 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
   },
 ];
 
-const WIDGETS_STORAGE_BASE_KEY = "garia_dashboard_widgets_v2";
-
-export const getWidgetsKey = (profileId?: string): string => {
-  const pId = profileId || loadActiveProfileId() || "default";
-  return `garia_p_${pId}_dashboard_widgets_v2`;
-};
-
-export const loadDashboardWidgets = (profileId?: string): DashboardWidgetConfig[] => {
-  try {
-    const key = getWidgetsKey(profileId);
-    const stored = localStorage.getItem(key);
-    if (!stored) {
-      return [...DEFAULT_DASHBOARD_WIDGETS];
-    }
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return [...DEFAULT_DASHBOARD_WIDGETS];
-    }
-
-    // Merge with defaults in case new widgets were added to the codebase
-    const existingMap = new Map<HomeWidgetId, DashboardWidgetConfig>();
-    parsed.forEach((w: DashboardWidgetConfig) => {
-      if (w && w.id) {
-        existingMap.set(w.id, w);
-      }
-    });
-
-    const result: DashboardWidgetConfig[] = [];
-    // First keep existing order
-    parsed.forEach((w: DashboardWidgetConfig) => {
-      if (w && w.id && WIDGET_METADATA[w.id]) {
-        result.push({
-          id: w.id,
-          enabled: typeof w.enabled === "boolean" ? w.enabled : true,
-          order: result.length,
-        });
-      }
-    });
-
-    // Add any missing widgets from DEFAULT_DASHBOARD_WIDGETS
-    DEFAULT_DASHBOARD_WIDGETS.forEach((def) => {
-      if (!existingMap.has(def.id)) {
-        result.push({
-          id: def.id,
-          enabled: def.enabled,
-          order: result.length,
-        });
-      }
-    });
-
-    return result;
-  } catch (e) {
-    console.error("Error loading dashboard widgets config", e);
-    return [...DEFAULT_DASHBOARD_WIDGETS];
-  }
-};
-
-export const saveDashboardWidgets = (
-  widgets: DashboardWidgetConfig[],
-  profileId?: string
-): void => {
-  try {
-    const key = getWidgetsKey(profileId);
-    // Normalize order indices
-    const normalized = widgets.map((w, idx) => ({
-      id: w.id,
-      enabled: w.enabled,
-      order: idx,
-    }));
-    localStorage.setItem(key, JSON.stringify(normalized));
-  } catch (e) {
-    console.error("Error saving dashboard widgets config", e);
+export const getWidgetColSpanClasses = (
+  colSpan?: WidgetColSpan,
+  defaultSpan: WidgetColSpan = "half"
+): string => {
+  const span = colSpan || defaultSpan;
+  switch (span) {
+    case "full":
+      return "col-span-1 md:col-span-12";
+    case "half":
+      return "col-span-1 md:col-span-6";
+    case "third":
+      return "col-span-1 md:col-span-4";
+    case "two-thirds":
+      return "col-span-1 md:col-span-8";
+    default:
+      return "col-span-1 md:col-span-6";
   }
 };
 
@@ -363,6 +307,25 @@ export const toggleWidgetEnabled = (
       return {
         ...w,
         enabled: typeof forceState === "boolean" ? forceState : !w.enabled,
+      };
+    }
+    return w;
+  });
+  saveDashboardWidgets(updated, profileId);
+  return updated;
+};
+
+export const resizeWidgetColSpan = (
+  widgets: DashboardWidgetConfig[],
+  id: HomeWidgetId,
+  colSpan: WidgetColSpan,
+  profileId?: string
+): DashboardWidgetConfig[] => {
+  const updated = widgets.map((w) => {
+    if (w.id === id) {
+      return {
+        ...w,
+        colSpan,
       };
     }
     return w;

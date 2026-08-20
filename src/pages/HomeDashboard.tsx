@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Sparkles,
   CheckCircle2,
@@ -26,6 +26,9 @@ import {
   Search,
   Bell,
   Menu,
+  PlusCircle,
+  LayoutGrid,
+  Columns,
 } from "lucide-react";
 import {
   Task,
@@ -45,6 +48,12 @@ import {
   CareerProfile,
   Priority,
   TaskCategory,
+  DashboardWidgetConfig,
+  HomeWidgetId,
+  WidgetColSpan,
+  AcademicChapter,
+  AcademicSubject,
+  AcademicRevisionItem,
 } from "../types";
 import { getTodayString } from "../utils/storage";
 import { calculateGamificationState } from "../utils/gamificationEngine";
@@ -52,6 +61,30 @@ import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine"
 import { AppLanguage, translations } from "../utils/i18n";
 import { GariaLogo } from "../components/GariaLogo";
 import { fetchDailyQuote, fetchNextQuote, MOTIVATIONAL_QUOTES, MotivationalQuote } from "../utils/quotes";
+import {
+  loadDashboardWidgets,
+  saveDashboardWidgets,
+  toggleWidgetEnabled,
+  moveWidgetPosition,
+  resizeWidgetColSpan,
+  WIDGET_METADATA,
+  DEFAULT_DASHBOARD_WIDGETS,
+} from "../utils/dashboardWidgets";
+import { DashboardWidgetCustomizer } from "../components/home/DashboardWidgetCustomizer";
+import { WidgetCardWrapper } from "../components/home/widgets/WidgetCardWrapper";
+import { TodaysTasksWidget } from "../components/home/widgets/TodaysTasksWidget";
+import { QuickActionsWidget } from "../components/home/widgets/QuickActionsWidget";
+import { StudyProgressWidget } from "../components/home/widgets/StudyProgressWidget";
+import { WaterIntakeWidget } from "../components/home/widgets/WaterIntakeWidget";
+import { GamificationWidget } from "../components/home/widgets/GamificationWidget";
+import { QuoteWidget } from "../components/home/widgets/QuoteWidget";
+import { QuickAccessWidget } from "../components/home/widgets/QuickAccessWidget";
+import { ContinueLearningWidget } from "../components/home/widgets/ContinueLearningWidget";
+import { FocusTimerWidget } from "../components/home/widgets/FocusTimerWidget";
+import { RevisionDueWidget } from "../components/home/widgets/RevisionDueWidget";
+import { AbyaSuggestionsWidget } from "../components/home/widgets/AbyaSuggestionsWidget";
+import { HabitTrackerWidget } from "../components/home/widgets/HabitTrackerWidget";
+import { generateSmartSuggestions, SmartSuggestion } from "../utils/suggestionsEngine";
 
 interface HomeDashboardProps {
   tasks: Task[];
@@ -107,6 +140,37 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const todayStr = getTodayString();
   const t = translations[currentLanguage] || translations.en;
 
+  // Customizable Widgets State
+  const [widgets, setWidgets] = useState<DashboardWidgetConfig[]>(() =>
+    loadDashboardWidgets(activeStudent?.id)
+  );
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+
+  // Sync widgets whenever active profile changes
+  useEffect(() => {
+    setWidgets(loadDashboardWidgets(activeStudent?.id));
+  }, [activeStudent?.id]);
+
+  const handleSaveWidgets = useCallback((updated: DashboardWidgetConfig[]) => {
+    setWidgets(updated);
+    saveDashboardWidgets(updated, activeStudent?.id);
+  }, [activeStudent?.id]);
+
+  const handleToggleWidget = useCallback((id: HomeWidgetId, forceState?: boolean) => {
+    const updated = toggleWidgetEnabled(widgets, id, forceState, activeStudent?.id);
+    setWidgets(updated);
+  }, [widgets, activeStudent?.id]);
+
+  const handleMoveWidget = useCallback((id: HomeWidgetId, direction: "up" | "down") => {
+    const updated = moveWidgetPosition(widgets, id, direction, activeStudent?.id);
+    setWidgets(updated);
+  }, [widgets, activeStudent?.id]);
+
+  const handleResizeWidget = useCallback((id: HomeWidgetId, colSpan: WidgetColSpan) => {
+    const updated = resizeWidgetColSpan(widgets, id, colSpan, activeStudent?.id);
+    setWidgets(updated);
+  }, [widgets, activeStudent?.id]);
+
   // Live Clock & Date State
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
   useEffect(() => {
@@ -116,7 +180,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Dynamic Motivational Quote (Initialized via fetchDailyQuote, auto-rotates every 25s)
+  // Dynamic Motivational Quote
   const [quoteIndex, setQuoteIndex] = useState<number>(() => {
     const daily = fetchDailyQuote();
     const idx = MOTIVATIONAL_QUOTES.findIndex((q) => q.id === daily.id);
@@ -147,7 +211,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     timeGreeting = "Good Night";
   }
 
-  // Hindi localization for greetings
   const hindiGreeting =
     hour >= 4 && hour < 12
       ? "सुप्रभात"
@@ -159,7 +222,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
   const displayGreeting = currentLanguage === "hi" ? hindiGreeting : timeGreeting;
 
-  // Formatted Date and Time strings
   const formattedDate = currentDateTime.toLocaleDateString(
     currentLanguage === "hi" ? "hi-IN" : "en-US",
     {
@@ -180,43 +242,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     }
   );
 
-  // Inline quick add task state
-  const [inlineTaskTitle, setInlineTaskTitle] = useState("");
-  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all");
-
-  // Focus Timer Mini State
-  const [timerMode, setTimerMode] = useState<"focus" | "shortBreak" | "longBreak">("focus");
-  const [timerSecondsLeft, setTimerSecondsLeft] = useState(25 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isTimerRunning && timerSecondsLeft > 0) {
-      interval = setInterval(() => {
-        setTimerSecondsLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timerSecondsLeft === 0) {
-      setIsTimerRunning(false);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isTimerRunning, timerSecondsLeft]);
-
-  const handleSwitchTimerMode = (mode: "focus" | "shortBreak" | "longBreak") => {
-    setTimerMode(mode);
-    setIsTimerRunning(false);
-    if (mode === "focus") setTimerSecondsLeft(25 * 60);
-    else if (mode === "shortBreak") setTimerSecondsLeft(5 * 60);
-    else setTimerSecondsLeft(15 * 60);
-  };
-
-  const formatTimerTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
-
   // Productivity Score Calculation
   const gamification = useMemo(() => {
     return calculateGamificationState(
@@ -236,12 +261,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const todaysTasks = useMemo(() => {
     return tasks.filter((task) => task.date === todayStr);
   }, [tasks, todayStr]);
-
-  const displayedTasks = useMemo(() => {
-    if (taskFilter === "pending") return todaysTasks.filter((t) => !t.completed);
-    if (taskFilter === "completed") return todaysTasks.filter((t) => t.completed);
-    return todaysTasks;
-  }, [todaysTasks, taskFilter]);
 
   const completedTodayCount = todaysTasks.filter((t) => t.completed).length;
   const taskCompletionRate = todaysTasks.length > 0
@@ -264,21 +283,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     );
   }, [activeStudent, examProfile, examTestRecords, careerProfile]);
 
-  const handleInlineSubmitTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inlineTaskTitle.trim()) return;
-    if (onAddTask) {
-      onAddTask({
-        title: inlineTaskTitle.trim(),
-        date: todayStr,
-        priority: "medium",
-        category: "study",
-        completed: false,
-      });
-    }
-    setInlineTaskTitle("");
-  };
-
   // Focus time today
   const todayFocusMinutes = useMemo(() => {
     return focusLogs
@@ -286,59 +290,233 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       .reduce((acc, l) => acc + l.durationMinutes, 0);
   }, [focusLogs, todayStr]);
 
-  // Abya AI Suggestions
-  const abyaSuggestions = useMemo(() => {
-    const list = [];
-    if (todaysTasks.filter((t) => !t.completed).length > 0) {
-      list.push({
-        id: "task_focus",
-        title: "Focus on High Priority Tasks",
-        desc: `You have ${todaysTasks.filter((t) => !t.completed).length} pending task(s) for today.`,
-        actionTab: "tasks" as ActiveTab,
-        actionLabel: "View Tasks",
-        tag: "Priority",
-        color: "emerald",
-      });
+  // Smart suggestions generator
+  const smartSuggestions: SmartSuggestion[] = useMemo(() => {
+    if (!activeStudent) return [];
+    return generateSmartSuggestions(
+      activeStudent,
+      tasks,
+      subjects,
+      [],
+      [],
+      goals,
+      water,
+      habits,
+      [],
+      examTestRecords,
+      [],
+      examReport
+    );
+  }, [activeStudent, tasks, subjects, goals, water, habits, examTestRecords, examReport]);
+
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
+  const visibleSuggestions = useMemo(() => {
+    return smartSuggestions.filter((s) => !dismissedSuggestions.includes(s.id));
+  }, [smartSuggestions, dismissedSuggestions]);
+
+  const handleDismissSuggestion = (id: string) => {
+    setDismissedSuggestions((prev) => [...prev, id]);
+  };
+
+  // Mock revisions due for spaced repetition widget
+  const dummyRevisions: AcademicRevisionItem[] = useMemo(() => {
+    return [
+      {
+        id: "rev-1",
+        subjectId: subjects[0]?.id || "sub-1",
+        subjectName: subjects[0]?.name || "Accountancy",
+        chapterId: "ch-1",
+        chapterName: "Financial Statements & Analysis",
+        topicName: "Cash Flow Statements (Operating Activities)",
+        intervalStage: 3,
+        scheduledDate: todayStr,
+        completed: false,
+        confidenceLevel: "medium",
+      },
+      {
+        id: "rev-2",
+        subjectId: subjects[1]?.id || "sub-2",
+        subjectName: subjects[1]?.name || "Economics",
+        chapterId: "ch-2",
+        chapterName: "Macroeconomics: National Income",
+        topicName: "Gross Domestic Product (GDP) Deflator",
+        intervalStage: 7,
+        scheduledDate: todayStr,
+        completed: false,
+        confidenceLevel: "needs_review",
+      },
+    ];
+  }, [subjects, todayStr]);
+
+  // Filter and sort active enabled widgets
+  const enabledWidgets = useMemo(() => {
+    return [...widgets]
+      .filter((w) => w.enabled)
+      .sort((a, b) => a.order - b.order);
+  }, [widgets]);
+
+  const hiddenWidgets = useMemo(() => {
+    return widgets.filter((w) => !w.enabled);
+  }, [widgets]);
+
+  // Function to render each individual widget component dynamically
+  const renderWidgetContent = (widgetId: HomeWidgetId) => {
+    switch (widgetId) {
+      case "quick_actions":
+        return (
+          <QuickActionsWidget
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+            onQuickAddTask={onQuickAddTask || (() => onNavigate("tasks"))}
+          />
+        );
+
+      case "todays_tasks":
+        return (
+          <TodaysTasksWidget
+            tasks={tasks}
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+            onQuickAddTask={onQuickAddTask || (() => onNavigate("tasks"))}
+            onToggleTask={onToggleTask}
+          />
+        );
+
+      case "study_progress":
+        return (
+          <StudyProgressWidget
+            subjects={subjects}
+            studySessions={studySessions}
+            focusLogs={focusLogs}
+            tasks={tasks}
+            streamLabel={activeStudent ? `${activeStudent.classLevel} ${activeStudent.stream}` : "Syllabus"}
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+          />
+        );
+
+      case "water_intake":
+        return (
+          <WaterIntakeWidget
+            water={water}
+            currentLanguage={currentLanguage}
+            onAddWaterGlass={onAddWaterGlass}
+            onRemoveWaterGlass={onRemoveWaterGlass}
+          />
+        );
+
+      case "gamification_card":
+        return (
+          <GamificationWidget
+            gamification={gamification}
+            examReport={examReport || {
+              overallReadinessScore: 85,
+              predictedScoreMin: 80,
+              predictedScoreMax: 92,
+              readinessTier: "good",
+              daysUntilExam: 60,
+              subjectBreakdowns: [],
+              weakestSubject: null,
+              strongestSubject: null,
+              highYieldRecommendations: [],
+              lastUpdated: new Date().toISOString(),
+            }}
+            targetExamName={examProfile?.targetExamName || `${activeStudent?.stream || "Board"} Final Exams`}
+            daysUntilExam={examReport?.daysUntilExam || 60}
+            onNavigate={onNavigate}
+          />
+        );
+
+      case "quote_card":
+        return (
+          <QuoteWidget
+            quote={{
+              id: activeQuote.id,
+              quote: activeQuote.quote,
+              author: activeQuote.author,
+              category: activeQuote.category as any,
+              hindiTranslation: activeQuote.hindiTranslation,
+            }}
+            currentLanguage={currentLanguage}
+          />
+        );
+
+      case "quick_access":
+        return <QuickAccessWidget onNavigate={onNavigate} />;
+
+      case "continue_learning":
+        return (
+          <ContinueLearningWidget
+            activeChapter={{
+              id: "active-ch-1",
+              subjectId: subjects[0]?.id || "sub-1",
+              title: "Financial Statements of a Company & Accounting Ratios",
+              description: "Deep dive into Balance Sheet heads, Liquidity, Solvency and Profitability ratios with NCERT solutions.",
+              order: 1,
+              completed: false,
+              isVVI: true,
+              totalQuestions: 24,
+              completedQuestions: 14,
+            }}
+            activeChapterSubject={{
+              id: subjects[0]?.id || "sub-1",
+              name: subjects[0]?.name || "Accountancy",
+              code: "ACC-12",
+              icon: "BookOpen",
+              color: "emerald",
+              totalChapters: 8,
+              completedChapters: 4,
+            }}
+            chapterProgress={65}
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+          />
+        );
+
+      case "focus_timer":
+        return (
+          <FocusTimerWidget
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+          />
+        );
+
+      case "revision_due":
+        return (
+          <RevisionDueWidget
+            revisions={dummyRevisions}
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+          />
+        );
+
+      case "abya_suggestions":
+        return (
+          <AbyaSuggestionsWidget
+            smartSuggestions={visibleSuggestions}
+            currentLanguage={currentLanguage}
+            onNavigate={onNavigate}
+            onDismissSuggestion={handleDismissSuggestion}
+          />
+        );
+
+      case "habit_tracker":
+        return (
+          <HabitTrackerWidget
+            habits={habits}
+            currentLanguage={currentLanguage}
+            onToggleHabit={onToggleHabit}
+            onNavigate={onNavigate}
+          />
+        );
+
+      default:
+        return null;
     }
-    if (todayFocusMinutes < 45) {
-      list.push({
-        id: "pomodoro_boost",
-        title: "Start a 25m Focus Block",
-        desc: "Deep focus session boosts syllabus retention by 40%.",
-        actionTab: "focus" as ActiveTab,
-        actionLabel: "Start Focus",
-        tag: "Study Hack",
-        color: "cyan",
-      });
-    }
-    if (water.glasses < (water.goal || 8)) {
-      list.push({
-        id: "hydration_boost",
-        title: "Stay Hydrated for Brain Health",
-        desc: `Logged ${water.glasses}/${water.goal || 8} glasses. Keep your mind refreshed.`,
-        actionTab: "water" as ActiveTab,
-        actionLabel: "Drink Water",
-        tag: "Health",
-        color: "blue",
-      });
-    }
-    if (list.length === 0) {
-      list.push({
-        id: "general_motivation",
-        title: "All Goals on Track Today!",
-        desc: "Great momentum. Keep reviewing your notes and staying consistent.",
-        actionTab: "notes" as ActiveTab,
-        actionLabel: "Open Notes",
-        tag: "Momentum",
-        color: "purple",
-      });
-    }
-    return list;
-  }, [todaysTasks, todayFocusMinutes, water]);
+  };
 
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
-      {/* ========================================================================= */}
       {/* ========================================================================= */}
       {/* 1. PREMIUM HOME HERO & BRANDING SECTION                                    */}
       {/* ========================================================================= */}
@@ -421,8 +599,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               </p>
             </div>
 
-            {/* Quick Streak / XP Stats Pills */}
-            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+            {/* Quick Streak / XP Stats Pills & Customize Dashboard Trigger */}
+            <div className="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
               <div className="px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-rose-500/30 flex items-center gap-2.5 shadow-sm">
                 <Flame className="w-4 h-4 text-rose-400 fill-rose-400" />
                 <div>
@@ -446,46 +624,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Dynamic Motivational Quote Card */}
-          <div
-            id="home-dynamic-quote-card"
-            className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/60 border border-amber-500/30 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-inner"
-          >
-            <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center shrink-0 mt-0.5">
-                <QuoteIcon className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">
-                    {currentLanguage === "hi" ? "दैनिक प्रेरणा" : "Dynamic Motivation"}
-                  </span>
-                  <span className="text-[9px] px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 capitalize">
-                    {activeQuote.category}
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-100 italic leading-relaxed">
-                  "{currentLanguage === "hi" && activeQuote.hindiTranslation ? activeQuote.hindiTranslation : activeQuote.quote}"
-                </p>
-                <div className="text-[11px] text-slate-400 font-medium">
-                  — <span className="text-amber-200">{activeQuote.author}</span>
-                </div>
-              </div>
+              {/* Customize Dashboard Button */}
+              <button
+                onClick={() => setIsCustomizerOpen(true)}
+                id="header-customize-dashboard-btn"
+                title="Customize Home Dashboard Widgets"
+                className="px-3.5 py-2 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all card-press active:scale-95 shadow-sm"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
+                <span>{currentLanguage === "hi" ? "विजेट अनुकूलन" : "Customize"}</span>
+                <span className="text-[10px] font-mono bg-emerald-500/20 px-1.5 py-0.2 rounded-full border border-emerald-500/30">
+                  {enabledWidgets.length}
+                </span>
+              </button>
             </div>
-
-            {/* Quote Shuffle Button */}
-            <button
-              onClick={handleNextQuote}
-              title="Next Motivational Quote"
-              aria-label="Refresh Quote"
-              className="p-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all self-end sm:self-center shrink-0"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span className="text-[10px] hidden sm:inline">New Quote</span>
-            </button>
           </div>
         </div>
       </section>
@@ -576,471 +729,131 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. PRIMARY ACTION & PRODUCTIVITY WORKSPACE GRID                            */}
+      {/* 3. CUSTOMIZABLE WORKSPACE WIDGETS TOOLBAR                                  */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5">
-        
-        {/* COLUMN LEFT: TASKS & FOCUS TIMER (Col 7 on Desktop) */}
-        <div className="col-span-1 md:col-span-7 space-y-4 sm:space-y-5">
-          
-          {/* SECTION: TODAY'S TASKS */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Today's Focus Tasks</h3>
-                  <p className="text-[11px] text-slate-400">
-                    {completedTodayCount} of {todaysTasks.length} completed
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setTaskFilter("all")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                    taskFilter === "all" ? "bg-white/15 text-white" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setTaskFilter("pending")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                    taskFilter === "pending" ? "bg-white/15 text-white" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => setTaskFilter("completed")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                    taskFilter === "completed" ? "bg-white/15 text-white" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Done
-                </button>
-                <button
-                  onClick={() => onNavigate("tasks")}
-                  className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 ml-1.5 flex items-center gap-0.5"
-                >
-                  <span>All Tasks</span>
-                  <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* Inline Quick Add Task */}
-            <form onSubmit={handleInlineSubmitTask} className="relative">
-              <input
-                type="text"
-                value={inlineTaskTitle}
-                onChange={(e) => setInlineTaskTitle(e.target.value)}
-                placeholder="Quick add a task for today..."
-                className="w-full pl-9 pr-16 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-              />
-              <Plus className="w-4 h-4 text-emerald-400 absolute left-3 top-3 pointer-events-none" />
-              <button
-                type="submit"
-                disabled={!inlineTaskTitle.trim()}
-                className="absolute right-1.5 top-1.5 px-3 py-1 rounded-lg bg-emerald-500 disabled:opacity-40 text-slate-950 text-xs font-bold transition-all"
-              >
-                Add
-              </button>
-            </form>
-
-            {/* Task Items List */}
-            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-              {displayedTasks.length > 0 ? (
-                displayedTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => onToggleTask && onToggleTask(task)}
-                    className={`p-3 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
-                      task.completed
-                        ? "bg-slate-900/40 border-white/5 text-slate-500 line-through opacity-70"
-                        : "bg-slate-800/60 hover:bg-slate-800 border-white/5 text-slate-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <button
-                        type="button"
-                        className="shrink-0 text-slate-400 hover:text-emerald-400 transition-colors"
-                      >
-                        {task.completed ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
-                        ) : (
-                          <Circle className="w-4 h-4" />
-                        )}
-                      </button>
-                      <span className="text-xs font-medium truncate">{task.title}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {task.priority === "high" && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25">
-                          High
-                        </span>
-                      )}
-                      {task.priority === "medium" && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                          Med
-                        </span>
-                      )}
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {task.time || "Today"}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-7 text-slate-500 text-xs border border-dashed border-white/5 rounded-xl">
-                  {taskFilter === "all"
-                    ? "No tasks scheduled for today. Add one above to get started!"
-                    : taskFilter === "pending"
-                    ? "🎉 All tasks completed for today!"
-                    : "No completed tasks yet."}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION: FOCUS TIMER MINI */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Pomodoro Focus Timer</h3>
-                  <p className="text-[11px] text-slate-400">Deep study sprints & structured breaks</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onNavigate("focus")}
-                className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-              >
-                <span>Full Focus App</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Mode Switcher */}
-            <div className="flex p-1 rounded-xl bg-slate-800/80 border border-white/5 text-xs">
-              <button
-                onClick={() => handleSwitchTimerMode("focus")}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition-all ${
-                  timerMode === "focus"
-                    ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Focus (25m)
-              </button>
-              <button
-                onClick={() => handleSwitchTimerMode("shortBreak")}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition-all ${
-                  timerMode === "shortBreak"
-                    ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Short Break (5m)
-              </button>
-              <button
-                onClick={() => handleSwitchTimerMode("longBreak")}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition-all ${
-                  timerMode === "longBreak"
-                    ? "bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Long Break (15m)
-              </button>
-            </div>
-
-            {/* Time Display & Actions */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                {formatTimerTime(timerSecondsLeft)}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsTimerRunning((prev) => !prev)}
-                  className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95 ${
-                    isTimerRunning
-                      ? "bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30"
-                      : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
-                  }`}
-                >
-                  {isTimerRunning ? (
-                    <>
-                      <Pause className="w-4 h-4" />
-                      <span>Pause</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>Start Session</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleSwitchTimerMode(timerMode)}
-                  aria-label="Reset Timer"
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-white/5 transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="w-4 h-4 text-emerald-400" />
+          <h2 className="text-sm font-bold font-heading text-white uppercase tracking-wider">
+            {currentLanguage === "hi" ? "डैशबोर्ड विजेट्स" : "Dashboard Workspace"}
+          </h2>
+          <span className="text-[10px] font-mono font-bold bg-white/5 text-slate-400 px-2 py-0.5 rounded-full border border-white/5">
+            {enabledWidgets.length} {currentLanguage === "hi" ? "सक्रिय" : "Active"}
+          </span>
         </div>
 
-        {/* COLUMN RIGHT: HABITS & WATER (Col 5 on Desktop) */}
-        <div className="col-span-1 md:col-span-5 space-y-4 sm:space-y-5">
-          
-          {/* SECTION: HABIT TRACKER */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-                  <Flame className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Habits & Consistency</h3>
-                  <p className="text-[11px] text-slate-400">Daily routine tracking</p>
-                </div>
-              </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCustomizerOpen(true)}
+            id="toolbar-add-widget-btn"
+            className="px-3 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 hover:border-emerald-500/40 text-xs text-slate-300 hover:text-white font-semibold transition-all flex items-center gap-1.5"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{currentLanguage === "hi" ? "+ विजेट जोड़ें" : "+ Add Widget"}</span>
+          </button>
 
-              <button
-                onClick={() => onNavigate("habits")}
-                className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-0.5"
-              >
-                <span>View All</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {habits.slice(0, 3).map((habit) => {
-                const isCompletedToday = habit.completedDates?.includes(todayStr);
-                return (
-                  <div
-                    key={habit.id}
-                    className="p-3 rounded-xl bg-slate-800/60 border border-white/5 flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <button
-                        onClick={() => onToggleHabit && onToggleHabit(habit.id, todayStr)}
-                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${
-                          isCompletedToday
-                            ? "bg-rose-500 border-rose-500 text-white"
-                            : "border-slate-600 hover:border-rose-400"
-                        }`}
-                      >
-                        {isCompletedToday && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                      </button>
-                      <span className="text-xs font-medium text-slate-200 truncate">
-                        {habit.title}
-                      </span>
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/10 text-rose-300 border border-rose-500/20 flex items-center gap-1 shrink-0">
-                      <Flame className="w-3 h-3" />
-                      {habit.streak || 0}d
-                    </span>
-                  </div>
-                );
-              })}
-
-              {habits.length === 0 && (
-                <button
-                  onClick={() => onNavigate("habits")}
-                  className="w-full py-4 rounded-xl border border-dashed border-white/10 text-xs text-slate-400 hover:text-white transition-colors"
-                >
-                  + Add your first daily habit
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION: WATER TRACKER */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <Droplet className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Hydration Log</h3>
-                  <p className="text-[11px] text-slate-400">
-                    {water.glasses} / {water.goal || 8} glasses ({(water.glasses * 250) / 1000}L)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {onRemoveWaterGlass && water.glasses > 0 && (
-                  <button
-                    onClick={onRemoveWaterGlass}
-                    title="Remove glass"
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-white/5 flex items-center justify-center text-xs font-bold transition-colors"
-                  >
-                    -
-                  </button>
-                )}
-                <button
-                  onClick={onAddWaterGlass}
-                  className="px-3 py-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition-colors active:scale-95 shadow-md shadow-blue-500/20"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Drink</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="space-y-1.5">
-              <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
-                  style={{
-                    width: `${Math.min(100, Math.round((water.glasses / (water.goal || 8)) * 100))}%`,
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>{Math.min(100, Math.round((water.glasses / (water.goal || 8)) * 100))}% of Daily Goal</span>
-                <span>Goal: {((water.goal || 8) * 250) / 1000}L</span>
-              </div>
-            </div>
-          </div>
+          <button
+            onClick={() => setIsCustomizerOpen(true)}
+            id="toolbar-customize-btn"
+            className="p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-400 hover:text-white transition-all"
+            title="Arrange & Resize Widgets"
+            aria-label="Arrange & Resize Widgets"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
         </div>
-
-        {/* WIDGET 6: EXAM INTELLIGENCE (Col 6 on Desktop) */}
-        <div className="col-span-1 md:col-span-6 glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <ShieldAlert className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Exam Intelligence</h3>
-                  <p className="text-[11px] text-slate-400">Target board & readiness score</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onNavigate("exam")}
-                className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5"
-              >
-                <span>Exam Center</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/40 to-slate-800/80 border border-white/5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">
-                  {examProfile?.targetExamName || `${activeStudent?.stream || "Board"} Final Exams`}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold">
-                  {examReport && examReport.daysUntilExam > 0
-                    ? `${examReport.daysUntilExam} Days Left`
-                    : "Exam Ready"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-300">
-                <span>Readiness Score:</span>
-                <span className="font-bold text-emerald-400">
-                  {examReport?.overallReadinessScore || 85}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-white/5 mt-3 flex items-center justify-between text-xs text-slate-400">
-            <span>Target Score: {examProfile?.targetScorePercentage || 95}%</span>
-            <button
-              onClick={() => onNavigate("exam")}
-              className="text-xs text-indigo-400 font-bold hover:underline"
-            >
-              Analyze Weak Areas →
-            </button>
-          </div>
-        </div>
-
-        {/* WIDGET 7: ABYA AI SUGGESTIONS (Col 6 on Desktop) */}
-        <div className="col-span-1 md:col-span-6 glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 bg-slate-900/80 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">Abya AI Suggestions</h3>
-                  <p className="text-[11px] text-slate-400">Adaptive personalized recommendations</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onNavigate("abya")}
-                className="text-[11px] font-bold text-purple-400 hover:text-purple-300 flex items-center gap-0.5"
-              >
-                <span>Ask Abya</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {abyaSuggestions.slice(0, 2).map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 rounded-2xl bg-purple-950/20 border border-purple-500/15 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-white truncate">{item.title}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300">
-                        {item.tag}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{item.desc}</p>
-                  </div>
-
-                  <button
-                    onClick={() => onNavigate(item.actionTab)}
-                    className="px-2.5 py-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs font-bold shrink-0 transition-colors"
-                  >
-                    {item.actionLabel}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-white/5 mt-3 flex items-center justify-between text-xs text-slate-400">
-            <span>Powered by Abya AI Engine</span>
-            <button
-              onClick={() => onNavigate("abya")}
-              className="text-xs text-purple-400 font-bold hover:underline"
-            >
-              Open AI Chat →
-            </button>
-          </div>
-        </div>
-
       </div>
+
+      {/* ========================================================================= */}
+      {/* 4. DYNAMIC CUSTOMIZABLE WIDGETS GRID                                      */}
+      {/* ========================================================================= */}
+      <div
+        id="dashboard-widgets-grid"
+        className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5"
+      >
+        {enabledWidgets.map((widgetConfig, index) => {
+          const isFirst = index === 0;
+          const isLast = index === enabledWidgets.length - 1;
+          const meta = WIDGET_METADATA[widgetConfig.id];
+
+          return (
+            <WidgetCardWrapper
+              key={widgetConfig.id}
+              id={widgetConfig.id}
+              colSpan={widgetConfig.colSpan || meta?.defaultColSpan || "half"}
+              isFirst={isFirst}
+              isLast={isLast}
+              onMoveUp={() => handleMoveWidget(widgetConfig.id, "up")}
+              onMoveDown={() => handleMoveWidget(widgetConfig.id, "down")}
+              onResize={(newSpan) => handleResizeWidget(widgetConfig.id, newSpan)}
+              onHide={() => handleToggleWidget(widgetConfig.id, false)}
+              onOpenCustomizer={() => setIsCustomizerOpen(true)}
+            >
+              {renderWidgetContent(widgetConfig.id)}
+            </WidgetCardWrapper>
+          );
+        })}
+
+        {/* Empty / Add More Widgets Card (Full Width at Bottom) */}
+        {hiddenWidgets.length > 0 && (
+          <div className="col-span-1 md:col-span-12">
+            <div className="glass-card rounded-3xl p-5 border border-dashed border-white/15 bg-slate-900/40 hover:bg-slate-900/70 transition-all flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <PlusCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white font-heading">
+                    {currentLanguage === "hi"
+                      ? "अधिक विजेट्स जोड़ें"
+                      : "Add More Widgets to Your Dashboard"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {hiddenWidgets.length} {currentLanguage === "hi" ? "अतिरिक्त विजेट उपलब्ध हैं" : "additional widgets available in gallery"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {hiddenWidgets.slice(0, 3).map((w) => {
+                  const meta = WIDGET_METADATA[w.id];
+                  if (!meta) return null;
+                  return (
+                    <button
+                      key={w.id}
+                      onClick={() => handleToggleWidget(w.id, true)}
+                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-xs font-semibold text-slate-300 hover:text-emerald-300 transition-all flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3 h-3 text-emerald-400" />
+                      <span>{currentLanguage === "hi" ? meta.nameHi : meta.name}</span>
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setIsCustomizerOpen(true)}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{currentLanguage === "hi" ? "सभी देखें" : "Open Customizer"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. DASHBOARD WIDGET CUSTOMIZER MODAL                                      */}
+      {/* ========================================================================= */}
+      <DashboardWidgetCustomizer
+        isOpen={isCustomizerOpen}
+        onClose={() => setIsCustomizerOpen(false)}
+        widgets={widgets}
+        onSave={handleSaveWidgets}
+        currentLanguage={currentLanguage}
+        profileId={activeStudent?.id}
+      />
     </div>
   );
 };
