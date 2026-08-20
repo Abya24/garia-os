@@ -186,6 +186,17 @@ export interface UserAccount {
   createdAt: number;
 }
 
+export interface PinSecuritySettings {
+  enabled: boolean;
+  pinHash?: string;
+  lockOnLaunch: boolean;
+  autoLockMinutes?: number; // 0 = immediate/on launch, 5, 15, 30, -1 = manual only
+  lastUnlockedAt?: number;
+  requirePinForSensitiveActions?: boolean;
+  recoveryCode?: string; // e.g. "GARIA-7K9P"
+  recoveryEmail?: string;
+}
+
 export type AbyaLanguageSetting =
   | "English"
   | "Hindi"
@@ -238,6 +249,7 @@ export interface UserSettings {
   notificationsEnabled: boolean;
   notifications?: NotificationSettings;
   account?: UserAccount;
+  security?: PinSecuritySettings;
   waterGoal: number;
   defaultFocusDuration: number;
   defaultBreakDuration: number;

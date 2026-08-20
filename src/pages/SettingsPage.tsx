@@ -36,6 +36,12 @@ import {
   Sunset,
   MapPin,
   Compass,
+  Lock,
+  Unlock,
+  Shield,
+  ShieldCheck,
+  KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 import {
   UserSettings,
@@ -64,6 +70,8 @@ import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
 import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
+import { PinManagementModal, PinModalMode } from "../components/PinManagementModal";
+import { lockSession } from "../utils/security";
 import {
   loadCalendarSyncSettings,
   saveCalendarSyncSettings,
@@ -101,6 +109,7 @@ interface SettingsPageProps {
   onClearAllOSData: () => void;
   onReloadData: () => void;
   onBack?: () => void;
+  onLockApp?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -123,12 +132,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onClearAllOSData,
   onReloadData,
   onBack,
+  onLockApp,
 }) => {
   const t = translations[currentLanguage] || translations.en;
   const [userName, setUserName] = useState(settings.userName || activeStudent?.name || "Student");
   const [apiKey, setApiKey] = useState(settings.customApiKey || "");
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
+  const [pinModalMode, setPinModalMode] = useState<PinModalMode | null>(null);
 
   // Google Calendar Integration State
   const [gcalUser, setGcalUser] = useState<User | null>(null);
@@ -554,6 +565,137 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* 2.1 PIN Lock & Security Settings */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-5 bg-gradient-to-br from-purple-500/5 via-slate-900/40 to-transparent shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/40 flex items-center justify-center shrink-0 shadow-md shadow-purple-500/10">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 font-mono">
+                  Garia Security Engine
+                </span>
+                {settings.security?.enabled && settings.security?.pinHash ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>PIN Active</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-medium border border-white/10">
+                    Disabled
+                  </span>
+                )}
+              </div>
+              <h3 className="text-lg font-bold font-heading text-white">
+                {currentLanguage === "hi" ? "पिन लॉक और सुरक्षा सेटिंग्स" : "PIN Lock & Security Settings"}
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {currentLanguage === "hi"
+                  ? "अपने अध्ययन सत्र, कार्य और नोट्स को 4-8 अंकों के सुरक्षित पिन से लॉक करें।"
+                  : "Protect your study sessions, confidential notes, exams, and habits with a secure numeric PIN."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {settings.security?.enabled && settings.security?.pinHash ? (
+              <button
+                onClick={() => setPinModalMode("remove")}
+                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors"
+              >
+                {currentLanguage === "hi" ? "पिन हटाएं" : "Remove PIN"}
+              </button>
+            ) : (
+              <button
+                onClick={() => setPinModalMode("setup")}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{currentLanguage === "hi" ? "पिन लॉक सेट करें" : "Create PIN Lock"}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* PIN Configuration Options when Enabled */}
+        {settings.security?.enabled && settings.security?.pinHash && (
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Launch Lock Toggle */}
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{currentLanguage === "hi" ? "ऐप लॉन्च पर लॉक स्क्रीन" : "Lock Screen on App Launch"}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {currentLanguage === "hi"
+                      ? "ब्राउज़र टैब खोलने पर तुरंत पिन मांगें"
+                      : "Require PIN verification when opening Garia OS"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (settings.security) {
+                      onUpdateSettings({
+                        ...settings,
+                        security: {
+                          ...settings.security,
+                          lockOnLaunch: !settings.security.lockOnLaunch,
+                        },
+                      });
+                    }
+                  }}
+                  className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                    settings.security.lockOnLaunch ? "bg-emerald-500" : "bg-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
+                      settings.security.lockOnLaunch ? "translate-x-4.5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Action Buttons: Change PIN & Lock Now */}
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-bold text-white">
+                    {currentLanguage === "hi" ? "सत्र प्रबंधन" : "Session Controls"}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {currentLanguage === "hi" ? "पिन बदलें या अभी लॉक करें" : "Update PIN or lock your screen now"}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPinModalMode("change")}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-slate-200 transition-colors"
+                  >
+                    {currentLanguage === "hi" ? "पिन बदलें" : "Change PIN"}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      lockSession();
+                      if (onLockApp) onLockApp();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-colors flex items-center gap-1"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>{currentLanguage === "hi" ? "अभी लॉक करें" : "Lock Now"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2.2 Firebase Firestore Cloud Sync Section */}
@@ -1385,6 +1527,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         goals={goals}
         activeProfile={activeStudent}
       />
+
+      {/* PIN Management Modal */}
+      {pinModalMode && (
+        <PinManagementModal
+          isOpen={Boolean(pinModalMode)}
+          mode={pinModalMode}
+          onClose={() => setPinModalMode(null)}
+          settings={settings}
+          onUpdateSettings={onUpdateSettings}
+          onSuccessMessage={(msg) => showToast(msg)}
+        />
+      )}
     </div>
   );
 };

@@ -137,6 +137,13 @@ const defaultSettings: UserSettings = {
     isPrivateMode: true,
     createdAt: Date.now(),
   },
+  security: {
+    enabled: false,
+    pinHash: "",
+    lockOnLaunch: true,
+    autoLockMinutes: 0,
+    requirePinForSensitiveActions: false,
+  },
   waterGoal: 8,
   defaultFocusDuration: 25,
   defaultBreakDuration: 5,
@@ -1308,6 +1315,10 @@ export const loadSettings = (profileId?: string): UserSettings => {
       ...defaultSettings.account!,
       ...(stored?.account || {}),
       name: accountName,
+    },
+    security: {
+      ...defaultSettings.security!,
+      ...(stored?.security || {}),
     },
   };
 };

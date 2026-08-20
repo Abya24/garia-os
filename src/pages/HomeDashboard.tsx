@@ -85,6 +85,11 @@ import { RevisionDueWidget } from "../components/home/widgets/RevisionDueWidget"
 import { AbyaSuggestionsWidget } from "../components/home/widgets/AbyaSuggestionsWidget";
 import { HabitTrackerWidget } from "../components/home/widgets/HabitTrackerWidget";
 import { generateSmartSuggestions, SmartSuggestion } from "../utils/suggestionsEngine";
+import { HeroSection } from "../components/home/sections/HeroSection";
+import { DailyExecutionSection } from "../components/home/sections/DailyExecutionSection";
+import { AcademicProgressSection } from "../components/home/sections/AcademicProgressSection";
+import { ExamIntelligenceSection } from "../components/home/sections/ExamIntelligenceSection";
+import { WellnessSection } from "../components/home/sections/WellnessSection";
 
 interface HomeDashboardProps {
   tasks: Task[];
@@ -289,6 +294,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       .filter((l) => l.date === todayStr && l.type === "focus")
       .reduce((acc, l) => acc + l.durationMinutes, 0);
   }, [focusLogs, todayStr]);
+
+  // Total Study Minutes today (Study sessions + Focus sessions)
+  const todayStudyMinutes = useMemo(() => {
+    const studySecs = (studySessions || [])
+      .filter((s) => s.date === todayStr)
+      .reduce((acc, s) => acc + s.durationSeconds, 0);
+    return Math.round(studySecs / 60) + todayFocusMinutes;
+  }, [studySessions, todayFocusMinutes, todayStr]);
 
   // Smart suggestions generator
   const smartSuggestions: SmartSuggestion[] = useMemo(() => {
@@ -516,336 +529,88 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
+    <div className="space-y-7 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
       {/* ========================================================================= */}
-      {/* 1. PREMIUM HOME HERO & BRANDING SECTION                                    */}
+      {/* SECTION 1: HERO AREA (Greeting, Productivity Score, Countdown, Focus)     */}
       {/* ========================================================================= */}
-      <section
-        id="home-dashboard-hero"
-        className="glass-card rounded-3xl p-5 sm:p-7 border border-white/10 relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-[#0d1222]/90 to-purple-950/20 shadow-xl"
-      >
-        {/* Ambient background glow */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-10 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 space-y-5">
-          {/* Top Bar: Centered on Mobile, Balanced & Vertically Centered on Desktop */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-white/10 overflow-visible w-full">
-            {/* Branding Container: Centered on mobile, vertically centered with controls on desktop */}
-            <div className="flex items-center justify-center sm:justify-start overflow-visible w-full sm:w-auto py-1">
-              <GariaLogo
-                size="md"
-                variant="horizontal"
-                showTagline={true}
-                withGlow={true}
-                onClick={onOpenSliderMenu}
-                className="cursor-pointer hover:opacity-95 transition-opacity overflow-visible"
-              />
-            </div>
-
-            {/* Right: Live Time, Date, and Menu Trigger */}
-            <div className="flex items-center justify-center sm:justify-end gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto overflow-visible">
-              {/* Live Digital Clock Badge */}
-              <div
-                id="home-live-clock"
-                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-purple-500/30 text-purple-200 text-xs font-mono font-bold flex items-center gap-2 shadow-inner shrink-0"
-                title="Current Local Time"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <Clock className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span>{formattedTime}</span>
-              </div>
-
-              {/* Current Date Badge */}
-              <div
-                id="home-current-date"
-                className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-slate-300 text-xs font-medium flex items-center gap-1.5 shadow-inner shrink-0"
-                title="Today's Date"
-              >
-                <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span>{formattedDate}</span>
-              </div>
-
-              {/* System Drawer / Settings Button */}
-              {onOpenSliderMenu && (
-                <button
-                  onClick={onOpenSliderMenu}
-                  id="home-menu-trigger"
-                  title="Open Garia OS Settings & Navigation"
-                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all card-press shrink-0"
-                >
-                  <Menu className="w-4 h-4 text-emerald-400" />
-                  <span className="hidden sm:inline text-xs">Menu</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Dynamic Greeting & Student Context */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight">
-                  {displayGreeting}, {activeStudent?.name || settings.userName || "Student"}! 👋
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {activeStudent?.classLevel || "Class 12"} • {activeStudent?.stream || "Commerce"}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-300">
-                {currentLanguage === "hi"
-                  ? "आपका स्वागत है! आज के अध्ययन लक्ष्यों और प्राथमिकताओं पर केंद्रित रहें।"
-                  : "Welcome to your command center. Stay consistent and conquer today's study goals."}
-              </p>
-            </div>
-
-            {/* Quick Streak / XP Stats Pills & Customize Dashboard Trigger */}
-            <div className="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
-              <div className="px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-rose-500/30 flex items-center gap-2.5 shadow-sm">
-                <Flame className="w-4 h-4 text-rose-400 fill-rose-400" />
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                    {currentLanguage === "hi" ? "दैनिक स्ट्रीक" : "Streak"}
-                  </div>
-                  <div className="text-xs font-extrabold text-white font-mono">
-                    {gamification.streakDays} {currentLanguage === "hi" ? "दिन" : "Days"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-amber-500/30 flex items-center gap-2.5 shadow-sm">
-                <Award className="w-4 h-4 text-amber-400" />
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                    Level {gamification.level}
-                  </div>
-                  <div className="text-xs font-extrabold text-amber-300 font-mono">
-                    {gamification.currentXP} XP
-                  </div>
-                </div>
-              </div>
-
-              {/* Customize Dashboard Button */}
-              <button
-                onClick={() => setIsCustomizerOpen(true)}
-                id="header-customize-dashboard-btn"
-                title="Customize Home Dashboard Widgets"
-                className="px-3.5 py-2 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all card-press active:scale-95 shadow-sm"
-              >
-                <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-                <span>{currentLanguage === "hi" ? "विजेट अनुकूलन" : "Customize"}</span>
-                <span className="text-[10px] font-mono bg-emerald-500/20 px-1.5 py-0.2 rounded-full border border-emerald-500/30">
-                  {enabledWidgets.length}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSection
+        activeStudent={activeStudent}
+        settings={settings}
+        gamification={gamification}
+        examReport={examReport}
+        examProfile={examProfile}
+        activeQuote={activeQuote}
+        onNextQuote={handleNextQuote}
+        formattedTime={formattedTime}
+        formattedDate={formattedDate}
+        displayGreeting={displayGreeting}
+        currentLanguage={currentLanguage}
+        todaysCompletedTasksCount={completedTodayCount}
+        todaysTotalTasksCount={todaysTasks.length}
+        todayStudyMinutes={todayStudyMinutes}
+        todayHabitsCompletedCount={
+          habits.filter((h) => h.completedDates?.includes(todayStr)).length
+        }
+        totalHabitsCount={habits.length}
+        onNavigate={onNavigate}
+        onOpenSliderMenu={onOpenSliderMenu}
+        onOpenCustomizer={() => setIsCustomizerOpen(true)}
+      />
 
       {/* ========================================================================= */}
-      {/* 2. CORE FOCUS SUMMARY METRICS CARDS (TOP ROW)                             */}
+      {/* SECTION 2: DAILY EXECUTION (Tasks, Pending, Focus Sessions, Study Time)   */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Metric 1: Productivity & Level */}
-        <div className="glass-card rounded-2xl p-4 border border-emerald-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-emerald-950/20 shadow-sm relative overflow-hidden flex flex-col justify-between group hover:border-emerald-500/40 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Level {gamification.level}
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {gamification.currentXP} <span className="text-xs text-emerald-400 font-sans font-bold">XP</span>
-            </div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Productivity Velocity
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 2: Today's Tasks Progress */}
-        <div className="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-cyan-950/20 shadow-sm relative overflow-hidden flex flex-col justify-between group hover:border-cyan-500/40 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-              {completedTodayCount}/{todaysTasks.length} Done
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {taskCompletionRate}<span className="text-xs text-cyan-400 font-sans font-bold">%</span>
-            </div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Tasks Completed Today
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 3: Deep Focus Time */}
-        <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-amber-950/20 shadow-sm relative overflow-hidden flex flex-col justify-between group hover:border-amber-500/40 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <Clock className="w-4 h-4" />
-            </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              Pomodoro
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {todayFocusMinutes} <span className="text-xs text-amber-400 font-sans font-bold">min</span>
-            </div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Deep Focus Today
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 4: Daily Streak */}
-        <div className="glass-card rounded-2xl p-4 border border-rose-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-rose-950/20 shadow-sm relative overflow-hidden flex flex-col justify-between group hover:border-rose-500/40 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-              <Flame className="w-4 h-4 fill-rose-400" />
-            </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-              Active
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {gamification.streakDays} <span className="text-xs text-rose-400 font-sans font-bold">{currentLanguage === "hi" ? "दिन" : "Days"}</span>
-            </div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Study Streak
-            </div>
-          </div>
-        </div>
-      </div>
+      <DailyExecutionSection
+        tasks={tasks}
+        studySessions={studySessions}
+        focusLogs={focusLogs}
+        currentLanguage={currentLanguage}
+        onNavigate={onNavigate}
+        onQuickAddTask={onQuickAddTask}
+        onAddTask={onAddTask}
+        onToggleTask={onToggleTask}
+      />
 
       {/* ========================================================================= */}
-      {/* 3. CUSTOMIZABLE WORKSPACE WIDGETS TOOLBAR                                  */}
+      {/* SECTION 3: ACADEMIC PROGRESS (Active Subjects, Mastery, Weak Alert)       */}
       {/* ========================================================================= */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <LayoutGrid className="w-4 h-4 text-emerald-400" />
-          <h2 className="text-sm font-bold font-heading text-white uppercase tracking-wider">
-            {currentLanguage === "hi" ? "डैशबोर्ड विजेट्स" : "Dashboard Workspace"}
-          </h2>
-          <span className="text-[10px] font-mono font-bold bg-white/5 text-slate-400 px-2 py-0.5 rounded-full border border-white/5">
-            {enabledWidgets.length} {currentLanguage === "hi" ? "सक्रिय" : "Active"}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCustomizerOpen(true)}
-            id="toolbar-add-widget-btn"
-            className="px-3 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 hover:border-emerald-500/40 text-xs text-slate-300 hover:text-white font-semibold transition-all flex items-center gap-1.5"
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{currentLanguage === "hi" ? "+ विजेट जोड़ें" : "+ Add Widget"}</span>
-          </button>
-
-          <button
-            onClick={() => setIsCustomizerOpen(true)}
-            id="toolbar-customize-btn"
-            className="p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-400 hover:text-white transition-all"
-            title="Arrange & Resize Widgets"
-            aria-label="Arrange & Resize Widgets"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <AcademicProgressSection
+        subjects={subjects}
+        studySessions={studySessions}
+        examReport={examReport}
+        activeStudent={activeStudent}
+        currentLanguage={currentLanguage}
+        onNavigate={onNavigate}
+      />
 
       {/* ========================================================================= */}
-      {/* 4. DYNAMIC CUSTOMIZABLE WIDGETS GRID                                      */}
+      {/* SECTION 4: EXAM INTELLIGENCE (Readiness Score, Upcoming, Suggested Hours)  */}
       {/* ========================================================================= */}
-      <div
-        id="dashboard-widgets-grid"
-        className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5"
-      >
-        {enabledWidgets.map((widgetConfig, index) => {
-          const isFirst = index === 0;
-          const isLast = index === enabledWidgets.length - 1;
-          const meta = WIDGET_METADATA[widgetConfig.id];
-
-          return (
-            <WidgetCardWrapper
-              key={widgetConfig.id}
-              id={widgetConfig.id}
-              colSpan={widgetConfig.colSpan || meta?.defaultColSpan || "half"}
-              isFirst={isFirst}
-              isLast={isLast}
-              onMoveUp={() => handleMoveWidget(widgetConfig.id, "up")}
-              onMoveDown={() => handleMoveWidget(widgetConfig.id, "down")}
-              onResize={(newSpan) => handleResizeWidget(widgetConfig.id, newSpan)}
-              onHide={() => handleToggleWidget(widgetConfig.id, false)}
-              onOpenCustomizer={() => setIsCustomizerOpen(true)}
-            >
-              {renderWidgetContent(widgetConfig.id)}
-            </WidgetCardWrapper>
-          );
-        })}
-
-        {/* Empty / Add More Widgets Card (Full Width at Bottom) */}
-        {hiddenWidgets.length > 0 && (
-          <div className="col-span-1 md:col-span-12">
-            <div className="glass-card rounded-3xl p-5 border border-dashed border-white/15 bg-slate-900/40 hover:bg-slate-900/70 transition-all flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-center sm:text-left">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <PlusCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-heading">
-                    {currentLanguage === "hi"
-                      ? "अधिक विजेट्स जोड़ें"
-                      : "Add More Widgets to Your Dashboard"}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {hiddenWidgets.length} {currentLanguage === "hi" ? "अतिरिक्त विजेट उपलब्ध हैं" : "additional widgets available in gallery"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {hiddenWidgets.slice(0, 3).map((w) => {
-                  const meta = WIDGET_METADATA[w.id];
-                  if (!meta) return null;
-                  return (
-                    <button
-                      key={w.id}
-                      onClick={() => handleToggleWidget(w.id, true)}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-xs font-semibold text-slate-300 hover:text-emerald-300 transition-all flex items-center gap-1.5"
-                    >
-                      <Plus className="w-3 h-3 text-emerald-400" />
-                      <span>{currentLanguage === "hi" ? meta.nameHi : meta.name}</span>
-                    </button>
-                  );
-                })}
-
-                <button
-                  onClick={() => setIsCustomizerOpen(true)}
-                  className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>{currentLanguage === "hi" ? "सभी देखें" : "Open Customizer"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <ExamIntelligenceSection
+        examReport={examReport}
+        examProfile={examProfile}
+        activeStudent={activeStudent}
+        subjects={subjects}
+        smartSuggestions={visibleSuggestions}
+        currentLanguage={currentLanguage}
+        onNavigate={onNavigate}
+        onDismissSuggestion={handleDismissSuggestion}
+      />
 
       {/* ========================================================================= */}
-      {/* 5. DASHBOARD WIDGET CUSTOMIZER MODAL                                      */}
+      {/* SECTION 5: WELLNESS (Habit Tracker, Water Tracker)                        */}
       {/* ========================================================================= */}
+      <WellnessSection
+        habits={habits}
+        water={water}
+        currentLanguage={currentLanguage}
+        onToggleHabit={onToggleHabit}
+        onAddWaterGlass={onAddWaterGlass}
+        onRemoveWaterGlass={onRemoveWaterGlass}
+        onNavigate={onNavigate}
+      />
+
+      {/* Dashboard Widget Customizer Modal & Workspace Configurator */}
       <DashboardWidgetCustomizer
         isOpen={isCustomizerOpen}
         onClose={() => setIsCustomizerOpen(false)}

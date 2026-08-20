@@ -143,6 +143,8 @@ import { QuickSearchModal } from "./components/QuickSearchModal";
 import { NotificationsModal } from "./components/NotificationsModal";
 import { SavedItemsModal } from "./components/SavedItemsModal";
 import { OfflineSyncToast } from "./components/OfflineSyncToast";
+import { PinLockScreen } from "./components/PinLockScreen";
+import { shouldAppBeLocked, markSessionUnlocked, lockSession } from "./utils/security";
 
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { TaskManager } from "./pages/TaskManager";
@@ -420,6 +422,10 @@ export default function App() {
 
   // App Data States
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings());
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => {
+    const initialSettings = loadSettings();
+    return shouldAppBeLocked(initialSettings);
+  });
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
   const [studySessions, setStudySessions] = useState<StudySession[]>(() => loadStudySessions());
@@ -531,7 +537,9 @@ export default function App() {
     const loadedSubs = loadSubjects(profileId);
     const syncedSubs = syncSubjectTotals(loadedSubs, loadedSessions);
 
-    setSettings(loadSettings(profileId));
+    const newSettings = loadSettings(profileId);
+    setSettings(newSettings);
+    setIsAppLocked(shouldAppBeLocked(newSettings));
     setTasks(loadTasks(profileId));
     setSubjects(syncedSubs);
     setStudySessions(loadedSessions);
@@ -2103,6 +2111,10 @@ export default function App() {
               onClearAllOSData={handleClearAllOSData}
               onReloadData={handleReloadData}
               onBack={handleGoBack}
+              onLockApp={() => {
+                lockSession();
+                setIsAppLocked(true);
+              }}
             />
           )}
         </main>
@@ -2149,6 +2161,10 @@ export default function App() {
         onLogout={() => {
           setIsSliderMenuOpen(false);
           setIsStudentModalOpen(true);
+        }}
+        onLockApp={() => {
+          lockSession();
+          setIsAppLocked(true);
         }}
       />
 
@@ -2211,7 +2227,7 @@ export default function App() {
         isOpen={isStudentModalOpen}
         onClose={() => setIsStudentModalOpen(false)}
         profiles={profiles}
-        activeProfile={activeStudent}
+        activeProfile={activeProfileId ? profiles.find((p) => p.id === activeProfileId) || activeStudent : activeStudent}
         onSwitchProfile={(pId) => {
           handleSwitchProfile(pId);
           setIsStudentModalOpen(false);
@@ -2234,6 +2250,37 @@ export default function App() {
 
       {/* Real-Time Offline Queue Firestore Flush Toast Notification */}
       <OfflineSyncToast currentLanguage={currentLanguage} />
+
+      {/* Full-Screen PIN Lock Gate Overlay */}
+      {isAppLocked && settings.security?.enabled && settings.security?.pinHash && (
+        <PinLockScreen
+          settings={settings}
+          activeStudent={activeStudent}
+          studentName={activeStudent?.name || settings.userName}
+          onUnlocked={() => {
+            markSessionUnlocked();
+            setIsAppLocked(false);
+          }}
+          onUnlockSuccess={() => {
+            markSessionUnlocked();
+            setIsAppLocked(false);
+          }}
+          onUpdateSettings={handleUpdateSettings}
+          onEmergencyReset={() => {
+            const updated: UserSettings = {
+              ...settings,
+              security: {
+                ...settings.security,
+                enabled: false,
+                pinHash: "",
+              },
+            };
+            handleUpdateSettings(updated);
+            markSessionUnlocked();
+            setIsAppLocked(false);
+          }}
+        />
+      )}
     </div>
   );
 }

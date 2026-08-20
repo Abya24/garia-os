@@ -13,8 +13,9 @@ import {
   LayoutGrid,
   Shield,
   Key,
-  Fingerprint,
-  Grid,
+  Lock,
+  Unlock,
+  KeyRound,
   Settings,
   Database,
   Cloud,
@@ -39,6 +40,8 @@ import {
 import { APP_VERSION, APP_BUILD_DATE } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
 import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
+import { PinManagementModal, PinModalMode } from "./PinManagementModal";
+import { lockSession } from "../utils/security";
 
 interface SliderMenuProps {
   isOpen: boolean;
@@ -54,6 +57,7 @@ interface SliderMenuProps {
   onNavigate: (tab: ActiveTab) => void;
   onClearAllData?: () => void;
   onLogout?: () => void;
+  onLockApp?: () => void;
 }
 
 export const SliderMenu: React.FC<SliderMenuProps> = ({
@@ -68,6 +72,9 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
   onUpdateLanguage,
   onUpdateSettings,
   onNavigate,
+  onClearAllData,
+  onLogout,
+  onLockApp,
 }) => {
   // Accordion / Dropdown States
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -87,8 +94,8 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
 
-  // App Lock Sub-options
-  const [lockMethod, setLockMethod] = useState<"pin" | "pattern" | "biometric">("pin");
+  // PIN Lock Management Modal State
+  const [pinModalMode, setPinModalMode] = useState<PinModalMode | null>(null);
 
   const t = translations[currentLanguage] || translations.en;
 
@@ -531,92 +538,106 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
 
               {/* 4. SECURITY */}
               <div className="glass-card rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 space-y-3">
-                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Security</span>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Security & App Lock</span>
+                  </div>
+                  {settings?.security?.enabled && settings?.security?.pinHash ? (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>PIN Protected</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-white/5">
+                      No PIN Set
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <div className="p-2.5 rounded-xl bg-slate-800/70 border border-white/5 space-y-2">
+                  <div className="p-3 rounded-xl bg-slate-800/70 border border-white/5 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>App Lock</span>
+                          <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>App PIN Lock</span>
                         </div>
                         <p className="text-[10px] text-slate-400">
-                          Protect private notes, sessions & logs
+                          Secure study sessions, tasks & notes with a numeric code
                         </p>
                       </div>
-                      <button
-                        onClick={handleTogglePrivateMode}
-                        className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
-                          settings?.account?.isPrivateMode ? "bg-emerald-500" : "bg-slate-700"
-                        }`}
-                      >
-                        <span
-                          className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
-                            settings?.account?.isPrivateMode ? "translate-x-4.5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
+
+                      {settings?.security?.enabled && settings?.security?.pinHash ? (
+                        <button
+                          onClick={() => setPinModalMode("remove")}
+                          className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold transition-colors"
+                        >
+                          Disable
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setPinModalMode("setup")}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-sm transition-all"
+                        >
+                          Set PIN
+                        </button>
+                      )}
                     </div>
 
-                    {/* Sub-lock methods: PIN, Pattern, Biometrics */}
-                    <div className="pt-2 border-t border-white/5 grid grid-cols-3 gap-1.5">
-                      <button
-                        onClick={() => setLockMethod("pin")}
-                        id="lock-method-pin"
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
-                          lockMethod === "pin"
-                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300 shadow-sm"
-                            : "bg-slate-800 border-white/5 text-slate-400"
-                        }`}
-                      >
-                        <Key className="w-3 h-3" />
-                        <span>PIN</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setLockMethod("pattern");
-                          setSyncStatusMsg("Pattern Lock: Coming Soon in Android Native build");
-                          setTimeout(() => setSyncStatusMsg(null), 3000);
-                        }}
-                        id="lock-method-pattern"
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex flex-col items-center justify-center transition-all ${
-                          lockMethod === "pattern"
-                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                            : "bg-slate-800 border-white/5 text-slate-400"
-                        }`}
-                        title="Pattern Lock (Coming Soon in Native Android)"
-                      >
-                        <div className="flex items-center gap-1">
-                          <Grid className="w-3 h-3" />
-                          <span>Pattern</span>
+                    {settings?.security?.enabled && settings?.security?.pinHash && (
+                      <div className="pt-2 border-t border-white/5 space-y-2">
+                        {/* Lock on App Launch Toggle */}
+                        <div className="flex items-center justify-between text-xs py-1">
+                          <span className="text-slate-300 font-medium">Require PIN on Launch</span>
+                          <button
+                            onClick={() => {
+                              if (settings.security) {
+                                onUpdateSettings({
+                                  ...settings,
+                                  security: {
+                                    ...settings.security,
+                                    lockOnLaunch: !settings.security.lockOnLaunch,
+                                  },
+                                });
+                              }
+                            }}
+                            className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                              settings.security.lockOnLaunch ? "bg-emerald-500" : "bg-slate-700"
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full bg-white transition-transform transform shadow-sm ${
+                                settings.security.lockOnLaunch ? "translate-x-4" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
                         </div>
-                        <span className="text-[8px] font-mono text-purple-400/80">Coming Soon</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setLockMethod("biometric");
-                          setSyncStatusMsg("Biometrics: Coming Soon in Android Native build");
-                          setTimeout(() => setSyncStatusMsg(null), 3000);
-                        }}
-                        id="lock-method-biometric"
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex flex-col items-center justify-center transition-all ${
-                          lockMethod === "biometric"
-                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                            : "bg-slate-800 border-white/5 text-slate-400"
-                        }`}
-                        title="Biometric Fingerprint (Coming Soon in Native Android)"
-                      >
-                        <div className="flex items-center gap-1">
-                          <Fingerprint className="w-3 h-3" />
-                          <span>Biometrics</span>
+
+                        {/* Action buttons: Change PIN & Lock Now */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            onClick={() => setPinModalMode("change")}
+                            className="py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-[11px] font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Change PIN</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              lockSession();
+                              if (onLockApp) onLockApp();
+                              onClose();
+                            }}
+                            className="py-1.5 px-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-[11px] font-bold text-purple-300 flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Lock Now</span>
+                          </button>
                         </div>
-                        <span className="text-[8px] font-mono text-purple-400/80">Coming Soon</span>
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -963,6 +984,21 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                 )}
               </div>
             </div>
+          )}
+
+          {/* PIN Lock Setup / Change / Remove Modal */}
+          {pinModalMode && (
+            <PinManagementModal
+              isOpen={Boolean(pinModalMode)}
+              mode={pinModalMode}
+              onClose={() => setPinModalMode(null)}
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+              onSuccessMessage={(msg) => {
+                setSyncStatusMsg(msg);
+                setTimeout(() => setSyncStatusMsg(null), 3000);
+              }}
+            />
           )}
         </>
       )}
