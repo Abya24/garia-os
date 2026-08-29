@@ -24,6 +24,7 @@ import {
 import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
+import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GariaLogo } from "./GariaLogo";
 
 export type SidebarMode = "expanded" | "compact" | "icons_only";
@@ -118,7 +119,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     },
   ];
 
-  const studentName = activeStudent?.name || settings.userName || (currentLanguage === "hi" ? "विद्यार्थी" : "Student");
+  const defaultFallback = currentLanguage === "hi" ? "विद्यार्थी" : "Student";
+  const studentName = getStudentDisplayName(activeStudent, settings, defaultFallback);
 
   return (
     <aside
@@ -270,7 +272,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
                 activeStudent.avatarColor || "from-emerald-400 to-cyan-400"
               } flex items-center justify-center text-xs font-bold text-slate-950 shrink-0`}
             >
-              {studentName.charAt(0).toUpperCase()}
+              {getStudentAvatarInitials(studentName)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-white truncate">{studentName}</div>

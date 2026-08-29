@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Sparkles,
   Send,
@@ -55,9 +55,14 @@ import {
   TrendingUp,
   Bookmark,
   Hash,
+  PlusCircle,
+  CornerDownRight,
+  Eye,
+  Plus,
 } from "lucide-react";
 import {
   AbyaMessage,
+  AbyaChatSession,
   UserSettings,
   StudentProfile,
   AbyaInsightCard,
@@ -75,17 +80,24 @@ import {
   Habit,
 } from "../types";
 import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
+import { AcademicDecisionEngineSection } from "../components/home/sections/AcademicDecisionEngineSection";
 import {
   getCurriculumSubjects,
   CurriculumSubject,
   CurriculumChapter,
   CurriculumTopic,
 } from "../data/masterCurriculum";
+import {
+  loadAbyaChatSessions,
+  saveAbyaChatSessions,
+  deleteAbyaChatSession,
+} from "../utils/storage";
+import { getStudentDisplayName } from "../utils/studentNameUtils";
 
 interface AbyaAIPageProps {
   messages: AbyaMessage[];
   settings: UserSettings;
-  activeStudent: StudentProfile;
+  activeStudent?: StudentProfile | null;
   insightCards: AbyaInsightCard[];
   abyaLanguage?: AbyaLanguageSetting;
   onUpdateAbyaLanguage?: (lang: AbyaLanguageSetting) => void;
@@ -114,7 +126,7 @@ interface AbyaAIPageProps {
   diagnostics?: AbyaDiagnosticsInfo;
   onTestDiagnostics?: () => Promise<void>;
   onBack?: () => void;
-  // Optional intelligence props
+  // Context props
   tasks?: Task[];
   academicSubjects?: AcademicSubject[];
   academicChapters?: AcademicChapter[];
@@ -150,6 +162,11 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   examProfile,
   habits = [],
 }) => {
+  // Navigation between Home Dashboard and Active Conversation Thread
+  const [viewMode, setViewMode] = useState<"home" | "chat">(
+    messages.length > 0 ? "chat" : "home"
+  );
+
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
   const [isLoading, setIsLoading] = useState(false);
@@ -162,10 +179,16 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const [tempApiKey, setTempApiKey] = useState(settings.customApiKey || "");
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  // Recent chat sessions state
+  const [chatSessions, setChatSessions] = useState<AbyaChatSession[]>(() =>
+    loadAbyaChatSessions(activeStudent?.id || "")
+  );
+
   // Drawers
   const [isContextDrawerOpen, setIsContextDrawerOpen] = useState(false);
   const [isIntelligenceDrawerOpen, setIsIntelligenceDrawerOpen] = useState(false);
 
+  // Image input
   const [selectedImage, setSelectedImage] = useState<{
     data: string;
     mimeType: string;
@@ -178,194 +201,127 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic Visual Viewport support for Mobile Virtual Keyboards
+  // Responsive Virtual Keyboard Handling for mobile viewports
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleViewportChange = () => {
+    if (typeof window === "undefined") return;
+
+    const handleResize = () => {
       if (window.visualViewport) {
-        const currentHeight = window.visualViewport.height;
-        setViewportHeight(currentHeight);
-        const isVirtualKeyboard = window.innerHeight - currentHeight > 120;
-        setIsKeyboardOpen(isVirtualKeyboard);
+        const height = window.visualViewport.height;
+        setViewportHeight(height);
+        const isOpen = height < window.screen.height * 0.75;
+        setIsKeyboardOpen(isOpen);
       }
     };
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleViewportChange);
-      window.visualViewport.addEventListener("scroll", handleViewportChange);
-      handleViewportChange();
+      window.visualViewport.addEventListener("resize", handleResize);
+      window.visualViewport.addEventListener("scroll", handleResize);
+      handleResize();
     }
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleViewportChange);
-        window.visualViewport.removeEventListener("scroll", handleViewportChange);
+        window.visualViewport.removeEventListener("resize", handleResize);
+        window.visualViewport.removeEventListener("scroll", handleResize);
       }
     };
   }, []);
 
-  // Curriculum Hierarchy State (Class -> Stream -> Subject -> Chapter -> Topic)
-  const curriculumSubjects = getCurriculumSubjects(
-    activeStudent.classLevel,
-    activeStudent.stream
-  );
-  const [selectedSubId, setSelectedSubId] = useState<string>(
-    curriculumSubjects[0]?.id || ""
-  );
-  const currentSubject =
-    curriculumSubjects.find((s) => s.id === selectedSubId) ||
-    curriculumSubjects[0];
-  const [selectedChapId, setSelectedChapId] = useState<string>(
-    currentSubject?.chapters[0]?.id || ""
-  );
-  const currentChapter =
-    currentSubject?.chapters.find((c) => c.id === selectedChapId) ||
-    currentSubject?.chapters[0];
-  const [selectedTopId, setSelectedTopId] = useState<string>(
-    currentChapter?.topics[0]?.id || ""
-  );
-  const currentTopic =
-    currentChapter?.topics.find((t) => t.id === selectedTopId) ||
-    currentChapter?.topics[0];
-
-  // Update chapter/topic selections when subject changes
-  const handleSelectSubject = (subId: string) => {
-    setSelectedSubId(subId);
-    const sub = curriculumSubjects.find((s) => s.id === subId);
-    if (sub && sub.chapters.length > 0) {
-      setSelectedChapId(sub.chapters[0].id);
-      if (sub.chapters[0].topics.length > 0) {
-        setSelectedTopId(sub.chapters[0].topics[0].id);
-      }
-    }
-  };
-
-  const handleSelectChapter = (chapId: string) => {
-    setSelectedChapId(chapId);
-    const chap = currentSubject?.chapters.find((c) => c.id === chapId);
-    if (chap && chap.topics.length > 0) {
-      setSelectedTopId(chap.topics[0].id);
-    }
-  };
-
-  const handleCurriculumTopicAction = (
-    modeType: "explanation" | "notes" | "revision" | "mcq" | "pyq" | "vvi" | "doubt"
-  ) => {
-    if (!currentSubject || !currentChapter || !currentTopic) return;
-
-    const curriculumContext = {
-      classLevel: activeStudent.classLevel,
-      stream: activeStudent.stream,
-      subject: currentSubject.name,
-      chapter: currentChapter.title,
-      topic: currentTopic.name,
-      modeType,
-    };
-
-    let promptText = "";
-    if (modeType === "explanation") {
-      promptText = `Please provide a thorough, step-by-step concept explanation for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel} ${activeStudent.stream}). Structure your response with: 1. Core Concept in Intuitive Terms, 2. Real-World Analogy, 3. Key Formulas / Rules / Definitions, 4. Step-by-Step Solved Problem, 5. Quick Self-Check Question.`;
-    } else if (modeType === "notes") {
-      promptText = `Generate high-yield quick revision notes and key definition points for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel} ${activeStudent.stream}). Include high-frequency board pointers and formula summaries.`;
-    } else if (modeType === "revision") {
-      promptText = `Provide a 5-minute rapid recall revision summary for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). Focus on must-remember board exam keywords, triggers, and examiner pitfalls.`;
-    } else if (modeType === "mcq") {
-      promptText = `Generate 5 exam-standard Multiple Choice Questions (MCQs) for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}", ${activeStudent.classLevel}). Provide 4 distinct options (A, B, C, D), mark the correct option clearly, provide step-by-step solutions, and alert against common student traps.`;
-    } else if (modeType === "pyq") {
-      promptText = `Provide verified previous year board exam questions (PYQs) and expected question patterns for "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). Include official step-wise marking tips and answer writing rubrics.`;
-    } else if (modeType === "vvi") {
-      promptText = `Highlight the Most Important (VVI) exam questions and common mistake areas students make in "${currentTopic.name}" (Chapter: "${currentChapter.title}", Subject: "${currentSubject.name}"). How can I score 100% on questions from this topic?`;
-    } else if (modeType === "doubt") {
-      setInputPrompt(`[${currentSubject.name} - ${currentTopic.name}] Doubt: `);
-      inputRef.current?.focus();
-      return;
-    }
-
-    setIsContextDrawerOpen(false);
-    handleSend(promptText, "explain_topic", undefined, curriculumContext);
-  };
-
-  // Quick Action Chips (ChatGPT Tools Bar Style)
-  const quickActionTools: {
-    type: AbyaQuickActionType;
-    label: string;
-    icon: React.ElementType;
-    prompt: string;
-    accentClass: string;
-    modeToSet?: AbyaAIMode;
-    isModalTrigger?: "voice" | "camera" | "intel";
-  }[] = [
-    {
-      type: "fast_mode",
-      label: "🎙️ Live Voice",
-      icon: Mic,
-      prompt: "",
-      accentClass: "hover:bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
-      isModalTrigger: "voice",
-    },
-    {
-      type: "search_grounding",
-      label: "🌐 Search Grounded",
-      icon: Search,
-      prompt: "Use Google Search Grounding (gemini-3.5-flash) to find the latest verified syllabus updates, exam dates, and official announcements for:",
-      accentClass: "hover:bg-blue-500/15 border-blue-500/40 text-blue-300",
-      modeToSet: "search_grounded",
-    },
-    {
-      type: "plan_day",
-      label: "🎯 Study Coach",
-      icon: Calendar,
-      prompt: "Act as my Study Coach: analyze my daily schedule, syllabus priorities, and create an optimized step-by-step study plan for today.",
-      accentClass: "hover:bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
-      modeToSet: "mentor",
-    },
-    {
-      type: "fast_mode",
-      label: "⚡ Fast Lite",
-      icon: Zap,
-      prompt: "Give me an ultra-fast flashcard summary and rapid-recall key points using gemini-3.1-flash-lite for:",
-      accentClass: "hover:bg-amber-500/15 border-amber-500/40 text-amber-300",
-      modeToSet: "fast_lite",
-    },
-    {
-      type: "high_thinking",
-      label: "🧠 High Thinking",
-      icon: Brain,
-      prompt: "Use deep step-by-step reasoning (gemini-3.1-pro-preview with ThinkingLevel.HIGH) to analyze and solve this complex derivation / multi-step proof:",
-      accentClass: "hover:bg-purple-500/15 border-purple-500/40 text-purple-300",
-      modeToSet: "high_thinking",
-    },
-    {
-      type: "explain_topic",
-      label: "📸 Doubt Solver",
-      icon: ImageIcon,
-      prompt: "I have a concept doubt. Please explain it clearly with step-by-step breakdown, simple analogies, and a quick check question for:",
-      accentClass: "hover:bg-cyan-500/15 border-cyan-500/40 text-cyan-300",
-      isModalTrigger: "camera",
-    },
-    {
-      type: "exam_coach",
-      label: "📊 Intelligence Panel",
-      icon: BarChart3,
-      prompt: "",
-      accentClass: "hover:bg-indigo-500/15 border-indigo-500/40 text-indigo-300",
-      isModalTrigger: "intel",
-    },
-  ];
-
-  // Auto-scroll to latest message
+  // Sync sessions when student changes or messages change
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    const loaded = loadAbyaChatSessions(activeStudent?.id || "");
+    setChatSessions(loaded);
+  }, [activeStudent?.id]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Save current active session whenever messages update
+  useEffect(() => {
+    if (messages.length > 0) {
+      const firstUserMsg = messages.find((m) => m.role === "user")?.content || "Academic Session";
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      const title = firstUserMsg.slice(0, 45).trim() + (firstUserMsg.length > 45 ? "..." : "");
+
+      const currentSessions = loadAbyaChatSessions(activeStudent?.id || "");
+      const existingIdx = currentSessions.findIndex((s) => s.id === "active_session");
+
+      const sessionObj: AbyaChatSession = {
+        id: "active_session",
+        title: title || "Study Session",
+        createdAt: messages[0]?.timestamp || Date.now(),
+        updatedAt: Date.now(),
+        previewMessage: lastMsg.slice(0, 70) || "Recent conversation",
+        messagesCount: messages.length,
+        mode: selectedMode,
+        messages: messages,
+      };
+
+      let updated: AbyaChatSession[];
+      if (existingIdx >= 0) {
+        updated = [...currentSessions];
+        updated[existingIdx] = sessionObj;
+      } else {
+        updated = [sessionObj, ...currentSessions];
+      }
+      saveAbyaChatSessions(updated, activeStudent?.id || "");
+      setChatSessions(updated);
+    }
+  }, [messages, activeStudent?.id, selectedMode]);
+
+  // Master Curriculum State (for contextual drilldown)
+  const [selectedSubId, setSelectedSubId] = useState<string>("");
+  const [selectedChapId, setSelectedChapId] = useState<string>("");
+  const [selectedTopId, setSelectedTopId] = useState<string>("");
+
+  const curriculumSubjects = useMemo(() => {
+    return getCurriculumSubjects(activeStudent?.classLevel, activeStudent?.stream);
+  }, [activeStudent?.classLevel, activeStudent?.stream]);
+
+  // Initialize selected subject if empty
+  useEffect(() => {
+    if (curriculumSubjects.length > 0 && !selectedSubId) {
+      setSelectedSubId(curriculumSubjects[0].id);
+    }
+  }, [curriculumSubjects, selectedSubId]);
+
+  const currentSubject: CurriculumSubject | undefined = useMemo(() => {
+    return (
+      curriculumSubjects.find((s) => s.id === selectedSubId) || curriculumSubjects[0]
+    );
+  }, [curriculumSubjects, selectedSubId]);
+
+  const currentChapter: CurriculumChapter | undefined = useMemo(() => {
+    if (!currentSubject) return undefined;
+    return (
+      currentSubject.chapters.find((c) => c.id === selectedChapId) ||
+      currentSubject.chapters[0]
+    );
+  }, [currentSubject, selectedChapId]);
+
+  const currentTopic: CurriculumTopic | undefined = useMemo(() => {
+    if (!currentChapter) return undefined;
+    return (
+      currentChapter.topics.find((t) => t.id === selectedTopId) ||
+      currentChapter.topics[0]
+    );
+  }, [currentChapter, selectedTopId]);
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    if (viewMode === "chat") {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isLoading, viewMode]);
+
+  // Image Upload Handlers
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image file (JPEG, PNG, WebP).");
+      alert("Please select a valid image file (PNG, JPEG, WebP).");
       return;
     }
 
@@ -379,16 +335,19 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         previewUrl: result,
         fileName: file.name,
       });
+      // Switch to chat view to prepare asking
+      setViewMode("chat");
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveImage = () => {
+  const handleClearSelectedImage = () => {
     setSelectedImage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
+  // Primary Message Sender
   const handleSend = async (
     textToSend?: string,
     actionType?: AbyaQuickActionType,
@@ -415,6 +374,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     setIsLoading(true);
+    setViewMode("chat");
 
     try {
       await onSendMessage(
@@ -452,23 +412,189 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     return "Good Evening";
   };
 
-  // Academic accuracy calculation
-  const calculatedAccuracy = (() => {
-    if (academicPractice.length === 0) return 88;
-    const totalQ = academicPractice.reduce((sum, p) => sum + (p.totalQuestions || 0), 0);
-    const correctQ = academicPractice.reduce((sum, p) => sum + (p.correctAnswers || 0), 0);
-    return totalQ > 0 ? Math.round((correctQ / totalQ) * 100) : 88;
-  })();
+  // Student Intelligence & Briefing Calculations
+  const pendingTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
+  const completedTasks = useMemo(() => tasks.filter((t) => t.completed), [tasks]);
+  const highPriorityTasksCount = useMemo(
+    () => pendingTasks.filter((t) => t.priority === "high").length,
+    [pendingTasks]
+  );
 
-  // Weak topics extracted from chapters
-  const weakTopics = academicChapters
-    .filter((c) => c.status === "needs_revision" || (c.masteryLevel && c.masteryLevel < 50))
-    .slice(0, 4);
+  // Study Time Calculation
+  const studyTimeMinutesToday = useMemo(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    return habits
+      .filter((h) => h.completedDates.includes(todayStr))
+      .reduce((acc, h) => acc + (h.durationMinutes || 30), 0);
+  }, [habits]);
 
-  // Revisions due
-  const dueRevisions = academicRevisions
-    .filter((r) => r.status === "due" || r.status === "overdue")
-    .slice(0, 4);
+  const targetStudyHours = examProfile?.dailyStudyHours || 4;
+  const studyTimeHours = Math.floor(studyTimeMinutesToday / 60);
+  const studyTimeMinutes = studyTimeMinutesToday % 60;
+  const studyProgressPct = Math.min(
+    100,
+    Math.round((studyTimeMinutesToday / (targetStudyHours * 60)) * 100)
+  );
+
+  // Weak Subject & Topic Extraction
+  const weakSubjectInfo = useMemo(() => {
+    const weakChap = academicChapters.find(
+      (c) => (c.status as string) === "needs_revision" || (c.masteryLevel && c.masteryLevel < 50) || c.isWeak
+    );
+    if (weakChap) {
+      return {
+        title: weakChap.title,
+        detail: `Needs revision (${weakChap.masteryLevel || 42}% mastery)`,
+      };
+    }
+    const defaultSub = academicSubjects[0]?.name || activeStudent?.stream || "Core Subject";
+    return {
+      title: defaultSub,
+      detail: "Steady mastery • Keep practicing PYQs",
+    };
+  }, [academicChapters, academicSubjects, activeStudent?.stream]);
+
+  // Suggested Study Duration based on pending tasks and countdown
+  const daysRemaining = useMemo(() => {
+    if (!examProfile?.targetDate) return 179;
+    const target = new Date(examProfile.targetDate).getTime();
+    const now = new Date().getTime();
+    const diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 0;
+  }, [examProfile]);
+
+  const suggestedDurationText = useMemo(() => {
+    if (pendingTasks.length > 4) return "3h 30m recommended";
+    if (pendingTasks.length > 0) return "2h 15m recommended";
+    return "1h 45m (Light Recall)";
+  }, [pendingTasks.length]);
+
+  const calculatedReadiness = useMemo(() => {
+    const completedChapters = academicChapters.filter((c) => c.status === "Completed").length;
+    const total = academicChapters.length || 1;
+    const base = Math.round((completedChapters / total) * 100);
+    return Math.max(35, Math.min(95, base || 74));
+  }, [academicChapters]);
+
+  const streakCount = useMemo(() => {
+    return habits.reduce((max, h) => Math.max(max, h.streak || 1), 5);
+  }, [habits]);
+
+  // Contextual AI Tip
+  const aiRecommendationTip = useMemo(() => {
+    if (weakSubjectInfo.title) {
+      return `Dedicate your next 45-minute focus session to "${weakSubjectInfo.title}" to boost your readiness score by +4% today!`;
+    }
+    return `Review high-yield PYQs and summary definitions today to reinforce long-term memory retention!`;
+  }, [weakSubjectInfo.title]);
+
+  // Suggested Prompts List (dynamically tailored to student context)
+  const suggestedPromptsList = useMemo(() => {
+    const stream = activeStudent?.stream || "General";
+    const careerTarget = activeStudent?.stream === "Commerce" ? "CA Foundation & B.Com" : "JEE / NEET / Board";
+    return [
+      "What should I study today?",
+      "Create a revision timetable for my upcoming exams.",
+      "Analyze my weak subjects and tell me where to start.",
+      "Help me prepare for boards with scoring tips.",
+      `Build a ${careerTarget} roadmap.`,
+      "Give me 5 high-yield MCQs for quick practice.",
+      `Explain the hardest concept in ${weakSubjectInfo.title}.`,
+    ];
+  }, [activeStudent?.stream, weakSubjectInfo.title]);
+
+  // Quick Action Handler
+  const handleQuickActionClick = (actionType: AbyaQuickActionType) => {
+    let promptToSend = "";
+    switch (actionType) {
+      case "study_plan":
+        promptToSend = `Please create a customized, high-yield Today's Study Plan for me (${activeStudent?.name || "Student"}, ${activeStudent?.classLevel || "Class 12"} ${activeStudent?.stream || "Commerce"} • ${activeStudent?.board || "CBSE"} Board). Balance my pending tasks and weak chapters into time blocks with active breaks.`;
+        break;
+      case "revision_plan":
+        promptToSend = `Please generate an active recall Spaced Revision Plan for my subjects (${activeStudent?.classLevel || "Class 12"} ${activeStudent?.stream || "Commerce"}). Prioritize weak topics, formulas to write down, and 3-step recall intervals.`;
+        break;
+      case "exam_strategy":
+        promptToSend = `Please generate an Exam Scoring Strategy for my ${examProfile?.examName || "Board Exam"} (${activeStudent?.board || "CBSE"} ${activeStudent?.classLevel || "Class 12"}). Include high-weightage topics, time management in the exam hall, and step-by-step marking rubrics.`;
+        break;
+      case "progress_analysis":
+        promptToSend = `Please perform a detailed Progress & Mastery Analysis for my syllabus. Review completed chapters, identify gaps in my weak areas, and suggest concrete next steps to reach 95%+ score.`;
+        break;
+      case "weekly_schedule":
+        promptToSend = `Please create a balanced 7-Day Weekly Timetable covering all my subjects (${activeStudent?.classLevel || "Class 12"} ${activeStudent?.stream || "Commerce"}). Allocate dedicated slots for theory, solved numericals/cases, mock test day, and Sunday backlog clearance.`;
+        break;
+      case "ask_doubt":
+        // Switch to chat and focus input
+        setViewMode("chat");
+        setInputPrompt("Explain step-by-step: ");
+        setTimeout(() => inputRef.current?.focus(), 150);
+        return;
+      default:
+        promptToSend = `Help me with ${actionType} for my studies.`;
+    }
+
+    handleSend(promptToSend, actionType);
+  };
+
+  const handleSendSuggestedPrompt = (promptText: string) => {
+    handleSend(promptText);
+  };
+
+  const handleStartNewChat = () => {
+    onClearChat();
+    setViewMode("chat");
+  };
+
+  const handleReopenSession = (session: AbyaChatSession) => {
+    // If messages are available, view them
+    setViewMode("chat");
+  };
+
+  const handleDeleteRecentSession = (sessionId: string) => {
+    deleteAbyaChatSession(sessionId, activeStudent?.id || "");
+    setChatSessions((prev) => prev.filter((s) => s.id !== sessionId));
+  };
+
+  const formatSessionTimestamp = (ts: number) => {
+    const now = Date.now();
+    const diffHours = Math.floor((now - ts) / (1000 * 60 * 60));
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `Today, ${new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffHours < 48) return "Yesterday";
+    return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
+  // Helper for curriculum action
+  const handleCurriculumTopicAction = (action: "explanation" | "notes" | "mcq" | "pyq" | "revision") => {
+    if (!currentTopic || !currentSubject) return;
+
+    let prompt = "";
+    switch (action) {
+      case "explanation":
+        prompt = `Please explain the concept "${currentTopic.name}" from ${currentSubject.name} (Chapter: ${currentChapter?.title || "Current Chapter"}) in simple intuitive language with real-world examples and exam key points.`;
+        break;
+      case "notes":
+        prompt = `Generate high-yield revision notes and formula bullet points for "${currentTopic.name}" in ${currentSubject.name} (${activeStudent?.classLevel || "Class 12"} ${activeStudent?.board || "CBSE"}).`;
+        break;
+      case "mcq":
+        prompt = `Provide 5 exam-level Multiple Choice Questions (MCQs) on "${currentTopic.name}" from ${currentSubject.name} with detailed answer explanations.`;
+        break;
+      case "pyq":
+        prompt = `Give 3 previous year board examination questions and step-by-step model answers for "${currentTopic.name}" in ${currentSubject.name}.`;
+        break;
+      case "revision":
+        prompt = `Give me a rapid 5-minute recall summary and key memory triggers for "${currentTopic.name}" (${currentSubject.name}).`;
+        break;
+    }
+
+    handleSend(prompt, undefined, undefined, {
+      classLevel: activeStudent?.classLevel,
+      stream: activeStudent?.stream,
+      subject: currentSubject.name,
+      chapter: currentChapter?.title,
+      topic: currentTopic.name,
+      modeType: action,
+    });
+  };
 
   return (
     <div
@@ -483,10 +609,10 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       }}
     >
       {/* ========================================================================= */}
-      {/* 1. ABYA HEADER CARD (Clean, Minimal, Modern AI Header)                    */}
+      {/* 1. TOP ABYA HEADER                                                        */}
       {/* ========================================================================= */}
       <div className="glass-card rounded-2xl p-2.5 sm:px-3.5 sm:py-2.5 border border-emerald-500/30 flex items-center justify-between gap-3 mb-2 shrink-0 relative z-40 bg-slate-950/80 backdrop-blur-xl shadow-lg shadow-black/20">
-        {/* Left: Avatar & Identity */}
+        {/* Left: Avatar & View Toggle */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative shrink-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shadow-emerald-500/20">
@@ -501,14 +627,14 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 Abya AI
               </h2>
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold truncate">
-                V4 Companion
+                Study Mentor
               </span>
             </div>
             <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5 flex items-center gap-1">
-              <span className="text-emerald-300 font-medium truncate">{activeStudent.name}</span>
+              <span className="text-emerald-300 font-medium truncate">{activeStudent?.name || "Student"}</span>
               <span className="text-slate-600">•</span>
-              <span className="truncate">{activeStudent.classLevel}</span>
-              {activeStudent.stream && (
+              <span className="truncate">{activeStudent?.classLevel || "Class 12"}</span>
+              {activeStudent?.stream && (
                 <>
                   <span className="text-slate-600">•</span>
                   <span className="truncate hidden xs:inline">{activeStudent.stream}</span>
@@ -518,32 +644,65 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           </div>
         </div>
 
-        {/* Right: Clean High-Value Actions (Language Switcher & More Options) */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Prominent Language Switcher */}
+        {/* Center / Navigation Pill */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setViewMode("home")}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+              viewMode === "home"
+                ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20"
+                : "bg-white/5 hover:bg-white/10 text-slate-300"
+            }`}
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => setViewMode("chat")}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+              viewMode === "chat"
+                ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20"
+                : "bg-white/5 hover:bg-white/10 text-slate-300"
+            }`}
+          >
+            <MessageCircle className="w-3 h-3" />
+            <span>Chat ({messages.length})</span>
+          </button>
+        </div>
+
+        {/* Right Actions: Voice, Language, More */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Live Voice Button */}
+          <button
+            onClick={() => setShowLiveVoiceModal(true)}
+            className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-gradient-to-r from-emerald-500/15 to-cyan-500/15 hover:from-emerald-500/25 hover:to-cyan-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
+            title="Live Voice Mentor"
+            aria-label="Live Voice Mentor"
+          >
+            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
+
+          {/* Language Switcher */}
           <button
             onClick={() => setShowLanguageModal(true)}
             id="abya-language-switcher-btn"
-            className="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 border border-purple-500/30 text-purple-200 transition-all text-xs flex items-center gap-1.5 font-semibold shrink-0 shadow-sm"
-            title="Switch Language (Hinglish, English, Hindi, etc.)"
-            aria-label="Switch Language"
+            className="px-2.5 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 border border-purple-500/30 text-purple-200 transition-all text-xs flex items-center gap-1 font-semibold shrink-0 shadow-sm"
+            title="Switch Language"
           >
-            <Globe className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            <span className="text-xs font-semibold">{abyaLanguage}</span>
-            <ChevronDown className="w-3 h-3 text-purple-300 opacity-70 shrink-0" />
+            <Globe className="w-3 h-3 text-purple-400 shrink-0" />
+            <span className="hidden xs:inline text-xs">{abyaLanguage}</span>
+            <ChevronDown className="w-2.5 h-2.5 text-purple-300 opacity-70 shrink-0" />
           </button>
 
-          {/* More Options Dropdown (Curriculum, Intelligence, Diagnostics, Settings) */}
+          {/* More Options */}
           <div className="relative shrink-0">
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}
               id="abya-more-options-btn"
-              className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white transition-all border border-white/10 text-xs flex items-center gap-1.5 font-semibold shrink-0"
-              title="More Options & Settings"
-              aria-label="More Options"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white transition-all border border-white/10 text-xs"
+              title="More Options"
             >
-              <MoreHorizontal className="w-4 h-4 text-slate-400 group-hover:text-white shrink-0" />
-              <span className="hidden sm:inline text-xs font-medium">More</span>
+              <MoreHorizontal className="w-4 h-4" />
             </button>
 
             {showMoreMenu && (
@@ -553,6 +712,18 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                   onClick={() => setShowMoreMenu(false)}
                 />
                 <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card border border-white/15 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1 bg-slate-900/95 backdrop-blur-xl">
+                  {/* New Chat */}
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleStartNewChat();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-emerald-300 hover:text-emerald-200 transition-colors text-left"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Start New Chat</span>
+                  </button>
+
                   {/* Curriculum & AI Context */}
                   <button
                     onClick={() => {
@@ -563,7 +734,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                   >
                     <Sliders className="w-3.5 h-3.5 text-purple-400" />
                     <div>
-                      <div className="text-white">Curriculum & AI Context</div>
+                      <div className="text-white">Curriculum Context</div>
                       <div className="text-[10px] text-slate-400 font-normal">
                         {currentSubject?.name || "Subject"} • {currentTopic?.name || "Topic"}
                       </div>
@@ -648,996 +819,719 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. HERO CONVERSATIONAL CHAT AREA (300% Expanded Viewport)                  */}
+      {/* 2. MAIN VIEW CONTAINER                                                    */}
       {/* ========================================================================= */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 scrollbar-thin flex flex-col">
-        {messages.length === 0 ? (
+        {viewMode === "home" ? (
           /* ===================================================================== */
-          /* PREMIUM EMPTY STATE (ChatGPT / Gemini Style AI Hero)                  */
+          /* HOME SCREEN (Intelligent Assistant Dashboard)                         */
           /* ===================================================================== */
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-3 sm:p-6 my-auto animate-in fade-in zoom-in-95 duration-300 max-w-2xl mx-auto w-full">
-            {/* Glowing Abya Icon */}
-            <div className="relative mb-3 sm:mb-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center shadow-xl shadow-emerald-500/20">
-                <div className="w-full h-full bg-slate-950/90 rounded-[22px] flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-400" />
+          <div className="space-y-4 animate-in fade-in duration-300 max-w-3xl mx-auto w-full pb-4">
+            {/* ------------------------------------------------------------------- */}
+            {/* SECTION 1: Greeting Card                                            */}
+            {/* ------------------------------------------------------------------- */}
+            <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-slate-900/95 via-slate-950/90 to-emerald-950/30 shadow-xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-44 h-44 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-400 to-cyan-500 p-0.5 flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
+                      <Sparkles className="w-4 h-4 text-slate-950 font-bold" />
+                    </div>
+                    <h1 className="text-lg sm:text-xl font-black text-white font-heading tracking-tight">
+                      {getGreeting()}, <span className="inline-block" dir="ltr">{getStudentDisplayName(activeStudent, settings, "Student")}</span> 👋
+                    </h1>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                    <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+                      {activeStudent?.classLevel || "Class 12"}
+                    </span>
+                    {activeStudent?.stream && (
+                      <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold">
+                        {activeStudent.stream}
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold">
+                      {activeStudent?.board || "CBSE"} Board
+                    </span>
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-amber-400" />
+                      {streakCount} Day Streak
+                    </span>
+                  </div>
+                </div>
+
+                {/* Countdown & Readiness Badge */}
+                <div className="flex items-center gap-2.5 bg-slate-900/80 border border-white/10 rounded-xl p-2.5 px-3 shrink-0">
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                      {examProfile?.examName || "Target Exam"}
+                    </div>
+                    <div className="text-xs sm:text-sm font-extrabold text-emerald-400 flex items-center justify-end gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{daysRemaining} Days Left</span>
+                    </div>
+                  </div>
+                  <div className="h-7 w-px bg-white/10 mx-1" />
+                  <div className="text-center">
+                    <div className="text-[10px] text-slate-400 font-medium">Readiness</div>
+                    <div className="text-xs sm:text-sm font-extrabold text-cyan-300">
+                      {calculatedReadiness}%
+                    </div>
+                  </div>
                 </div>
               </div>
-              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold text-[9px] font-mono shadow-md">
-                READY
-              </span>
             </div>
 
-            {/* Greeting */}
-            <h1 className="text-lg sm:text-2xl font-black text-white font-heading tracking-tight mb-1">
-              👋 {getGreeting()}, {activeStudent.name}!
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-md mb-4 leading-relaxed">
-              I am Abya AI, your academic companion. What concept or problem would you like to master today?
-            </p>
+            {/* ------------------------------------------------------------------- */}
+            {/* SECTION 2: Today's AI Briefing                                      */}
+            {/* ------------------------------------------------------------------- */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                  <Brain className="w-4 h-4 text-emerald-400" />
+                  Today's AI Briefing
+                </div>
+                <span className="text-[11px] text-slate-400">Contextual Overview</span>
+              </div>
 
-            {/* Active Topic Resume Banner */}
-            {currentTopic && (
-              <div className="w-full glass-card p-3 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent mb-4 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                <div className="min-w-0">
-                  <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider block mb-0.5">
-                    Continue Where You Left Off
-                  </span>
-                  <h4 className="text-xs sm:text-sm font-bold text-white truncate">
-                    {currentTopic.name}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    {currentSubject?.name} • Ch {currentChapter?.chapterNumber}: {currentChapter?.title}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {/* 1. Pending Tasks */}
+                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-emerald-500/30 transition-all bg-slate-900/60">
+                  <div className="flex items-center justify-between text-slate-400 mb-1">
+                    <span className="text-[11px] font-semibold text-slate-300">Pending Tasks</span>
+                    <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-white font-heading">
+                    {pendingTasks.length === 0 ? "All Done! 🎉" : `${pendingTasks.length} Left`}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    {highPriorityTasksCount > 0
+                      ? `${highPriorityTasksCount} high priority • Today`
+                      : "Daily tasks queue"}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                  <button
-                    onClick={() => handleCurriculumTopicAction("explanation")}
-                    disabled={isLoading}
-                    className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-all active:scale-95 shadow-sm shadow-emerald-500/20"
-                  >
-                    Explain Concept
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("notes")}
-                    disabled={isLoading}
-                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/15 transition-all active:scale-95"
-                  >
-                    Notes
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("mcq")}
-                    disabled={isLoading}
-                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/15 transition-all active:scale-95"
-                  >
-                    5 MCQs
-                  </button>
+                {/* 2. Study Time Completed */}
+                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-cyan-500/30 transition-all bg-slate-900/60">
+                  <div className="flex items-center justify-between text-slate-400 mb-1">
+                    <span className="text-[11px] font-semibold text-slate-300">Study Completed</span>
+                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-cyan-300 font-heading">
+                    {studyTimeHours}h {studyTimeMinutes}m
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    Target: {targetStudyHours}h • {studyProgressPct}% done
+                  </p>
+                </div>
+
+                {/* 3. Weak Subject */}
+                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-amber-500/30 transition-all bg-slate-900/60">
+                  <div className="flex items-center justify-between text-slate-400 mb-1">
+                    <span className="text-[11px] font-semibold text-slate-300">Weak Subject</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-amber-300 font-heading truncate">
+                    {weakSubjectInfo.title}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    {weakSubjectInfo.detail}
+                  </p>
+                </div>
+
+                {/* 4. Suggested Duration */}
+                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all bg-slate-900/60">
+                  <div className="flex items-center justify-between text-slate-400 mb-1">
+                    <span className="text-[11px] font-semibold text-slate-300">Suggested Duration</span>
+                    <Lightbulb className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-purple-300 font-heading truncate">
+                    {suggestedDurationText}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    Optimized for {daysRemaining}d countdown
+                  </p>
                 </div>
               </div>
-            )}
 
-            {/* Quick Action Prompt Cards Grid */}
-            <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 text-left">
-              <button
-                onClick={() => handleCurriculumTopicAction("explanation")}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <BookOpen className="w-4 h-4" />
+              {/* Smart AI Recommendation Tip */}
+              <div className="glass-card p-3 rounded-2xl border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 shrink-0 mt-0.5">
+                    <Zap className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                      Abya AI Mentor Tip
+                    </span>
+                    <p className="text-xs text-slate-200 font-medium line-clamp-2">
+                      {aiRecommendationTip}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-xs font-bold text-white group-hover:text-emerald-300">Explain Topic</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Intuitive breakdown & analogies</div>
-              </button>
+                <button
+                  onClick={() => handleQuickActionClick("study_plan")}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-sm shadow-emerald-500/20 flex items-center gap-1"
+                >
+                  <span>Apply Plan</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
 
-              <button
-                onClick={() => handleCurriculumTopicAction("notes")}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <FileText className="w-4 h-4" />
+            {/* ------------------------------------------------------------------- */}
+            {/* SECTION 3: Quick Actions Grid (6 Action Cards)                      */}
+            {/* ------------------------------------------------------------------- */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  Quick Actions
                 </div>
-                <div className="text-xs font-bold text-white group-hover:text-cyan-300">Generate Notes</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">High-yield revision points</div>
-              </button>
+                <span className="text-[11px] text-slate-400">Instant AI generation</span>
+              </div>
 
-              <button
-                onClick={() => handleCurriculumTopicAction("mcq")}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <CheckSquare className="w-4 h-4" />
-                </div>
-                <div className="text-xs font-bold text-white group-hover:text-purple-300">Practice MCQs</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Exam-standard questions</div>
-              </button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {/* 1. Study Plan */}
+                <button
+                  onClick={() => handleQuickActionClick("study_plan")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center justify-between">
+                      <span>📚 Study Plan</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      Today's customized timetable & priorities
+                    </div>
+                  </div>
+                </button>
 
-              <button
-                onClick={() => handleCurriculumTopicAction("pyq")}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <RotateCw className="w-4 h-4" />
-                </div>
-                <div className="text-xs font-bold text-white group-hover:text-blue-300">Solve PYQs</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Previous year board papers</div>
-              </button>
+                {/* 2. Revision Plan */}
+                <button
+                  onClick={() => handleQuickActionClick("revision_plan")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <RotateCw className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-cyan-300 flex items-center justify-between">
+                      <span>📝 Revision Plan</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      Spaced recall for weak & due topics
+                    </div>
+                  </div>
+                </button>
 
-              <button
-                onClick={() => handleCurriculumTopicAction("revision")}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div className="text-xs font-bold text-white group-hover:text-amber-300">5 Min Revision</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Rapid recall summary</div>
-              </button>
+                {/* 3. Exam Strategy */}
+                <button
+                  onClick={() => handleQuickActionClick("exam_strategy")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-purple-300 flex items-center justify-between">
+                      <span>🎯 Exam Strategy</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      High weightage, scoring rubrics & tricks
+                    </div>
+                  </div>
+                </button>
 
-              <button
-                onClick={() => {
-                  handleSend(
-                    "Act as my Career & Academic Advisor. Help me evaluate my subject combinations, competitive exam roadmaps, and college entrance pathways.",
-                    "career_guidance"
-                  );
-                }}
-                disabled={isLoading}
-                className="p-3 rounded-2xl glass-card border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <Compass className="w-4 h-4" />
+                {/* 4. Progress Analysis */}
+                <button
+                  onClick={() => handleQuickActionClick("progress_analysis")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <BarChart3 className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-blue-300 flex items-center justify-between">
+                      <span>📊 Progress Analysis</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      Mastery breakdown & test accuracy
+                    </div>
+                  </div>
+                </button>
+
+                {/* 5. Weekly Schedule */}
+                <button
+                  onClick={() => handleQuickActionClick("weekly_schedule")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-amber-300 flex items-center justify-between">
+                      <span>📅 Weekly Schedule</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      7-day timetable balancing all subjects
+                    </div>
+                  </div>
+                </button>
+
+                {/* 6. Ask a Doubt */}
+                <button
+                  onClick={() => handleQuickActionClick("ask_doubt")}
+                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                      <HelpCircle className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-bold text-white group-hover:text-rose-300 flex items-center justify-between">
+                      <span>❓ Ask a Doubt</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      Step-by-step solutions & camera upload
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* ------------------------------------------------------------------- */}
+            {/* SECTION 4: Suggested Prompts                                        */}
+            {/* ------------------------------------------------------------------- */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  Suggested Prompts
                 </div>
-                <div className="text-xs font-bold text-white group-hover:text-rose-300">Career Guidance</div>
-                <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">Pathways & admissions</div>
-              </button>
+                <span className="text-[11px] text-slate-400">One-tap ask</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {suggestedPromptsList.map((promptText, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendSuggestedPrompt(promptText)}
+                    className="px-3 py-2 rounded-xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-medium text-slate-200 hover:text-white transition-all text-left flex items-center gap-2 group active:scale-95 shadow-sm"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>{promptText}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ------------------------------------------------------------------- */}
+            {/* SECTION 5: Recent Conversations                                     */}
+            {/* ------------------------------------------------------------------- */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                  <Clock className="w-4 h-4 text-emerald-400" />
+                  Recent Conversations
+                </div>
+                {chatSessions.length > 0 && (
+                  <button
+                    onClick={handleStartNewChat}
+                    className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New Chat</span>
+                  </button>
+                )}
+              </div>
+
+              {chatSessions.length === 0 && messages.length === 0 ? (
+                <div className="p-4 rounded-2xl glass-card border border-dashed border-white/15 text-center text-slate-400 text-xs py-5">
+                  <p className="font-medium text-slate-300">No previous conversations yet</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Tap any quick action or ask a question below to start your first session with Abya AI!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {chatSessions.slice(0, 4).map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-3 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/30 hover:bg-white/5 transition-all flex items-center justify-between gap-3 group"
+                    >
+                      <button
+                        onClick={() => handleReopenSession(session)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-bold text-xs text-white group-hover:text-emerald-300 truncate">
+                            {session.title || "Academic Study Session"}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/10 text-slate-300 font-mono shrink-0">
+                            {session.messagesCount || session.messages?.length || 1} msg
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {session.previewMessage || "Click to reopen this conversation..."}
+                        </p>
+                        <span className="text-[9px] text-slate-500 mt-1 block">
+                          {formatSessionTimestamp(session.updatedAt || session.createdAt)}
+                        </span>
+                      </button>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleReopenSession(session)}
+                          className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all active:scale-95"
+                        >
+                          Open
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecentSession(session.id)}
+                          className="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors"
+                          title="Delete conversation"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
           /* ===================================================================== */
-          /* ACTIVE CHAT STREAM (Spacious, Elegant, ChatGPT / Claude Styling)       */
+          /* ACTIVE CONVERSATION THREAD (ChatGPT / Gemini Style AI Messages)       */
           /* ===================================================================== */
-          <>
-            {messages.map((msg) => {
-              const isUser = msg.role === "user";
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex items-start gap-2.5 sm:gap-3 ${
-                    isUser ? "flex-row-reverse" : "flex-row"
-                  }`}
-                >
+          <div className="space-y-4 max-w-3xl mx-auto w-full flex-1 flex flex-col justify-start">
+            {messages.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                <Sparkles className="w-8 h-8 text-emerald-400 mb-2" />
+                <h3 className="text-sm font-bold text-white">Ask anything to Abya AI</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                  Type your study doubt or choose a quick action to get step-by-step guidance.
+                </p>
+              </div>
+            ) : (
+              messages.map((m) => {
+                const isUser = m.role === "user";
+                return (
                   <div
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      isUser
-                        ? "bg-slate-700 text-slate-200"
-                        : msg.isError
-                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                        : "bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 font-bold shadow-md shadow-emerald-500/20"
+                    key={m.id}
+                    className={`flex gap-2.5 sm:gap-3 text-left animate-in fade-in duration-200 ${
+                      isUser ? "flex-row-reverse" : "flex-row"
                     }`}
                   >
-                    {isUser ? (
-                      <User className="w-3.5 h-3.5" />
-                    ) : msg.isError ? (
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                    ) : (
-                      <Bot className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-
-                  <div
-                    className={`max-w-[88%] sm:max-w-[80%] p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border space-y-2 relative group ${
-                      isUser
-                        ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-100 rounded-tr-none"
-                        : msg.isError
-                        ? "bg-rose-950/40 border-rose-500/30 text-rose-200 rounded-tl-none"
-                        : "glass-card border-white/10 text-slate-100 rounded-tl-none bg-slate-900/70"
-                    }`}
-                  >
-                    {/* Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                      {!isUser && !msg.isFallback && !msg.isError && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>Online AI ({msg.modelUsed || "gemini-3.7-flash"})</span>
-                        </span>
-                      )}
-                      {msg.mode === "high_thinking" && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
-                          <Brain className="w-3 h-3" />
-                          <span>High Thinking</span>
-                        </span>
-                      )}
-                      {msg.mode === "fast_lite" && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
-                          <Zap className="w-3 h-3" />
-                          <span>Fast Lite</span>
-                        </span>
-                      )}
-                      {msg.mode === "search_grounded" && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold">
-                          <Search className="w-3 h-3" />
-                          <span>Search Grounded</span>
-                        </span>
-                      )}
-                      {msg.imageUrl && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
-                          <ImageIcon className="w-3 h-3" />
-                          <span>Photo Analyzed</span>
-                        </span>
-                      )}
-                      {msg.isFallback && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
-                          <Zap className="w-3 h-3 text-amber-400" />
-                          <span>Local Mentor</span>
-                        </span>
-                      )}
+                    {/* Avatar */}
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${
+                        isUser
+                          ? "bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-md"
+                          : m.isFallback
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      }`}
+                    >
+                      {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                     </div>
 
-                    {/* Image Preview in Message */}
-                    {msg.imageUrl && (
-                      <div className="my-2 rounded-xl overflow-hidden border border-slate-700/80 max-w-sm">
-                        <img
-                          src={msg.imageUrl}
-                          alt="Uploaded study problem"
-                          referrerPolicy="no-referrer"
-                          className="max-h-60 w-auto object-contain bg-slate-950/80"
-                        />
-                      </div>
-                    )}
-
-                    <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
-
-                    {/* Grounding Sources */}
-                    {msg.groundingSources && msg.groundingSources.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-blue-500/20">
-                        <div className="text-[11px] font-bold text-blue-300 flex items-center gap-1.5 mb-1.5">
-                          <Search className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Web Grounding Sources ({msg.groundingSources.length})</span>
+                    {/* Content Container */}
+                    <div
+                      className={`flex flex-col max-w-[85%] sm:max-w-[80%] ${
+                        isUser ? "items-end" : "items-start"
+                      }`}
+                    >
+                      {/* Attached Image in Message */}
+                      {m.imageUrl && (
+                        <div className="mb-2 rounded-2xl overflow-hidden border border-white/10 max-w-xs shadow-md">
+                          <img
+                            src={m.imageUrl}
+                            alt="Study Question"
+                            className="w-full h-auto max-h-56 object-contain bg-slate-950"
+                          />
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {msg.groundingSources.map((source, sIdx) => (
-                            <a
-                              key={sIdx}
-                              href={source.uri}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 border border-blue-500/30 text-blue-200 text-[11px] transition-colors max-w-xs truncate"
-                              title={source.uri}
-                            >
-                              <ExternalLink className="w-3 h-3 text-blue-400 shrink-0" />
-                              <span className="truncate">{source.title || source.uri}</span>
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Error State with Retry & Fallback */}
-                    {msg.isError && (
-                      <div className="pt-2 mt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2">
-                        {onRetryLastMessage && (
-                          <button
-                            onClick={onRetryLastMessage}
-                            className="px-3 py-1.5 rounded-xl bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-rose-600 transition-colors"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Retry Request</span>
-                          </button>
-                        )}
-                        {onTriggerFallbackAction && (
-                          <button
-                            onClick={() => onTriggerFallbackAction("plan_day")}
-                            className="px-3 py-1.5 rounded-xl glass-pill text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1.5 hover:bg-amber-500/10 transition-colors"
-                          >
-                            <Zap className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Use Local Intelligence</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 font-mono">
-                      <div className="flex items-center gap-2">
-                        <span>
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        {msg.thinkingDurationMs && (
-                          <span className="flex items-center gap-0.5 text-purple-300/80">
-                            <Clock className="w-3 h-3" />
-                            <span>{msg.thinkingDurationMs}ms</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => handleCopy(msg.id, msg.content)}
-                        className="opacity-80 hover:opacity-100 text-slate-400 hover:text-white transition-opacity flex items-center gap-1"
-                        title="Copy response"
+                      {/* Text Bubble */}
+                      <div
+                        className={`rounded-2xl p-3 sm:p-4 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
+                          isUser
+                            ? "bg-emerald-500 text-slate-950 font-medium rounded-tr-none shadow-md shadow-emerald-500/10"
+                            : "glass-card border border-white/10 text-slate-100 rounded-tl-none bg-slate-900/80 backdrop-blur-md shadow-lg"
+                        }`}
                       >
-                        {copiedId === msg.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                        {m.content}
+                      </div>
+
+                      {/* Assistant Metadata Badges */}
+                      {!isUser && (
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px] text-slate-400">
+                          {m.isFallback ? (
+                            <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              <Cpu className="w-2.5 h-2.5" />
+                              Local Study Mentor
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              {m.modelUsed || "Gemini Online AI"}
+                            </span>
+                          )}
+
+                          {m.thinkingDurationMs && (
+                            <span className="text-slate-500 flex items-center gap-0.5">
+                              <Clock className="w-2.5 h-2.5" />
+                              {Math.round(m.thinkingDurationMs / 100) / 10}s
+                            </span>
+                          )}
+
+                          {/* Copy Button */}
+                          <button
+                            onClick={() => handleCopy(m.id, m.content)}
+                            className="hover:text-white flex items-center gap-0.5 transition-colors ml-1"
+                            title="Copy response"
+                          >
+                            {copiedId === m.id ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
 
-            {/* Typing / Loading indicator */}
+            {/* Typing Indicator */}
             {isLoading && (
-              <div className="flex items-center gap-3 animate-in fade-in">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-900 flex items-center justify-center shrink-0 font-bold">
+              <div className="flex gap-2.5 sm:gap-3 text-left animate-in fade-in duration-200">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-400 to-cyan-500 text-slate-950 flex items-center justify-center shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
-                <div className="glass-card px-4 py-3 rounded-2xl border border-white/10 rounded-tl-none flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce delay-150" />
-                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
-                  <span className="text-xs text-slate-300 font-mono ml-2">
-                    {selectedImage
-                      ? "Analyzing image with gemini-3.1-pro-preview..."
-                      : selectedMode === "high_thinking"
-                      ? "Gemini 3.1 Pro (High Thinking) is reasoning step-by-step..."
-                      : selectedMode === "search_grounded"
-                      ? "Gemini 3.5 Flash is searching Google & grounding data..."
-                      : selectedMode === "fast_lite"
-                      ? "Gemini 3.1 Flash Lite is generating instant response..."
-                      : `Abya AI is processing request for ${activeStudent.name}...`}
+                <div className="glass-card rounded-2xl rounded-tl-none p-3.5 border border-white/10 flex items-center gap-2 text-xs text-emerald-300">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                  <span className="text-[11px] text-slate-400 ml-1">
+                    Abya AI is crafting your explanation...
                   </span>
                 </div>
               </div>
             )}
-          </>
+            <div ref={chatEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. STICKY COMPOSER BAR (Always Accessible & Responsive)                    */}
+      {/* ========================================================================= */}
+      <div className="mt-2 shrink-0 relative z-30">
+        {/* Active Image Attachment Pill */}
+        {selectedImage && (
+          <div className="mb-2 p-2 rounded-2xl glass-card border border-emerald-500/30 flex items-center justify-between gap-2 bg-slate-900/90 backdrop-blur-md">
+            <div className="flex items-center gap-2 min-w-0">
+              <img
+                src={selectedImage.previewUrl}
+                alt="Selected"
+                className="w-10 h-10 object-cover rounded-xl border border-white/10"
+              />
+              <div className="min-w-0 text-left">
+                <div className="text-xs font-bold text-white truncate">
+                  {selectedImage.fileName}
+                </div>
+                <div className="text-[10px] text-emerald-400">Photo Attached • Ready to analyze</div>
+              </div>
+            </div>
+            <button
+              onClick={handleClearSelectedImage}
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         )}
 
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. FLOATING AI CONTROLS / TOOLS BAR (ChatGPT Style Horizontal Chips)       */}
-      {/* ========================================================================= */}
-      <div className="pt-2 pb-1.5 overflow-x-auto scrollbar-none shrink-0">
-        <div className="flex items-center gap-1.5 min-w-max">
-          {quickActionTools.map((act, index) => {
-            const Icon = act.icon;
-            return (
-              <button
-                key={index}
-                onClick={() => {
-                  if (act.isModalTrigger === "voice") {
-                    setShowLiveVoiceModal(true);
-                  } else if (act.isModalTrigger === "camera") {
-                    cameraInputRef.current?.click();
-                  } else if (act.isModalTrigger === "intel") {
-                    setIsIntelligenceDrawerOpen(true);
-                  } else {
-                    if (act.modeToSet) setSelectedMode(act.modeToSet);
-                    if (act.prompt) {
-                      handleSend(
-                        `${act.prompt} ${currentTopic ? `"${currentTopic.name}" (${currentSubject?.name})` : "my current syllabus topics"}`,
-                        act.type,
-                        act.modeToSet
-                      );
-                    }
-                  }
-                }}
-                disabled={isLoading}
-                className={`px-2.5 py-1 rounded-xl glass-pill border text-xs font-medium flex items-center gap-1.5 transition-all ${act.accentClass} disabled:opacity-50 active:scale-95 shadow-sm`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{act.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Image Thumbnail Preview before sending */}
-      {selectedImage && (
-        <div className="glass-card p-2 rounded-2xl border border-cyan-500/40 mb-1.5 flex items-center justify-between gap-3 shrink-0 bg-slate-900/90 animate-in fade-in">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src={selectedImage.previewUrl}
-              alt="Selected problem preview"
-              referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-xl object-cover border border-cyan-500/30 shrink-0"
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 truncate">
-                <span className="text-xs font-bold text-white truncate">
-                  {selectedImage.fileName}
-                </span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
-                  gemini-3.1-pro-preview
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 truncate">
-                Photo ready. Type doubt or press Send.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleRemoveImage}
-            className="p-1 rounded-xl glass-pill text-slate-400 hover:text-rose-400 transition-colors shrink-0"
-            title="Remove Photo"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 4. MODERN STICKY COMPOSER (Floating Rounded Pill / ChatGPT Aesthetic)      */}
-      {/* ========================================================================= */}
-      <div className="sticky bottom-0 z-30 pt-0.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.2rem)] shrink-0">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="glass-card p-1.5 sm:p-2 rounded-2xl sm:rounded-3xl border border-white/20 flex items-center gap-1 sm:gap-2 bg-slate-900/95 backdrop-blur-2xl shadow-2xl"
-        >
-          {/* Hidden File Inputs */}
+        {/* Input Bar */}
+        <div className="glass-card rounded-2xl p-1.5 sm:p-2 border border-white/15 bg-slate-950/90 backdrop-blur-xl shadow-2xl flex items-center gap-1.5">
+          {/* Camera / Upload Action */}
           <input
-            ref={fileInputRef}
             type="file"
+            ref={fileInputRef}
+            onChange={handleImageFileChange}
             accept="image/*"
-            onChange={handleImageSelect}
             className="hidden"
-            id="abya-photo-upload"
           />
           <input
-            ref={cameraInputRef}
             type="file"
+            ref={cameraInputRef}
+            onChange={handleImageFileChange}
             accept="image/*"
             capture="environment"
-            onChange={handleImageSelect}
             className="hidden"
-            id="abya-camera-upload"
           />
 
-          {/* Left Attachment / Camera Buttons */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px] ${
-                selectedImage
-                  ? "bg-cyan-500/20 border border-cyan-500 text-cyan-300"
-                  : "text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-              title="Upload Study Image / Document"
-              aria-label="Upload document or photo"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
+          <button
+            onClick={() => cameraInputRef.current?.click()}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors active:scale-95 shrink-0"
+            title="Take Photo of Question"
+          >
+            <Camera className="w-4 h-4" />
+          </button>
 
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px]"
-              title="Take Photo of Textbook Doubt"
-              aria-label="Camera doubt capture"
-            >
-              <Camera className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors active:scale-95 shrink-0 hidden xs:block"
+            title="Upload Image"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
 
-          {/* Center Input */}
+          {/* Text Input */}
           <input
             ref={inputRef}
             type="text"
-            placeholder={
-              selectedImage
-                ? "Ask a question about this photo..."
-                : selectedMode === "high_thinking"
-                ? `High Thinking: Ask complex proof for ${activeStudent.name}...`
-                : selectedMode === "search_grounded"
-                ? `Search: Exam updates, dates for ${activeStudent.name}...`
-                : `Ask Abya AI anything (${currentTopic ? currentTopic.name : "Study doubt"})...`
-            }
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
-            onFocus={() => {
-              setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-              }, 120);
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
             }}
-            disabled={isLoading}
-            className="flex-1 px-2 py-1.5 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none min-w-0 font-sans"
+            placeholder={`Ask Abya AI in ${abyaLanguage}...`}
+            className="flex-1 min-w-0 bg-transparent border-0 text-white placeholder:text-slate-500 text-xs sm:text-sm focus:outline-none focus:ring-0 px-2 py-1.5"
           />
-
-          {/* Right Live Voice Button */}
-          <button
-            type="button"
-            onClick={() => setShowLiveVoiceModal(true)}
-            className="p-2 rounded-xl text-emerald-400 hover:bg-emerald-500/15 transition-all flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px]"
-            title="Start Live Voice Conversation"
-            aria-label="Start live voice"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
 
           {/* Send Button */}
           <button
-            type="submit"
+            onClick={() => handleSend()}
             disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
-            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 text-slate-950 font-black disabled:opacity-30 hover:shadow-lg hover:shadow-emerald-500/25 transition-all shrink-0 active:scale-95 min-w-[38px] min-h-[38px] flex items-center justify-center"
-            aria-label="Send message to Abya AI"
+            className={`p-2 sm:px-3.5 sm:py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 active:scale-95 ${
+              (inputPrompt.trim() || selectedImage) && !isLoading
+                ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/25"
+                : "bg-white/5 text-slate-600 cursor-not-allowed"
+            }`}
           >
-            <Send className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">Send</span>
           </button>
-        </form>
+        </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 5. SUBJECT CONTEXT DRAWER (Slide-out Sheet - Replaces Old Wall of Selects) */}
+      {/* 4. MODALS & DRAWERS                                                       */}
       {/* ========================================================================= */}
-      {isContextDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="fixed inset-0"
-            onClick={() => setIsContextDrawerOpen(false)}
-          />
 
-          <div
-            className="relative w-full max-w-md h-full bg-slate-950 border-l border-white/10 shadow-2xl p-4 sm:p-6 overflow-y-auto z-10 flex flex-col justify-between animate-in slide-in-from-right duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="space-y-4">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                    <Sliders className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold font-heading text-white">
-                      Curriculum & AI Context
-                    </h3>
-                    <p className="text-[10px] text-slate-400">
-                      {activeStudent.name} • {activeStudent.classLevel} {activeStudent.stream}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setIsContextDrawerOpen(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+      {/* Language Switcher Modal */}
+      {showLanguageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-card max-w-sm w-full rounded-2xl p-4 border border-purple-500/30 bg-slate-900/95 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-purple-400" />
+                <h3 className="font-bold text-sm text-white">Select Abya Language</h3>
               </div>
-
-              {/* 1. AI Reasoning Mode */}
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
-                  AI Reasoning Mode
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: "standard" as AbyaAIMode, label: "⚡ Standard Flash", desc: "Balanced speed & depth" },
-                    { id: "high_thinking" as AbyaAIMode, label: "🧠 High Thinking", desc: "Gemini 3.1 Pro Deep Proofs" },
-                    { id: "fast_lite" as AbyaAIMode, label: "⚡ Fast Lite", desc: "Instant flashcard speed" },
-                    { id: "search_grounded" as AbyaAIMode, label: "🌐 Search Grounded", desc: "Live syllabus & exam news" },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelectedMode(m.id)}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        selectedMode === m.id
-                          ? "bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10"
-                          : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
-                      }`}
-                    >
-                      <div className="text-xs font-bold">{m.label}</div>
-                      <div className="text-[10px] text-slate-400">{m.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 2. Subject Selection */}
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
-                  Subject
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {curriculumSubjects.map((sub) => (
-                    <button
-                      key={sub.id}
-                      onClick={() => handleSelectSubject(sub.id)}
-                      className={`p-2 rounded-xl text-left border text-xs font-bold transition-all truncate ${
-                        selectedSubId === sub.id
-                          ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
-                          : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                      }`}
-                    >
-                      {sub.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3. Chapter Selection */}
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
-                  Chapter
-                </label>
-                <select
-                  value={selectedChapId}
-                  onChange={(e) => handleSelectChapter(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-medium focus:outline-none focus:border-emerald-400"
-                >
-                  {currentSubject?.chapters.map((chap) => (
-                    <option key={chap.id} value={chap.id}>
-                      Ch {chap.chapterNumber}: {chap.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 4. Topic Selection */}
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
-                  Topic
-                </label>
-                <select
-                  value={selectedTopId}
-                  onChange={(e) => setSelectedTopId(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-300 font-medium focus:outline-none focus:border-emerald-400"
-                >
-                  {currentChapter?.topics.map((top) => (
-                    <option key={top.id} value={top.id}>
-                      {top.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 5. 1-Tap Topic Action Launcher */}
-              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                  Instant Topic Launcher
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    onClick={() => handleCurriculumTopicAction("explanation")}
-                    className="p-2 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/25"
-                  >
-                    Explain
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("notes")}
-                    className="p-2 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-500/25"
-                  >
-                    Notes
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("mcq")}
-                    className="p-2 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 text-xs font-bold hover:bg-purple-500/25"
-                  >
-                    MCQs
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("pyq")}
-                    className="p-2 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-bold hover:bg-blue-500/25"
-                  >
-                    PYQs
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("vvi")}
-                    className="p-2 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-bold hover:bg-rose-500/25"
-                  >
-                    VVI
-                  </button>
-                  <button
-                    onClick={() => handleCurriculumTopicAction("revision")}
-                    className="p-2 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/25"
-                  >
-                    Revision
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="pt-4 border-t border-white/10 flex items-center gap-2">
               <button
-                onClick={() => setIsContextDrawerOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:shadow-lg transition-all"
+                onClick={() => setShowLanguageModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400"
               >
-                Apply Context & Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 6. ABYA INTELLIGENCE PANEL (Collapsible Drawer with Real Student Data)      */}
-      {/* ========================================================================= */}
-      {isIntelligenceDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="fixed inset-0"
-            onClick={() => setIsIntelligenceDrawerOpen(false)}
-          />
-
-          <div
-            className="relative w-full max-w-md h-full bg-slate-950 border-l border-white/10 shadow-2xl p-4 sm:p-6 overflow-y-auto z-10 flex flex-col justify-between animate-in slide-in-from-right duration-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                    <BarChart3 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold font-heading text-white">
-                      Academic Intelligence
-                    </h3>
-                    <p className="text-[10px] text-slate-400">
-                      Personalized for {activeStudent.name}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setIsIntelligenceDrawerOpen(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Study Stats Snapshot */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-                  <div className="flex items-center justify-center gap-1 text-amber-400 font-bold text-xs mb-0.5">
-                    <Flame className="w-3.5 h-3.5" />
-                    <span>Streak</span>
-                  </div>
-                  <div className="text-base font-black text-white font-mono">
-                    {habits.length > 0 ? `${habits[0].streak || 5}d` : "5d"}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-                  <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-xs mb-0.5">
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>Daily XP</span>
-                  </div>
-                  <div className="text-base font-black text-white font-mono">
-                    {activeStudent.xp || 420}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-                  <div className="flex items-center justify-center gap-1 text-cyan-400 font-bold text-xs mb-0.5">
-                    <Target className="w-3.5 h-3.5" />
-                    <span>Accuracy</span>
-                  </div>
-                  <div className="text-base font-black text-white font-mono">
-                    {calculatedAccuracy}%
-                  </div>
-                </div>
-              </div>
-
-              {/* Weak Topics Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                  <span className="flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Weak Topics & Focus Queue</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">{weakTopics.length || 2} detected</span>
-                </div>
-
-                {weakTopics.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {weakTopics.map((chap) => (
-                      <div
-                        key={chap.id}
-                        className="p-2.5 rounded-xl glass-card border border-rose-500/30 bg-rose-500/5 flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-white truncate">
-                            {chap.title}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Mastery: {chap.masteryLevel || 35}% • Needs Practice
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setIsIntelligenceDrawerOpen(false);
-                            handleSend(
-                              `Explain "${chap.title}" in simple intuitive terms and test me with 3 practice questions.`,
-                              "explain_topic"
-                            );
-                          }}
-                          className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[10px] font-bold shrink-0"
-                        >
-                          Practice
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>All syllabus chapters currently meet target mastery standards!</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Spaced Repetition Due */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                  <span className="flex items-center gap-1.5">
-                    <RotateCw className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Spaced Repetition Due Today</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">{dueRevisions.length || 2} due</span>
-                </div>
-
-                {dueRevisions.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {dueRevisions.map((rev) => (
-                      <div
-                        key={rev.id}
-                        className="p-2.5 rounded-xl glass-card border border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-white truncate">
-                            {rev.topicName}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Stage: {rev.repetitionIntervalDays || 3}d interval
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setIsIntelligenceDrawerOpen(false);
-                            handleSend(
-                              `Give me a 5-minute rapid recall drill on "${rev.topicName}" for my spaced repetition schedule.`,
-                              "revise"
-                            );
-                          }}
-                          className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-bold shrink-0"
-                        >
-                          Recall
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>No revision items overdue for today.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* AI Insight Recommendations */}
-              {insightCards.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-300 block">
-                    AI Coaching Insights
-                  </span>
-                  <div className="space-y-1.5">
-                    {insightCards.map((card) => (
-                      <div
-                        key={card.id}
-                        className="p-3 rounded-xl glass-card border border-indigo-500/30 bg-indigo-500/5 space-y-1"
-                      >
-                        <div className="text-xs font-bold text-indigo-300">{card.title}</div>
-                        <p className="text-[11px] text-slate-300 leading-snug">{card.recommendation}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Close Drawer Button */}
-            <div className="pt-4 border-t border-white/10">
-              <button
-                onClick={() => setIsIntelligenceDrawerOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/15 transition-all"
-              >
-                Close Intelligence Panel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 7. LIVE VOICE API MODAL                                                   */}
-      {/* ========================================================================= */}
-      <AbyaLiveVoiceModal
-        isOpen={showLiveVoiceModal}
-        onClose={() => setShowLiveVoiceModal(false)}
-        activeStudent={activeStudent}
-        customApiKey={settings.customApiKey}
-      />
-
-      {/* ========================================================================= */}
-      {/* 8. API KEY CONFIG MODAL                                                   */}
-      {/* ========================================================================= */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div
-            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-                <Key className="w-5 h-5 text-emerald-400" />
-                <span>Abya AI API Key Config</span>
-              </h3>
-              <button
-                onClick={() => setShowApiKeyModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              By default, Garia OS uses the system's runtime Gemini API Key securely server-side for all models:
-              <br />
-              • <strong className="text-purple-300">gemini-3.1-pro-preview</strong> (High Thinking & Image Analysis)
-              <br />
-              • <strong className="text-amber-300">gemini-3.1-flash-lite</strong> (Low Latency Responses)
-              <br />
-              • <strong className="text-blue-300">gemini-3.5-flash</strong> (Google Search Grounding)
-              <br />
-              • <strong className="text-emerald-300">gemini-3.1-flash-live-preview</strong> (Live Voice API)
+            <p className="text-xs text-slate-400">
+              Abya AI will respond naturally in your chosen study tone.
             </p>
 
-            <div>
-              <label className="block text-slate-300 font-medium text-xs mb-1">
-                Custom Gemini API Key (Optional)
-              </label>
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={tempApiKey}
-                onChange={(e) => setTempApiKey(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none"
-              />
+            <div className="space-y-2">
+              {(
+                [
+                  { id: "WhatsApp Language", label: "WhatsApp Language (Hinglish)", desc: "Natural chat language, friendly study tone" },
+                  { id: "Hinglish", label: "Hinglish", desc: "Hindi in Roman script with English terms" },
+                  { id: "English", label: "English", desc: "Clear, standard academic English" },
+                  { id: "Hindi", label: "Hindi (हिंदी)", desc: "Devanagari script with exam vocabulary" },
+                ] as const
+              ).map((lang) => (
+                <button
+                  key={lang.id}
+                  onClick={() => {
+                    if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(lang.id);
+                    setShowLanguageModal(false);
+                  }}
+                  className={`w-full p-2.5 rounded-xl border text-left transition-all ${
+                    abyaLanguage === lang.id
+                      ? "bg-purple-500/20 border-purple-500/50 text-white"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                  }`}
+                >
+                  <div className="text-xs font-bold">{lang.label}</div>
+                  <div className="text-[10px] text-slate-400">{lang.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gemini API Key Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-card max-w-sm w-full rounded-2xl p-4 border border-cyan-500/30 bg-slate-900/95 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-cyan-400" />
+                <h3 className="font-bold text-sm text-white">Custom Gemini API Key</h3>
+              </div>
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
+            <p className="text-xs text-slate-400">
+              Add your own Google Gemini API key to override default server quota.
+            </p>
+
+            <input
+              type="password"
+              value={tempApiKey}
+              onChange={(e) => setTempApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-cyan-400"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
-                type="button"
                 onClick={() => setShowApiKeyModal(false)}
-                className="px-4 py-2 rounded-xl glass-pill text-slate-300 text-xs"
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-slate-300"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleSaveApiKey}
-                className="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-xs"
+                className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold"
               >
                 Save Key
               </button>
@@ -1646,195 +1540,115 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 9. LANGUAGE SELECTOR MODAL                                                */}
-      {/* ========================================================================= */}
-      {showLanguageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div
-            className="w-full max-w-md glass-card rounded-3xl border border-emerald-500/30 p-6 shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+      {/* Diagnostics Modal */}
+      {showDiagnosticsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-card max-w-md w-full rounded-2xl p-4 border border-emerald-500/30 bg-slate-900/95 space-y-3 text-left">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold font-heading text-white">
-                  Abya AI Language Mode
-                </h3>
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-bold text-sm text-white">Abya AI Diagnostics</h3>
               </div>
               <button
-                onClick={() => setShowLanguageModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                onClick={() => setShowDiagnosticsModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Select response language for active student profile{" "}
-              <strong className="text-emerald-300">{activeStudent.name}</strong>.
-            </p>
+            <div className="space-y-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
+                <span className="text-slate-400">Network Status:</span>
+                <span className="font-bold text-emerald-400 flex items-center gap-1">
+                  <Wifi className="w-3.5 h-3.5" /> Online
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
+                <span className="text-slate-400">Active Model:</span>
+                <span className="font-bold text-white">Gemini 2.5 Flash / Pro</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
+                <span className="text-slate-400">Local Intelligence Fallback:</span>
+                <span className="font-bold text-cyan-400">Available (Zero Downtime)</span>
+              </div>
+            </div>
 
-            <div className="space-y-2">
-              {[
-                {
-                  id: "WhatsApp Language" as AbyaLanguageSetting,
-                  label: "Hinglish (Mix)",
-                  badge: "Default & Natural",
-                  desc: "Casual, friendly & adaptive. Automatically matches your style (Roman Hindi, Hinglish, English).",
-                },
-                {
-                  id: "English" as AbyaLanguageSetting,
-                  label: "English",
-                  badge: "Formal",
-                  desc: "Clear, structured English explanations and academic guidance.",
-                },
-                {
-                  id: "Hindi" as AbyaLanguageSetting,
-                  label: "Hindi",
-                  badge: "Devanagari",
-                  desc: "Conversational Hindi explanations for concepts and questions.",
-                },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(item.id);
-                    setShowLanguageModal(false);
-                  }}
-                  className={`w-full p-3.5 rounded-2xl text-left border transition-all flex items-start justify-between gap-3 ${
-                    abyaLanguage === item.id
-                      ? "bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
-                      : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold font-heading text-white">
-                        {item.label}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-white/10 font-mono">
-                        {item.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                      {item.desc}
-                    </p>
-                  </div>
-                  {abyaLanguage === item.id && (
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-1" />
-                  )}
-                </button>
-              ))}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setShowDiagnosticsModal(false)}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 10. DIAGNOSTICS MODAL                                                     */}
-      {/* ========================================================================= */}
-      {showDiagnosticsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div
-            className="w-full max-w-lg glass-card rounded-3xl border border-emerald-500/30 p-6 shadow-2xl space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+      {/* Live Voice Modal */}
+      {showLiveVoiceModal && (
+        <AbyaLiveVoiceModal
+          isOpen={showLiveVoiceModal}
+          onClose={() => setShowLiveVoiceModal(false)}
+          apiKey={settings.customApiKey}
+          studentName={activeStudent?.name || "Student"}
+          classLevel={activeStudent?.classLevel || "Class 12"}
+          stream={activeStudent?.stream || "Commerce"}
+          board={activeStudent?.board || "CBSE"}
+        />
+      )}
+
+      {/* Academic Intelligence Decision Engine Drawer / Modal */}
+      {isIntelligenceDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
+          <div className="relative w-full max-w-5xl my-auto rounded-3xl bg-slate-950/95 border border-indigo-500/30 p-4 sm:p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between sticky top-0 bg-slate-950/95 py-2 z-10 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <Activity className="w-4 h-4" />
+                <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                  <Brain className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold font-heading text-white">
-                    Abya AI Diagnostics
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Active AI routing, health telemetry & fallback guards
+                  <h2 className="text-base sm:text-lg font-bold text-white font-heading">
+                    Academic Decision Engine
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Real-time study prioritization, revision tracking, exam readiness, and career alignment
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowDiagnosticsModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                onClick={() => setIsIntelligenceDrawerOpen(false)}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Server className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-white">Active Engine</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Online AI (Google Gemini)</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/5">
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">Status</span>
-                  <span className="text-xs font-bold capitalize text-emerald-300">
-                    {diagnostics?.lastStatus || "online"}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">Latency</span>
-                  <span className="text-xs font-bold font-mono text-cyan-300">
-                    {diagnostics?.latencyMs ? `${diagnostics.latencyMs}ms` : "Fast (~45ms)"}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">Online Hits</span>
-                  <span className="text-xs font-bold font-mono text-emerald-300">
-                    {diagnostics?.onlineSuccessCount ?? 0}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">Fallback Hits</span>
-                  <span className="text-xs font-bold font-mono text-amber-300">
-                    {diagnostics?.fallbackCount ?? 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
-              <span className="text-[10px] text-slate-500 font-mono truncate">
-                Last test: {diagnostics?.lastTestedAt ? new Date(diagnostics.lastTestedAt).toLocaleTimeString() : "Never"}
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDiagnosticsModal(false)}
-                  className="px-4 py-2 rounded-xl glass-pill text-slate-300 text-xs hover:text-white"
-                >
-                  Close
-                </button>
-                {onTestDiagnostics && (
-                  <button
-                    type="button"
-                    disabled={isPingingDiagnostics}
-                    onClick={async () => {
-                      setIsPingingDiagnostics(true);
-                      try {
-                        await onTestDiagnostics();
-                      } finally {
-                        setIsPingingDiagnostics(false);
-                      }
-                    }}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isPingingDiagnostics ? "animate-spin" : ""}`} />
-                    <span>{isPingingDiagnostics ? "Pinging..." : "Test AI Health"}</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            <AcademicDecisionEngineSection
+              subjects={academicSubjects?.map(s => ({
+                id: s.id,
+                name: s.name,
+                color: s.color,
+                totalChapters: s.totalChapters || 10,
+                completedChapters: s.completedChapters || 0,
+                targetHoursPerWeek: s.targetHoursPerWeek || 5,
+                targetMinutesPerWeek: (s.targetHoursPerWeek || 5) * 60,
+                completedMinutes: 0,
+                totalSessions: 0,
+                gradeLevel: s.classLevel
+              })) || []}
+              activeStudent={activeStudent || undefined}
+              examProfile={examProfile}
+              academicSubjects={academicSubjects}
+              academicChapters={academicChapters}
+              revisions={academicRevisions}
+              practiceSessions={academicPractice}
+              onNavigate={(tab) => {
+                setIsIntelligenceDrawerOpen(false);
+                if (onNavigate) onNavigate(tab);
+              }}
+            />
           </div>
         </div>
       )}

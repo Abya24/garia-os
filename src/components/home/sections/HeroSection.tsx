@@ -25,6 +25,7 @@ import {
 import { GamificationState } from "../../../utils/gamificationEngine";
 import { MotivationalQuote } from "../../../utils/quotes";
 import { AppLanguage } from "../../../utils/i18n";
+import { getStudentDisplayName } from "../../../utils/studentNameUtils";
 import { GariaLogo } from "../../GariaLogo";
 
 interface HeroSectionProps {
@@ -107,9 +108,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     )
   );
 
-  const studentName = activeStudent?.name || settings.userName || "Student";
+  const studentName = getStudentDisplayName(activeStudent, settings, "Student");
   const studentStream = activeStudent?.stream || "Commerce";
   const studentClass = activeStudent?.classLevel || "Class 12";
+
+  // Diagnostic trace for verification
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[Name Trace - HeroSection]", {
+      rawActiveStudentName: activeStudent?.name,
+      rawSettingsUserName: settings?.userName,
+      resolvedDisplayName: studentName,
+      displayGreeting,
+    });
+  }
 
   return (
     <section id="section-1-hero" className="space-y-4">
@@ -171,7 +182,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white font-heading tracking-tight">
-                {displayGreeting}, {studentName}! 👋
+                {displayGreeting}, <span className="inline-block" dir="ltr">{studentName}</span>! 👋
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 {studentClass} • {studentStream}

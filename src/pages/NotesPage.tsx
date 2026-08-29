@@ -347,9 +347,9 @@ export const NotesPage: React.FC<NotesPageProps> = ({
                               key={m.userId || idx}
                               className="inline-block h-6 w-6 rounded-full ring-2 ring-slate-900 flex items-center justify-center text-[10px] text-white font-bold"
                               style={{ backgroundColor: m.avatarColor || "#3B82F6" }}
-                              title={m.name}
+                              title={m?.name || "Member"}
                             >
-                              {m.name.slice(0, 1).toUpperCase()}
+                              {(m?.name || "U").slice(0, 1).toUpperCase()}
                             </div>
                           ))}
                           {members.length > 3 && (

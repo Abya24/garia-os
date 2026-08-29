@@ -19,6 +19,7 @@ import { StreamType } from "../types";
 import { GariaLogo } from "./GariaLogo";
 import { APP_VERSION } from "../constants/version";
 import { signInWithGoogle } from "../utils/firebase";
+import { capitalizeWords } from "../utils/studentNameUtils";
 
 interface WelcomeScreenProps {
   onCreateAccount: (data: {
@@ -238,11 +239,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <input
                   type="text"
                   required
-                  dir="ltr"
-                  style={{ direction: "ltr", textAlign: "left" }}
                   placeholder="e.g. Alex Sharma"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    const formatted = capitalizeWords(e.target.value);
+                    setName(formatted);
+                  }}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
                 />
               </div>

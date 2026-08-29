@@ -34,6 +34,7 @@ import {
   MAX_PIN_LENGTH,
   isValidPinFormat,
 } from "../utils/security";
+import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GariaLogo } from "./GariaLogo";
 
 interface PinLockScreenProps {
@@ -389,7 +390,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                 activeStudent?.avatarColor || "from-emerald-500 to-cyan-500"
               } flex items-center justify-center text-white font-extrabold text-2xl font-heading shadow-xl shadow-emerald-500/20 ring-4 ring-white/10`}
             >
-              {activeStudent?.name ? activeStudent.name.charAt(0).toUpperCase() : <User className="w-8 h-8" />}
+              {getStudentAvatarInitials(getStudentDisplayName(activeStudent, settings, studentName || "Student"))}
             </div>
             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-slate-900 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow">
               <Lock className="w-3 h-3" />
@@ -397,8 +398,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
           </div>
 
           <div>
-            <h2 className="text-lg font-bold font-heading text-white tracking-tight">
-              {activeStudent?.name || studentName || settings.userName || "Student Workspace"}
+            <h2 className="text-lg font-bold font-heading text-white tracking-tight" dir="ltr">
+              {getStudentDisplayName(activeStudent, settings, studentName || "Student Workspace")}
             </h2>
             <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5 mt-0.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />

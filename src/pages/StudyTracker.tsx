@@ -454,7 +454,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
               </h1>
               {activeStudent && (
                 <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-semibold border border-cyan-500/30">
-                  {activeStudent.name} ({activeStudent.stream})
+                  {activeStudent.name || "Student"} ({activeStudent.stream || "General"})
                 </span>
               )}
             </div>
@@ -561,7 +561,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           </div>
 
           {/* Search Box */}
-          <div className="relative min-w-[220px] ml-auto">
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:ml-auto">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"

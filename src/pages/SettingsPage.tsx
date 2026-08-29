@@ -69,6 +69,7 @@ import {
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { AppLanguage, translations } from "../utils/i18n";
+import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
 import { PinManagementModal, PinModalMode } from "../components/PinManagementModal";
 import { lockSession } from "../utils/security";
@@ -135,7 +136,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onLockApp,
 }) => {
   const t = translations[currentLanguage] || translations.en;
-  const [userName, setUserName] = useState(settings.userName || activeStudent?.name || "Student");
+  const initialStudentName = getStudentDisplayName(activeStudent, settings, "Student");
+  const [userName, setUserName] = useState(initialStudentName);
   const [apiKey, setApiKey] = useState(settings.customApiKey || "");
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
@@ -517,17 +519,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   activeStudent.avatarColor || "from-cyan-500 to-emerald-500"
                 } flex items-center justify-center text-white font-bold text-sm font-heading shadow-md`}
               >
-                {activeStudent.name.charAt(0).toUpperCase()}
+                {getStudentAvatarInitials(getStudentDisplayName(activeStudent, settings, "Student"))}
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm font-heading flex items-center gap-2">
-                  {activeStudent.name}
+                <h4 className="font-bold text-white text-sm font-heading flex items-center gap-2" dir="ltr">
+                  {getStudentDisplayName(activeStudent, settings, "Student")}
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
                     {currentLanguage === "hi" ? "सक्रिय परिवेश" : "Active Environment"}
                   </span>
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {activeStudent.classLevel} • {activeStudent.stream} • {activeStudent.board} Board
+                  {activeStudent.classLevel || "Class 12"} • {activeStudent.stream || "General"} • {activeStudent.board || "CBSE"} Board
                 </p>
               </div>
             </div>

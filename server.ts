@@ -371,9 +371,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
   });
 
   // Static asset serving & SPA routing in production / Vite middleware in development
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    fs.existsSync(path.join(process.cwd(), "dist", "index.html"));
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (!isProduction) {
     console.log("[Garia OS Server] Starting in DEVELOPMENT mode with Vite middleware...");

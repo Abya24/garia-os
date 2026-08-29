@@ -300,6 +300,7 @@ export interface GamificationState {
   currentLevel: number;
   levelTitle: string;
   currentStreak: number;
+  streakDays?: number;
   xpInCurrentLevel: number;
   xpForNextLevel: number;
   levelProgressPercent: number;
@@ -499,6 +500,7 @@ export function calculateGamificationState(
     currentLevel,
     levelTitle,
     currentStreak: maxStreak || (completedTasksCount > 0 ? 1 : 0),
+    streakDays: maxStreak || (completedTasksCount > 0 ? 1 : 0),
     xpInCurrentLevel,
     xpForNextLevel: xpForNext,
     levelProgressPercent,

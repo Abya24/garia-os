@@ -50,6 +50,7 @@ export interface Habit {
   streak: number;
   completedDates: string[]; // YYYY-MM-DD strings
   createdAt: number;
+  durationMinutes?: number;
   streakGoal?: number; // Target streak count (e.g. 7, 14, 21, 30, 60, 100 days)
   streakGoalReward?: string; // Optional reward / motivation text
   streakGoalStartDate?: string; // YYYY-MM-DD
@@ -130,11 +131,23 @@ export interface AbyaMessage {
   thinkingDurationMs?: number;
 }
 
+export interface AbyaChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  previewMessage: string;
+  messagesCount: number;
+  mode?: AbyaAIMode;
+  actionType?: AbyaQuickActionType;
+  messages: AbyaMessage[];
+}
+
 export interface AbyaDiagnosticsInfo {
   provider: AbyaProvider;
   activeModel: string;
   latencyMs?: number;
-  lastStatus: "online" | "fallback" | "idle" | "error";
+  lastStatus: "online" | "fallback" | "idle" | "error" | "offline";
   lastFallbackReason?: AbyaFallbackReason;
   isOnlineNetwork: boolean;
   totalOnlineCalls: number;
@@ -144,6 +157,12 @@ export interface AbyaDiagnosticsInfo {
 }
 
 export type AbyaQuickActionType =
+  | "study_plan"
+  | "revision_plan"
+  | "exam_strategy"
+  | "progress_analysis"
+  | "weekly_schedule"
+  | "ask_doubt"
   | "plan_day"
   | "explain_topic"
   | "weak_topics"
@@ -325,6 +344,7 @@ export interface CareerProfile {
   stream: StreamType;
   currentClass: string;
   selectedCareerId?: string;
+  targetCareer?: string;
   updatedAt: number;
 }
 
@@ -391,26 +411,40 @@ export type ChapterPriority = "VVI" | "Important" | "Normal";
 export interface AcademicSubject {
   id: string;
   name: string;
-  stream: StreamType;
+  stream?: StreamType;
   color: string;
   isCustom?: boolean;
+  code?: string;
+  icon?: string;
+  totalChapters?: number;
+  completedChapters?: number;
+  targetHoursPerWeek?: number;
+  classLevel?: string;
 }
 
 export interface AcademicChapter {
   id: string;
   subjectId: string;
-  chapterNumber: number;
+  chapterNumber?: number;
   title: string;
-  topics: string[];
-  status: "Not Started" | "In Progress" | "Completed";
-  priority: ChapterPriority;
-  isWeak: boolean;
-  pyqStatus: "Completed" | "Pending";
-  revisionCount: number; // 0, 1, 2, 3
+  topics?: string[];
+  status?: "Not Started" | "In Progress" | "Completed" | "needs_revision" | string;
+  priority?: ChapterPriority;
+  isWeak?: boolean;
+  pyqStatus?: "Completed" | "Pending" | string;
+  revisionCount?: number; // 0, 1, 2, 3
   lastRevisedAt?: number;
   nextRevisionDue?: number;
   notes?: string;
-  testStatus: "Tested" | "Pending";
+  testStatus?: "Tested" | "Pending";
+  description?: string;
+  order?: number;
+  completed?: boolean;
+  isVVI?: boolean;
+  totalQuestions?: number;
+  completedQuestions?: number;
+  masteryLevel?: number;
+  subjectName?: string;
 }
 
 export interface AcademicTest {
@@ -431,7 +465,7 @@ export interface AcademicVVITopic {
   chapterTitle: string;
   topicName: string;
   priority: ChapterPriority;
-  status: "Not Started" | "In Progress" | "Completed";
+  status: "Not Started" | "In Progress" | "Completed" | string;
   revisionCount: number;
   lastRevisedAt?: number;
   nextRevisionDue?: number;
@@ -444,14 +478,18 @@ export interface AcademicRevisionItem {
   subjectId: string;
   subjectName: string;
   chapterId?: string;
-  chapterTitle: string;
+  chapterTitle?: string;
+  chapterName?: string;
   topicName?: string;
-  priority: ChapterPriority;
+  priority?: ChapterPriority;
   scheduledDate: string; // YYYY-MM-DD
   completed: boolean;
   completedAt?: number;
   notes?: string;
-  createdAt: number;
+  createdAt?: number;
+  confidenceLevel?: string;
+  cycleCount?: number;
+  intervalStage?: number;
 }
 
 export interface AcademicPracticeSession {
@@ -568,19 +606,28 @@ export interface WeakAreaItem {
 
 export interface ExamIntelligenceReport {
   overallReadinessScore: number | null;
-  readinessCategory: "Needs Attention" | "Building" | "Good Progress" | "Strong Preparation" | "Not enough data";
-  hasSufficientData: boolean;
-  totalTestsRecorded: number;
-  strongSubjects: SubjectPerformanceAnalysis[];
-  weakSubjects: SubjectPerformanceAnalysis[];
-  subjectAnalyses: SubjectPerformanceAnalysis[];
-  weakAreas: WeakAreaItem[];
-  priorityTopics: { topic: string; subjectName: string; priority: string; reason: string }[];
-  recommendedRevisions: { subjectName: string; chapterOrTopic: string; reason: string }[];
-  recommendedPractices: { subjectName: string; action: string; reason: string }[];
-  nextBestAction: string;
-  latestTestPercentage: number | null;
-  lastCalculatedAt: number;
+  readinessCategory?: "Needs Attention" | "Building" | "Good Progress" | "Strong Preparation" | "Not enough data" | string;
+  readinessTier?: string;
+  hasSufficientData?: boolean;
+  totalTestsRecorded?: number;
+  strongSubjects?: SubjectPerformanceAnalysis[];
+  weakSubjects?: SubjectPerformanceAnalysis[];
+  subjectAnalyses?: SubjectPerformanceAnalysis[];
+  weakAreas?: WeakAreaItem[];
+  priorityTopics?: { topic: string; subjectName: string; priority: string; reason: string }[];
+  recommendedRevisions?: { subjectName: string; chapterOrTopic: string; reason: string }[];
+  recommendedPractices?: { subjectName: string; action: string; reason: string }[];
+  nextBestAction?: string;
+  latestTestPercentage?: number | null;
+  lastCalculatedAt?: number;
+  predictedScoreMin?: number;
+  predictedScoreMax?: number;
+  daysUntilExam?: number;
+  subjectBreakdowns?: any[];
+  weakestSubject?: any;
+  strongestSubject?: any;
+  highYieldRecommendations?: any[];
+  lastUpdated?: string;
 }
 
 // GARIA OS v1.4.2 EXAM INTELLIGENCE TYPES
@@ -603,6 +650,11 @@ export interface ExamProfile {
   academicYear: string; // "2025-2026"
   examName: string; // "Class 12 Board Exam 2026"
   startDate: string; // YYYY-MM-DD
+  targetDate?: string;
+  targetExamDate?: string;
+  examStartDate?: string;
+  targetExamName?: string;
+  targetScorePercent?: number;
   endDate?: string; // YYYY-MM-DD
   subjectExamDates: Record<string, string>; // subjectId or subjectName -> YYYY-MM-DD
   dailyStudyHours: number; // default 5
@@ -870,6 +922,8 @@ export type ActiveTab =
   | "water"
   | "habits"
   | "stats"
+  | "gmail"
+  | "questionbank"
   | "settings";
 
 export type CollaborationRole = "owner" | "editor" | "viewer";

@@ -23,6 +23,7 @@ import { StreamSelector } from "./StreamSelector";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations, saveStoredLanguage } from "../utils/i18n";
+import { getStudentAvatarInitials, formatStudentDisplayName, capitalizeWords } from "../utils/studentNameUtils";
 
 interface StudentProfileModalProps {
   isOpen: boolean;
@@ -95,7 +96,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setClassLevel(p.classLevel);
     setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
-    setLanguage(p.language || "en");
+    setLanguage((p.language as AppLanguage) || "en");
     setAvatarColor(p.avatarColor || AVATAR_GRADIENTS[0].value);
     setActiveTab("edit");
   };
@@ -111,10 +112,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   const handleSaveAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const cleanName = capitalizeWords(name).trim();
+    if (!cleanName) return;
     const finalStream: StreamType = classLevel === "Class 10" ? "General" : stream;
     onAddProfile({
-      name: name.trim(),
+      name: cleanName,
       classLevel,
       stream: finalStream,
       board,
@@ -128,11 +130,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProfile || !name.trim()) return;
+    const cleanName = capitalizeWords(name).trim();
+    if (!editingProfile || !cleanName) return;
     const finalStream: StreamType = classLevel === "Class 10" ? "General" : stream;
     onUpdateProfile({
       ...editingProfile,
-      name: name.trim(),
+      name: cleanName,
       classLevel,
       stream: finalStream,
       board,
@@ -277,7 +280,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                           p.avatarColor || "from-cyan-500 to-emerald-500"
                         } p-0.5 flex items-center justify-center shadow-md text-white font-bold text-lg font-heading shrink-0`}
                       >
-                        {p.name.charAt(0).toUpperCase()}
+                        {getStudentAvatarInitials(p.name)}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -405,9 +408,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <input
                     type="text"
                     required
-                    dir="ltr"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      const formatted = capitalizeWords(e.target.value);
+                      setName(formatted);
+                    }}
                     placeholder={t.studentNamePlaceholder}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm text-left"
                   />

@@ -32,6 +32,15 @@ export default defineConfig(() => {
               if (id.includes('@google/genai')) {
                 return 'vendor-genai';
               }
+              if (id.includes('motion') || id.includes('framer-motion')) {
+                return 'vendor-motion';
+              }
+            }
+            if (id.includes('masterCurriculum')) {
+              return 'data-master-curriculum';
+            }
+            if (id.includes('quotes')) {
+              return 'data-quotes';
             }
           },
         },

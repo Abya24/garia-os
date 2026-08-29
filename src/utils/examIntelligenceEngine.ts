@@ -78,6 +78,11 @@ export interface ExamIntelligenceReport {
   nextBestAction: string;
   latestTestPercentage: number | null;
   lastCalculatedAt: number;
+  daysUntilExam?: number;
+  weakestSubject?: any;
+  strongestSubject?: any;
+  highYieldRecommendations?: any[];
+  lastUpdated?: string;
 }
 
 /**

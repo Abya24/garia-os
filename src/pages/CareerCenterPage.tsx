@@ -152,21 +152,21 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   // Search filter for catalog
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCatalogStream, setSelectedCatalogStream] = useState<
-    "All" | "Commerce" | "Science" | "Arts / Humanities" | "Arts"
-  >(profile.stream || "Commerce");
+    "All" | StreamType
+  >((profile.stream as any) || "Commerce");
 
   // Keep stream and target career validated when profile stream changes
   useEffect(() => {
     if (profile.stream) {
       setStream(profile.stream);
-      setSelectedCatalogStream(profile.stream);
+      setSelectedCatalogStream(profile.stream as any);
 
       // Check if currently selected target career matches new stream
       const currentTarget = CAREER_CATALOG.find((c) => c.id === profile.selectedCareerId);
       const isTargetValid =
         currentTarget &&
         (profile.stream === "General" ||
-          profile.stream === "All" ||
+          (profile.stream as string) === "All" ||
           currentTarget.stream === profile.stream ||
           ((profile.stream === "Arts" || profile.stream === "Arts / Humanities") &&
             (currentTarget.stream === "Arts" || currentTarget.stream === "Arts / Humanities")));
@@ -689,7 +689,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
             )}
           </div>
 
-          <div className="relative min-w-[240px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[240px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"

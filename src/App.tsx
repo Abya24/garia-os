@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import {
   Task,
   Subject,
@@ -135,7 +135,6 @@ import { BottomNav } from "./components/BottomNav";
 import { DesktopSidebar } from "./components/DesktopSidebar";
 import { SliderMenu } from "./components/SliderMenu";
 import { MoreDrawer } from "./components/MoreDrawer";
-import { MoreMenuModal } from "./components/MoreMenuModal";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
@@ -144,22 +143,79 @@ import { NotificationsModal } from "./components/NotificationsModal";
 import { SavedItemsModal } from "./components/SavedItemsModal";
 import { OfflineSyncToast } from "./components/OfflineSyncToast";
 import { PinLockScreen } from "./components/PinLockScreen";
+import { PageSkeletonLoader } from "./components/PageSkeletonLoader";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { shouldAppBeLocked, markSessionUnlocked, lockSession } from "./utils/security";
 
-import { HomeDashboard } from "./pages/HomeDashboard";
-import { TaskManager } from "./pages/TaskManager";
-import { StudyTracker } from "./pages/StudyTracker";
-import { FocusTimer } from "./pages/FocusTimer";
-import { NotesPage } from "./pages/NotesPage";
-import { WaterTracker } from "./pages/WaterTracker";
-import { HabitsPage } from "./pages/HabitsPage";
-import { GoalsPage } from "./pages/GoalsPage";
-import { CalendarPage } from "./pages/CalendarPage";
-import { AbyaAIPage } from "./pages/AbyaAIPage";
-import { StatisticsPage } from "./pages/StatisticsPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { CareerCenterPage } from "./pages/CareerCenterPage";
-import { ExamCenterPage } from "./pages/ExamCenterPage";
+// Resilient Route-Level Lazy Loader with Automatic Reload on Stale Chunks / Deployments
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error: any) {
+      console.warn("[Garia OS] Dynamic import chunk load error detected:", error?.message || error);
+      const hasReloaded = sessionStorage.getItem("garia_chunk_reload");
+      if (!hasReloaded) {
+        sessionStorage.setItem("garia_chunk_reload", "true");
+        window.location.reload();
+        return { default: (() => null) as unknown as T };
+      }
+      try {
+        sessionStorage.removeItem("garia_chunk_reload");
+        return await componentImport();
+      } catch (retryErr) {
+        console.error("[Garia OS] Critical lazy import failure after retry:", retryErr);
+        throw retryErr;
+      }
+    }
+  });
+}
+
+// Route-Level Lazy Loaded Pages
+const HomeDashboard = lazyWithRetry(() =>
+  import("./pages/HomeDashboard").then((m) => ({ default: m.HomeDashboard }))
+);
+const TaskManager = lazyWithRetry(() =>
+  import("./pages/TaskManager").then((m) => ({ default: m.TaskManager }))
+);
+const StudyTracker = lazyWithRetry(() =>
+  import("./pages/StudyTracker").then((m) => ({ default: m.StudyTracker }))
+);
+const FocusTimer = lazyWithRetry(() =>
+  import("./pages/FocusTimer").then((m) => ({ default: m.FocusTimer }))
+);
+const NotesPage = lazyWithRetry(() =>
+  import("./pages/NotesPage").then((m) => ({ default: m.NotesPage }))
+);
+const WaterTracker = lazyWithRetry(() =>
+  import("./pages/WaterTracker").then((m) => ({ default: m.WaterTracker }))
+);
+const HabitsPage = lazyWithRetry(() =>
+  import("./pages/HabitsPage").then((m) => ({ default: m.HabitsPage }))
+);
+const GoalsPage = lazyWithRetry(() =>
+  import("./pages/GoalsPage").then((m) => ({ default: m.GoalsPage }))
+);
+const CalendarPage = lazyWithRetry(() =>
+  import("./pages/CalendarPage").then((m) => ({ default: m.CalendarPage }))
+);
+const AbyaAIPage = lazyWithRetry(() =>
+  import("./pages/AbyaAIPage").then((m) => ({ default: m.AbyaAIPage }))
+);
+const StatisticsPage = lazyWithRetry(() =>
+  import("./pages/StatisticsPage").then((m) => ({ default: m.StatisticsPage }))
+);
+const SettingsPage = lazyWithRetry(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
+);
+const CareerCenterPage = lazyWithRetry(() =>
+  import("./pages/CareerCenterPage").then((m) => ({ default: m.CareerCenterPage }))
+);
+const ExamCenterPage = lazyWithRetry(() =>
+  import("./pages/ExamCenterPage").then((m) => ({ default: m.ExamCenterPage }))
+);
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -1159,7 +1215,7 @@ export default function App() {
 
   const handleUpdateAbyaLanguage = (lang: AbyaLanguageSetting) => {
     setAbyaLanguage(lang);
-    saveAbyaLanguage(lang, activeStudent.id);
+    saveAbyaLanguage(lang, activeStudent?.id);
   };
 
   // Abya AI Chat Messaging Handler
@@ -1214,19 +1270,19 @@ export default function App() {
       curriculumContext,
       abyaLanguage,
       studentProfileContext: {
-        id: activeStudent.id,
-        name: activeStudent.name,
-        classLevel: activeStudent.classLevel,
-        stream: activeStudent.stream,
-        board: activeStudent.board,
+        id: activeStudent?.id || "guest",
+        name: activeStudent?.name || "Student",
+        classLevel: activeStudent?.classLevel || "Class 12",
+        stream: activeStudent?.stream || "Commerce",
+        board: activeStudent?.board || "CBSE",
       },
       todayContext: {
         pendingTasksCount: tasks.filter((t) => !t.completed).length,
         completedTasksCount: tasks.filter((t) => t.completed).length,
       },
       careerContext: {
-        stream: activeStudent.stream,
-        currentClass: activeStudent.classLevel,
+        stream: activeStudent?.stream || "Commerce",
+        currentClass: activeStudent?.classLevel || "Class 12",
         targetCareer: careerRoadmap.careerTitle || careerProfile.selectedCareerId || "General",
         strongSubjects: careerAssessment.strongSubjects,
         roadmapProgress: Math.round(
@@ -1236,7 +1292,7 @@ export default function App() {
         ),
       },
       academicContext: {
-        stream: activeStudent.stream,
+        stream: activeStudent?.stream || "Commerce",
         overallProgress: Math.round(
           (academicChapters.filter((c) => c.status === "Completed").length /
             (academicChapters.length || 1)) *
@@ -1259,9 +1315,9 @@ export default function App() {
             : 0,
       },
       examContext: {
-        board: activeStudent.board || examProfile.board,
-        classLevel: activeStudent.classLevel || examProfile.classLevel,
-        stream: activeStudent.stream,
+        board: activeStudent?.board || examProfile.board,
+        classLevel: activeStudent?.classLevel || examProfile.classLevel,
+        stream: activeStudent?.stream || examProfile.stream,
         examName: examProfile.examName,
         daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
         readinessScore: calculateExamReadiness(
@@ -1832,292 +1888,296 @@ export default function App() {
               : "p-4 sm:p-6 lg:p-8"
           }`}
         >
-          {activeTab === "home" && (
-            <HomeDashboard
-              tasks={tasks}
-              subjects={subjects}
-              studySessions={studySessions}
-              focusLogs={focusLogs}
-              notes={notes}
-              habits={habits}
-              water={water}
-              goals={goals}
-              events={calendarEvents}
-              examTestRecords={examTestRecords}
-              examProfile={examProfile}
-              careerProfile={careerProfile}
-              settings={settings}
-              activeStudent={activeStudent}
-              currentLanguage={currentLanguage}
-              onNavigate={(tab) => {
-                handleNavigate(tab);
-                setIsMoreMenuOpen(false);
-              }}
-              onQuickAddTask={() => handleNavigate("tasks")}
-              onAddTask={handleAddTask}
-              onAddWaterGlass={() =>
-                handleUpdateWater({ ...water, glasses: water.glasses + 1 })
-              }
-              onRemoveWaterGlass={() =>
-                handleUpdateWater({ ...water, glasses: Math.max(0, water.glasses - 1) })
-              }
-              onToggleTask={(task) =>
-                handleUpdateTask({ ...task, completed: !task.completed })
-              }
-              onToggleHabit={(habitId, dateStr) =>
-                handleToggleHabitDate(habitId, dateStr)
-              }
-              onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
-            />
-          )}
+          <ErrorBoundary>
+            <Suspense fallback={<PageSkeletonLoader tabName={activeTab} />}>
+            {activeTab === "home" && (
+              <HomeDashboard
+                tasks={tasks}
+                subjects={subjects}
+                studySessions={studySessions}
+                focusLogs={focusLogs}
+                notes={notes}
+                habits={habits}
+                water={water}
+                goals={goals}
+                events={calendarEvents}
+                examTestRecords={examTestRecords}
+                examProfile={examProfile}
+                careerProfile={careerProfile}
+                settings={settings}
+                activeStudent={activeStudent}
+                currentLanguage={currentLanguage}
+                onNavigate={(tab) => {
+                  handleNavigate(tab);
+                  setIsMoreMenuOpen(false);
+                }}
+                onQuickAddTask={() => handleNavigate("tasks")}
+                onAddTask={handleAddTask}
+                onAddWaterGlass={() =>
+                  handleUpdateWater({ ...water, glasses: water.glasses + 1 })
+                }
+                onRemoveWaterGlass={() =>
+                  handleUpdateWater({ ...water, glasses: Math.max(0, water.glasses - 1) })
+                }
+                onToggleTask={(task) =>
+                  handleUpdateTask({ ...task, completed: !task.completed })
+                }
+                onToggleHabit={(habitId, dateStr) =>
+                  handleToggleHabitDate(habitId, dateStr)
+                }
+                onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
+              />
+            )}
 
-          {activeTab === "tasks" && (
-            <TaskManager
-              tasks={tasks}
-              onAddTask={handleAddTask}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onBack={handleGoBack}
-              currentUserId={activeStudent.id}
-              currentUserName={activeStudent.name}
-              currentUserEmail={auth.currentUser?.email || undefined}
-            />
-          )}
+            {activeTab === "tasks" && (
+              <TaskManager
+                tasks={tasks}
+                onAddTask={handleAddTask}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                onBack={handleGoBack}
+                currentUserId={activeStudent?.id || "guest"}
+                currentUserName={activeStudent?.name || "Student"}
+                currentUserEmail={auth.currentUser?.email || undefined}
+              />
+            )}
 
-          {activeTab === "goals" && (
-            <GoalsPage
-              goals={goals}
-              subjects={subjects}
-              onAddGoal={handleAddGoal}
-              onUpdateGoal={handleUpdateGoal}
-              onDeleteGoal={handleDeleteGoal}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "goals" && (
+              <GoalsPage
+                goals={goals}
+                subjects={subjects}
+                onAddGoal={handleAddGoal}
+                onUpdateGoal={handleUpdateGoal}
+                onDeleteGoal={handleDeleteGoal}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "calendar" && (
-            <CalendarPage
-              events={calendarEvents}
-              tasks={tasks}
-              studySessions={studySessions}
-              goals={goals}
-              activeProfile={activeStudent}
-              onAddEvent={handleAddCalendarEvent}
-              onUpdateEvent={handleUpdateCalendarEvent}
-              onDeleteEvent={handleDeleteCalendarEvent}
-              onToggleTaskComplete={handleUpdateTask}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "calendar" && (
+              <CalendarPage
+                events={calendarEvents}
+                tasks={tasks}
+                studySessions={studySessions}
+                goals={goals}
+                activeProfile={activeStudent}
+                onAddEvent={handleAddCalendarEvent}
+                onUpdateEvent={handleUpdateCalendarEvent}
+                onDeleteEvent={handleDeleteCalendarEvent}
+                onToggleTaskComplete={handleUpdateTask}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "exam" && (
-            <ExamCenterPage
-              examProfile={examProfile}
-              examMilestones={examMilestones}
-              examMockTests={examMockTests}
-              examPlan={examPlan}
-              academicSubjects={academicSubjects}
-              academicChapters={academicChapters}
-              academicTests={academicTests}
-              careerProfile={careerProfile}
-              careerRoadmap={careerRoadmap}
-              vviTopics={vviTopics}
-              revisions={academicRevisions}
-              practiceSessions={academicPractice}
-              examTestRecords={examTestRecords}
-              onSaveExamTestRecord={handleSaveExamTestRecord}
-              onDeleteExamTestRecord={handleDeleteExamTestRecord}
-              onUpdateExamProfile={handleUpdateExamProfile}
-              onUpdateExamMilestones={handleUpdateExamMilestones}
-              onUpdateExamMockTests={handleUpdateExamMockTests}
-              onUpdateExamPlan={handleUpdateExamPlan}
-              onUpdateChapters={handleUpdateAcademicChapters}
-              onAskAbyaWithContext={handleAskAbyaWithContext}
-              onNavigate={(tab) => {
-                handleNavigate(tab);
-                setIsMoreMenuOpen(false);
-              }}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "exam" && (
+              <ExamCenterPage
+                examProfile={examProfile}
+                examMilestones={examMilestones}
+                examMockTests={examMockTests}
+                examPlan={examPlan}
+                academicSubjects={academicSubjects}
+                academicChapters={academicChapters}
+                academicTests={academicTests}
+                careerProfile={careerProfile}
+                careerRoadmap={careerRoadmap}
+                vviTopics={vviTopics}
+                revisions={academicRevisions}
+                practiceSessions={academicPractice}
+                examTestRecords={examTestRecords}
+                onSaveExamTestRecord={handleSaveExamTestRecord}
+                onDeleteExamTestRecord={handleDeleteExamTestRecord}
+                onUpdateExamProfile={handleUpdateExamProfile}
+                onUpdateExamMilestones={handleUpdateExamMilestones}
+                onUpdateExamMockTests={handleUpdateExamMockTests}
+                onUpdateExamPlan={handleUpdateExamPlan}
+                onUpdateChapters={handleUpdateAcademicChapters}
+                onAskAbyaWithContext={handleAskAbyaWithContext}
+                onNavigate={(tab) => {
+                  handleNavigate(tab);
+                  setIsMoreMenuOpen(false);
+                }}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "career" && (
-            <CareerCenterPage
-              profile={careerProfile}
-              assessment={careerAssessment}
-              roadmap={careerRoadmap}
-              quizAnswers={careerQuiz}
-              activeStudentName={activeStudent.name}
-              subjects={subjects}
-              onUpdateProfile={handleUpdateCareerProfile}
-              onUpdateAssessment={handleUpdateCareerAssessment}
-              onUpdateRoadmap={handleUpdateCareerRoadmap}
-              onUpdateQuiz={handleUpdateCareerQuiz}
-              onNavigateToAbya={() => handleNavigate("abya")}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "career" && (
+              <CareerCenterPage
+                profile={careerProfile}
+                assessment={careerAssessment}
+                roadmap={careerRoadmap}
+                quizAnswers={careerQuiz}
+                activeStudentName={activeStudent?.name || "Student"}
+                subjects={subjects}
+                onUpdateProfile={handleUpdateCareerProfile}
+                onUpdateAssessment={handleUpdateCareerAssessment}
+                onUpdateRoadmap={handleUpdateCareerRoadmap}
+                onUpdateQuiz={handleUpdateCareerQuiz}
+                onNavigateToAbya={() => handleNavigate("abya")}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "study" && (
-            <StudyTracker
-              subjects={subjects}
-              studySessions={studySessions}
-              academicChapters={academicChapters}
-              activeStudent={activeStudent}
-              onAddSubject={handleAddSubject}
-              onUpdateSubject={handleUpdateSubject}
-              onDeleteSubject={handleDeleteSubject}
-              onResetSubjectsToDefaults={handleResetSubjectsToDefaults}
-              onLogStudySession={handleLogStudySession}
-              onDeleteStudySession={handleDeleteStudySession}
-              onUpdateStudySession={handleUpdateStudySession}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "study" && (
+              <StudyTracker
+                subjects={subjects}
+                studySessions={studySessions}
+                academicChapters={academicChapters}
+                activeStudent={activeStudent}
+                onAddSubject={handleAddSubject}
+                onUpdateSubject={handleUpdateSubject}
+                onDeleteSubject={handleDeleteSubject}
+                onResetSubjectsToDefaults={handleResetSubjectsToDefaults}
+                onLogStudySession={handleLogStudySession}
+                onDeleteStudySession={handleDeleteStudySession}
+                onUpdateStudySession={handleUpdateStudySession}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "focus" && (
-            <FocusTimer
-              settings={settings}
-              focusLogs={focusLogs}
-              onLogFocusSession={handleLogFocusSession}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "focus" && (
+              <FocusTimer
+                settings={settings}
+                focusLogs={focusLogs}
+                onLogFocusSession={handleLogFocusSession}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "notes" && (
-            <NotesPage
-              notes={notes}
-              onAddNote={handleAddNote}
-              onUpdateNote={handleUpdateNote}
-              onDeleteNote={handleDeleteNote}
-              onAskAbyaWithContext={handleAskAbyaWithContext}
-              onBack={handleGoBack}
-              currentUserId={activeStudent.id}
-              currentUserName={activeStudent.name}
-              currentUserEmail={auth.currentUser?.email || undefined}
-            />
-          )}
+            {activeTab === "notes" && (
+              <NotesPage
+                notes={notes}
+                onAddNote={handleAddNote}
+                onUpdateNote={handleUpdateNote}
+                onDeleteNote={handleDeleteNote}
+                onAskAbyaWithContext={handleAskAbyaWithContext}
+                onBack={handleGoBack}
+                currentUserId={activeStudent?.id || "guest"}
+                currentUserName={activeStudent?.name || "Student"}
+                currentUserEmail={auth.currentUser?.email || undefined}
+              />
+            )}
 
-          {activeTab === "water" && (
-            <WaterTracker
-              water={water}
-              onUpdateWater={handleUpdateWater}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "water" && (
+              <WaterTracker
+                water={water}
+                onUpdateWater={handleUpdateWater}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "habits" && (
-            <HabitsPage
-              habits={habits}
-              onAddHabit={handleAddHabit}
-              onUpdateHabit={handleUpdateHabit}
-              onToggleHabitDate={handleToggleHabitDate}
-              onDeleteHabit={handleDeleteHabit}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "habits" && (
+              <HabitsPage
+                habits={habits}
+                onAddHabit={handleAddHabit}
+                onUpdateHabit={handleUpdateHabit}
+                onToggleHabitDate={handleToggleHabitDate}
+                onDeleteHabit={handleDeleteHabit}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "abya" && (
-            <AbyaAIPage
-              messages={abyaChat}
-              settings={settings}
-              activeStudent={activeStudent}
-              insightCards={generateAbyaInsightCards({
-                profile: activeStudent,
-                tasks,
-                subjects: academicSubjects,
-                chapters: academicChapters,
-                tests: academicTests,
-                examProfile,
-                mockTests: examMockTests,
-                careerProfile,
-                careerRoadmap,
-                daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
-                readinessScore: calculateExamReadiness(
+            {activeTab === "abya" && (
+              <AbyaAIPage
+                messages={abyaChat}
+                settings={settings}
+                activeStudent={activeStudent}
+                insightCards={generateAbyaInsightCards({
+                  profile: activeStudent,
+                  tasks,
+                  subjects: academicSubjects,
+                  chapters: academicChapters,
+                  tests: academicTests,
                   examProfile,
-                  academicSubjects,
-                  academicChapters,
-                  [...academicTests, ...examMockTests]
-                ).overallScore,
-              })}
-              onSendMessage={handleSendAbyaMessage}
-              abyaLanguage={abyaLanguage}
-              onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
-              onClearChat={handleClearChatHistory}
-              onUpdateSettings={handleUpdateSettings}
-              attachedContextNote={attachedContextNote}
-              onClearAttachedContext={() => setAttachedContextNote("")}
-              onNavigate={(tab) => {
-                handleNavigate(tab);
-                setIsMoreMenuOpen(false);
-              }}
-              onTriggerFallbackAction={handleTriggerAbyaFallback}
-              onRetryLastMessage={handleRetryLastMessage}
-              diagnostics={abyaDiagnostics}
-              onTestDiagnostics={handleTestAbyaDiagnostics}
-              onBack={handleGoBack}
-              tasks={tasks}
-              academicSubjects={academicSubjects}
-              academicChapters={academicChapters}
-              academicRevisions={academicRevisions}
-              academicPractice={academicPractice}
-              examProfile={examProfile}
-              habits={habits}
-            />
-          )}
+                  mockTests: examMockTests,
+                  careerProfile,
+                  careerRoadmap,
+                  daysRemaining: calculateExamCountdown(examProfile).daysRemaining,
+                  readinessScore: calculateExamReadiness(
+                    examProfile,
+                    academicSubjects,
+                    academicChapters,
+                    [...academicTests, ...examMockTests]
+                  ).overallScore,
+                })}
+                onSendMessage={handleSendAbyaMessage}
+                abyaLanguage={abyaLanguage}
+                onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
+                onClearChat={handleClearChatHistory}
+                onUpdateSettings={handleUpdateSettings}
+                attachedContextNote={attachedContextNote}
+                onClearAttachedContext={() => setAttachedContextNote("")}
+                onNavigate={(tab) => {
+                  handleNavigate(tab);
+                  setIsMoreMenuOpen(false);
+                }}
+                onTriggerFallbackAction={handleTriggerAbyaFallback}
+                onRetryLastMessage={handleRetryLastMessage}
+                diagnostics={abyaDiagnostics}
+                onTestDiagnostics={handleTestAbyaDiagnostics}
+                onBack={handleGoBack}
+                tasks={tasks}
+                academicSubjects={academicSubjects}
+                academicChapters={academicChapters}
+                academicRevisions={academicRevisions}
+                academicPractice={academicPractice}
+                examProfile={examProfile}
+                habits={habits}
+              />
+            )}
 
-          {activeTab === "stats" && (
-            <StatisticsPage
-              tasks={tasks}
-              subjects={subjects}
-              studySessions={studySessions}
-              habits={habits}
-              focusLogs={focusLogs}
-              water={water}
-              goals={goals}
-              activeStudent={activeStudent}
-              academicSubjects={academicSubjects}
-              academicChapters={academicChapters}
-              vviTopics={vviTopics}
-              academicRevisions={academicRevisions}
-              academicPractice={academicPractice}
-              examTestRecords={examTestRecords}
-              onNavigate={(tab) => {
-                handleNavigate(tab);
-                setIsMoreMenuOpen(false);
-              }}
-              onBack={handleGoBack}
-            />
-          )}
+            {activeTab === "stats" && (
+              <StatisticsPage
+                tasks={tasks}
+                subjects={subjects}
+                studySessions={studySessions}
+                habits={habits}
+                focusLogs={focusLogs}
+                water={water}
+                goals={goals}
+                activeStudent={activeStudent}
+                academicSubjects={academicSubjects}
+                academicChapters={academicChapters}
+                vviTopics={vviTopics}
+                academicRevisions={academicRevisions}
+                academicPractice={academicPractice}
+                examTestRecords={examTestRecords}
+                onNavigate={(tab: any) => {
+                  handleNavigate(tab as ActiveTab);
+                  setIsMoreMenuOpen(false);
+                }}
+                onBack={handleGoBack}
+              />
+            )}
 
-          {activeTab === "settings" && (
-            <SettingsPage
-              settings={settings}
-              activeStudent={activeStudent}
-              profiles={profiles}
-              tasks={tasks}
-              studySessions={studySessions}
-              events={calendarEvents}
-              goals={goals}
-              currentLanguage={currentLanguage}
-              onUpdateLanguage={handleUpdateLanguage}
-              abyaLanguage={abyaLanguage}
-              onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
-              onOpenStudentModal={() => setIsStudentModalOpen(true)}
-              onOpenAuthModal={() => setIsAuthModalOpen(true)}
-              onNavigate={(tab) => handleNavigate(tab)}
-              onUpdateSettings={handleUpdateSettings}
-              onClearChatHistory={handleClearChatHistory}
-              onClearAllOSData={handleClearAllOSData}
-              onReloadData={handleReloadData}
-              onBack={handleGoBack}
-              onLockApp={() => {
-                lockSession();
-                setIsAppLocked(true);
-              }}
-            />
-          )}
-        </main>
+            {activeTab === "settings" && (
+              <SettingsPage
+                settings={settings}
+                activeStudent={activeStudent}
+                profiles={profiles}
+                tasks={tasks}
+                studySessions={studySessions}
+                events={calendarEvents}
+                goals={goals}
+                currentLanguage={currentLanguage}
+                onUpdateLanguage={handleUpdateLanguage}
+                abyaLanguage={abyaLanguage}
+                onUpdateAbyaLanguage={handleUpdateAbyaLanguage}
+                onOpenStudentModal={() => setIsStudentModalOpen(true)}
+                onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                onNavigate={(tab) => handleNavigate(tab)}
+                onUpdateSettings={handleUpdateSettings}
+                onClearChatHistory={handleClearChatHistory}
+                onClearAllOSData={handleClearAllOSData}
+                onReloadData={handleReloadData}
+                onBack={handleGoBack}
+                onLockApp={() => {
+                  lockSession();
+                  setIsAppLocked(true);
+                }}
+              />
+            )}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
       </div>
 
       {/* Mobile Bottom Navigation */}

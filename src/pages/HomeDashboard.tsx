@@ -55,7 +55,14 @@ import {
   AcademicSubject,
   AcademicRevisionItem,
 } from "../types";
-import { getTodayString } from "../utils/storage";
+import {
+  getTodayString,
+  loadAcademicSubjects,
+  loadAcademicChapters,
+  loadVVITopics,
+  loadAcademicRevisions,
+  loadAcademicPractice,
+} from "../utils/storage";
 import { calculateGamificationState } from "../utils/gamificationEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
 import { AppLanguage, translations } from "../utils/i18n";
@@ -87,8 +94,7 @@ import { HabitTrackerWidget } from "../components/home/widgets/HabitTrackerWidge
 import { generateSmartSuggestions, SmartSuggestion } from "../utils/suggestionsEngine";
 import { HeroSection } from "../components/home/sections/HeroSection";
 import { DailyExecutionSection } from "../components/home/sections/DailyExecutionSection";
-import { AcademicProgressSection } from "../components/home/sections/AcademicProgressSection";
-import { ExamIntelligenceSection } from "../components/home/sections/ExamIntelligenceSection";
+import { AcademicDecisionEngineSection } from "../components/home/sections/AcademicDecisionEngineSection";
 import { WellnessSection } from "../components/home/sections/WellnessSection";
 
 interface HomeDashboardProps {
@@ -175,6 +181,28 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     const updated = resizeWidgetColSpan(widgets, id, colSpan, activeStudent?.id);
     setWidgets(updated);
   }, [widgets, activeStudent?.id]);
+
+  // Academic Dataset for Decision Engine
+  const academicSubjects = useMemo(
+    () => loadAcademicSubjects(activeStudent?.stream, activeStudent?.id, activeStudent?.classLevel),
+    [activeStudent?.stream, activeStudent?.id, activeStudent?.classLevel]
+  );
+  const academicChapters = useMemo(
+    () => loadAcademicChapters(activeStudent?.id),
+    [activeStudent?.id]
+  );
+  const vviTopics = useMemo(
+    () => loadVVITopics(activeStudent?.id),
+    [activeStudent?.id]
+  );
+  const academicRevisions = useMemo(
+    () => loadAcademicRevisions(activeStudent?.id),
+    [activeStudent?.id]
+  );
+  const academicPractice = useMemo(
+    () => loadAcademicPractice(activeStudent?.id),
+    [activeStudent?.id]
+  );
 
   // Live Clock & Date State
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
@@ -477,6 +505,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               code: "ACC-12",
               icon: "BookOpen",
               color: "emerald",
+              stream: "Commerce",
               totalChapters: 8,
               completedChapters: 4,
             }}
@@ -572,33 +601,28 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* SECTION 3: ACADEMIC PROGRESS (Active Subjects, Mastery, Weak Alert)       */}
+      {/* SECTION 3: ACADEMIC INTELLIGENCE & STUDENT DECISION ENGINE                */}
+      {/* 5 Ordered Cards: 1. Focus, 2. Revision, 3. Readiness, 4. Performance, 5. Career */}
       {/* ========================================================================= */}
-      <AcademicProgressSection
+      <AcademicDecisionEngineSection
         subjects={subjects}
         studySessions={studySessions}
-        examReport={examReport}
         activeStudent={activeStudent}
-        currentLanguage={currentLanguage}
-        onNavigate={onNavigate}
-      />
-
-      {/* ========================================================================= */}
-      {/* SECTION 4: EXAM INTELLIGENCE (Readiness Score, Upcoming, Suggested Hours)  */}
-      {/* ========================================================================= */}
-      <ExamIntelligenceSection
-        examReport={examReport}
+        careerProfile={careerProfile}
         examProfile={examProfile}
-        activeStudent={activeStudent}
-        subjects={subjects}
-        smartSuggestions={visibleSuggestions}
+        academicSubjects={academicSubjects}
+        academicChapters={academicChapters}
+        vviTopics={vviTopics}
+        revisions={academicRevisions}
+        practiceSessions={academicPractice}
+        examRecords={examTestRecords}
+        streakDays={gamification.streakDays}
         currentLanguage={currentLanguage}
         onNavigate={onNavigate}
-        onDismissSuggestion={handleDismissSuggestion}
       />
 
       {/* ========================================================================= */}
-      {/* SECTION 5: WELLNESS (Habit Tracker, Water Tracker)                        */}
+      {/* SECTION 4: WELLNESS (Habit Tracker, Water Tracker)                        */}
       {/* ========================================================================= */}
       <WellnessSection
         habits={habits}

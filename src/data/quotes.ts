@@ -1,7 +1,8 @@
 export interface DailyQuote {
+  id?: string;
   quote: string;
   author: string;
-  category: "focus" | "resilience" | "consistency" | "excellence" | "discipline";
+  category: "focus" | "resilience" | "consistency" | "excellence" | "discipline" | string;
   hindiTranslation?: string;
 }
 

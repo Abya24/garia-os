@@ -21,8 +21,13 @@ import { float32To16BitPCMBase64, LiveAudioPlayer } from "../utils/audioUtils";
 interface AbyaLiveVoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activeStudent: StudentProfile;
+  activeStudent?: StudentProfile | null;
+  studentName?: string;
+  classLevel?: string;
+  stream?: string;
+  board?: string;
   customApiKey?: string;
+  apiKey?: string;
 }
 
 type VoiceSessionMode = "tutor" | "viva" | "rapid_quiz";
@@ -31,8 +36,18 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
   isOpen,
   onClose,
   activeStudent,
+  studentName: propStudentName,
+  classLevel: propClassLevel,
+  stream: propStream,
+  board: propBoard,
   customApiKey,
+  apiKey,
 }) => {
+  const effectiveName = propStudentName || activeStudent?.name || "Student";
+  const effectiveClass = propClassLevel || activeStudent?.classLevel || "Class 12";
+  const effectiveStream = propStream || activeStudent?.stream || "Commerce";
+  const effectiveBoard = propBoard || activeStudent?.board || "CBSE";
+  const effectiveApiKey = customApiKey || apiKey;
   const [status, setStatus] = useState<
     "idle" | "connecting" | "connected" | "speaking" | "listening" | "error"
   >("idle");
@@ -114,6 +129,10 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
     setErrorMessage(null);
 
     try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error("Your browser environment does not support microphone audio capture.");
+      }
+
       // 1. Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -144,14 +163,14 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
       const queryParams = new URLSearchParams({
-        studentName: activeStudent.name || "Student",
-        classLevel: activeStudent.classLevel || "Class 12",
-        stream: activeStudent.stream || "Science",
-        board: activeStudent.board || "CBSE",
+        studentName: effectiveName,
+        classLevel: effectiveClass,
+        stream: effectiveStream,
+        board: effectiveBoard,
         mode: sessionMode,
       });
-      if (customApiKey) {
-        queryParams.set("apiKey", customApiKey);
+      if (effectiveApiKey) {
+        queryParams.set("apiKey", effectiveApiKey);
       }
 
       const wsUrl = `${protocol}//${host}/api/live-voice?${queryParams.toString()}`;
@@ -203,9 +222,7 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
 
       ws.onclose = () => {
         console.log("[Abya Live Voice] WebSocket closed.");
-        if (status !== "error") {
-          setStatus("idle");
-        }
+        setStatus((current) => (current === "error" ? "error" : "idle"));
       };
 
       // 5. Connect Audio Processing Pipeline
@@ -234,14 +251,33 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       processor.connect(inputCtx.destination);
     } catch (err: any) {
       console.error("[Abya Live Voice] Failed to start voice session:", err);
-      setErrorMessage(
-        err?.message?.includes("Permission") || err?.name === "NotAllowedError"
-          ? "Microphone permission was denied. Please allow microphone access to talk with Abya."
-          : err?.message || "Failed to initialize microphone or live audio stream."
-      );
+      const isPermissionIssue =
+        err?.name === "NotAllowedError" ||
+        err?.name === "PermissionDeniedError" ||
+        err?.name === "SecurityError" ||
+        err?.message?.toLowerCase().includes("permission") ||
+        err?.message?.toLowerCase().includes("denied");
+
+      if (isPermissionIssue) {
+        setErrorMessage(
+          "Microphone permission was not granted. Please click 'Enable Microphone' below to allow access and start talking with Abya."
+        );
+      } else {
+        setErrorMessage(
+          err?.message || "Failed to initialize microphone or live audio stream."
+        );
+      }
       setStatus("error");
     }
-  }, [activeStudent, customApiKey, sessionMode, cleanupAudio, status]);
+  }, [
+    effectiveName,
+    effectiveClass,
+    effectiveStream,
+    effectiveBoard,
+    effectiveApiKey,
+    sessionMode,
+    cleanupAudio,
+  ]);
 
   // Start on modal open
   useEffect(() => {
@@ -322,7 +358,7 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
               <p className="text-xs text-slate-400 flex items-center gap-1.5">
                 <span>Speaking with:</span>
                 <span className="text-emerald-300 font-medium">
-                  {activeStudent.name} ({activeStudent.classLevel})
+                  {effectiveName} ({effectiveClass})
                 </span>
               </p>
             </div>
@@ -412,8 +448,8 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
             )}
           </div>
 
-          {/* Status Text Indicator */}
-          <div className="flex items-center gap-2 text-center">
+          {/* Status Text Indicator & Error Recovery */}
+          <div className="flex flex-col items-center gap-2 text-center w-full px-2">
             {status === "connecting" && (
               <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
@@ -433,10 +469,27 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
               </span>
             )}
             {status === "error" && (
-              <span className="text-sm font-semibold text-rose-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {errorMessage || "Connection error"}
-              </span>
+              <div className="flex flex-col items-center gap-2.5 w-full bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-rose-300 text-xs font-semibold">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{errorMessage || "Connection error occurred"}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    onClick={startVoiceSession}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    Allow Mic & Reconnect
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -494,7 +547,7 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 font-semibold mb-0.5 text-[10px] opacity-75">
-                  <span>{t.speaker === "abya" ? "Abya AI" : activeStudent.name}</span>
+                  <span>{t.speaker === "abya" ? "Abya AI" : effectiveName}</span>
                   <span>{t.time}</span>
                 </div>
                 <p className="text-xs leading-relaxed">{t.text}</p>

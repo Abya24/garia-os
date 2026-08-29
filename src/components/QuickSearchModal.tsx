@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { formatStudentDisplayName } from "../utils/studentNameUtils";
 
 interface QuickSearchModalProps {
   isOpen: boolean;
@@ -265,7 +266,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
         {activeStudent && (
           <div className="px-4 py-2 bg-slate-950/60 border-b border-white/5 flex items-center justify-between text-xs text-slate-400">
             <span className="truncate">
-              Active: <strong className="text-slate-200">{activeStudent.name}</strong> • {activeStudent.classLevel || "Class 10"} • {activeStudent.stream || "General"}
+              Active: <strong className="text-slate-200" dir="ltr">{formatStudentDisplayName(activeStudent.name, "Student")}</strong> • {activeStudent.classLevel || "Class 10"} • {activeStudent.stream || "General"}
             </span>
             <span className="text-[10px] font-mono text-emerald-400 shrink-0">
               {filteredItems.length} results

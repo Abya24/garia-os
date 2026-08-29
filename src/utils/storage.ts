@@ -9,6 +9,7 @@ import {
   Goal,
   CalendarEvent,
   AbyaMessage,
+  AbyaChatSession,
   UserSettings,
   AbyaLanguageSetting,
   StudentProfile,
@@ -1274,6 +1275,24 @@ export const saveAbyaChat = (messages: AbyaMessage[], profileId?: string): void 
   const pId = profileId || loadActiveProfileId();
   if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.ABYA_CHAT), messages);
+};
+
+export const loadAbyaChatSessions = (profileId?: string): AbyaChatSession[] => {
+  const pId = profileId || loadActiveProfileId();
+  return getItem<AbyaChatSession[]>(getProfileKey(pId, "garia_abya_sessions_v1"), []);
+};
+
+export const saveAbyaChatSessions = (sessions: AbyaChatSession[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
+  setItem(getProfileKey(pId, "garia_abya_sessions_v1"), sessions);
+};
+
+export const deleteAbyaChatSession = (sessionId: string, profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
+  const sessions = loadAbyaChatSessions(pId).filter((s) => s.id !== sessionId);
+  saveAbyaChatSessions(sessions, pId);
 };
 
 export const loadAbyaLanguage = (profileId?: string): AbyaLanguageSetting => {

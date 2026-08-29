@@ -83,7 +83,7 @@ export const ExamReadinessScoreCard: React.FC<ExamReadinessScoreCardProps> = ({
         </div>
 
         {/* Right Gauge / Score */}
-        <div className="flex flex-col items-center justify-center p-6 rounded-3xl bg-slate-800/60 border border-white/10 text-center shrink-0 min-w-[200px]">
+        <div className="flex flex-col items-center justify-center p-5 sm:p-6 rounded-3xl bg-slate-800/60 border border-white/10 text-center shrink-0 w-full md:w-auto md:min-w-[200px]">
           {hasSufficientData && overallReadinessScore !== null ? (
             <>
               <div className="relative flex items-center justify-center">

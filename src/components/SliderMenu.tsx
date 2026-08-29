@@ -39,6 +39,7 @@ import {
 } from "../types";
 import { APP_VERSION, APP_BUILD_DATE } from "../constants/version";
 import { AppLanguage, translations } from "../utils/i18n";
+import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
 import { PinManagementModal, PinModalMode } from "./PinManagementModal";
 import { lockSession } from "../utils/security";
@@ -260,11 +261,11 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
-                        {activeStudent?.name?.charAt(0) || "S"}
+                        {getStudentAvatarInitials(getStudentDisplayName(activeStudent, settings, "Student"))}
                       </div>
                       <div>
-                        <div className="font-bold text-white text-xs">
-                          {activeStudent?.name || settings.userName || "Student Profile"}
+                        <div className="font-bold text-white text-xs" dir="ltr">
+                          {getStudentDisplayName(activeStudent, settings, "Student Profile")}
                         </div>
                         <div className="text-[10px] text-slate-400">
                           {activeStudent?.classLevel || "Class 12"} • {activeStudent?.stream || "General"}

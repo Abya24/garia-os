@@ -24,6 +24,9 @@ interface StatusBarProps {
   onOpenSavedItems?: () => void;
   onGoBack?: () => void;
   onOpenSliderMenu?: () => void;
+  tasks?: any;
+  goals?: any;
+  habits?: any;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({

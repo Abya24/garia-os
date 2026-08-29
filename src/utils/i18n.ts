@@ -168,6 +168,13 @@ export interface TranslationStrings {
   search: string;
   more: string;
   cancel: string;
+  tasks: string;
+  focus: string;
+  calendar: string;
+  goals: string;
+  noStreamNeededClass10?: string;
+  streamHelperText?: string;
+  saveProfileBtn?: string;
 }
 
 export const translations: Record<AppLanguage, TranslationStrings> = {
@@ -339,6 +346,13 @@ export const translations: Record<AppLanguage, TranslationStrings> = {
     search: "Search",
     more: "More Apps",
     cancel: "Cancel",
+    tasks: "Tasks",
+    focus: "Focus",
+    calendar: "Calendar",
+    goals: "Goals",
+    noStreamNeededClass10: "No stream specialization required for Class 10 (General Foundation)",
+    streamHelperText: "Select your academic stream for tailored curriculum and career matching",
+    saveProfileBtn: "Save Profile",
   },
   hi: {
     appName: "गारिया ओएस",
@@ -508,6 +522,13 @@ export const translations: Record<AppLanguage, TranslationStrings> = {
     search: "खोजें",
     more: "अन्य ऐप्स",
     cancel: "रद्द करें",
+    tasks: "कार्य",
+    focus: "फोकस",
+    calendar: "कैलेंडर",
+    goals: "लक्ष्य",
+    noStreamNeededClass10: "कक्षा 10 के लिए संकाय चयन आवश्यक नहीं है",
+    streamHelperText: "अनुरूप पाठ्यक्रम और करियर मिलान के लिए अपना अकादमिक संकाय चुनें",
+    saveProfileBtn: "प्रोफ़ाइल सहेजें",
   },
 };
 
