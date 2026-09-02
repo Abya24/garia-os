@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   X,
   User,
@@ -72,6 +72,16 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && (activeTab === "add" || activeTab === "edit")) {
+      const timer = setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, activeTab]);
 
   if (!isOpen) return null;
 
@@ -406,15 +416,14 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     {t.studentNameLabel} *
                   </label>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     required
                     value={name}
-                    onChange={(e) => {
-                      const formatted = capitalizeWords(e.target.value);
-                      setName(formatted);
-                    }}
+                    onChange={(e) => setName(e.target.value)}
+                    onBlur={() => setName((prev) => capitalizeWords(prev).trim())}
                     placeholder={t.studentNamePlaceholder}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm text-left"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm text-left capitalize"
                   />
                 </div>
 

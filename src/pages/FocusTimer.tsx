@@ -13,11 +13,25 @@ import {
   Flame,
   Volume2,
   VolumeX,
+  Volume1,
+  CloudRain,
+  Wind,
+  Activity,
+  Radio,
+  Droplets,
+  Waves,
+  Headphones,
+  Sliders,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { FocusSessionLog, UserSettings } from "../types";
 import { sendNotification } from "../utils/notifications";
 import { getTodayString } from "../utils/storage";
+import {
+  ambientAudio,
+  AMBIENT_SOUND_OPTIONS,
+  AmbientSoundType,
+} from "../utils/ambientAudio";
 
 interface FocusTimerProps {
   settings: UserSettings;
@@ -47,7 +61,55 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   const [sessionsCompletedToday, setSessionsCompletedToday] = useState<number>(0);
   const [soundMuted, setSoundMuted] = useState<boolean>(false);
 
+  // Ambient Sound Engine State
+  const [selectedAmbientSound, setSelectedAmbientSound] = useState<AmbientSoundType>("rain");
+  const [isAmbientPlaying, setIsAmbientPlaying] = useState<boolean>(false);
+  const [ambientVolume, setAmbientVolume] = useState<number>(0.5);
+  const [autoPlayAmbient, setAutoPlayAmbient] = useState<boolean>(true);
+
   const todayStr = getTodayString();
+
+  // Keep ambient audio engine volume in sync
+  useEffect(() => {
+    ambientAudio.setVolume(ambientVolume);
+  }, [ambientVolume]);
+
+  // Clean up ambient audio on unmount
+  useEffect(() => {
+    return () => {
+      ambientAudio.stop();
+    };
+  }, []);
+
+  const handleToggleAmbientPlay = (forceType?: AmbientSoundType) => {
+    const target = forceType || selectedAmbientSound;
+    if (target === "none") {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+      return;
+    }
+
+    if (isAmbientPlaying && !forceType) {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+    } else {
+      ambientAudio.setVolume(ambientVolume);
+      ambientAudio.play(target);
+      setIsAmbientPlaying(true);
+    }
+  };
+
+  const handleSelectAmbientSound = (soundType: AmbientSoundType) => {
+    setSelectedAmbientSound(soundType);
+    if (soundType === "none") {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+    } else if (isAmbientPlaying || (isRunning && autoPlayAmbient)) {
+      ambientAudio.setVolume(ambientVolume);
+      ambientAudio.play(soundType);
+      setIsAmbientPlaying(true);
+    }
+  };
 
   useEffect(() => {
     const countToday = (Array.isArray(focusLogs) ? focusLogs : []).filter(
@@ -115,6 +177,10 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
       // Session Completed
       setIsRunning(false);
       playChime(true);
+      if (isAmbientPlaying) {
+        ambientAudio.stop();
+        setIsAmbientPlaying(false);
+      }
       if (mode === "focus") {
         onLogFocusSession({
           type: "focus",
@@ -167,11 +233,26 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   const handleStart = () => {
     playChime(false);
     setIsRunning(true);
+    if (autoPlayAmbient && selectedAmbientSound !== "none" && !isAmbientPlaying) {
+      ambientAudio.setVolume(ambientVolume);
+      ambientAudio.play(selectedAmbientSound);
+      setIsAmbientPlaying(true);
+    }
   };
-  const handlePause = () => setIsRunning(false);
+  const handlePause = () => {
+    setIsRunning(false);
+    if (autoPlayAmbient && isAmbientPlaying) {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+    }
+  };
   const handleReset = () => {
     setIsRunning(false);
     setTimeLeftSeconds(totalModeSeconds);
+    if (autoPlayAmbient && isAmbientPlaying) {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+    }
   };
 
   const handleSkip = () => {
@@ -594,6 +675,154 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
           <span className="font-bold font-mono text-emerald-400 text-sm">
             {sessionsCompletedToday} sessions
           </span>
+        </div>
+      </div>
+
+      {/* Ambient Background Sounds Card */}
+      <div className="glass-card rounded-3xl p-6 border border-white/10 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+              <Headphones className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white font-heading">
+                  Ambient Background Sounds
+                </h3>
+                {isAmbientPlaying && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    Playing
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400">
+                Continuous calming soundscapes (rain, white noise, binaural beats) to mask distractions and deepen focus.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Play/Stop Preview Button */}
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <button
+              id="ambient-play-toggle-btn"
+              onClick={() => handleToggleAmbientPlay()}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border card-press ${
+                isAmbientPlaying
+                  ? "bg-amber-500/20 border-amber-400/50 text-amber-300 shadow-sm"
+                  : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+              }`}
+            >
+              {isAmbientPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5 fill-amber-300" />
+                  <span>Pause Sound</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-slate-300" />
+                  <span>Play Sound</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Sound Selection Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+          {AMBIENT_SOUND_OPTIONS.map((option) => {
+            const isSelected = selectedAmbientSound === option.id;
+            const isPlayingThis = isSelected && isAmbientPlaying;
+
+            const renderIcon = () => {
+              switch (option.id) {
+                case "rain":
+                  return <CloudRain className="w-4 h-4 text-cyan-400" />;
+                case "white_noise":
+                  return <Wind className="w-4 h-4 text-sky-400" />;
+                case "pink_noise":
+                  return <Activity className="w-4 h-4 text-pink-400" />;
+                case "brown_noise":
+                  return <Radio className="w-4 h-4 text-amber-400" />;
+                case "forest_stream":
+                  return <Droplets className="w-4 h-4 text-teal-400" />;
+                case "waves":
+                  return <Waves className="w-4 h-4 text-blue-400" />;
+                case "binaural_focus":
+                  return <Sparkles className="w-4 h-4 text-purple-400" />;
+                default:
+                  return <VolumeX className="w-4 h-4 text-slate-500" />;
+              }
+            };
+
+            return (
+              <button
+                key={option.id}
+                onClick={() => handleSelectAmbientSound(option.id)}
+                className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between gap-1.5 ${
+                  isSelected
+                    ? "bg-gradient-to-br from-indigo-950/40 to-slate-900 border-indigo-400/50 shadow-md shadow-indigo-500/10 text-white"
+                    : "bg-white/5 border-white/5 hover:border-white/15 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="p-1.5 rounded-xl bg-white/5 border border-white/10">
+                    {renderIcon()}
+                  </div>
+                  {isPlayingThis && (
+                    <div className="flex items-end gap-0.5 h-3">
+                      <span className="w-0.5 h-2 bg-emerald-400 animate-pulse" />
+                      <span className="w-0.5 h-3 bg-emerald-400 animate-pulse delay-75" />
+                      <span className="w-0.5 h-1.5 bg-emerald-400 animate-pulse delay-150" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white font-heading truncate">
+                    {option.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 line-clamp-1">
+                    {option.description}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Volume & Auto-Play Controls */}
+        <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+          {/* Volume Slider */}
+          <div className="flex items-center gap-3 w-full sm:w-64">
+            <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="flex-1 flex items-center gap-2">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={ambientVolume}
+                onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-400"
+                title="Ambient Sound Volume"
+              />
+              <span className="font-mono text-slate-400 text-[11px] w-8 text-right">
+                {Math.round(ambientVolume * 100)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Auto-play with timer toggle */}
+          <label className="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoPlayAmbient}
+              onChange={(e) => setAutoPlayAmbient(e.target.checked)}
+              className="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
+            />
+            <span>Auto-play sound when focus timer starts</span>
+          </label>
         </div>
       </div>
     </div>

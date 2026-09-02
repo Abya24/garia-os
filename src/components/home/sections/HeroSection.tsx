@@ -27,6 +27,7 @@ import { MotivationalQuote } from "../../../utils/quotes";
 import { AppLanguage } from "../../../utils/i18n";
 import { getStudentDisplayName } from "../../../utils/studentNameUtils";
 import { GariaLogo } from "../../GariaLogo";
+import { LanguageSwitcher } from "../../LanguageSwitcher";
 
 interface HeroSectionProps {
   activeStudent?: StudentProfile;
@@ -40,6 +41,7 @@ interface HeroSectionProps {
   formattedDate: string;
   displayGreeting: string;
   currentLanguage: AppLanguage;
+  onUpdateLanguage?: (lang: AppLanguage) => void;
   todaysCompletedTasksCount: number;
   todaysTotalTasksCount: number;
   todayStudyMinutes: number;
@@ -62,6 +64,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   formattedDate,
   displayGreeting,
   currentLanguage,
+  onUpdateLanguage,
   todaysCompletedTasksCount,
   todaysTotalTasksCount,
   todayStudyMinutes,
@@ -139,8 +142,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             />
           </div>
 
-          {/* Right: Date, Time & Menu */}
+          {/* Right: Language Switcher, Date, Time & Menu */}
           <div className="flex items-center justify-center sm:justify-end gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            {/* Language Switcher */}
+            <LanguageSwitcher
+              currentLanguage={currentLanguage}
+              onLanguageChange={onUpdateLanguage}
+              variant="pill"
+            />
+
             {/* Live Clock Badge */}
             <div
               id="hero-live-clock"

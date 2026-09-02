@@ -1365,13 +1365,54 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         )}
 
+        <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-cyan-400" />
+              <h4 className="text-sm font-bold text-white font-heading">
+                {currentLanguage === "hi" ? "छात्र डेटा बैकअप करें" : "Backup Data"}
+              </h4>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                JSON File
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              {currentLanguage === "hi"
+                ? "छात्र प्रोफ़ाइल, कार्य, नोट्स, आदतें, अध्ययन सत्र और सभी शैक्षणिक डेटा की एक पूर्ण JSON बैकअप फ़ाइल डाउनलोड करें।"
+                : "Generates a downloadable JSON file of all student profile, tasks, notes, habits, study sessions, and productivity data."}
+            </p>
+          </div>
+          <button
+            id="backup-data-btn"
+            onClick={() => {
+              exportStudentProfileJSON(activeStudent?.id);
+              showToast(
+                currentLanguage === "hi"
+                  ? "बैकअप JSON सफलतापूर्वक डाउनलोड हो गया!"
+                  : "Backup JSON downloaded successfully!"
+              );
+            }}
+            className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-slate-950 text-xs font-extrabold transition-all flex items-center justify-center gap-2 shrink-0 card-press shadow-lg shadow-cyan-500/20"
+          >
+            <Download className="w-4 h-4 text-slate-950" />
+            <span>{currentLanguage === "hi" ? "बैकअप डेटा डाउनलोड करें" : "Backup Data"}</span>
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
-            onClick={() => exportStudentProfileJSON(activeStudent?.id)}
+            onClick={() => {
+              exportStudentProfileJSON(activeStudent?.id);
+              showToast(
+                currentLanguage === "hi"
+                  ? "सक्रिय छात्र डेटा निर्यात हो गया!"
+                  : "Student JSON exported successfully!"
+              );
+            }}
             className="flex items-center justify-center gap-2 p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-300 text-xs font-bold transition-all"
           >
             <Download className="w-4 h-4" />
-            <span>{currentLanguage === "hi" ? "सक्रिय छात्र डेटा निर्यात करें" : "Export Active Student JSON"}</span>
+            <span>{currentLanguage === "hi" ? "सक्रिय छात्र डेटा निर्यात करें" : "Export Student JSON"}</span>
           </button>
 
           <button

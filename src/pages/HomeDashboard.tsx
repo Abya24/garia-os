@@ -113,6 +113,7 @@ interface HomeDashboardProps {
   settings: UserSettings;
   activeStudent?: StudentProfile;
   currentLanguage?: AppLanguage;
+  onUpdateLanguage?: (lang: AppLanguage) => void;
   onNavigate: (tab: ActiveTab) => void;
   onQuickAddTask?: () => void;
   onAddTask?: (task: Omit<Task, "id" | "createdAt">) => void;
@@ -139,6 +140,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   settings,
   activeStudent,
   currentLanguage = "en",
+  onUpdateLanguage,
   onNavigate,
   onQuickAddTask,
   onAddTask,
@@ -574,6 +576,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         formattedDate={formattedDate}
         displayGreeting={displayGreeting}
         currentLanguage={currentLanguage}
+        onUpdateLanguage={onUpdateLanguage}
         todaysCompletedTasksCount={completedTodayCount}
         todaysTotalTasksCount={todaysTasks.length}
         todayStudyMinutes={todayStudyMinutes}

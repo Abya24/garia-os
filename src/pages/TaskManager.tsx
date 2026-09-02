@@ -38,6 +38,7 @@ import {
 import { CreateSharedWorkspaceModal } from "../components/collaboration/CreateSharedWorkspaceModal";
 import { JoinWorkspaceModal } from "../components/collaboration/JoinWorkspaceModal";
 import { SharedTasksWorkspaceView } from "../components/collaboration/SharedTasksWorkspaceView";
+import { SwipeableItemCard } from "../components/SwipeableItemCard";
 
 interface TaskManagerProps {
   tasks: Task[];
@@ -785,151 +786,159 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                 const isJustDone = justCompletedId === task.id;
 
                 return (
-                  <div
+                  <SwipeableItemCard
                     key={task.id}
-                    className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${getPriorityBorderClass(
-                      task.priority,
-                      task.completed
-                    )} ${
-                      task.completed
-                        ? "opacity-70 bg-slate-900/40 border-slate-800"
-                        : "border-white/10 hover:border-white/25 hover:shadow-lg"
-                    } ${isJustDone ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950 scale-[1.01]" : ""}`}
+                    id={task.id}
+                    isCompleted={task.completed}
+                    onToggleComplete={() => handleToggleTaskCompletion(task)}
+                    completedText="Task Completed!"
+                    uncompletedText="Mark as Pending"
                   >
-                    {/* Task Content */}
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleTaskCompletion(task)}
-                        className={`mt-0.5 p-1 rounded-xl transition-all shrink-0 cursor-pointer ${
-                          task.completed
-                            ? "text-emerald-400 hover:scale-110 active:scale-95"
-                            : "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 active:scale-90"
-                        }`}
-                        title={task.completed ? "Mark as pending" : "Mark as completed"}
-                      >
-                        {task.completed ? (
-                          <div className="relative">
-                            <CheckCircle2 className="w-6 h-6 text-emerald-400 fill-emerald-500/20" />
+                    <div
+                      className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${getPriorityBorderClass(
+                        task.priority,
+                        task.completed
+                      )} ${
+                        task.completed
+                          ? "opacity-70 bg-slate-900/40 border-slate-800"
+                          : "border-white/10 hover:border-white/25 hover:shadow-lg"
+                      } ${isJustDone ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950 scale-[1.01]" : ""}`}
+                    >
+                      {/* Task Content */}
+                      <div className="flex items-start gap-3.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTaskCompletion(task)}
+                          className={`mt-0.5 p-1 rounded-xl transition-all shrink-0 cursor-pointer ${
+                            task.completed
+                              ? "text-emerald-400 hover:scale-110 active:scale-95"
+                              : "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 active:scale-90"
+                          }`}
+                          title={task.completed ? "Mark as pending" : "Mark as completed"}
+                        >
+                          {task.completed ? (
+                            <div className="relative">
+                              <CheckCircle2 className="w-6 h-6 text-emerald-400 fill-emerald-500/20" />
+                              {isJustDone && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+                              )}
+                            </div>
+                          ) : (
+                            <Circle className="w-6 h-6" />
+                          )}
+                        </button>
+
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4
+                              className={`font-bold text-base font-heading transition-all duration-300 ${
+                                task.completed
+                                  ? "line-through text-slate-400 decoration-emerald-400/80 decoration-2 italic"
+                                  : "text-white"
+                              }`}
+                            >
+                              {task.title}
+                            </h4>
+                            {/* Visual Priority Badge */}
+                            {renderPriorityBadge(task.priority)}
+                          </div>
+
+                          {task.description && (
+                            <p
+                              className={`text-xs transition-colors line-clamp-2 ${
+                                task.completed ? "text-slate-500 line-through" : "text-slate-400"
+                              }`}
+                            >
+                              {task.description}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono">
+                            <span className="text-slate-400 flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              {task.date === todayStr ? (
+                                <strong className="text-emerald-400">Today</strong>
+                              ) : (
+                                task.date
+                              )}
+                            </span>
+
+                            {task.time && (
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                {task.time}
+                              </span>
+                            )}
+
+                            {/* Dynamic / Custom Category Badge */}
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold capitalize tracking-wide ${getCategoryBadge(
+                                task.category
+                              )}`}
+                            >
+                              {task.category}
+                            </span>
+
                             {isJustDone && (
-                              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+                              <span className="text-[10px] font-bold text-emerald-400 animate-bounce flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> Done!
+                              </span>
                             )}
                           </div>
-                        ) : (
-                          <Circle className="w-6 h-6" />
-                        )}
-                      </button>
-
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4
-                            className={`font-bold text-base font-heading transition-all duration-300 ${
-                              task.completed
-                                ? "line-through text-slate-400 decoration-emerald-400/80 decoration-2 italic"
-                                : "text-white"
-                            }`}
-                          >
-                            {task.title}
-                          </h4>
-                          {/* Visual Priority Badge */}
-                          {renderPriorityBadge(task.priority)}
-                        </div>
-
-                        {task.description && (
-                          <p
-                            className={`text-xs transition-colors line-clamp-2 ${
-                              task.completed ? "text-slate-500 line-through" : "text-slate-400"
-                            }`}
-                          >
-                            {task.description}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono">
-                          <span className="text-slate-400 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            {task.date === todayStr ? (
-                              <strong className="text-emerald-400">Today</strong>
-                            ) : (
-                              task.date
-                            )}
-                          </span>
-
-                          {task.time && (
-                            <span className="text-slate-400 flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              {task.time}
-                            </span>
-                          )}
-
-                          {/* Dynamic / Custom Category Badge */}
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold capitalize tracking-wide ${getCategoryBadge(
-                              task.category
-                            )}`}
-                          >
-                            {task.category}
-                          </span>
-
-                          {isJustDone && (
-                            <span className="text-[10px] font-bold text-emerald-400 animate-bounce flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" /> Done!
-                            </span>
-                          )}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Task Actions */}
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      {/* Share to workspace if workspaces exist */}
-                      {sharedWorkspaces.length > 0 && (
-                        <select
-                          onChange={(e) => {
-                            const targetWs = sharedWorkspaces.find((w) => w.id === e.target.value);
-                            if (targetWs) {
-                              handleShareTaskToWorkspace(task, targetWs);
-                            }
+                      {/* Task Actions */}
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        {/* Share to workspace if workspaces exist */}
+                        {sharedWorkspaces.length > 0 && (
+                          <select
+                            onChange={(e) => {
+                              const targetWs = sharedWorkspaces.find((w) => w.id === e.target.value);
+                              if (targetWs) {
+                                handleShareTaskToWorkspace(task, targetWs);
+                              }
+                            }}
+                            defaultValue=""
+                            className="px-2 py-1 bg-slate-800 border border-white/10 rounded-xl text-[11px] text-slate-300 focus:outline-none cursor-pointer"
+                            title="Copy to shared workspace"
+                          >
+                            <option value="" disabled>Share to Workspace ▾</option>
+                            {sharedWorkspaces.map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.title}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        <CalendarSyncDropdown
+                          event={{
+                            title: task.title,
+                            description: task.description,
+                            date: task.date,
+                            time: task.time,
+                            location: "Garia Study OS",
                           }}
-                          defaultValue=""
-                          className="px-2 py-1 bg-slate-800 border border-white/10 rounded-xl text-[11px] text-slate-300 focus:outline-none cursor-pointer"
-                          title="Copy to shared workspace"
+                        />
+
+                        <button
+                          onClick={() => handleOpenEditModal(task)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                          title="Edit task"
                         >
-                          <option value="" disabled>Share to Workspace ▾</option>
-                          {sharedWorkspaces.map((w) => (
-                            <option key={w.id} value={w.id}>
-                              {w.title}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <CalendarSyncDropdown
-                        event={{
-                          title: task.title,
-                          description: task.description,
-                          date: task.date,
-                          time: task.time,
-                          location: "Garia Study OS",
-                        }}
-                      />
-
-                      <button
-                        onClick={() => handleOpenEditModal(task)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                        title="Edit task"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setTaskToDelete(task)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Delete task"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setTaskToDelete(task)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete task"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </SwipeableItemCard>
                 );
               })
             )}

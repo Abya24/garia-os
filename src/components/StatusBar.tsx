@@ -4,6 +4,7 @@ import { ActiveTab, UserSettings, StudentProfile } from "../types";
 import { AppLanguage, translations } from "../utils/i18n";
 import { motion } from "motion/react";
 import { GariaLogo } from "./GariaLogo";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface StatusBarProps {
   settings: UserSettings;
@@ -34,6 +35,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onGoBack,
   onOpenSliderMenu,
   currentLanguage = "en",
+  onUpdateLanguage,
 }) => {
   const t = translations[currentLanguage] || translations.en;
 
@@ -103,18 +105,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           </h2>
         </div>
 
-        {/* Right: Official Garia OS App Icon to open the Slider Menu */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onOpenSliderMenu}
-          id="header-garia-os-app-icon-sub"
-          title="Open Garia OS Slider Menu"
-          aria-label="Open Garia OS Menu"
-          className="p-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all card-press group flex items-center justify-center gap-1.5 overflow-visible shrink-0"
-        >
-          <GariaLogo size="sm" variant="icon" withGlow={true} className="overflow-visible" />
-        </motion.button>
+        {/* Right: Language Switcher & Official Garia OS App Icon */}
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher
+            currentLanguage={currentLanguage}
+            onLanguageChange={onUpdateLanguage}
+            variant="pill"
+          />
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onOpenSliderMenu}
+            id="header-garia-os-app-icon-sub"
+            title="Open Garia OS Slider Menu"
+            aria-label="Open Garia OS Menu"
+            className="p-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all card-press group flex items-center justify-center gap-1.5 overflow-visible shrink-0"
+          >
+            <GariaLogo size="sm" variant="icon" withGlow={true} className="overflow-visible" />
+          </motion.button>
+        </div>
       </div>
     </header>
   );

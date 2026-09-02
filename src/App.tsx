@@ -1907,6 +1907,7 @@ export default function App() {
                 settings={settings}
                 activeStudent={activeStudent}
                 currentLanguage={currentLanguage}
+                onUpdateLanguage={handleUpdateLanguage}
                 onNavigate={(tab) => {
                   handleNavigate(tab);
                   setIsMoreMenuOpen(false);

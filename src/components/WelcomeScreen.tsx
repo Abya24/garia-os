@@ -241,11 +241,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   required
                   placeholder="e.g. Alex Sharma"
                   value={name}
-                  onChange={(e) => {
-                    const formatted = capitalizeWords(e.target.value);
-                    setName(formatted);
-                  }}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left"
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={() => setName((prev) => capitalizeWords(prev).trim())}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl glass-pill text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400 text-left capitalize"
                 />
               </div>
             </div>
