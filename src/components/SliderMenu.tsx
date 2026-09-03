@@ -38,6 +38,7 @@ import {
   AppTheme,
 } from "../types";
 import { APP_VERSION, APP_BUILD_DATE } from "../constants/version";
+import { PWAInstallOption } from "./PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
 import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
@@ -655,6 +656,9 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                 </div>
 
                 <div className="space-y-2">
+                  {/* PWA App Installation */}
+                  <PWAInstallOption variant="menu-item" currentLanguage={currentLanguage} />
+
                   {/* Full Settings Navigation */}
                   <button
                     onClick={() => {

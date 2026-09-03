@@ -68,6 +68,7 @@ import {
 } from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
+import { PWAInstallOption } from "../components/PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
 import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
@@ -1487,7 +1488,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 7. About & System Information Section */}
+      {/* 7. Application & PWA Installation */}
+      <PWAInstallOption variant="card" currentLanguage={currentLanguage} />
+
+      {/* 8. About & System Information Section */}
       <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
         <h3 className="text-lg font-bold font-heading text-white flex items-center justify-between">
           <div className="flex items-center gap-2">

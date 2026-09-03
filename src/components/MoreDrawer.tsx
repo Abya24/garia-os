@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ActiveTab, StudentProfile, UserSettings, AppTheme } from "../types";
 import { APP_VERSION } from "../constants/version";
+import { PWAInstallOption } from "./PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
 import {
   reconcilePendingQueueWithFirestore,
@@ -381,6 +382,9 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                         {syncStatusMsg}
                       </div>
                     )}
+
+                    {/* PWA App Installation Option */}
+                    <PWAInstallOption variant="menu-item" currentLanguage={currentLanguage} />
 
                     <button
                       onClick={() => {

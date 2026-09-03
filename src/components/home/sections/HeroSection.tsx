@@ -28,6 +28,7 @@ import { AppLanguage } from "../../../utils/i18n";
 import { getStudentDisplayName } from "../../../utils/studentNameUtils";
 import { GariaLogo } from "../../GariaLogo";
 import { LanguageSwitcher } from "../../LanguageSwitcher";
+import { PWAInstallOption } from "../../PWAInstallOption";
 
 interface HeroSectionProps {
   activeStudent?: StudentProfile;
@@ -171,6 +172,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span>{formattedDate}</span>
             </div>
+
+            {/* PWA Install Option */}
+            <PWAInstallOption
+              variant="compact-button"
+              currentLanguage={currentLanguage}
+            />
 
             {/* Menu Trigger */}
             {onOpenSliderMenu && (
