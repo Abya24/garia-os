@@ -903,6 +903,23 @@ export default function App() {
     });
   };
 
+  const handleBulkDeleteTasks = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const updated = tasks.filter((t) => !idSet.has(t.id));
+    setTasks(updated);
+    saveTasks(updated, activeProfileId);
+    ids.forEach((id) => {
+      enqueueOfflineAction({
+        type: "DELETE_TASK",
+        entityName: "tasks",
+        action: "delete",
+        profileId: activeProfileId,
+        payload: { id },
+      });
+    });
+  };
+
   const handleAddSubject = (
     newSubj: Omit<Subject, "id" | "completedMinutes" | "totalSessions">
   ) => {
@@ -1936,6 +1953,7 @@ export default function App() {
                 onAddTask={handleAddTask}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
+                onBulkDeleteTasks={handleBulkDeleteTasks}
                 onBack={handleGoBack}
                 currentUserId={activeStudent?.id || "guest"}
                 currentUserName={activeStudent?.name || "Student"}

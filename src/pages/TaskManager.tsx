@@ -23,6 +23,10 @@ import {
   FolderPlus,
   Flame,
   Zap,
+  CheckSquare,
+  Square,
+  Layers,
+  CheckCheck,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { Task, Priority, TaskCategory, SharedWorkspace, WorkspaceMember } from "../types";
@@ -45,6 +49,7 @@ interface TaskManagerProps {
   onAddTask: (task: Omit<Task, "id" | "createdAt">) => void;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
+  onBulkDeleteTasks?: (ids: string[]) => void;
   onBack?: () => void;
   currentUserId?: string;
   currentUserName?: string;
@@ -56,6 +61,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onBulkDeleteTasks,
   onBack,
   currentUserId,
   currentUserName,
@@ -75,8 +81,13 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  // Deletion Confirmation Modal State
+  // Deletion Confirmation Modal State (Single)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  // Bulk Action Mode State
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
   // Success Animation Tracker
   const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
@@ -225,6 +236,53 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       onDeleteTask(taskToDelete.id);
       setTaskToDelete(null);
     }
+  };
+
+  // Bulk Selection Operations
+  const toggleSelectTask = (id: string) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const visibleIds = filteredTasks.map((t) => t.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedTaskIds.includes(id));
+    if (allSelected) {
+      setSelectedTaskIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedTaskIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleSelectAllCompleted = () => {
+    const completed = tasks.filter((t) => t.completed);
+    const completedIds = completed.map((t) => t.id);
+    setSelectedTaskIds(completedIds);
+    if (!isBulkMode) {
+      setIsBulkMode(true);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedTaskIds([]);
+  };
+
+  const handleExitBulkMode = () => {
+    setIsBulkMode(false);
+    setSelectedTaskIds([]);
+  };
+
+  const handleExecuteBulkDelete = () => {
+    if (selectedTaskIds.length === 0) return;
+    if (onBulkDeleteTasks) {
+      onBulkDeleteTasks(selectedTaskIds);
+    } else {
+      selectedTaskIds.forEach((id) => onDeleteTask(id));
+    }
+    setSelectedTaskIds([]);
+    setIsBulkDeleteModalOpen(false);
+    setIsBulkMode(false);
   };
 
   // Share a personal task to a shared workspace
@@ -417,13 +475,49 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
           </div>
 
           {activeViewMode === "personal" ? (
-            <button
-              onClick={handleOpenAddModal}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-900 font-bold text-xs sm:text-sm hover:shadow-lg hover:shadow-emerald-500/25 transition-all transform active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Task</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="tasks-bulk-action-toggle-btn"
+                onClick={() => {
+                  if (isBulkMode) {
+                    handleExitBulkMode();
+                  } else {
+                    setIsBulkMode(true);
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all border ${
+                  isBulkMode
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm"
+                    : "bg-white/10 hover:bg-white/15 text-slate-200 border-white/10"
+                }`}
+                title={isBulkMode ? "Exit Bulk Action Mode" : "Enter Bulk Action Mode"}
+              >
+                {isBulkMode ? (
+                  <>
+                    <X className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Exit Bulk</span>
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Bulk Actions</span>
+                    {tasks.filter((t) => t.completed).length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-mono">
+                        {tasks.filter((t) => t.completed).length} done
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleOpenAddModal}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-900 font-bold text-xs sm:text-sm hover:shadow-lg hover:shadow-emerald-500/25 transition-all transform active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Task</span>
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <button
@@ -744,12 +838,107 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                 </select>
               </div>
 
-              {/* Quick Results Summary */}
-              <div className="ml-auto text-xs text-slate-400 font-mono">
-                Showing <strong className="text-white">{filteredTasks.length}</strong> of {tasks.length}
+              {/* Quick Results Summary & Quick Bulk Select */}
+              <div className="ml-auto flex items-center gap-2.5">
+                {tasks.filter((t) => t.completed).length > 0 && !isBulkMode && (
+                  <button
+                    type="button"
+                    onClick={handleSelectAllCompleted}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                    title="Select all completed tasks and open bulk actions"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span>Select {tasks.filter((t) => t.completed).length} Completed</span>
+                  </button>
+                )}
+                <div className="text-xs text-slate-400 font-mono">
+                  Showing <strong className="text-white">{filteredTasks.length}</strong> of {tasks.length}
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Active Bulk Action Control Toolbar */}
+          {isBulkMode && (
+            <div className="glass-card rounded-3xl p-4 sm:p-5 border-2 border-emerald-500/40 bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-2xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <CheckSquare className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm sm:text-base font-bold text-white font-heading">
+                        Bulk Action Mode
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-xs font-bold">
+                        {selectedTaskIds.length} Selected
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Select multiple tasks to delete them at once or use quick selectors below.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  {selectedTaskIds.length > 0 && (
+                    <button
+                      id="bulk-delete-selected-btn"
+                      onClick={() => setIsBulkDeleteModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Selected ({selectedTaskIds.length})</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={handleExitBulkMode}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs border border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Exit Bulk Mode</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Select Buttons Ribbon */}
+              <div className="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={handleSelectAllCompleted}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Select all completed tasks at once"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Select All Completed ({tasks.filter((t) => t.completed).length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiltered}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    {filteredTasks.every((t) => selectedTaskIds.includes(t.id)) && filteredTasks.length > 0
+                      ? "Deselect Visible"
+                      : `Select All Visible (${filteredTasks.length})`}
+                  </span>
+                </button>
+
+                {selectedTaskIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 text-xs transition-colors cursor-pointer"
+                  >
+                    Clear Selection
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Task List */}
           <div className="space-y-3">
@@ -784,6 +973,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
             ) : (
               filteredTasks.map((task) => {
                 const isJustDone = justCompletedId === task.id;
+                const isSelected = selectedTaskIds.includes(task.id);
 
                 return (
                   <SwipeableItemCard
@@ -795,38 +985,66 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                     uncompletedText="Mark as Pending"
                   >
                     <div
-                      className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${getPriorityBorderClass(
-                        task.priority,
-                        task.completed
-                      )} ${
-                        task.completed
+                      onClick={isBulkMode ? () => toggleSelectTask(task.id) : undefined}
+                      className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${
+                        isBulkMode ? "cursor-pointer select-none" : ""
+                      } ${
+                        isSelected
+                          ? "ring-2 ring-emerald-400 bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-950/30"
+                          : getPriorityBorderClass(task.priority, task.completed)
+                      } ${
+                        task.completed && !isSelected
                           ? "opacity-70 bg-slate-900/40 border-slate-800"
-                          : "border-white/10 hover:border-white/25 hover:shadow-lg"
+                          : !isSelected
+                          ? "border-white/10 hover:border-white/25 hover:shadow-lg"
+                          : ""
                       } ${isJustDone ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950 scale-[1.01]" : ""}`}
                     >
                       {/* Task Content */}
                       <div className="flex items-start gap-3.5 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTaskCompletion(task)}
-                          className={`mt-0.5 p-1 rounded-xl transition-all shrink-0 cursor-pointer ${
-                            task.completed
-                              ? "text-emerald-400 hover:scale-110 active:scale-95"
-                              : "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 active:scale-90"
-                          }`}
-                          title={task.completed ? "Mark as pending" : "Mark as completed"}
-                        >
-                          {task.completed ? (
-                            <div className="relative">
-                              <CheckCircle2 className="w-6 h-6 text-emerald-400 fill-emerald-500/20" />
-                              {isJustDone && (
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
-                              )}
-                            </div>
-                          ) : (
-                            <Circle className="w-6 h-6" />
-                          )}
-                        </button>
+                        {isBulkMode ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectTask(task.id);
+                            }}
+                            className={`mt-0.5 p-1 rounded-xl transition-all shrink-0 cursor-pointer ${
+                              isSelected
+                                ? "text-emerald-400 hover:scale-110"
+                                : "text-slate-500 hover:text-white"
+                            }`}
+                            title={isSelected ? "Deselect task" : "Select task"}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-6 h-6 text-emerald-400" />
+                            ) : (
+                              <Square className="w-6 h-6 text-slate-500 hover:text-slate-300" />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTaskCompletion(task)}
+                            className={`mt-0.5 p-1 rounded-xl transition-all shrink-0 cursor-pointer ${
+                              task.completed
+                                ? "text-emerald-400 hover:scale-110 active:scale-95"
+                                : "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 active:scale-90"
+                            }`}
+                            title={task.completed ? "Mark as pending" : "Mark as completed"}
+                          >
+                            {task.completed ? (
+                              <div className="relative">
+                                <CheckCircle2 className="w-6 h-6 text-emerald-400 fill-emerald-500/20" />
+                                {isJustDone && (
+                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+                                )}
+                              </div>
+                            ) : (
+                              <Circle className="w-6 h-6" />
+                            )}
+                          </button>
+                        )}
 
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -890,52 +1108,71 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
                       {/* Task Actions */}
                       <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {/* Share to workspace if workspaces exist */}
-                        {sharedWorkspaces.length > 0 && (
-                          <select
-                            onChange={(e) => {
-                              const targetWs = sharedWorkspaces.find((w) => w.id === e.target.value);
-                              if (targetWs) {
-                                handleShareTaskToWorkspace(task, targetWs);
-                              }
+                        {isBulkMode ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectTask(task.id);
                             }}
-                            defaultValue=""
-                            className="px-2 py-1 bg-slate-800 border border-white/10 rounded-xl text-[11px] text-slate-300 focus:outline-none cursor-pointer"
-                            title="Copy to shared workspace"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                              isSelected
+                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20"
+                                : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                            }`}
                           >
-                            <option value="" disabled>Share to Workspace ▾</option>
-                            {sharedWorkspaces.map((w) => (
-                              <option key={w.id} value={w.id}>
-                                {w.title}
-                              </option>
-                            ))}
-                          </select>
+                            {isSelected ? "Selected ✓" : "Select"}
+                          </button>
+                        ) : (
+                          <>
+                            {/* Share to workspace if workspaces exist */}
+                            {sharedWorkspaces.length > 0 && (
+                              <select
+                                onChange={(e) => {
+                                  const targetWs = sharedWorkspaces.find((w) => w.id === e.target.value);
+                                  if (targetWs) {
+                                    handleShareTaskToWorkspace(task, targetWs);
+                                  }
+                                }}
+                                defaultValue=""
+                                className="px-2 py-1 bg-slate-800 border border-white/10 rounded-xl text-[11px] text-slate-300 focus:outline-none cursor-pointer"
+                                title="Copy to shared workspace"
+                              >
+                                <option value="" disabled>Share to Workspace ▾</option>
+                                {sharedWorkspaces.map((w) => (
+                                  <option key={w.id} value={w.id}>
+                                    {w.title}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+
+                            <CalendarSyncDropdown
+                              event={{
+                                title: task.title,
+                                description: task.description,
+                                date: task.date,
+                                time: task.time,
+                                location: "Garia Study OS",
+                              }}
+                            />
+
+                            <button
+                              onClick={() => handleOpenEditModal(task)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                              title="Edit task"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setTaskToDelete(task)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                              title="Delete task"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
-
-                        <CalendarSyncDropdown
-                          event={{
-                            title: task.title,
-                            description: task.description,
-                            date: task.date,
-                            time: task.time,
-                            location: "Garia Study OS",
-                          }}
-                        />
-
-                        <button
-                          onClick={() => handleOpenEditModal(task)}
-                          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                          title="Edit task"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setTaskToDelete(task)}
-                          className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                          title="Delete task"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   </SwipeableItemCard>
@@ -1196,6 +1433,85 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Task</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal (Prevents Accidental Bulk Data Loss) */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white font-heading">
+                  Delete {selectedTaskIds.length} Selected Tasks?
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Are you sure you want to delete these {selectedTaskIds.length} tasks in one click? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Selected Items Breakdown & Preview */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>
+                  {tasks.filter((t) => selectedTaskIds.includes(t.id) && t.completed).length} Completed,{" "}
+                  {tasks.filter((t) => selectedTaskIds.includes(t.id) && !t.completed).length} Pending
+                </span>
+                <span>{selectedTaskIds.length} items to remove</span>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto space-y-2 p-2 rounded-2xl bg-slate-950/70 border border-white/10 no-scrollbar">
+                {tasks
+                  .filter((t) => selectedTaskIds.includes(t.id))
+                  .map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {task.completed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-slate-500 shrink-0" />
+                        )}
+                        <span className={`truncate font-semibold ${task.completed ? "line-through text-slate-400" : "text-white"}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize shrink-0 ${getCategoryBadge(task.category)}`}>
+                        {task.category}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-bulk-delete-btn"
+                onClick={handleExecuteBulkDelete}
+                className="px-5 py-2 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete {selectedTaskIds.length} Tasks</span>
               </button>
             </div>
           </div>
