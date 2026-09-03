@@ -1,4 +1,5 @@
-import { auth, uploadWorkspaceToCloud, db } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, uploadWorkspaceToCloud, persistEntityToFirestore } from "./firebase";
 import { getWorkspaceSnapshot } from "./storage";
 
 export type OfflineActionType =
@@ -244,7 +245,68 @@ export function clearPendingQueue(): void {
 }
 
 /**
- * Automatically reconcile all pending offline actions with Firestore once online.
+ * Persist an individual offline action to the remote Firestore database.
+ * Throws an error if remote persistence is rejected or fails.
+ */
+async function persistActionToFirestore(
+  userId: string,
+  action: PendingOfflineAction
+): Promise<void> {
+  const p = action.payload || {};
+  const isDelete = action.action === "delete";
+  const rawId = p.id || (typeof p === "string" ? p : action.id);
+  const type = action.type;
+  const entity = action.entityName;
+
+  // 1. Tasks
+  if (type.includes("TASK") || entity === "tasks") {
+    await persistEntityToFirestore(userId, "tasks", rawId, p, isDelete);
+    return;
+  }
+
+  // 2. Notes
+  if (type.includes("NOTE") || entity === "notes") {
+    await persistEntityToFirestore(userId, "notes", rawId, p, isDelete);
+    return;
+  }
+
+  // 3. Habits
+  if (type.includes("HABIT") || entity === "habits") {
+    await persistEntityToFirestore(userId, "habits", rawId, p, isDelete);
+    return;
+  }
+
+  // 4. Goals
+  if (type.includes("GOAL") || entity === "goals") {
+    await persistEntityToFirestore(userId, "goals", rawId, p, isDelete);
+    return;
+  }
+
+  // 5. Calendar Events
+  if (type.includes("EVENT") || entity === "calendar_events") {
+    await persistEntityToFirestore(userId, "calendar_events", rawId, p, isDelete);
+    return;
+  }
+
+  // 6. Profiles
+  if (type.includes("PROFILE") || entity === "profiles") {
+    await persistEntityToFirestore(userId, "profiles", rawId, p, isDelete);
+    return;
+  }
+
+  // 7. Any other actions (UPDATE_SETTINGS, UPDATE_WATER, LOG_FOCUS, SAVE_EXAM_RECORD, WORKSPACE_SNAPSHOT, etc.)
+  // Persist directly into the user's Firestore cloud backup workspace snapshot!
+  const snapshot = getWorkspaceSnapshot();
+  await uploadWorkspaceToCloud(userId, {
+    activeProfileId: snapshot.activeProfileId,
+    profiles: snapshot.profiles,
+    fullStorageDump: snapshot.fullStorageDump,
+  });
+}
+
+/**
+ * Reconcile pending offline actions with the remote Firestore database once online and authenticated.
+ * Actions are ONLY removed from the queue after actual successful persistence is confirmed.
  */
 export async function reconcilePendingQueueWithFirestore(
   targetUserId?: string,
@@ -273,19 +335,45 @@ export async function reconcilePendingQueueWithFirestore(
 
   if (isReconcilingInProgress) {
     return {
-      success: true,
+      success: false,
       processed: 0,
       remaining: currentState.pendingActions.length,
+      error: "Reconciliation already in progress",
     };
   }
 
-  const queue = [...currentState.pendingActions];
-  if (queue.length === 0) {
+  const effectiveUserId = targetUserId || auth.currentUser?.uid;
+  if (!effectiveUserId) {
+    currentState = {
+      ...currentState,
+      isReconciling: false,
+      lastReconciliationStatus: "idle",
+      syncProgress: {
+        total: currentState.pendingActions.length,
+        current: 0,
+        percentage: 0,
+        stage: "idle",
+      },
+    };
+    notifyListeners();
+    console.log(
+      "[OfflineQueue] Reconciliation skipped: user is not authenticated. Pending actions remain safely stored in local queue."
+    );
+    return {
+      success: false,
+      processed: 0,
+      remaining: currentState.pendingActions.length,
+      error: "Authentication required for cloud synchronization",
+    };
+  }
+
+  const queueToProcess = [...currentState.pendingActions];
+  if (queueToProcess.length === 0) {
     return { success: true, processed: 0, remaining: 0 };
   }
 
   isReconcilingInProgress = true;
-  const totalActions = queue.length;
+  const totalActions = queueToProcess.length;
 
   currentState = {
     ...currentState,
@@ -296,163 +384,172 @@ export async function reconcilePendingQueueWithFirestore(
       current: 0,
       percentage: 10,
       stage: "preparing",
-      currentActionType: queue[0]?.type,
+      currentActionType: queueToProcess[0]?.type,
     },
     lastError: undefined,
   };
   notifyListeners();
 
-  let attempt = 0;
+  const persistedIds = new Set<string>();
+  const failedActionErrors = new Map<string, string>();
   let lastErrorMsg: string | undefined;
 
   try {
-    while (attempt < maxRetries) {
-      attempt++;
-      try {
-        const currentUserId = targetUserId || auth.currentUser?.uid || "anonymous_workspace_user";
+    for (let i = 0; i < queueToProcess.length; i++) {
+      const action = queueToProcess[i];
+      currentState.syncProgress = {
+        total: totalActions,
+        current: i,
+        percentage: Math.round(((i + 1) / totalActions) * 80),
+        stage: "uploading",
+        currentActionType: action.type,
+      };
+      notifyListeners();
 
-        // 1. Stage: Preparing workspace snapshot
-        currentState.syncProgress = {
-          total: totalActions,
-          current: Math.min(1, totalActions),
-          percentage: 30,
-          stage: "preparing",
-          currentActionType: queue[0]?.type || "WORKSPACE_SNAPSHOT",
-        };
-        notifyListeners();
+      let actionPersisted = false;
+      let actionErr: string | undefined;
 
-        const snapshot = getWorkspaceSnapshot();
-
-        // 2. Stage: Uploading to Firestore
-        currentState.syncProgress = {
-          total: totalActions,
-          current: Math.ceil(totalActions * 0.6),
-          percentage: 65,
-          stage: "uploading",
-          currentActionType: "WORKSPACE_SNAPSHOT",
-        };
-        notifyListeners();
-
-        let cloudSynced = false;
-        if (auth.currentUser) {
-          await uploadWorkspaceToCloud(auth.currentUser.uid, {
-            activeProfileId: snapshot.activeProfileId,
-            profiles: snapshot.profiles,
-            fullStorageDump: snapshot.fullStorageDump,
-          });
-          cloudSynced = true;
-        } else {
-          // Verify server ping & Firestore link status
-          const res = await fetch("/api/health", { cache: "no-store" });
-          cloudSynced = res.ok;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          await persistActionToFirestore(effectiveUserId, action);
+          actionPersisted = true;
+          break;
+        } catch (err: any) {
+          actionErr = err?.message || String(err);
+          if (attempt < maxRetries) {
+            await new Promise((res) => setTimeout(res, 250 * attempt));
+          }
         }
+      }
 
-        // 3. Stage: Verifying
-        currentState.syncProgress = {
-          total: totalActions,
-          current: totalActions,
-          percentage: 90,
-          stage: "verifying",
-          currentActionType: "VERIFYING",
-        };
-        notifyListeners();
-
-        if (cloudSynced) {
-          const processedIds = new Set(queue.map((a) => a.id));
-          const remainingActions = currentState.pendingActions.filter((a) => !processedIds.has(a.id));
-          const processedCount = queue.length;
-          const now = Date.now();
-          setStoredLastReconciledTime(now);
-          saveStoredQueue(remainingActions);
-
-          currentState = {
-            ...currentState,
-            pendingActions: remainingActions,
-            pendingCount: remainingActions.length,
-            isReconciling: false,
-            syncProgress: {
-              total: totalActions,
-              current: totalActions,
-              percentage: 100,
-              stage: "complete",
-            },
-            lastReconciledAt: now,
-            lastReconciliationStatus: "success",
-            lastError: undefined,
-          };
-
-          console.log(`[OfflineQueue] Successfully reconciled ${processedCount} pending actions with Firestore!`);
-          notifyListeners();
-
-          // Reset progress back to idle after a brief celebration interval
-          setTimeout(() => {
-            if (!isReconcilingInProgress && currentState.pendingCount === 0) {
-              currentState.syncProgress.stage = "idle";
-              notifyListeners();
-            }
-          }, 3000);
-
-          return {
-            success: true,
-            processed: processedCount,
-            remaining: remainingActions.length,
-          };
-        } else {
-          throw new Error("Unable to establish write connection with Firestore");
-        }
-      } catch (err: any) {
-        lastErrorMsg = err?.message || String(err);
-        console.warn(`[OfflineQueue] Sync attempt ${attempt}/${maxRetries} failed:`, lastErrorMsg);
-
-        if (attempt < maxRetries) {
-          // Exponential backoff wait (750ms, 1500ms)
-          await new Promise((res) => setTimeout(res, 750 * Math.pow(2, attempt - 1)));
-        }
+      if (actionPersisted) {
+        persistedIds.add(action.id);
+      } else {
+        lastErrorMsg = actionErr;
+        failedActionErrors.set(action.id, actionErr || "Persistence failed");
       }
     }
 
-    // All retries failed
+    // Auxiliary cloud backup snapshot sync for confirmed batch
+    if (persistedIds.size > 0) {
+      currentState.syncProgress = {
+        total: totalActions,
+        current: totalActions,
+        percentage: 95,
+        stage: "verifying",
+        currentActionType: "WORKSPACE_SNAPSHOT",
+      };
+      notifyListeners();
+
+      try {
+        const snapshot = getWorkspaceSnapshot();
+        await uploadWorkspaceToCloud(effectiveUserId, {
+          activeProfileId: snapshot.activeProfileId,
+          profiles: snapshot.profiles,
+          fullStorageDump: snapshot.fullStorageDump,
+        });
+      } catch (backupErr) {
+        console.warn("[OfflineQueue] Auxiliary cloud backup snapshot sync notice:", backupErr);
+      }
+    }
+
+    // ONLY remove actions whose actual remote persistence was confirmed
+    const currentStored = loadStoredQueue();
+    const remainingActions = currentStored
+      .filter((a) => !persistedIds.has(a.id))
+      .map((a) => {
+        const failureReason = failedActionErrors.get(a.id);
+        if (failureReason) {
+          return {
+            ...a,
+            status: "failed" as const,
+            retryCount: (a.retryCount || 0) + 1,
+            lastError: failureReason,
+          };
+        }
+        return a;
+      });
+
+    saveStoredQueue(remainingActions);
+
+    const now = Date.now();
+    if (persistedIds.size > 0) {
+      setStoredLastReconciledTime(now);
+    }
+
+    const allSucceeded = remainingActions.length === 0;
+    const partialSuccess = persistedIds.size > 0 && remainingActions.length > 0;
+
     currentState = {
       ...currentState,
+      pendingActions: remainingActions,
+      pendingCount: remainingActions.length,
       isReconciling: false,
       syncProgress: {
         total: totalActions,
-        current: 0,
-        percentage: 0,
-        stage: "failed",
+        current: persistedIds.size,
+        percentage: allSucceeded ? 100 : Math.round((persistedIds.size / totalActions) * 100),
+        stage: allSucceeded ? "complete" : partialSuccess ? "idle" : "failed",
       },
-      lastReconciliationStatus: "failed",
-      lastError: lastErrorMsg,
+      lastReconciledAt: persistedIds.size > 0 ? now : currentState.lastReconciledAt,
+      lastReconciliationStatus: allSucceeded ? "success" : partialSuccess ? "partial" : "failed",
+      lastError: allSucceeded ? undefined : lastErrorMsg,
     };
     notifyListeners();
 
+    if (allSucceeded) {
+      setTimeout(() => {
+        if (!isReconcilingInProgress && currentState.pendingCount === 0) {
+          currentState.syncProgress.stage = "idle";
+          notifyListeners();
+        }
+      }, 3000);
+    }
+
     return {
-      success: false,
-      processed: 0,
-      remaining: currentState.pendingActions.length,
-      error: lastErrorMsg,
+      success: allSucceeded,
+      processed: persistedIds.size,
+      remaining: remainingActions.length,
+      error: allSucceeded ? undefined : lastErrorMsg,
     };
   } finally {
     isReconcilingInProgress = false;
   }
 }
 
-// Automatically bind online / offline window event listeners & heartbeat polling
+// Automatically bind online / offline window event listeners, auth changes & heartbeat polling
 if (typeof window !== "undefined") {
+  // Listen for authentication changes to automatically reconcile pending offline actions
+  onAuthStateChanged(auth, (user) => {
+    if (user && typeof navigator !== "undefined" && navigator.onLine) {
+      const stored = loadStoredQueue();
+      if (stored.length > 0 && !isReconcilingInProgress) {
+        console.log(`[OfflineQueue] User authenticated (${user.uid}). Reconciling ${stored.length} pending offline actions...`);
+        setTimeout(() => {
+          reconcilePendingQueueWithFirestore(user.uid).catch((err) => {
+            console.warn("[OfflineQueue] Automatic reconciliation on auth change notice:", err);
+          });
+        }, 500);
+      }
+    }
+  });
+
   window.addEventListener("online", () => {
     currentState = {
       ...currentState,
       isOnline: true,
     };
     notifyListeners();
-    console.log("[OfflineQueue] Network restored (online). Initiating automatic reconciliation...");
+    console.log("[OfflineQueue] Network restored (online). Checking pending queue...");
 
-    // Immediate flush on online event
-    setTimeout(() => {
-      reconcilePendingQueueWithFirestore().catch((e) => {
-        console.error("[OfflineQueue] Auto-reconciliation after online event failed:", e);
-      });
-    }, 500);
+    // If authenticated and has pending queue, initiate reconciliation
+    if (loadStoredQueue().length > 0 && !isReconcilingInProgress && auth.currentUser) {
+      setTimeout(() => {
+        reconcilePendingQueueWithFirestore().catch((e) => {
+          console.warn("[OfflineQueue] Auto-reconciliation after online event error:", e);
+        });
+      }, 500);
+    }
   });
 
   window.addEventListener("offline", () => {
@@ -469,8 +566,8 @@ if (typeof window !== "undefined") {
     console.log("[OfflineQueue] Network disconnected (offline). All changes will be queued locally.");
   });
 
-  // Initial check on boot: if online and has pending queue, reconcile after 1.5s
-  if (navigator.onLine && loadStoredQueue().length > 0) {
+  // Initial check on boot: if online, authenticated, and has pending queue, reconcile after 1.5s
+  if (navigator.onLine && loadStoredQueue().length > 0 && auth.currentUser) {
     setTimeout(() => {
       reconcilePendingQueueWithFirestore().catch(() => {});
     }, 1500);
@@ -478,7 +575,13 @@ if (typeof window !== "undefined") {
 
   // Periodic heartbeat sync check every 45 seconds for unattended offline queues
   setInterval(() => {
-    if (typeof navigator !== "undefined" && navigator.onLine && loadStoredQueue().length > 0 && !isReconcilingInProgress) {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.onLine &&
+      loadStoredQueue().length > 0 &&
+      !isReconcilingInProgress &&
+      auth.currentUser
+    ) {
       reconcilePendingQueueWithFirestore().catch(() => {});
     }
   }, 45000);

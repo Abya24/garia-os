@@ -265,6 +265,103 @@ export async function signOutFromFirebase(): Promise<void> {
   }
 }
 
+let customEntityPersister:
+  | ((userId: string, entityName: string, entityId: string, data: any, isDelete: boolean) => Promise<void>)
+  | null = null;
+
+export function __setTestEntityPersister(
+  fn: ((userId: string, entityName: string, entityId: string, data: any, isDelete: boolean) => Promise<void>) | null
+) {
+  customEntityPersister = fn;
+}
+
+/**
+ * Persist an individual entity action to Firestore subcollections.
+ */
+export async function persistEntityToFirestore(
+  userId: string,
+  entityName: string,
+  entityId: string,
+  data: any,
+  isDelete: boolean
+): Promise<void> {
+  if (customEntityPersister) {
+    return customEntityPersister(userId, entityName, entityId, data, isDelete);
+  }
+  const sanitizedId = String(entityId).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128);
+  const validCollections = ["tasks", "notes", "habits", "goals", "calendar_events", "profiles"];
+  const targetCollection = validCollections.includes(entityName) ? entityName : "tasks";
+  const path = `users/${userId}/${targetCollection}/${sanitizedId}`;
+  const docRef = doc(db, "users", userId, targetCollection, sanitizedId);
+
+  try {
+    if (isDelete) {
+      await deleteDoc(docRef);
+      return;
+    }
+
+    // Format data based on collection requirements
+    let payload: Record<string, any> = {
+      userId,
+      id: sanitizedId,
+      createdAt: typeof data?.createdAt === "number" ? data.createdAt : Date.now(),
+    };
+
+    if (targetCollection === "tasks") {
+      payload = {
+        ...payload,
+        title: String(data?.title || "Untitled Task").slice(0, 256),
+        completed: Boolean(data?.completed),
+        description: String(data?.description || "").slice(0, 1000),
+        priority: ["low", "medium", "high"].includes(data?.priority) ? data.priority : "medium",
+        date: String(data?.date || "").slice(0, 32),
+        time: String(data?.time || "").slice(0, 16),
+      };
+    } else if (targetCollection === "notes") {
+      payload = {
+        ...payload,
+        title: String(data?.title || "").slice(0, 256),
+        content: String(data?.content || "").slice(0, 50000),
+        pinned: Boolean(data?.pinned),
+      };
+    } else if (targetCollection === "habits") {
+      payload = {
+        ...payload,
+        title: String(data?.title || "Habit").slice(0, 128),
+        streak: typeof data?.streak === "number" ? data.streak : 0,
+        completedDates: Array.isArray(data?.completedDates) ? data.completedDates.slice(0, 400) : [],
+      };
+    } else if (targetCollection === "goals") {
+      payload = {
+        ...payload,
+        title: String(data?.title || "Goal").slice(0, 256),
+        progress: typeof data?.progress === "number" ? Math.max(0, Math.min(100, data.progress)) : 0,
+        completed: Boolean(data?.completed),
+      };
+    } else if (targetCollection === "calendar_events") {
+      payload = {
+        ...payload,
+        title: String(data?.title || "Event").slice(0, 256),
+        date: String(data?.date || "").slice(0, 32),
+        completed: Boolean(data?.completed),
+      };
+    } else if (targetCollection === "profiles") {
+      payload = {
+        ...payload,
+        name: String(data?.name || "Student").slice(0, 128),
+        stream: String(data?.stream || "General").slice(0, 64),
+        classLevel: String(data?.classLevel || "").slice(0, 64),
+        board: String(data?.board || "").slice(0, 64),
+      };
+    }
+
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, isDelete ? OperationType.DELETE : OperationType.WRITE, path);
+  }
+}
+
+
 export interface CloudBackupState {
   userId: string;
   lastSyncedAt: number;
