@@ -38,6 +38,7 @@ import {
 } from "../types";
 import { getTodayString } from "../utils/storage";
 import { computePerformanceIntelligence } from "../utils/studentPerformanceAnalytics";
+import { loadQuestionBankProgress } from "../utils/questionBankEngine";
 import { PerformanceOverviewSection } from "../components/analytics/PerformanceOverviewSection";
 import { SubjectAnalyticsSection } from "../components/analytics/SubjectAnalyticsSection";
 import { ReadinessTrendsSection } from "../components/analytics/ReadinessTrendsSection";
@@ -110,22 +111,7 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
   // Load question bank progress for student
   const profileId = activeStudent?.id || "default";
   const qbankProgress: QuestionBankProfileProgress = useMemo(() => {
-    try {
-      const saved = localStorage.getItem(`garia_question_progress_${profileId}`);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return {
-      profileId,
-      mcqAttempts: {},
-      mcqBookmarks: [],
-      practiceCompleted: [],
-      practiceBookmarks: [],
-      pyqCompleted: [],
-      pyqBookmarks: [],
-      updatedAt: Date.now(),
-    };
+    return loadQuestionBankProgress(profileId);
   }, [profileId]);
 
   // Compute comprehensive student performance intelligence (memoized for instant rendering)

@@ -45,6 +45,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+
+  // Never intercept API routes or non-http/https protocols
+  if (url.pathname.startsWith("/api/") || !url.protocol.startsWith("http")) {
+    return;
+  }
+
   // Network-First strategy with cache fallback for standard web UI assets
   event.respondWith(
     fetch(event.request)
@@ -59,7 +66,12 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => {
         return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || caches.match("/") || caches.match("/index.html");
+          if (cachedResponse) return cachedResponse;
+          // Only provide SPA fallback for navigation requests
+          if (event.request.mode === "navigate") {
+            return caches.match("/index.html") || caches.match("/");
+          }
+          return undefined;
         });
       })
   );

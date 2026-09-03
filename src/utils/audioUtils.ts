@@ -26,7 +26,10 @@ export function base64ToFloat32Array(base64: string): Float32Array {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  const int16 = new Int16Array(bytes.buffer);
+  // Ensure buffer length is even to prevent Int16Array RangeError on odd-length chunks
+  const evenLength = bytes.length - (bytes.length % 2);
+  if (evenLength <= 0) return new Float32Array(0);
+  const int16 = new Int16Array(bytes.buffer, 0, evenLength / 2);
   const float32 = new Float32Array(int16.length);
   for (let i = 0; i < int16.length; i++) {
     float32[i] = int16[i] / 32768.0;
@@ -85,6 +88,9 @@ export class LiveAudioPlayer {
 
       this.activeSources.push(source);
       source.onended = () => {
+        try {
+          source.disconnect();
+        } catch (e) {}
         const idx = this.activeSources.indexOf(source);
         if (idx !== -1) this.activeSources.splice(idx, 1);
         if (onEnded) onEnded();

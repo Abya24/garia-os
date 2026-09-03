@@ -215,7 +215,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         candidates.push(
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
           { model: "gemini-3.7-flash", config: { systemInstruction } },
-          { model: "gemini-flash-latest", config: { systemInstruction } }
+          { model: "gemini-2.5-flash", config: { systemInstruction } }
         );
       } else if (mode === "search_grounded") {
         candidates.push(
@@ -234,7 +234,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         candidates.push(
           { model: "gemini-3.7-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
-          { model: "gemini-flash-latest", config: { systemInstruction } },
+          { model: "gemini-2.5-flash", config: { systemInstruction } },
           { model: "gemini-3.5-flash", config: { systemInstruction } }
         );
       }

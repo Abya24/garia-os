@@ -305,131 +305,136 @@ export async function reconcilePendingQueueWithFirestore(
   let attempt = 0;
   let lastErrorMsg: string | undefined;
 
-  while (attempt < maxRetries) {
-    attempt++;
-    try {
-      const currentUserId = targetUserId || auth.currentUser?.uid || "anonymous_workspace_user";
+  try {
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        const currentUserId = targetUserId || auth.currentUser?.uid || "anonymous_workspace_user";
 
-      // 1. Stage: Preparing workspace snapshot
-      currentState.syncProgress = {
-        total: totalActions,
-        current: Math.min(1, totalActions),
-        percentage: 30,
-        stage: "preparing",
-        currentActionType: queue[0]?.type || "WORKSPACE_SNAPSHOT",
-      };
-      notifyListeners();
-
-      const snapshot = getWorkspaceSnapshot();
-
-      // 2. Stage: Uploading to Firestore
-      currentState.syncProgress = {
-        total: totalActions,
-        current: Math.ceil(totalActions * 0.6),
-        percentage: 65,
-        stage: "uploading",
-        currentActionType: "WORKSPACE_SNAPSHOT",
-      };
-      notifyListeners();
-
-      let cloudSynced = false;
-      if (auth.currentUser) {
-        await uploadWorkspaceToCloud(auth.currentUser.uid, {
-          activeProfileId: snapshot.activeProfileId,
-          profiles: snapshot.profiles,
-          fullStorageDump: snapshot.fullStorageDump,
-        });
-        cloudSynced = true;
-      } else {
-        // Verify server ping & Firestore link status
-        const res = await fetch("/api/health", { cache: "no-store" });
-        cloudSynced = res.ok;
-      }
-
-      // 3. Stage: Verifying
-      currentState.syncProgress = {
-        total: totalActions,
-        current: totalActions,
-        percentage: 90,
-        stage: "verifying",
-        currentActionType: "VERIFYING",
-      };
-      notifyListeners();
-
-      if (cloudSynced) {
-        const processedCount = queue.length;
-        const now = Date.now();
-        setStoredLastReconciledTime(now);
-        saveStoredQueue([]);
-
-        currentState = {
-          ...currentState,
-          pendingActions: [],
-          pendingCount: 0,
-          isReconciling: false,
-          syncProgress: {
-            total: totalActions,
-            current: totalActions,
-            percentage: 100,
-            stage: "complete",
-          },
-          lastReconciledAt: now,
-          lastReconciliationStatus: "success",
-          lastError: undefined,
+        // 1. Stage: Preparing workspace snapshot
+        currentState.syncProgress = {
+          total: totalActions,
+          current: Math.min(1, totalActions),
+          percentage: 30,
+          stage: "preparing",
+          currentActionType: queue[0]?.type || "WORKSPACE_SNAPSHOT",
         };
-
-        console.log(`[OfflineQueue] Successfully reconciled ${processedCount} pending actions with Firestore!`);
         notifyListeners();
 
-        // Reset progress back to idle after a brief celebration interval
-        setTimeout(() => {
-          if (!isReconcilingInProgress && currentState.pendingCount === 0) {
-            currentState.syncProgress.stage = "idle";
-            notifyListeners();
-          }
-        }, 3000);
+        const snapshot = getWorkspaceSnapshot();
 
-        return {
-          success: true,
-          processed: processedCount,
-          remaining: 0,
+        // 2. Stage: Uploading to Firestore
+        currentState.syncProgress = {
+          total: totalActions,
+          current: Math.ceil(totalActions * 0.6),
+          percentage: 65,
+          stage: "uploading",
+          currentActionType: "WORKSPACE_SNAPSHOT",
         };
-      } else {
-        throw new Error("Unable to establish write connection with Firestore");
-      }
-    } catch (err: any) {
-      lastErrorMsg = err?.message || String(err);
-      console.warn(`[OfflineQueue] Sync attempt ${attempt}/${maxRetries} failed:`, lastErrorMsg);
+        notifyListeners();
 
-      if (attempt < maxRetries) {
-        // Exponential backoff wait (750ms, 1500ms)
-        await new Promise((res) => setTimeout(res, 750 * Math.pow(2, attempt - 1)));
+        let cloudSynced = false;
+        if (auth.currentUser) {
+          await uploadWorkspaceToCloud(auth.currentUser.uid, {
+            activeProfileId: snapshot.activeProfileId,
+            profiles: snapshot.profiles,
+            fullStorageDump: snapshot.fullStorageDump,
+          });
+          cloudSynced = true;
+        } else {
+          // Verify server ping & Firestore link status
+          const res = await fetch("/api/health", { cache: "no-store" });
+          cloudSynced = res.ok;
+        }
+
+        // 3. Stage: Verifying
+        currentState.syncProgress = {
+          total: totalActions,
+          current: totalActions,
+          percentage: 90,
+          stage: "verifying",
+          currentActionType: "VERIFYING",
+        };
+        notifyListeners();
+
+        if (cloudSynced) {
+          const processedIds = new Set(queue.map((a) => a.id));
+          const remainingActions = currentState.pendingActions.filter((a) => !processedIds.has(a.id));
+          const processedCount = queue.length;
+          const now = Date.now();
+          setStoredLastReconciledTime(now);
+          saveStoredQueue(remainingActions);
+
+          currentState = {
+            ...currentState,
+            pendingActions: remainingActions,
+            pendingCount: remainingActions.length,
+            isReconciling: false,
+            syncProgress: {
+              total: totalActions,
+              current: totalActions,
+              percentage: 100,
+              stage: "complete",
+            },
+            lastReconciledAt: now,
+            lastReconciliationStatus: "success",
+            lastError: undefined,
+          };
+
+          console.log(`[OfflineQueue] Successfully reconciled ${processedCount} pending actions with Firestore!`);
+          notifyListeners();
+
+          // Reset progress back to idle after a brief celebration interval
+          setTimeout(() => {
+            if (!isReconcilingInProgress && currentState.pendingCount === 0) {
+              currentState.syncProgress.stage = "idle";
+              notifyListeners();
+            }
+          }, 3000);
+
+          return {
+            success: true,
+            processed: processedCount,
+            remaining: remainingActions.length,
+          };
+        } else {
+          throw new Error("Unable to establish write connection with Firestore");
+        }
+      } catch (err: any) {
+        lastErrorMsg = err?.message || String(err);
+        console.warn(`[OfflineQueue] Sync attempt ${attempt}/${maxRetries} failed:`, lastErrorMsg);
+
+        if (attempt < maxRetries) {
+          // Exponential backoff wait (750ms, 1500ms)
+          await new Promise((res) => setTimeout(res, 750 * Math.pow(2, attempt - 1)));
+        }
       }
     }
+
+    // All retries failed
+    currentState = {
+      ...currentState,
+      isReconciling: false,
+      syncProgress: {
+        total: totalActions,
+        current: 0,
+        percentage: 0,
+        stage: "failed",
+      },
+      lastReconciliationStatus: "failed",
+      lastError: lastErrorMsg,
+    };
+    notifyListeners();
+
+    return {
+      success: false,
+      processed: 0,
+      remaining: currentState.pendingActions.length,
+      error: lastErrorMsg,
+    };
+  } finally {
+    isReconcilingInProgress = false;
   }
-
-  // All retries failed
-  currentState = {
-    ...currentState,
-    isReconciling: false,
-    syncProgress: {
-      total: totalActions,
-      current: 0,
-      percentage: 0,
-      stage: "failed",
-    },
-    lastReconciliationStatus: "failed",
-    lastError: lastErrorMsg,
-  };
-  notifyListeners();
-  isReconcilingInProgress = false;
-
-  return {
-    success: false,
-    processed: 0,
-    remaining: currentState.pendingActions.length,
-    error: lastErrorMsg,
-  };
 }
 
 // Automatically bind online / offline window event listeners & heartbeat polling

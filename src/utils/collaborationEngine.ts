@@ -65,6 +65,7 @@ export function getCollaboratorColor(index: number = 0): string {
 
 // Local storage fallback helpers
 function getLocalWorkspaces(): SharedWorkspace[] {
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_WORKSPACES_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -74,6 +75,7 @@ function getLocalWorkspaces(): SharedWorkspace[] {
 }
 
 function saveLocalWorkspaces(workspaces: SharedWorkspace[]): void {
+  if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(LOCAL_STORAGE_WORKSPACES_KEY, JSON.stringify(workspaces));
   } catch (e) {
@@ -82,6 +84,7 @@ function saveLocalWorkspaces(workspaces: SharedWorkspace[]): void {
 }
 
 function getLocalActivities(workspaceId?: string): ActivityLogItem[] {
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_ACTIVITIES_KEY);
     const list: ActivityLogItem[] = raw ? JSON.parse(raw) : [];
@@ -95,6 +98,7 @@ function getLocalActivities(workspaceId?: string): ActivityLogItem[] {
 }
 
 function saveLocalActivity(activity: ActivityLogItem): void {
+  if (typeof localStorage === "undefined") return;
   try {
     const list = getLocalActivities();
     list.unshift(activity);
@@ -105,6 +109,7 @@ function saveLocalActivity(activity: ActivityLogItem): void {
 }
 
 function getLocalNotifications(userId: string): CollaborationNotification[] {
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(`${LOCAL_STORAGE_NOTIFS_KEY}_${userId}`);
     return raw ? JSON.parse(raw) : [];
@@ -114,6 +119,7 @@ function getLocalNotifications(userId: string): CollaborationNotification[] {
 }
 
 function saveLocalNotification(notif: CollaborationNotification): void {
+  if (typeof localStorage === "undefined") return;
   try {
     const list = getLocalNotifications(notif.userId);
     list.unshift(notif);
@@ -1146,6 +1152,9 @@ export function subscribeToCollaborationNotifications(
  * Generate full shareable URL with unique join link
  */
 export function generateShareableLink(joinCode: string): string {
+  if (typeof window === "undefined") {
+    return `https://gariaos.local?join=${encodeURIComponent(joinCode)}`;
+  }
   const origin = window.location.origin + window.location.pathname;
   return `${origin}?join=${encodeURIComponent(joinCode)}`;
 }

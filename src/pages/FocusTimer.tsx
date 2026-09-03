@@ -140,6 +140,16 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
       osc.type = "sine";
       const now = ctx.currentTime;
 
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          gain.disconnect();
+          if (ctx.state !== "closed") {
+            ctx.close().catch(() => {});
+          }
+        } catch (e) {}
+      };
+
       if (isEnd) {
         // High soft chime for session end
         osc.frequency.setValueAtTime(523.25, now); // C5

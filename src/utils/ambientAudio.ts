@@ -319,6 +319,12 @@ class AmbientAudioEngine {
 
         dropOsc.connect(dropGain);
         dropGain.connect(this.masterGain);
+        dropOsc.onended = () => {
+          try {
+            dropOsc.disconnect();
+            dropGain.disconnect();
+          } catch (e) {}
+        };
         dropOsc.start();
         dropOsc.stop(this.ctx.currentTime + 0.09);
       } catch (e) {}

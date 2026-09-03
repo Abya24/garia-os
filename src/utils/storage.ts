@@ -48,7 +48,7 @@ import { CAREER_CATALOG, generateDefaultRoadmap } from "./careerEngine";
 export const PROFILES_KEY = "garia_profiles_v1";
 export const ACTIVE_PROFILE_KEY = "garia_active_profile_v1";
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   TASKS: "garia_tasks_v1",
   SUBJECTS: "garia_subjects_v1",
   STUDY_SESSIONS: "garia_study_sessions_v1",
@@ -107,9 +107,25 @@ function getItem<T>(key: string, defaultValue: T): T {
 }
 
 function setItem<T>(key: string, value: T): void {
+  if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
+  } catch (e: any) {
+    if (e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014)) {
+      console.warn(`[Storage] QuotaExceededError writing ${key}. Purging non-critical cached logs...`);
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith("garia_shared_activities") || k.startsWith("garia_collab_notifications"))) {
+            localStorage.removeItem(k);
+          }
+        }
+        localStorage.setItem(key, JSON.stringify(value));
+        return;
+      } catch (retryErr) {
+        console.error(`[Storage] Retry saving ${key} failed:`, retryErr);
+      }
+    }
     console.error(`Error saving ${key} to localStorage`, e);
   }
 }
@@ -685,6 +701,12 @@ export const loadProfiles = (): StudentProfile[] => {
   }
 
   if (!profiles || profiles.length === 0) {
+    if (typeof localStorage !== "undefined") {
+      const migrated = migrateAndInitDefaultProfile();
+      if (migrated && migrated.length > 0) {
+        return migrated;
+      }
+    }
     return [];
   }
 
@@ -711,7 +733,9 @@ export const loadActiveProfileId = (): string => {
 
 export const saveActiveProfileId = (id: string): void => {
   if (!id) {
-    localStorage.removeItem(getActiveProfileKey());
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(getActiveProfileKey());
+    }
     return;
   }
   setItem(getActiveProfileKey(), id);
@@ -870,12 +894,30 @@ export const deleteStudentProfile = (profileId: string): StudentProfile[] => {
   saveProfiles(profiles);
 
   // Clear keys for deleted profile ID
-  Object.values(STORAGE_KEYS).forEach((baseKey) => {
-    const profKey = getProfileKey(profileId, baseKey);
-    localStorage.removeItem(profKey);
-  });
-  localStorage.removeItem(getWidgetsKey(profileId));
-  localStorage.removeItem(`garia_p_${profileId}_dashboard_widgets_v1`);
+  if (typeof localStorage !== "undefined") {
+    // 1. Dynamic scan to purge any keys starting with profile prefix or ending with profile ID
+    const prefix = `garia_p_${profileId}_`;
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(prefix) || k.endsWith(`_${profileId}`))) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+
+    // 2. Explicit base key removals for complete safety
+    Object.values(STORAGE_KEYS).forEach((baseKey) => {
+      const profKey = getProfileKey(profileId, baseKey);
+      localStorage.removeItem(profKey);
+    });
+    localStorage.removeItem(getWidgetsKey(profileId));
+    localStorage.removeItem(`garia_p_${profileId}_dashboard_widgets_v1`);
+    localStorage.removeItem(`garia_timer_state_${profileId}`);
+    localStorage.removeItem(`garia_mock_test_history_${profileId}`);
+    localStorage.removeItem(`garia_question_progress_${profileId}`);
+    localStorage.removeItem(`garia_abya_chat_sessions_${profileId}`);
+  }
 
   const activeId = loadActiveProfileId();
   if (activeId === profileId) {
@@ -1867,6 +1909,19 @@ export const importStudentProfileJSON = (
 ): { success: boolean; profileId?: string; profileName?: string } => {
   try {
     const data = JSON.parse(jsonString);
+
+    // If this is a full workspace snapshot with fullStorageDump:
+    if (data && (data.fullStorageDump || (data.profiles && Array.isArray(data.profiles)))) {
+      const restored = restoreWorkspaceSnapshot(data);
+      if (restored) {
+        const activeId = data.activeProfileId || loadActiveProfileId();
+        const activeName = (data.profiles && Array.isArray(data.profiles))
+          ? data.profiles.find((p: any) => p.id === activeId)?.name || "Restored Workspace"
+          : "Restored Workspace";
+        return { success: true, profileId: activeId, profileName: activeName };
+      }
+    }
+
     const profiles = loadProfiles();
 
     let profMeta: StudentProfile = data.studentProfile || data.profile || {
@@ -1981,7 +2036,12 @@ export const restoreWorkspaceSnapshot = (snapshot: {
 
     if (typeof localStorage !== "undefined") {
       Object.entries(dump).forEach(([key, val]) => {
-        localStorage.setItem(key, val);
+        try {
+          const stringVal = typeof val === "string" ? val : JSON.stringify(val);
+          localStorage.setItem(key, stringVal);
+        } catch (setErr) {
+          console.warn(`[Storage] Failed restoring key ${key}:`, setErr);
+        }
       });
     }
 

@@ -631,6 +631,11 @@ export default function App() {
     setExamMockTests(loadExamMockTests(profileId));
     setExamPlan(loadExamDailyPlan(profileId));
     setExamTestRecords(loadExamTestRecords(profileId));
+
+    if (curProf?.language) {
+      setCurrentLanguage(curProf.language as AppLanguage);
+      saveStoredLanguage(curProf.language as AppLanguage);
+    }
   };
 
   // Profile Action Handlers

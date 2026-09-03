@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Clock,
   Award,
@@ -87,22 +87,39 @@ export const MockTestEngine: React.FC<MockTestEngineProps> = ({
 
   // Performance History
   const [history, setHistory] = useState<MockTestHistoryRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+    if (typeof localStorage !== "undefined") {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
     }
     return [];
   });
 
+  // Re-sync history on profile switch
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        setHistory(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        console.error(e);
+        setHistory([]);
+      }
+    }
+  }, [storageKey]);
+
   const saveHistoryRecord = (record: MockTestHistoryRecord) => {
     const updated = [record, ...history].slice(0, 30); // keep last 30
     setHistory(updated);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -276,6 +293,9 @@ export const MockTestEngine: React.FC<MockTestEngineProps> = ({
     }
   };
 
+  const handleSubmitTestRef = useRef(handleSubmitTest);
+  handleSubmitTestRef.current = handleSubmitTest;
+
   // Timer Effect with Auto Submission
   useEffect(() => {
     if (testState !== "ACTIVE") return;
@@ -283,14 +303,16 @@ export const MockTestEngine: React.FC<MockTestEngineProps> = ({
       setTimeLeftSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmitTest(true);
+          setTimeout(() => {
+            handleSubmitTestRef.current(true);
+          }, 0);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [testState, timeLeftSeconds, userAnswers, testQuestions]);
+  }, [testState]);
 
   const currentQ = testQuestions[currentIndex];
 

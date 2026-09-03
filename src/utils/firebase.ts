@@ -124,15 +124,18 @@ export async function upsertUserProfileDoc(user: FirebaseUser, displayName?: str
   if (!user || !user.uid) return;
   const userRef = doc(db, "users", user.uid);
   try {
+    const existingSnap = await getDoc(userRef);
+    const existingData = existingSnap.exists() ? existingSnap.data() : null;
+    const createdAt = existingData?.createdAt || Date.now();
     await setDoc(
       userRef,
       {
         userId: user.uid,
         email: user.email || "",
-        displayName: displayName || user.displayName || "Student",
-        photoURL: user.photoURL || "",
+        displayName: displayName || user.displayName || existingData?.displayName || "Student",
+        photoURL: user.photoURL || existingData?.photoURL || "",
         updatedAt: Date.now(),
-        createdAt: Date.now(),
+        createdAt,
       },
       { merge: true }
     );
@@ -339,7 +342,7 @@ export function subscribeToCloudSync(
       }
     },
     (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
+      console.warn(`[Firestore CloudSync] Subscription error at ${path}:`, error);
     }
   );
 }

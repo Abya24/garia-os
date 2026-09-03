@@ -1644,13 +1644,15 @@ export function auditQuestionBank(
 
 export function loadQuestionBankProgress(profileId: string): QuestionBankProfileProgress {
   const storageKey = `garia_question_progress_${profileId}`;
-  try {
-    const dataStr = localStorage.getItem(storageKey);
-    if (dataStr) {
-      return JSON.parse(dataStr);
+  if (typeof localStorage !== "undefined") {
+    try {
+      const dataStr = localStorage.getItem(storageKey);
+      if (dataStr) {
+        return JSON.parse(dataStr);
+      }
+    } catch (e) {
+      console.error("Failed to parse question bank progress:", e);
     }
-  } catch (e) {
-    console.error("Failed to parse question bank progress:", e);
   }
 
   return {
@@ -1670,11 +1672,13 @@ export function saveQuestionBankProgress(
   profileId: string
 ): void {
   const storageKey = `garia_question_progress_${profileId}`;
-  try {
-    const updated = { ...progress, updatedAt: Date.now() };
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to save question bank progress:", e);
+  if (typeof localStorage !== "undefined") {
+    try {
+      const updated = { ...progress, updatedAt: Date.now() };
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save question bank progress:", e);
+    }
   }
 }
 

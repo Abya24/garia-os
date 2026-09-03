@@ -43,6 +43,7 @@ import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studen
 import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
 import { PinManagementModal, PinModalMode } from "./PinManagementModal";
 import { lockSession } from "../utils/security";
+import { getWorkspaceSnapshot } from "../utils/storage";
 
 interface SliderMenuProps {
   isOpen: boolean;
@@ -190,16 +191,19 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
 
   const handleExportData = () => {
     try {
-      const dataStr = JSON.stringify(localStorage, null, 2);
+      const snapshot = getWorkspaceSnapshot();
+      const dataStr = JSON.stringify(snapshot, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `garia-os-backup-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error(e);
+      console.error("Export failed:", e);
     }
   };
 
