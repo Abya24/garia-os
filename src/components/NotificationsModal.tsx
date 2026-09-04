@@ -14,6 +14,7 @@ import {
   Layers,
 } from "lucide-react";
 import { ActiveTab, AcademicRevisionItem, Goal, Habit, Task } from "../types";
+import { APP_VERSION } from "../constants/version";
 
 export interface NotificationItem {
   id: string;
@@ -279,7 +280,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
         {/* Footer */}
         <div className="p-3.5 border-t border-white/10 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-          <span>Garia OS v3.0 Intelligence Engine</span>
+          <span>Garia OS v{APP_VERSION} Intelligence Engine</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold transition-all"

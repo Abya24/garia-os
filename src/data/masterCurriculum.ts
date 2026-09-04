@@ -1,5 +1,5 @@
 // =======================================================================
-// GARIA OS V3.0 MASTER CURRICULUM DATASET
+// GARIA OS V3.1 MASTER CURRICULUM DATASET
 // Complete NCERT / CBSE Academic Hierarchy for:
 // - Class 10 (Math, Science, Social Science, English, Hindi, Sanskrit)
 // - Class 11 Science (Physics, Chem, Math, Bio, English)

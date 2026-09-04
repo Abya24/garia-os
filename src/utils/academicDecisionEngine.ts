@@ -1,5 +1,5 @@
 // =======================================================================
-// GARIA OS V3.0 - ACADEMIC INTELLIGENCE STUDENT DECISION ENGINE
+// GARIA OS V3.1 - ACADEMIC INTELLIGENCE STUDENT DECISION ENGINE
 // =======================================================================
 // Pure deterministic intelligence algorithm that translates syllabus data,
 // study logs, test records, and stream profile into actionable next steps.

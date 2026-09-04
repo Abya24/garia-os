@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Download,
   Smartphone,
@@ -35,8 +35,25 @@ export const PWAInstallOption: React.FC<PWAInstallOptionProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [installStatusMsg, setInstallStatusMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleSuccess = () => {
+      setInstallStatusMsg(
+        currentLanguage === "hi"
+          ? "गारिया ओएस इंस्टॉल हो गया! स्टैंडअलोन मोड के लिए होम स्क्रीन से ऐप खोलें।"
+          : "Garia OS installed! Open from your home screen to launch in standalone mode."
+      );
+      setTimeout(() => setInstallStatusMsg(null), 6000);
+      if (onInstallSuccess) onInstallSuccess();
+    };
+
+    window.addEventListener("garia-pwa-installed-success", handleSuccess);
+    return () => {
+      window.removeEventListener("garia-pwa-installed-success", handleSuccess);
+    };
+  }, [currentLanguage, onInstallSuccess]);
+
   const handleAction = async () => {
-    // If already installed, open guide/details dialog confirming it
+    // If already installed (running in standalone mode), open guide/details dialog confirming it
     if (isInstalled) {
       setIsModalOpen(true);
       return;
@@ -48,10 +65,10 @@ export const PWAInstallOption: React.FC<PWAInstallOptionProps> = ({
       if (outcome === "accepted") {
         setInstallStatusMsg(
           currentLanguage === "hi"
-            ? "गारिया ओएस सफलतापूर्वक इंस्टॉल हो गया!"
-            : "Garia OS successfully installed!"
+            ? "गारिया ओएस जोड़ा जा रहा है! स्टैंडअलोन मोड में चलाने के लिए होम स्क्रीन से खोलें।"
+            : "Installation started! Launch Garia OS from your home screen to run in standalone mode."
         );
-        setTimeout(() => setInstallStatusMsg(null), 4000);
+        setTimeout(() => setInstallStatusMsg(null), 5000);
         if (onInstallSuccess) onInstallSuccess();
       } else if (outcome === "dismissed") {
         setInstallStatusMsg(

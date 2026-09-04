@@ -820,7 +820,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
-                    <h3 className="font-bold text-white text-sm font-heading">What's New in V3.0</h3>
+                    <h3 className="font-bold text-white text-sm font-heading">What's New in V{APP_VERSION}</h3>
                   </div>
                   <button
                     onClick={() => setShowWhatsNewModal(false)}
@@ -834,13 +834,13 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                   <div className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
                     <div>
-                      <strong className="text-white">Minimal Home Dashboard:</strong> Single Garia OS app icon access point with no clutter.
+                      <strong className="text-white">PWA & Offline Installation:</strong> Full-screen standalone app support for Android, iOS, and Desktop with zero-latency offline loading.
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
                     <div>
-                      <strong className="text-white">Direct Slider Panel:</strong> Smooth options drawer with Account, Personalization, Preferences, Security, and System.
+                      <strong className="text-white">Abya AI Cross-Module Management:</strong> Direct AI interaction to create tasks, organize notes, and schedule study sessions.
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -852,7 +852,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
                   <div className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
                     <div>
-                      <strong className="text-white">Conic Focus Timer:</strong> Precision circular angular track with ambient pulse.
+                      <strong className="text-white">Minimal Dashboard & Slider Panel:</strong> Distraction-free central access point with hardware-secured session isolation.
                     </div>
                   </div>
                 </div>

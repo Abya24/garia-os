@@ -23,6 +23,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { UserSettings, StudentProfile } from "../types";
+import { APP_VERSION } from "../constants/version";
 import {
   verifyPin,
   setSessionUnlocked,
@@ -558,7 +559,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
       {/* FOOTER: Security Information */}
       <div className="relative z-10 text-center pb-2 text-[11px] text-slate-500 font-mono">
-        Garia OS v3.0 • Hardware-Secured Session Isolation (4–8 Digits)
+        Garia OS v{APP_VERSION} • Hardware-Secured Session Isolation (4–8 Digits)
       </div>
 
       {/* Secure Forgot PIN Recovery Modal */}

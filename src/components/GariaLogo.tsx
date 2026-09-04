@@ -1,4 +1,5 @@
 import React from "react";
+import { APP_VERSION } from "../constants/version";
 
 interface GariaLogoProps {
   size?: number | "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
@@ -221,7 +222,7 @@ export const GariaLogo: React.FC<GariaLogoProps> = ({
           <span className="font-heading font-black text-xs tracking-tight text-white flex items-center gap-1 leading-tight">
             GARIA <span className="text-purple-400">OS</span>
           </span>
-          <span className="text-[9px] font-mono text-purple-300/80 leading-tight">v3.0.0</span>
+          <span className="text-[9px] font-mono text-purple-300/80 leading-tight">v{APP_VERSION}</span>
         </div>
       </div>
     );

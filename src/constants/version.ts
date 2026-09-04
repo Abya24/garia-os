@@ -1,10 +1,10 @@
 export const APP_NAME = "Garia OS";
-export const APP_VERSION = "3.0.0";
-export const APP_VERSION_CODE = 30001;
+export const APP_VERSION = "3.1.0";
+export const APP_VERSION_CODE = 30100;
 export const APP_VERSION_STRING = `Garia OS V${APP_VERSION}`;
-export const APP_BUILD_DATE = "2026.08.17";
-export const APP_BUILD_NAME = "Garia OS V3.0 Final Production";
-export const APP_RELEASE_DATE = "2026-08-17";
+export const APP_BUILD_DATE = "2026.09.04";
+export const APP_BUILD_NAME = "Garia OS V3.1 Production";
+export const APP_RELEASE_DATE = "2026-09-04";
 export const APP_PACKAGE_NAME = "com.gariaos.app";
 
 export type AppEnvironment = "Production" | "Staging" | "Development";

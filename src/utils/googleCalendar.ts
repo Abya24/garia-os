@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import firebaseConfig from "../../firebase-applet-config.json";
 import { Task, StudySession, CalendarEvent, Goal } from "../types";
+import { APP_VERSION } from "../constants/version";
 
 // Scopes required for Google Calendar and Gmail sync
 export const CALENDAR_SCOPES = [
@@ -236,7 +237,7 @@ export async function createGoogleCalendarEvent(
   let description = item.description || "";
   if (item.category) description += `\nCategory: ${item.category}`;
   if (item.priority) description += `\nPriority: ${item.priority.toUpperCase()}`;
-  description += `\n\n— Synced from Garia OS V3.0 Academic Hub`;
+  description += `\n\n— Synced from Garia OS V${APP_VERSION} Academic Hub`;
 
   const payload: any = {
     summary,

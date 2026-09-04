@@ -25,6 +25,7 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
+import { APP_VERSION } from "../constants/version";
 
 // Initialize Firebase App
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -389,7 +390,7 @@ export async function uploadWorkspaceToCloud(
     const payload: CloudBackupState = {
       userId,
       lastSyncedAt: timestamp,
-      version: "3.0.0",
+      version: APP_VERSION,
       activeProfileId: snapshot.activeProfileId,
       profiles: snapshot.profiles,
       payloadJson: JSON.stringify(snapshot.fullStorageDump),

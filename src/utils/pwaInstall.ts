@@ -25,8 +25,17 @@ export interface PWAInstallState {
   isIOS: boolean;
 }
 
-const STORAGE_KEY_INSTALLED = "garia_pwa_installed_state";
+const LEGACY_STORAGE_KEY_INSTALLED = "garia_pwa_installed_state";
 const STORAGE_KEY_DISMISSED = "garia_pwa_dismissed";
+
+// Clear any legacy or false persistent installed state immediately on load
+if (typeof window !== "undefined") {
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY_INSTALLED);
+  } catch {
+    // Ignore storage restrictions
+  }
+}
 
 interface NavigatorWithStandalone extends Navigator {
   standalone?: boolean;
@@ -54,42 +63,59 @@ export function detectDevicePlatform(): SupportedPlatform {
 }
 
 /**
- * Robust detection of whether Garia OS is running as an installed PWA
+ * Authoritative detection of whether Garia OS is actively running as an installed PWA.
+ *
+ * CRITICAL REQUIREMENTS:
+ * 1. Must NOT consider the app installed merely because a persistent localStorage token exists.
+ * 2. Normal Chrome/Safari browser tabs with the address bar visible must NEVER report installed.
+ * 3. Uses display-mode: standalone, iOS navigator.standalone, fullscreen/minimal-ui,
+ *    or verified Android app launcher referrer.
  */
 export function checkIsAppInstalled(): boolean {
   if (typeof window === "undefined") return false;
 
-  // 1. Check display-mode: standalone
-  const isStandaloneMedia = window.matchMedia("(display-mode: standalone)").matches;
-  if (isStandaloneMedia) return true;
-
-  // 2. Check iOS Safari standalone property
-  const nav = window.navigator as NavigatorWithStandalone;
-  if (nav.standalone === true) return true;
-
-  // 3. Check display-mode: fullscreen or minimal-ui
-  if (
-    window.matchMedia("(display-mode: fullscreen)").matches ||
-    window.matchMedia("(display-mode: minimal-ui)").matches
-  ) {
-    return true;
-  }
-
-  // 4. Check Android TWA / launcher referrer
-  if (typeof document !== "undefined" && document.referrer.startsWith("android-app://")) {
-    return true;
-  }
-
-  // 5. Check persisted verified installation state
+  // 1. Authoritative check: display-mode: standalone (Chromium, Edge, Desktop, Android WebAPK)
   try {
-    const persisted = localStorage.getItem(STORAGE_KEY_INSTALLED);
-    if (persisted === "true") {
+    if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) {
       return true;
     }
   } catch {
-    // Ignore storage restrictions
+    // Ignore matchMedia evaluation error
   }
 
+  // 2. Authoritative check: iOS Safari standalone property (launched from iOS Home Screen)
+  try {
+    const nav = window.navigator as NavigatorWithStandalone;
+    if (nav && nav.standalone === true) {
+      return true;
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 3. Check display-mode: fullscreen or minimal-ui (PWA launched window)
+  try {
+    if (
+      window.matchMedia &&
+      (window.matchMedia("(display-mode: fullscreen)").matches ||
+        window.matchMedia("(display-mode: minimal-ui)").matches)
+    ) {
+      return true;
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 4. Check Android trusted app / TWA launcher referrer
+  try {
+    if (typeof document !== "undefined" && document.referrer && document.referrer.startsWith("android-app://")) {
+      return true;
+    }
+  } catch {
+    // Ignore
+  }
+
+  // Running inside a normal browser tab with address bar visible -> NOT installed
   return false;
 }
 
@@ -177,29 +203,20 @@ export function initPWAInstallListener(): void {
   window.addEventListener("appinstalled", () => {
     globalDeferredPrompt = null;
     try {
-      localStorage.setItem(STORAGE_KEY_INSTALLED, "true");
       localStorage.removeItem(STORAGE_KEY_DISMISSED);
     } catch {
       // Ignore
     }
     notifySubscribers();
 
-    // Dispatch global custom event for any interested UI components
+    // Dispatch global custom event for any interested UI components (e.g. status notification)
     window.dispatchEvent(new CustomEvent("garia-pwa-installed-success"));
   });
 
-  // 3. Monitor display-mode changes
+  // 3. Monitor display-mode changes (e.g. opened in or moved to standalone window)
   try {
     const standaloneMedia = window.matchMedia("(display-mode: standalone)");
-    standaloneMedia.addEventListener("change", (e) => {
-      if (e.matches) {
-        try {
-          localStorage.setItem(STORAGE_KEY_INSTALLED, "true");
-          localStorage.removeItem(STORAGE_KEY_DISMISSED);
-        } catch {
-          // Ignore
-        }
-      }
+    standaloneMedia.addEventListener("change", () => {
       notifySubscribers();
     });
   } catch {
@@ -227,8 +244,9 @@ export async function promptPWAInstall(): Promise<PWAInstallOutcome> {
 
     if (outcome === "accepted") {
       globalDeferredPrompt = null;
+      // Do NOT set isInstalled = true immediately: the user is still inside the normal browser tab!
+      // Opening the app from the home screen / launcher will properly trigger standalone mode.
       try {
-        localStorage.setItem(STORAGE_KEY_INSTALLED, "true");
         localStorage.removeItem(STORAGE_KEY_DISMISSED);
       } catch {
         // Ignore
