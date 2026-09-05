@@ -91,6 +91,44 @@ export const getTodayString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const formatLocalDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export const parseDateStringToLocal = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split("-").map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(dateStr);
+};
+
+export const getOffsetLocalDateString = (daysOffset: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  return formatLocalDate(d);
+};
+
+export const getUpcomingExamCycle = (currentDate: Date = new Date()) => {
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  // If past March (April - Dec), upcoming board exam is next year's Feb-Mar
+  // If Jan - March, upcoming board exam is this year's Feb-Mar
+  const examYear = currentMonth > 3 ? currentYear + 1 : currentYear;
+  const startAcademicYear = examYear - 1;
+  return {
+    academicYear: `${startAcademicYear}-${examYear}`,
+    examYear,
+    startDate: `${examYear}-02-15`,
+    endDate: `${examYear}-03-15`,
+    examName: `Board Exam ${examYear}`,
+  };
+};
+
 export const getProfileKey = (profileId: string, baseKey: string): string => {
   return `garia_p_${profileId}_${baseKey}`;
 };
@@ -590,10 +628,10 @@ export const DEFAULT_EXAM_PROFILE: ExamProfile = {
   customBoardName: "",
   classLevel: "Class 12",
   stream: "Commerce",
-  academicYear: "2025-2026",
-  examName: "Class 12 Board Exam 2026",
-  startDate: "2026-02-15",
-  endDate: "2026-03-05",
+  academicYear: getUpcomingExamCycle().academicYear,
+  examName: `Class 12 Board Exam ${getUpcomingExamCycle().examYear}`,
+  startDate: getUpcomingExamCycle().startDate,
+  endDate: getUpcomingExamCycle().endDate,
   subjectExamDates: {},
   dailyStudyHours: 5,
 };
@@ -1069,14 +1107,15 @@ Use this space to write formulas, key terms, or daily notes.`,
   );
 
   // Exam Profile & Milestones
+  const examCycle = getUpcomingExamCycle();
   const examProf: ExamProfile = {
     board: profile.board as any,
     classLevel: profile.classLevel,
     stream: profile.stream,
-    academicYear: "2025-2026",
-    examName: `${profile.classLevel} Board Exam 2026`,
-    startDate: "2026-02-15",
-    endDate: "2026-03-05",
+    academicYear: examCycle.academicYear,
+    examName: `${profile.classLevel} Board Exam ${examCycle.examYear}`,
+    startDate: examCycle.startDate,
+    endDate: examCycle.endDate,
     subjectExamDates: {},
     dailyStudyHours: 5,
   };
@@ -1638,16 +1677,38 @@ export const saveAcademicRoadmapData = (roadmap: AcademicRoadmapData | null, pro
 export const loadExamProfile = (profileId?: string): ExamProfile => {
   const pId = profileId || loadActiveProfileId();
   const activeProf = loadProfiles().find((p) => p.id === pId);
-  const fallback = activeProf
+  const cycle = getUpcomingExamCycle();
+  const fallback: ExamProfile = activeProf
     ? {
         ...DEFAULT_EXAM_PROFILE,
         board: activeProf.board as any,
         stream: activeProf.stream,
         classLevel: activeProf.classLevel,
-        examName: `${activeProf.classLevel} Board Exam 2026`,
+        academicYear: cycle.academicYear,
+        examName: `${activeProf.classLevel} Board Exam ${cycle.examYear}`,
+        startDate: cycle.startDate,
+        endDate: cycle.endDate,
       }
     : DEFAULT_EXAM_PROFILE;
-  return getItem(getProfileKey(pId, STORAGE_KEYS.EXAM_PROFILE), fallback);
+  const stored = getItem(getProfileKey(pId, STORAGE_KEYS.EXAM_PROFILE), fallback);
+
+  // If stored profile has expired legacy date and today is past it, roll forward gracefully
+  if (
+    stored &&
+    stored.startDate &&
+    new Date(stored.startDate).getTime() < Date.now() - 30 * 86400000
+  ) {
+    return {
+      ...stored,
+      academicYear: cycle.academicYear,
+      examName: stored.examName?.includes("2026")
+        ? stored.examName.replace("2026", String(cycle.examYear))
+        : `${stored.classLevel || "Class 12"} Board Exam ${cycle.examYear}`,
+      startDate: cycle.startDate,
+      endDate: cycle.endDate,
+    };
+  }
+  return stored;
 };
 export const saveExamProfile = (prof: ExamProfile, profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();

@@ -114,6 +114,15 @@ export interface GroundingSource {
   uri: string;
 }
 
+export interface AbyaExecutedAction {
+  type: "create_task" | "create_note" | "log_water" | "create_goal" | "navigate_module" | "start_focus";
+  status: "success" | "error";
+  summary: string;
+  module: "tasks" | "notes" | "wellness" | "goals" | "focus" | "exam" | "study" | "career" | "stats";
+  details?: Record<string, any>;
+  targetTab?: string;
+}
+
 export interface AbyaMessage {
   id: string;
   role: "user" | "model";
@@ -129,6 +138,7 @@ export interface AbyaMessage {
   imageMimeType?: string;
   groundingSources?: GroundingSource[];
   thinkingDurationMs?: number;
+  executedAction?: AbyaExecutedAction;
 }
 
 export interface AbyaChatSession {

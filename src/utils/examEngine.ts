@@ -12,7 +12,7 @@ import {
   ExamPlanSlot,
   CareerRoadmap,
 } from "../types";
-import { getTodayString } from "./storage";
+import { getTodayString, getUpcomingExamCycle, parseDateStringToLocal } from "./storage";
 
 /**
  * 1. EXAM COUNTDOWN CALCULATOR
@@ -21,7 +21,8 @@ export function calculateExamCountdown(profile: ExamProfile) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const examStart = new Date(profile.startDate || "2026-02-15");
+  const fallbackStartDate = getUpcomingExamCycle().startDate;
+  const examStart = parseDateStringToLocal(profile.startDate || fallbackStartDate);
   examStart.setHours(0, 0, 0, 0);
 
   const diffTime = examStart.getTime() - today.getTime();
@@ -31,7 +32,7 @@ export function calculateExamCountdown(profile: ExamProfile) {
   let isExamOngoing = false;
 
   if (profile.endDate) {
-    const examEnd = new Date(profile.endDate);
+    const examEnd = parseDateStringToLocal(profile.endDate);
     examEnd.setHours(23, 59, 59, 999);
     if (today > examEnd) {
       isExamPassed = true;
@@ -48,7 +49,7 @@ export function calculateExamCountdown(profile: ExamProfile) {
     daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
     isExamPassed,
     isExamOngoing,
-    formattedStartDate: new Date(profile.startDate).toLocaleDateString("en-IN", {
+    formattedStartDate: examStart.toLocaleDateString("en-IN", {
       day: "numeric",
       month: "short",
       year: "numeric",

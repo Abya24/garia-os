@@ -70,6 +70,7 @@ import {
   exportStudyPlanIcs,
   exportSubjectExamDatesIcs,
 } from "../utils/icsExport";
+import { getTodayString } from "../utils/storage";
 import { Download } from "lucide-react";
 
 interface ExamCenterPageProps {
@@ -188,7 +189,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
     board: examProfile.board as string,
     subjectId: academicSubjects[0]?.id || "",
     chapterTitle: "",
-    testDate: new Date().toISOString().split("T")[0],
+    testDate: getTodayString(),
     maxMarks: 100,
     marksObtained: 75,
     timeTakenMinutes: 60,
@@ -255,7 +256,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       board: examProfile.board,
       subjectId: academicSubjects[0]?.id || "",
       chapterTitle: "",
-      testDate: new Date().toISOString().split("T")[0],
+      testDate: getTodayString(),
       maxMarks: 100,
       marksObtained: 75,
       timeTakenMinutes: 60,
@@ -1342,7 +1343,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                         id: `slot-${slot.id}`,
                         title: `[Study] ${slot.subjectName}: ${slot.chapterTitle}`,
                         description: `Activity: ${slot.activity}\nPriority: ${slot.priority}\nTime: ${slot.timeSlot}\nNotes: ${slot.explanation}`,
-                        date: new Date().toISOString().split("T")[0],
+                        date: getTodayString(),
                         category: "STUDY",
                       }}
                       variant="icon"

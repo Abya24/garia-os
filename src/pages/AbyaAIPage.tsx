@@ -91,6 +91,7 @@ import {
   loadAbyaChatSessions,
   saveAbyaChatSessions,
   deleteAbyaChatSession,
+  getTodayString,
 } from "../utils/storage";
 import { getStudentDisplayName } from "../utils/studentNameUtils";
 
@@ -422,7 +423,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
   // Study Time Calculation
   const studyTimeMinutesToday = useMemo(() => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getTodayString();
     return habits
       .filter((h) => h.completedDates.includes(todayStr))
       .reduce((acc, h) => acc + (h.durationMinutes || 30), 0);
@@ -1275,6 +1276,43 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                       >
                         {m.content}
                       </div>
+
+                      {/* Executed Action Card */}
+                      {m.executedAction && (
+                        <div className="mt-2 w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                              {m.executedAction.module === "tasks" && <CheckSquare className="w-4 h-4" />}
+                              {m.executedAction.module === "notes" && <FileText className="w-4 h-4" />}
+                              {m.executedAction.module === "wellness" && <Zap className="w-4 h-4" />}
+                              {m.executedAction.module === "goals" && <Target className="w-4 h-4" />}
+                              {m.executedAction.module === "exam" && <BookOpen className="w-4 h-4" />}
+                              {m.executedAction.module === "study" && <GraduationCap className="w-4 h-4" />}
+                              {!["tasks", "notes", "wellness", "goals", "exam", "study"].includes(m.executedAction.module) && (
+                                <CheckCircle2 className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div className="truncate text-left">
+                              <p className="font-semibold text-emerald-300 truncate">
+                                {m.executedAction.summary}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                Module: <span className="capitalize">{m.executedAction.module}</span> • Saved in Garia OS
+                              </p>
+                            </div>
+                          </div>
+                          {m.executedAction.targetTab && onNavigate && (
+                            <button
+                              type="button"
+                              onClick={() => onNavigate(m.executedAction!.targetTab as ActiveTab)}
+                              className="shrink-0 px-2.5 py-1 text-[11px] font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg transition-colors flex items-center gap-1 border border-emerald-500/30"
+                            >
+                              <span>Open</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                       {/* Assistant Metadata Badges */}
                       {!isUser && (

@@ -44,7 +44,7 @@ import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studen
 import { reconcilePendingQueueWithFirestore } from "../utils/offlineQueue";
 import { PinManagementModal, PinModalMode } from "./PinManagementModal";
 import { lockSession } from "../utils/security";
-import { getWorkspaceSnapshot } from "../utils/storage";
+import { getWorkspaceSnapshot, getTodayString } from "../utils/storage";
 
 interface SliderMenuProps {
   isOpen: boolean;
@@ -198,7 +198,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `garia-os-backup-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `garia-os-backup-${getTodayString()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

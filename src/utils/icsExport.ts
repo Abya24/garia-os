@@ -17,6 +17,7 @@ import {
   ExamPlanSlot,
   SmartStudySlot,
 } from "../types";
+import { getTodayString } from "./storage";
 
 export interface IcsEventOptions {
   id?: string;
@@ -256,7 +257,7 @@ export function exportAllMilestonesIcs(
     id: `milestone-${m.id || idx}`,
     title: `[Exam Milestone] ${m.title}`,
     description: `Category: ${m.category}\nStatus: ${m.completed ? "Completed ✅" : "Pending ⏳"}\nTarget Exam: ${examName}\n\n${m.description}`,
-    date: m.targetDate || new Date().toISOString().split("T")[0],
+    date: m.targetDate || getTodayString(),
     category: `MILESTONE_${m.category.toUpperCase()}`,
     reminderMinutes: 1440,
   }));
@@ -299,7 +300,7 @@ export function exportExamMilestoneIcs(
   targetDate?: string,
   examName?: string
 ): void {
-  const dateToUse = targetDate || milestone.targetDate || new Date().toISOString().split("T")[0];
+  const dateToUse = targetDate || milestone.targetDate || getTodayString();
   const title = `[Exam Milestone] ${milestone.title}`;
   const description = `Milestone Category: ${milestone.category}\nTarget Exam: ${
     examName || "Board / Entrance Preparation"
@@ -407,7 +408,7 @@ export function exportFullExamScheduleIcs(
   // 3. Exam Milestones
   milestones.forEach((m, idx) => {
     // distribute dates or use current/start date
-    const mDate = examProfile.startDate || new Date().toISOString().split("T")[0];
+    const mDate = examProfile.startDate || getTodayString();
     events.push({
       id: `milestone-${m.id || idx}`,
       title: `[Milestone] ${m.title}`,
@@ -433,7 +434,7 @@ export function exportAcademicRoadmapStageIcs(
   targetDate?: string,
   stream?: string
 ): void {
-  const dateToUse = targetDate || new Date().toISOString().split("T")[0];
+  const dateToUse = targetDate || getTodayString();
   const pendingText =
     stage.pendingItems.length > 0
       ? `\n\nPending Goals:\n- ${stage.pendingItems.join("\n- ")}`
@@ -519,7 +520,7 @@ export function exportAllCalendarEventsIcs(
   }));
 
   const ics = buildVCalendar(icsEvents, calendarName);
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayString();
   downloadIcsFile(`Garia_Full_Calendar_Backup_${todayStr}.ics`, ics);
 }
 
@@ -586,7 +587,7 @@ export function exportGoalTargetIcs(goal: Goal): void {
  */
 export function exportStudyPlanIcs(
   slots: (ExamPlanSlot | SmartStudySlot)[],
-  dateStr: string = new Date().toISOString().split("T")[0],
+  dateStr: string = getTodayString(),
   title: string = "Daily Study Timetable"
 ): void {
   const events: IcsEventOptions[] = slots.map((slot, idx) => {

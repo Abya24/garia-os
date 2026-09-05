@@ -6,7 +6,7 @@ import {
   ExamTestRecord,
   StudentProfile,
 } from "../types";
-import { getTodayString } from "./storage";
+import { getTodayString, formatLocalDate } from "./storage";
 
 export type SpacedRepetitionInterval = 1 | 3 | 7 | 15 | 30;
 
@@ -95,7 +95,7 @@ export function categorizeRevisions(
   const today = new Date(todayStr);
   const weekLater = new Date(today);
   weekLater.setDate(weekLater.getDate() + 7);
-  const weekLaterStr = weekLater.toISOString().split("T")[0];
+  const weekLaterStr = formatLocalDate(weekLater);
 
   const todayRevisions: AcademicRevisionItem[] = [];
   const weeklyRevisions: AcademicRevisionItem[] = [];

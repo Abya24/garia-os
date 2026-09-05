@@ -281,7 +281,13 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     }
 
     // Generate secure 6-digit one-time code for email verification
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const randomBytes = new Uint32Array(1);
+    if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.getRandomValues === "function") {
+      globalThis.crypto.getRandomValues(randomBytes);
+    } else {
+      throw new Error("Cryptographically secure RNG unavailable.");
+    }
+    const randomOtp = (100000 + (randomBytes[0] % 900000)).toString();
     setGeneratedOtp(randomOtp);
     setEmailOtpSent(true);
   };
@@ -296,7 +302,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
       return;
     }
 
-    if (inputOtp.trim() === generatedOtp || inputOtp.trim() === "123456") {
+    if (inputOtp.trim() === generatedOtp) {
       setRecoveryStep("new_pin");
     } else {
       setRecoveryError("Invalid verification code. Please check and re-enter.");
@@ -332,17 +338,6 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
       setIsProcessingRecovery(false);
       setRecoveryStep("success");
     }
-  };
-
-  // Handle Complete PIN Removal (Disable PIN Lock)
-  const handleRemovePinDirectly = () => {
-    if (typeof onEmergencyReset === "function") {
-      onEmergencyReset();
-    } else if (typeof onUpdateSettings === "function") {
-      resetPinSecurity(settings, onUpdateSettings);
-    }
-    setShowForgotModal(false);
-    triggerUnlock();
   };
 
   const handleCopyFreshCode = () => {
@@ -658,15 +653,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                       />
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={handleRemovePinDirectly}
-                        className="text-[11px] text-slate-400 hover:text-rose-400 underline underline-offset-2 transition-colors"
-                      >
-                        Bypass PIN & Open
-                      </button>
-
+                    <div className="pt-2 flex items-center justify-end gap-3">
                       <button
                         type="submit"
                         className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 transition-all"
@@ -701,15 +688,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                           />
                         </div>
 
-                        <div className="pt-2 flex items-center justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={handleRemovePinDirectly}
-                            className="text-[11px] text-slate-400 hover:text-rose-400 underline underline-offset-2 transition-colors"
-                          >
-                            Bypass PIN & Open
-                          </button>
-
+                        <div className="pt-2 flex items-center justify-end gap-3">
                           <button
                             type="submit"
                             className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 transition-all"
@@ -814,15 +793,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                   />
                 </div>
 
-                <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={handleRemovePinDirectly}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-semibold transition-colors"
-                  >
-                    Disable PIN Lock
-                  </button>
-
+                <div className="pt-2 flex items-center justify-end gap-3 border-t border-white/10">
                   <button
                     type="submit"
                     disabled={isProcessingRecovery}

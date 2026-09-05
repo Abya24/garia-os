@@ -11,6 +11,7 @@ import {
   ExamTestRecord,
   ExamIntelligenceReport,
 } from "../types";
+import { getTodayString } from "./storage";
 
 export interface SmartSuggestion {
   id: string;
@@ -38,7 +39,7 @@ export function generateSmartSuggestions(
   examReport?: ExamIntelligenceReport | null
 ): SmartSuggestion[] {
   const rawSuggestions: SmartSuggestion[] = [];
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayString();
 
   // 0. EXAM INTELLIGENCE RECOMMENDATIONS (V1.9)
   if (examReport && examReport.weakAreas.length > 0) {

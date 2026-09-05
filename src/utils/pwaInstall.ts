@@ -68,8 +68,10 @@ export function detectDevicePlatform(): SupportedPlatform {
  * CRITICAL REQUIREMENTS:
  * 1. Must NOT consider the app installed merely because a persistent localStorage token exists.
  * 2. Normal Chrome/Safari browser tabs with the address bar visible must NEVER report installed.
- * 3. Uses display-mode: standalone, iOS navigator.standalone, fullscreen/minimal-ui,
- *    or verified Android app launcher referrer.
+ * 3. Authoritative installed state relies strictly on:
+ *    - window.matchMedia('(display-mode: standalone)').matches (Chromium, Edge, Desktop, Android WebAPK)
+ *    - navigator.standalone === true (iOS Safari standalone)
+ *    - document.referrer starting with android-app:// (Android TWA / WebAPK)
  */
 export function checkIsAppInstalled(): boolean {
   if (typeof window === "undefined") return false;
@@ -93,20 +95,7 @@ export function checkIsAppInstalled(): boolean {
     // Ignore
   }
 
-  // 3. Check display-mode: fullscreen or minimal-ui (PWA launched window)
-  try {
-    if (
-      window.matchMedia &&
-      (window.matchMedia("(display-mode: fullscreen)").matches ||
-        window.matchMedia("(display-mode: minimal-ui)").matches)
-    ) {
-      return true;
-    }
-  } catch {
-    // Ignore
-  }
-
-  // 4. Check Android trusted app / TWA launcher referrer
+  // 3. Check Android trusted app / TWA launcher referrer
   try {
     if (typeof document !== "undefined" && document.referrer && document.referrer.startsWith("android-app://")) {
       return true;

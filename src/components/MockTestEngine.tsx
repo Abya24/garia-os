@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { TopicMCQ, StudentProfile } from "../types";
 import { SEED_MCQS } from "../utils/questionBankEngine";
+import { getTodayString } from "../utils/storage";
 
 export type MockTestMode = "full" | "subject" | "chapter" | "topic" | "speed";
 
@@ -271,7 +272,7 @@ export const MockTestEngine: React.FC<MockTestEngineProps> = ({
       unattemptedAnswers: unattemptedCount,
       accuracyPct: accuracy,
       timeSpentSeconds: timeSpent,
-      dateStr: new Date().toISOString().split("T")[0],
+      dateStr: getTodayString(),
       timestamp: Date.now(),
       topicBreakdown,
     };

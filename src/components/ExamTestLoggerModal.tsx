@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Award, CheckCircle2, AlertTriangle, Clock, Calendar, FileText, CheckSquare, Plus } from "lucide-react";
 import { AcademicSubject, ExamTestRecord } from "../types";
+import { getTodayString } from "../utils/storage";
 
 interface ExamTestLoggerModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const ExamTestLoggerModal: React.FC<ExamTestLoggerModalProps> = ({
   );
   const [testName, setTestName] = useState<string>(editingTest?.testName || "Mid-Term Practice Test");
   const [date, setDate] = useState<string>(
-    editingTest?.date || new Date().toISOString().split("T")[0]
+    editingTest?.date || getTodayString()
   );
   const [maxMarks, setMaxMarks] = useState<number>(editingTest?.maxMarks ?? 100);
   const [marksObtained, setMarksObtained] = useState<number>(editingTest?.marksObtained ?? 75);

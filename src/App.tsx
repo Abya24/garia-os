@@ -36,6 +36,7 @@ import {
   AbyaDiagnosticsInfo,
   AbyaFallbackReason,
   AbyaProvider,
+  AbyaExecutedAction,
 } from "./types";
 import {
   loadTasks,
@@ -121,6 +122,12 @@ import {
   generateAbyaInsightCards,
   generateAbyaFallbackResponse,
 } from "./utils/abyaFallbackEngine";
+
+import {
+  parseActionFromResponse,
+  parseActionFromPrompt,
+  executeAbyaModuleAction,
+} from "./utils/abyaModuleActions";
 
 import { hashPassword } from "./utils/auth";
 import { auth } from "./utils/firebase";
@@ -1444,12 +1451,42 @@ export default function App() {
     }
 
     try {
+      // Prepare module action context
+      const actionContext = {
+        tasks,
+        setTasks,
+        notes,
+        setNotes,
+        water,
+        setWater,
+        goals,
+        setGoals,
+        activeStudentId: activeStudent?.id,
+        onNavigate: handleNavigate,
+        defaultSubject: academicSubjects[0]?.name || "General",
+      };
+
       if (aiReplyText) {
         // Successful Online AI Response
+        // 1. Check if AI embedded a structured action block
+        const { cleanText, action: responseAction } = parseActionFromResponse(aiReplyText);
+        // 2. Fallback to parsing direct student intent from prompt if model didn't output action tag
+        const resolvedAction =
+          responseAction ||
+          parseActionFromPrompt(prompt, { defaultSubject: academicSubjects[0]?.name });
+
+        let executedAction: AbyaExecutedAction | undefined = undefined;
+        if (resolvedAction) {
+          const actionResult = executeAbyaModuleAction(resolvedAction, actionContext);
+          if (actionResult) {
+            executedAction = actionResult;
+          }
+        }
+
         const modelMsg: AbyaMessage = {
           id: "model-" + Date.now(),
           role: "model",
-          content: aiReplyText,
+          content: cleanText || aiReplyText,
           timestamp: Date.now(),
           mode: responseData?.modeUsed || mode,
           provider: "online_ai",
@@ -1457,6 +1494,7 @@ export default function App() {
           groundingSources: responseData?.groundingSources,
           thinkingDurationMs: responseData?.durationMs,
           isFallback: false,
+          executedAction,
         };
 
         setAbyaChat((prev) => {
@@ -1498,11 +1536,39 @@ export default function App() {
           ).overallScore,
         };
 
-        const fallbackContent = generateAbyaFallbackResponse(
-          actionType || "general",
-          prompt,
-          activeStudentData
-        );
+        // Check for direct module action in student prompt for offline/fallback mode
+        const promptAction = parseActionFromPrompt(prompt, {
+          defaultSubject: academicSubjects[0]?.name,
+        });
+
+        let executedAction: AbyaExecutedAction | undefined = undefined;
+        let fallbackContent = "";
+
+        if (promptAction) {
+          const actionResult = executeAbyaModuleAction(promptAction, actionContext);
+          if (actionResult) {
+            executedAction = actionResult;
+            if (actionResult.type === "create_task") {
+              fallbackContent = `Bilkul ${activeStudent?.name || "Student"}! Maine to-do list me naya task add kar diya hai: **${actionResult.details?.title}** (${actionResult.details?.subject || "General"}). Tum isko Task Manager me dekh sakte ho!`;
+            } else if (actionResult.type === "create_note") {
+              fallbackContent = `Done ${activeStudent?.name || "Student"}! Naya study note create ho gaya hai: **${actionResult.details?.title}**. Isko Notes section me dekh sakte ho.`;
+            } else if (actionResult.type === "log_water") {
+              fallbackContent = `Bahut badhiya ${activeStudent?.name || "Student"}! 💧 Water log update kar diya hai (${actionResult.details?.glasses}/${actionResult.details?.goal} glasses today). Hydration study focus ke liye bohot zaroori hai!`;
+            } else if (actionResult.type === "create_goal") {
+              fallbackContent = `Target set ${activeStudent?.name || "Student"}! 🎯 Naya study goal add kar diya hai: **${actionResult.details?.title}** (Target: ${actionResult.details?.targetDate}).`;
+            } else if (actionResult.type === "navigate_module") {
+              fallbackContent = `Chalo, ${actionResult.module} open kar diya hai!`;
+            }
+          }
+        }
+
+        if (!fallbackContent) {
+          fallbackContent = generateAbyaFallbackResponse(
+            actionType || "general",
+            prompt,
+            activeStudentData
+          );
+        }
 
         const modelMsg: AbyaMessage = {
           id: "model-" + Date.now(),
@@ -1513,6 +1579,7 @@ export default function App() {
           modelUsed: "Local Mentor Engine",
           isFallback: true,
           fallbackReason: fallbackReason || "api_error",
+          executedAction,
         };
 
         setAbyaChat((prev) => {

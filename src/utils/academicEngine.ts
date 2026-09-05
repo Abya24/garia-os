@@ -12,6 +12,7 @@ import {
   SmartStudySlot,
   StreamType,
 } from "../types";
+import { getTodayString, getOffsetLocalDateString } from "./storage";
 
 export const DEFAULT_COMMERCE_SUBJECTS: AcademicSubject[] = [
   { id: "sub-acc", name: "Accountancy", stream: "Commerce", color: "emerald" },
@@ -913,7 +914,7 @@ export function getDefaultRevisionsForStream(
   subjects: AcademicSubject[],
   chapters: AcademicChapter[]
 ): AcademicRevisionItem[] {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayString();
 
   // Map weak / in progress / low revision chapters to initial revisions
   const revisionTargetChaps = chapters.filter(
@@ -925,9 +926,7 @@ export function getDefaultRevisionsForStream(
       const sub = subjects.find((s) => s.id === ch.subjectId);
       const isOverdue = idx === 0;
       const daysOffset = isOverdue ? -1 : idx;
-      const targetDate = new Date(Date.now() + daysOffset * 86400000)
-        .toISOString()
-        .split("T")[0];
+      const targetDate = getOffsetLocalDateString(daysOffset);
 
       return {
         id: `rev-${ch.id}`,
@@ -1098,7 +1097,7 @@ export function generateAcademicRoadmapData(
   };
 
   // Stage 4: Revision
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayString();
   const overdueRev = revisions.filter((r) => !r.completed && r.scheduledDate < todayStr).map((r) => `${r.subjectName}: ${r.chapterTitle} (Overdue)`);
   const upcomingRev = revisions.filter((r) => !r.completed && r.scheduledDate >= todayStr).map((r) => `${r.subjectName}: ${r.chapterTitle} (${r.scheduledDate})`);
   const doneRev = revisions.filter((r) => r.completed).map((r) => `${r.subjectName}: ${r.chapterTitle}`);

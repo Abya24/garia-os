@@ -13,11 +13,17 @@ const PIN_SALT = "garia_os_secure_pin_salt_v2026";
  */
 export function generateRecoveryCode(): string {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // Exclude ambiguous chars: 0, 1, I, O
+  const randomBytes = new Uint8Array(8);
+  if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(randomBytes);
+  } else {
+    throw new Error("Cryptographically secure RNG is unavailable in this runtime environment.");
+  }
   let part1 = "";
   let part2 = "";
   for (let i = 0; i < 4; i++) {
-    part1 += chars.charAt(Math.floor(Math.random() * chars.length));
-    part2 += chars.charAt(Math.floor(Math.random() * chars.length));
+    part1 += chars.charAt(randomBytes[i] % chars.length);
+    part2 += chars.charAt(randomBytes[i + 4] % chars.length);
   }
   return `GARIA-${part1}-${part2}`;
 }
@@ -71,32 +77,27 @@ export async function verifyPin(enteredPin: string, storedHash: string): Promise
 }
 
 /**
- * Verify user's recovery code against stored recovery code or fallback recovery mechanism
+ * Verify user's recovery code against stored recovery code.
+ * Insecure universal bypass codes are strictly disallowed.
  */
 export function verifyRecoveryCode(enteredCode: string, settings: UserSettings): boolean {
   if (!enteredCode) return false;
   const normalizedInput = normalizeRecoveryCode(enteredCode);
   if (!normalizedInput || normalizedInput.length < 6) return false;
 
-  // 1. Check direct stored recovery code
+  // Strict check against stored recovery code
   if (settings.security?.recoveryCode) {
     const normalizedStored = normalizeRecoveryCode(settings.security.recoveryCode);
     if (normalizedInput === normalizedStored) return true;
-  }
-
-  // 2. Backward-compatible fallback for sessions where recoveryCode wasn't explicitly saved
-  const userNameClean = (settings.userName || "STUDENT").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const fallbackKey1 = normalizeRecoveryCode(`GARIA-${userNameClean}`);
-  const fallbackKey2 = normalizeRecoveryCode("GARIA-RECOVERY");
-  if (normalizedInput === fallbackKey1 || normalizedInput === fallbackKey2) {
-    return true;
   }
 
   return false;
 }
 
 /**
- * Verify registered account email for PIN recovery
+ * Verify registered account email for PIN recovery.
+ * Strictly verifies against registered security recovery email or account email.
+ * Arbitrary emails or wildcards are strictly rejected.
  */
 export function verifyAccountEmail(
   enteredEmail: string,
@@ -107,26 +108,31 @@ export function verifyAccountEmail(
   const cleanInput = enteredEmail.trim().toLowerCase();
   if (!cleanInput.includes("@") || !cleanInput.includes(".")) return false;
 
-  const knownEmails: string[] = [];
+  // Arbitrary or placeholder @gariaos.local addresses cannot recover an account
+  if (cleanInput.endsWith("@gariaos.local") || cleanInput === "private@gariaos.local") {
+    return false;
+  }
+
+  const allowedEmails = new Set<string>();
 
   if (settings.security?.recoveryEmail) {
-    knownEmails.push(settings.security.recoveryEmail.trim().toLowerCase());
+    const recEmail = settings.security.recoveryEmail.trim().toLowerCase();
+    if (recEmail && !recEmail.endsWith("@gariaos.local") && recEmail !== "private@gariaos.local") {
+      allowedEmails.add(recEmail);
+    }
   }
   if (settings.account?.email) {
-    knownEmails.push(settings.account.email.trim().toLowerCase());
-  }
-  // User name derived fallback email or standard domain
-  if (settings.userName) {
-    const slug = settings.userName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    knownEmails.push(`${slug}@gariaos.local`);
-  }
-  if (activeStudentName) {
-    const slug = activeStudentName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    knownEmails.push(`${slug}@gariaos.local`);
+    const accEmail = settings.account.email.trim().toLowerCase();
+    if (accEmail && !accEmail.endsWith("@gariaos.local") && accEmail !== "private@gariaos.local") {
+      allowedEmails.add(accEmail);
+    }
   }
 
-  // Also accept private fallback or user email if matches registered email
-  return knownEmails.some((known) => known === cleanInput) || cleanInput.endsWith("@gmail.com") || cleanInput.endsWith("@gariaos.local");
+  if (allowedEmails.size === 0) {
+    return false;
+  }
+
+  return allowedEmails.has(cleanInput);
 }
 
 

@@ -26,6 +26,7 @@ import {
   TaskCategory,
   WorkspaceMember,
 } from "../../types";
+import { getTodayString } from "../../utils/storage";
 import {
   addSharedTaskToWorkspace,
   updateSharedTaskInWorkspace,
@@ -64,7 +65,7 @@ export const SharedTasksWorkspaceView: React.FC<SharedTasksWorkspaceViewProps> =
   const [newDescription, setNewDescription] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newCategory, setNewCategory] = useState<TaskCategory>("academic");
-  const [newDate, setNewDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newDate, setNewDate] = useState(getTodayString());
   const [newTime, setNewTime] = useState("");
   const [newAssigneeId, setNewAssigneeId] = useState<string>("");
 
