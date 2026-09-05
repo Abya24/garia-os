@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1c073f" />
+      <stop offset="60%" stop-color="#0e0224" />
+      <stop offset="100%" stop-color="#070014" />
+    </radialGradient>
+
+    <!-- Main "R" Gradient (Glossy Purple) -->
+    <linearGradient id="rGradMain" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="30%" stop-color="#a855f7" />
+      <stop offset="70%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#5b21b6" />
+    </linearGradient>
+
+    <!-- Secondary Fold Gradient (3D Depth) -->
+    <linearGradient id="rGradLoop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e9d5ff" />
+      <stop offset="35%" stop-color="#c084fc" />
+      <stop offset="75%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+
+    <!-- Orbital Ring Gradient -->
+    <linearGradient id="ringGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6d28d9" stop-opacity="0.2" />
+      <stop offset="40%" stop-color="#8b5cf6" stop-opacity="0.8" />
+      <stop offset="85%" stop-color="#c084fc" />
+      <stop offset="100%" stop-color="#f3e8ff" />
+    </linearGradient>
+
+    <!-- Star Glow -->
+    <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Subtle Drop Shadow for 3D R -->
+    <filter id="rShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" fill="url(#bgGrad)" />
+
+  <g transform="translate(256, 256) scale(0.76) translate(-256, -256)">
+  <!-- Outer Subtle Ambient Glow -->
+  <circle cx="256" cy="240" r="180" fill="#7c3aed" opacity="0.12" filter="blur(30px)" />
+
+  <!-- Orbital Arch Ring -->
+  <path 
+    d="M 125 330 A 185 185 0 1 1 405 165" 
+    fill="none" 
+    stroke="url(#ringGrad)" 
+    stroke-width="7" 
+    stroke-linecap="round" 
+  />
+
+  <!-- 4-Pointed Sparkle Star at Top-Right of Orbital Arch -->
+  <g transform="translate(415, 160)" filter="url(#starGlow)">
+    <path 
+      d="M 0 -22 Q 0 0 -22 0 Q 0 0 0 22 Q 0 0 22 0 Q 0 0 0 -22 Z" 
+      fill="#f3e8ff" 
+    />
+    <circle cx="0" cy="0" r="4" fill="#ffffff" />
+  </g>
+
+  <!-- Stylized 3D "R" Symbol -->
+  <g filter="url(#rShadow)">
+    <!-- Vertical Left Stem -->
+    <path 
+      d="M 172 150
+         C 172 142, 180 136, 190 136
+         L 226 136
+         C 236 136, 242 142, 242 152
+         L 242 350
+         C 242 360, 234 366, 222 366
+         L 190 366
+         C 180 366, 172 358, 172 348
+         Z" 
+      fill="url(#rGradMain)" 
+    />
+
+    <!-- Upper Loop Ribbon wrapping gracefully from stem to right & middle fold -->
+    <path 
+      d="M 226 136
+         C 290 136, 348 155, 348 215
+         C 348 268, 298 285, 238 285
+         L 220 285
+         L 220 236
+         L 238 236
+         C 270 236, 295 228, 295 210
+         C 295 192, 270 184, 226 184
+         Z" 
+      fill="url(#rGradLoop)" 
+    />
+
+    <!-- Diagonal Leg swooping from middle fold to bottom right -->
+    <path 
+      d="M 236 260
+         L 310 355
+         C 316 363, 326 366, 338 366
+         L 358 366
+         C 368 366, 372 356, 365 348
+         L 285 248
+         Z" 
+      fill="url(#rGradMain)" 
+    />
+  </g>
+</g>
+</svg>

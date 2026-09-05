@@ -28,7 +28,7 @@ async function startServer() {
     res.json({
       status: "ok",
       app: "Garia OS",
-      version: "3.0.0",
+      version: "3.1.0",
       geminiFeatures: [
         "high_thinking (gemini-3.1-pro-preview)",
         "image_analysis (gemini-3.1-pro-preview)",
@@ -373,6 +373,21 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
   // Static asset serving & SPA routing in production / Vite middleware in development
   const isProduction = process.env.NODE_ENV === "production";
 
+  // Cache & PWA Headers Middleware
+  app.use((req, res, next) => {
+    if (req.path === "/sw.js") {
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Service-Worker-Allowed", "/");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    } else if (req.path === "/manifest.json") {
+      res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    } else if (req.path === "/index.html" || req.path === "/") {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    }
+    next();
+  });
+
   if (!isProduction) {
     console.log("[Garia OS Server] Starting in DEVELOPMENT mode with Vite middleware...");
     const { createServer: createViteServer } = await import("vite");
@@ -386,12 +401,6 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
     const distPath = path.join(process.cwd(), "dist");
     const indexPath = path.join(distPath, "index.html");
 
-    app.use((req, res, next) => {
-      if (req.path === "/sw.js" || req.path === "/index.html" || req.path === "/") {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      }
-      next();
-    });
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");

@@ -1,4 +1,4 @@
-const CACHE_NAME = "garia-os-v3.1.0-cache-v1";
+const CACHE_NAME = "garia-os-v3.1.0-cache-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -10,6 +10,8 @@ const ASSETS_TO_CACHE = [
   "/icon-144.png",
   "/icon-192.png",
   "/icon-512.png",
+  "/icon-maskable-192.png",
+  "/icon-maskable-512.png",
   "/icon.png",
   "/apple-touch-icon.png",
 ];

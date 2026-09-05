@@ -2,42 +2,64 @@
   "id": "/",
   "short_name": "Garia OS",
   "name": "Garia OS",
+  "description": "Garia OS is a student productivity and AI study companion with study tracking, academic planning, career guidance, smart suggestions and Abya AI.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
+  "prefer_related_applications": false,
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icon-48.png",
       "type": "image/png",
       "sizes": "48x48",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-72.png",
       "type": "image/png",
       "sizes": "72x72",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-96.png",
       "type": "image/png",
       "sizes": "96x96",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-144.png",
       "type": "image/png",
       "sizes": "144x144",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     },
     {
       "src": "/icon.svg",
@@ -45,12 +67,5 @@
       "sizes": "512x512",
       "purpose": "any"
     }
-  ],
-  "start_url": "/",
-  "scope": "/",
-  "background_color": "#090D16",
-  "theme_color": "#090D16",
-  "display": "standalone",
-  "orientation": "portrait",
-  "description": "Garia OS is a student productivity and AI study companion with study tracking, academic planning, career guidance, smart suggestions and Abya AI."
+  ]
 }
