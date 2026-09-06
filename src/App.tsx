@@ -2417,19 +2417,6 @@ export default function App() {
             setIsAppLocked(false);
           }}
           onUpdateSettings={handleUpdateSettings}
-          onEmergencyReset={() => {
-            const updated: UserSettings = {
-              ...settings,
-              security: {
-                ...settings.security,
-                enabled: false,
-                pinHash: "",
-              },
-            };
-            handleUpdateSettings(updated);
-            markSessionUnlocked();
-            setIsAppLocked(false);
-          }}
         />
       )}
     </div>

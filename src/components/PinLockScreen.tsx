@@ -21,13 +21,14 @@ import {
   ArrowLeft,
   RefreshCw,
   HelpCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { UserSettings, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
 import {
   verifyPin,
   setSessionUnlocked,
-  resetPinSecurity,
   resetPinWithRecovery,
   verifyRecoveryCode,
   verifyAccountEmail,
@@ -35,6 +36,8 @@ import {
   MAX_PIN_LENGTH,
   isValidPinFormat,
 } from "../utils/security";
+import { hashPassword } from "../utils/auth";
+import { signInWithEmail } from "../utils/firebase";
 import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GariaLogo } from "./GariaLogo";
 
@@ -45,10 +48,9 @@ interface PinLockScreenProps {
   onUnlocked?: () => void;
   onUnlockSuccess?: () => void;
   onUpdateSettings?: (s: UserSettings) => void;
-  onEmergencyReset?: () => void;
 }
 
-type RecoveryMethod = "code" | "email";
+type RecoveryMethod = "code" | "account";
 type RecoveryStep = "verify" | "new_pin" | "success";
 
 export const PinLockScreen: React.FC<PinLockScreenProps> = ({
@@ -58,7 +60,6 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   onUnlocked,
   onUnlockSuccess,
   onUpdateSettings,
-  onEmergencyReset,
 }) => {
   const [enteredPin, setEnteredPin] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -75,9 +76,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   const [recoveryStep, setRecoveryStep] = useState<RecoveryStep>("verify");
   const [inputRecoveryCode, setInputRecoveryCode] = useState<string>("");
   const [inputEmail, setInputEmail] = useState<string>("");
-  const [emailOtpSent, setEmailOtpSent] = useState<boolean>(false);
-  const [generatedOtp, setGeneratedOtp] = useState<string>("");
-  const [inputOtp, setInputOtp] = useState<string>("");
+  const [inputPassword, setInputPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [newRecoveryPin, setNewRecoveryPin] = useState<string>("");
   const [confirmRecoveryPin, setConfirmRecoveryPin] = useState<string>("");
@@ -231,9 +231,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     setRecoveryStep("verify");
     setInputRecoveryCode("");
     setInputEmail(settings.security?.recoveryEmail || settings.account?.email || "");
-    setEmailOtpSent(false);
-    setGeneratedOtp("");
-    setInputOtp("");
+    setInputPassword("");
+    setShowPassword(false);
     setRecoveryError(null);
     setNewRecoveryPin("");
     setConfirmRecoveryPin("");
@@ -264,49 +263,51 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     }
   };
 
-  // Handle Send Email OTP Verification Code
-  const handleSendEmailOtp = (e: React.FormEvent) => {
+  // Handle Account Password Credentials Verification (No simulated bypasses)
+  const handleVerifyAccountCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setRecoveryError(null);
 
-    if (!inputEmail.trim()) {
+    const emailTrimmed = inputEmail.trim().toLowerCase();
+    const passTrimmed = inputPassword;
+
+    if (!emailTrimmed) {
       setRecoveryError("Please enter your registered account email.");
       return;
     }
 
-    const isValidEmail = verifyAccountEmail(inputEmail, settings, activeStudent?.name);
+    if (!passTrimmed) {
+      setRecoveryError("Please enter your account password.");
+      return;
+    }
+
+    const isValidEmail = verifyAccountEmail(emailTrimmed, settings, activeStudent?.name);
     if (!isValidEmail) {
       setRecoveryError("Email address does not match any registered account.");
       return;
     }
 
-    // Generate secure 6-digit one-time code for email verification
-    const randomBytes = new Uint32Array(1);
-    if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.getRandomValues === "function") {
-      globalThis.crypto.getRandomValues(randomBytes);
-    } else {
-      throw new Error("Cryptographically secure RNG unavailable.");
-    }
-    const randomOtp = (100000 + (randomBytes[0] % 900000)).toString();
-    setGeneratedOtp(randomOtp);
-    setEmailOtpSent(true);
-  };
-
-  // Verify Email OTP
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    setRecoveryError(null);
-
-    if (!inputOtp.trim()) {
-      setRecoveryError("Please enter the 6-digit verification code.");
-      return;
+    // Check stored passwordHash
+    if (settings.account?.passwordHash) {
+      const enteredHash = await hashPassword(passTrimmed);
+      if (enteredHash === settings.account.passwordHash) {
+        setRecoveryStep("new_pin");
+        return;
+      }
     }
 
-    if (inputOtp.trim() === generatedOtp) {
-      setRecoveryStep("new_pin");
-    } else {
-      setRecoveryError("Invalid verification code. Please check and re-enter.");
+    // Check Firebase Auth if registered with cloud account
+    try {
+      const fbUser = await signInWithEmail(emailTrimmed, passTrimmed);
+      if (fbUser) {
+        setRecoveryStep("new_pin");
+        return;
+      }
+    } catch {
+      // Firebase auth failed or offline
     }
+
+    setRecoveryError("Incorrect password or credentials could not be verified. If you do not have a password, please use your Secret Recovery Code.");
   };
 
   // Handle Setting New PIN after successful verification
@@ -618,17 +619,17 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setRecoveryMethod("email");
+                      setRecoveryMethod("account");
                       setRecoveryError(null);
                     }}
                     className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      recoveryMethod === "email"
+                      recoveryMethod === "account"
                         ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
                         : "text-slate-400 hover:text-white"
                     }`}
                   >
                     <Mail className="w-3.5 h-3.5" />
-                    <span>Account Email</span>
+                    <span>Account Password</span>
                   </button>
                 </div>
 
@@ -665,91 +666,59 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                   </form>
                 )}
 
-                {/* Option 2: Account Email Verification */}
-                {recoveryMethod === "email" && (
-                  <div className="space-y-3">
-                    {!emailOtpSent ? (
-                      <form onSubmit={handleSendEmailOtp} className="space-y-3">
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          Verify using your registered account email address to receive a secure 6-digit recovery OTP:
-                        </p>
+                {/* Option 2: Account Password Verification */}
+                {recoveryMethod === "account" && (
+                  <form onSubmit={handleVerifyAccountCredentials} className="space-y-3">
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Verify your identity using your registered account email and password:
+                    </p>
 
-                        <div>
-                          <label className="text-xs font-semibold text-slate-300 mb-1 block">
-                            Registered Account Email
-                          </label>
-                          <input
-                            type="email"
-                            value={inputEmail}
-                            onChange={(e) => setInputEmail(e.target.value)}
-                            placeholder="student@gariaos.local"
-                            className="w-full px-4 py-3 rounded-2xl bg-slate-800/90 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-purple-400 transition-colors"
-                            autoFocus
-                          />
-                        </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-300 mb-1 block">
+                        Registered Account Email
+                      </label>
+                      <input
+                        type="email"
+                        value={inputEmail}
+                        onChange={(e) => setInputEmail(e.target.value)}
+                        placeholder="student@example.com"
+                        className="w-full px-4 py-3 rounded-2xl bg-slate-800/90 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-purple-400 transition-colors"
+                        autoFocus
+                      />
+                    </div>
 
-                        <div className="pt-2 flex items-center justify-end gap-3">
-                          <button
-                            type="submit"
-                            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 transition-all"
-                          >
-                            <Mail className="w-4 h-4" />
-                            <span>Send Recovery Code</span>
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <form onSubmit={handleVerifyOtp} className="space-y-3 animate-in fade-in">
-                        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
-                          <div className="font-bold flex items-center gap-1.5">
-                            <Check className="w-4 h-4 text-emerald-400" />
-                            <span>Verification Code Sent!</span>
-                          </div>
-                          <p className="text-[11px] text-slate-300 mt-1">
-                            For security verification, your simulated OTP is:{" "}
-                            <span className="font-mono font-bold text-emerald-400 text-sm bg-slate-900/80 px-2 py-0.5 rounded-md border border-emerald-500/40">
-                              {generatedOtp}
-                            </span>
-                          </p>
-                        </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-300 mb-1 block">
+                        Account Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={inputPassword}
+                          onChange={(e) => setInputPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-4 py-3 rounded-2xl bg-slate-800/90 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-purple-400 transition-colors pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
 
-                        <div>
-                          <label className="text-xs font-semibold text-slate-300 mb-1 block">
-                            Enter 6-Digit OTP Code
-                          </label>
-                          <input
-                            type="text"
-                            maxLength={6}
-                            inputMode="numeric"
-                            value={inputOtp}
-                            onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ""))}
-                            placeholder="••••••"
-                            className="w-full px-4 py-3 rounded-2xl bg-slate-800/90 border border-white/10 text-white font-mono text-center text-lg tracking-widest focus:outline-none focus:border-emerald-400 transition-colors"
-                            autoFocus
-                          />
-                        </div>
-
-                        <div className="pt-2 flex items-center justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setEmailOtpSent(false)}
-                            className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
-                          >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Change Email</span>
-                          </button>
-
-                          <button
-                            type="submit"
-                            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
-                          >
-                            <span>Verify & Proceed</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </div>
+                    <div className="pt-2 flex items-center justify-end gap-3">
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 transition-all"
+                      >
+                        <span>Verify &amp; Proceed</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </form>
                 )}
               </div>
             )}

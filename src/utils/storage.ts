@@ -136,8 +136,25 @@ export const getProfileKey = (profileId: string, baseKey: string): string => {
 // Helper Storage Functions
 function getItem<T>(key: string, defaultValue: T): T {
   try {
+    if (typeof localStorage === "undefined") return defaultValue;
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
+    if (!item) return defaultValue;
+    const parsed = JSON.parse(item);
+    if (parsed === null || parsed === undefined) return defaultValue;
+
+    // Array type defense: prevent object/primitive from corrupting array state
+    if (Array.isArray(defaultValue)) {
+      if (!Array.isArray(parsed)) return defaultValue;
+      return parsed as unknown as T;
+    }
+
+    // Object type defense: merge defaults to backfill missing fields from schema updates
+    if (typeof defaultValue === "object" && defaultValue !== null) {
+      if (typeof parsed !== "object" || Array.isArray(parsed)) return defaultValue;
+      return { ...defaultValue, ...parsed };
+    }
+
+    return parsed;
   } catch (e) {
     console.error(`Error reading ${key} from localStorage`, e);
     return defaultValue;
@@ -913,7 +930,7 @@ export const updateStudentProfile = (updated: StudentProfile): void => {
           board: updated.board as any,
           stream: finalUpdated.stream,
           classLevel: updated.classLevel,
-          examName: `${updated.classLevel} Board Exam 2026`,
+          examName: `${updated.classLevel} Board Exam ${getUpcomingExamCycle().examYear}`,
         },
         profId
       );
@@ -1913,6 +1930,26 @@ export const resetDashboardWidgets = (profileId?: string): DashboardWidgetConfig
 // STUDENT-SPECIFIC EXPORT & IMPORT
 // =========================================================================
 
+export const sanitizeSettingsForExport = (settings: UserSettings): UserSettings => {
+  return {
+    ...settings,
+    customApiKey: "",
+    security: settings.security
+      ? {
+          ...settings.security,
+          pinHash: "",
+          recoveryCode: "",
+        }
+      : undefined,
+    account: settings.account
+      ? {
+          ...settings.account,
+          passwordHash: "",
+        }
+      : undefined,
+  };
+};
+
 export const exportStudentProfileJSON = (profileId?: string) => {
   const pId = profileId || loadActiveProfileId();
   const profiles = loadProfiles();
@@ -1931,7 +1968,7 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     calendarEvents: loadCalendarEvents(pId),
     abyaChat: loadAbyaChat(pId),
     abyaLanguage: loadAbyaLanguage(pId),
-    settings: loadSettings(pId),
+    settings: sanitizeSettingsForExport(loadSettings(pId)),
     dashboardWidgets: loadDashboardWidgets(pId),
     careerProfile: loadCareerProfile(pId),
     careerAssessment: loadCareerAssessment(pId),
@@ -2065,9 +2102,41 @@ export const getWorkspaceSnapshot = (): {
   if (typeof localStorage !== "undefined") {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith("garia_") || key.startsWith("smart_") || key.startsWith("vvi_") || key.startsWith("revisions_") || key.startsWith("practice_") || key.startsWith("academic_") || key.startsWith("career_") || key.startsWith("exam_"))) {
+      if (!key) continue;
+
+      // Exclude session tokens and runtime security keys from snapshot
+      if (
+        key.startsWith("garia_os_session_") ||
+        key === "garia_active_session_token"
+      ) {
+        continue;
+      }
+
+      if (
+        key.startsWith("garia_") ||
+        key.startsWith("smart_") ||
+        key.startsWith("vvi_") ||
+        key.startsWith("revisions_") ||
+        key.startsWith("practice_") ||
+        key.startsWith("academic_") ||
+        key.startsWith("career_") ||
+        key.startsWith("exam_")
+      ) {
         const val = localStorage.getItem(key);
         if (val !== null) {
+          // If this key stores settings, sanitize sensitive credentials before backup
+          if (key.includes("settings")) {
+            try {
+              const parsedSettings = JSON.parse(val);
+              if (parsedSettings && typeof parsedSettings === "object") {
+                const sanitized = sanitizeSettingsForExport(parsedSettings as UserSettings);
+                fullStorageDump[key] = JSON.stringify(sanitized);
+                continue;
+              }
+            } catch {
+              // fallback to raw value if not standard JSON
+            }
+          }
           fullStorageDump[key] = val;
         }
       }
