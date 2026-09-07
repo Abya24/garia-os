@@ -139,10 +139,16 @@ service cloud.firestore {
     }
 
     function isParentWorkspaceMemberOrOwner(wsId) {
-      return isSignedIn() && (
+      return isSignedIn() && exists(/databases/$(database)/documents/shared_workspaces/$(wsId)) && (
         request.auth.uid == getWorkspaceDoc(wsId).data.ownerId ||
         request.auth.uid in getWorkspaceDoc(wsId).data.memberIds
       );
+    }
+
+    // Helper to verify field equality or mutual absence
+    function isFieldUnchanged(field) {
+      return (! (field in existing()) && ! (field in incoming())) ||
+        (field in existing() && field in incoming() && incoming()[field] == existing()[field]);
     }
 
     // Check if security-sensitive workspace metadata fields are unmodified
@@ -153,18 +159,9 @@ service cloud.firestore {
         incoming().type == existing().type &&
         incoming().joinCode == existing().joinCode &&
         incoming().memberIds == existing().memberIds &&
-        (
-          (!('allowInviteLink' in existing()) && !('allowInviteLink' in incoming())) ||
-          incoming().allowInviteLink == existing().allowInviteLink
-        ) &&
-        (
-          (!('members' in existing()) && !('members' in incoming())) ||
-          incoming().members == existing().members
-        ) &&
-        (
-          (!('description' in existing()) && !('description' in incoming())) ||
-          incoming().description == existing().description
-        );
+        isFieldUnchanged('allowInviteLink') &&
+        isFieldUnchanged('members') &&
+        isFieldUnchanged('description');
     }
 
     // Member collaborative edit: only tasks, noteContent, noteTags, title, updatedAt, lastModifiedBy
@@ -182,37 +179,9 @@ service cloud.firestore {
         incoming().ownerId == existing().ownerId &&
         incoming().createdAt == existing().createdAt &&
         incoming().id == existing().id &&
-        incoming().type == existing().type;
-    }
-
-    // Self-join: active invite link allows an unjoined user to ONLY add their own UID to memberIds
-    function isLegitimateSelfJoin() {
-      return isSignedIn() &&
-        existing().allowInviteLink == true &&
-        !(request.auth.uid in existing().memberIds) &&
-        request.auth.uid != existing().ownerId &&
-        incoming().ownerId == existing().ownerId &&
-        incoming().createdAt == existing().createdAt &&
-        incoming().id == existing().id &&
         incoming().type == existing().type &&
-        incoming().title == existing().title &&
         incoming().joinCode == existing().joinCode &&
-        incoming().allowInviteLink == existing().allowInviteLink &&
-        incoming().memberIds.size() == existing().memberIds.size() + 1 &&
-        incoming().memberIds.hasAll(existing().memberIds) &&
-        request.auth.uid in incoming().memberIds &&
-        (
-          (!('tasks' in existing()) && !('tasks' in incoming())) ||
-          incoming().tasks == existing().tasks
-        ) &&
-        (
-          (!('noteContent' in existing()) && !('noteContent' in incoming())) ||
-          incoming().noteContent == existing().noteContent
-        ) &&
-        (
-          (!('description' in existing()) && !('description' in incoming())) ||
-          incoming().description == existing().description
-        );
+        incoming().ownerId in incoming().memberIds;
     }
 
     function isValidActivityLog(data, wsId) {
@@ -222,7 +191,12 @@ service cloud.firestore {
         data.userName is string && data.userName.size() <= 128 &&
         data.action is string && data.action.size() <= 64 &&
         data.details is string && data.details.size() <= 500 &&
-        data.timestamp is number;
+        data.timestamp is number &&
+        !('ownerId' in data) &&
+        !('memberIds' in data) &&
+        !('members' in data) &&
+        !('joinCode' in data) &&
+        !('allowInviteLink' in data);
     }
 
     function isValidCollaborationNotification(data, uid) {
@@ -363,19 +337,34 @@ service cloud.firestore {
         isValidSharedWorkspace(incoming()) &&
         (
           isLegitimateOwnerUpdate() ||
-          isLegitimateMemberUpdate() ||
-          isLegitimateSelfJoin()
+          isLegitimateMemberUpdate()
         );
       allow delete: if isSignedIn() && isValidId(workspaceId) &&
         resource.data.ownerId == request.auth.uid;
 
       // Activity logs subcollection (requires membership/ownership of parent workspace)
       match /activities/{activityId} {
-        allow get, list: if isParentWorkspaceMemberOrOwner(workspaceId) && isValidId(activityId);
+        allow get: if isParentWorkspaceMemberOrOwner(workspaceId) && isValidId(activityId);
+        allow list: if isParentWorkspaceMemberOrOwner(workspaceId);
         allow create: if isParentWorkspaceMemberOrOwner(workspaceId) &&
           isValidId(activityId) &&
           isValidActivityLog(incoming(), workspaceId) &&
           incoming().userId == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      // Enforce parent-workspace authorization and block sensitive fields across any other subcollection
+      match /{subcollection}/{docId} {
+        allow get: if isParentWorkspaceMemberOrOwner(workspaceId) && isValidId(docId);
+        allow list: if isParentWorkspaceMemberOrOwner(workspaceId);
+        allow create: if isParentWorkspaceMemberOrOwner(workspaceId) &&
+          isValidId(docId) &&
+          incoming().userId == request.auth.uid &&
+          !('ownerId' in incoming()) &&
+          !('memberIds' in incoming()) &&
+          !('members' in incoming()) &&
+          !('joinCode' in incoming()) &&
+          !('allowInviteLink' in incoming());
         allow update, delete: if false;
       }
     }

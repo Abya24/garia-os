@@ -346,7 +346,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         } catch (err: any) {
           lastErr = err;
           console.warn(
-            `[Abya AI Server] Candidate ${candidate.model} failed (${err?.message || err}). Trying next candidate...`
+            `[Abya AI Server] Candidate ${candidate.model} failed (status: ${err?.status || err?.code || "UNAVAILABLE"}). Trying next candidate...`
           );
         }
       }
@@ -383,13 +383,14 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       });
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      console.error(`[Abya AI Server] Error in /api/ai/chat after ${duration}ms:`, error?.message || error);
       const isRateLimit =
         error?.status === 429 ||
         error?.message?.includes("429") ||
         error?.message?.includes("RESOURCE_EXHAUSTED");
+      const errCategory = isRateLimit ? "RATE_LIMIT_429" : error?.status || error?.code || "SERVICE_ERROR";
+      console.error(`[Abya AI Server] Request failed after ${duration}ms (category: ${errCategory})`);
       return res.status(isRateLimit ? 429 : 500).json({
-        error: error.message || "Failed to communicate with Abya AI service.",
+        error: isRateLimit ? "Service is currently rate-limited. Please try again shortly." : "Failed to communicate with Abya AI service.",
         code: isRateLimit ? "RATE_LIMITED" : "AI_SERVICE_ERROR",
       });
     }
@@ -545,12 +546,12 @@ Guidelines:
             }
           },
           onerror: (err: any) => {
-            console.error("[Abya Live Voice] Gemini session error:", err);
+            console.error(`[Abya Live Voice] Gemini session error (code: ${err?.code || "SESSION_ERROR"})`);
             if (clientWs.readyState === WebSocket.OPEN) {
               clientWs.send(
                 JSON.stringify({
                   type: "error",
-                  error: err?.message || "Live Voice session error",
+                  error: "Live Voice session encountered an error.",
                 })
               );
             }
@@ -579,7 +580,7 @@ Guidelines:
             });
           }
         } catch (e) {
-          console.error("[Abya Live Voice] Error processing client audio payload:", e);
+          console.error("[Abya Live Voice] Error processing client audio payload.");
         }
       });
 
@@ -592,7 +593,7 @@ Guidelines:
         }
       });
     } catch (err: any) {
-      console.error("[Abya Live Voice] Connection initialization error:", err);
+      console.error(`[Abya Live Voice] Connection initialization failed (code: ${err?.code || "INIT_FAILED"})`);
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(
           JSON.stringify({

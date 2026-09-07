@@ -43,11 +43,19 @@ android {
                 storePassword storePwd
                 keyAlias kAlias ?: "gariaos"
                 keyPassword kPassword ?: storePwd
-            } else {
-                storeFile signingConfigs.debug.storeFile
-                storePassword signingConfigs.debug.storePassword
-                keyAlias signingConfigs.debug.keyAlias
-                keyPassword signingConfigs.debug.keyPassword
+            }
+            // Release signing fails explicitly if required credentials are missing from environment.
+            // No committed secrets, fallback passwords, or debug keystore fallbacks are used.
+        }
+    }
+
+    gradle.taskGraph.whenReady { taskGraph ->
+        if (taskGraph.hasTask(":app:packageRelease") || taskGraph.hasTask(":app:assembleRelease") || taskGraph.hasTask(":app:bundleRelease")) {
+            def releaseConfig = android.signingConfigs.release
+            if (releaseConfig.storeFile == null || !releaseConfig.storeFile.exists() || releaseConfig.storePassword == null) {
+                throw new GradleException(
+                    "Release signing failed: Environment variables RELEASE_KEYSTORE_PATH (or release.keystore) and RELEASE_KEYSTORE_PASSWORD must be provided. Insecure defaults are disallowed."
+                )
             }
         }
     }
