@@ -102,6 +102,11 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
 
   const t = translations[currentLanguage] || translations.en;
 
+  const customPrimary =
+    settings.customTheme?.primary ||
+    settings.customThemeColors?.primary ||
+    "#10b981";
+
   const themes: { id: AppTheme; name: string; color: string }[] = [
     { id: "dark", name: "Dark Modern", color: "#0f172a" },
     { id: "amoled", name: "AMOLED Pure Black", color: "#000000" },
@@ -111,6 +116,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
     { id: "arctic", name: "Arctic Frost", color: "#0c4a6e" },
     { id: "light", name: "Pure Light", color: "#f8fafc" },
     { id: "system", name: "Auto System", color: "#334155" },
+    { id: "custom", name: "Custom Theme", color: customPrimary },
   ];
 
   const appIcons = [
@@ -139,10 +145,27 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
   };
 
   const handleThemeChange = (newTheme: AppTheme) => {
-    onUpdateSettings({
-      ...settings,
-      theme: newTheme,
-    });
+    if (newTheme === "custom") {
+      const p =
+        settings.customTheme?.primary ||
+        settings.customThemeColors?.primary ||
+        "#10b981";
+      const b =
+        settings.customTheme?.background ||
+        settings.customThemeColors?.background ||
+        "#0b0f19";
+      onUpdateSettings({
+        ...settings,
+        theme: "custom",
+        customTheme: { primary: p, background: b },
+        customThemeColors: { primary: p, background: b },
+      });
+    } else {
+      onUpdateSettings({
+        ...settings,
+        theme: newTheme,
+      });
+    }
   };
 
   const handleLanguageChange = (newLang: AppLanguage) => {

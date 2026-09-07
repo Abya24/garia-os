@@ -89,6 +89,16 @@
     --text-secondary: #fdba74;
     --accent-glow: rgba(249, 115, 22, 0.2);
   }
+
+  /* 9. Custom Theme */
+  .custom {
+    --bg-main: var(--custom-bg, #0b0f19);
+    --card-bg: var(--custom-card-bg, rgba(15, 23, 42, 0.88));
+    --card-border: var(--custom-card-border, rgba(255, 255, 255, 0.1));
+    --text-primary: var(--custom-text-primary, #f8fafc);
+    --text-secondary: var(--custom-text-secondary, #94a3b8);
+    --accent-glow: var(--custom-accent-glow, rgba(16, 185, 129, 0.2));
+  }
 }
 
 .amoled body, .amoled {
@@ -138,6 +148,55 @@
 }
 .sunset .bg-slate-950, .sunset .bg-slate-900 {
   background-color: #2b0f1a !important;
+}
+
+.custom body, .custom {
+  background-color: var(--custom-bg, #0b0f19) !important;
+}
+.custom .bg-slate-950 {
+  background-color: var(--custom-bg-darker, var(--custom-bg, #080c14)) !important;
+}
+.custom .bg-slate-900 {
+  background-color: var(--custom-card-bg, rgba(15, 23, 42, 0.88)) !important;
+}
+.custom .text-emerald-400,
+.custom .text-emerald-500 {
+  color: var(--custom-primary, #10b981) !important;
+}
+.custom .bg-emerald-500 {
+  background-color: var(--custom-primary, #10b981) !important;
+}
+.custom .border-emerald-500,
+.custom .border-emerald-400 {
+  border-color: var(--custom-primary, #10b981) !important;
+}
+
+.custom.custom-light body, .custom.custom-light {
+  background-color: var(--custom-bg, #f8fafc) !important;
+  color: #0f172a !important;
+}
+.custom.custom-light .text-white,
+.custom.custom-light .text-slate-100,
+.custom.custom-light .text-slate-200 {
+  color: #0f172a !important;
+}
+.custom.custom-light .text-slate-300,
+.custom.custom-light .text-slate-400 {
+  color: #334155 !important;
+}
+.custom.custom-light .text-slate-500 {
+  color: #475569 !important;
+}
+.custom.custom-light input,
+.custom.custom-light textarea,
+.custom.custom-light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+.custom.custom-light .bg-slate-950,
+.custom.custom-light .bg-slate-900 {
+  background-color: #ffffff !important;
 }
 
 .arctic body, .arctic, .light body, .light {

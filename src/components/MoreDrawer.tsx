@@ -93,6 +93,11 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
     }
   };
 
+  const customPrimary =
+    settings?.customTheme?.primary ||
+    settings?.customThemeColors?.primary ||
+    "#10b981";
+
   const themes: { id: AppTheme; label: string; color: string }[] = [
     { id: "dark", label: "Dark Modern", color: "#0f172a" },
     { id: "amoled", label: "AMOLED Pure Black", color: "#000000" },
@@ -102,6 +107,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
     { id: "arctic", label: "Arctic Frost", color: "#0c4a6e" },
     { id: "light", label: "Pure Light", color: "#f8fafc" },
     { id: "system", label: "System Default", color: "#334155" },
+    { id: "custom", label: "Custom Theme", color: customPrimary },
   ];
 
   const specialTools = [
@@ -194,7 +200,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
             </div>
 
             {/* Content: Expandable Categorized Sections */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 pb-12 sm:pb-6 space-y-3 custom-scrollbar">
               
               {/* CATEGORY 1: SPECIAL & ADVANCED TOOLS */}
               <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
@@ -285,7 +291,24 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
                             key={th.id}
                             onClick={() => {
                               if (settings && onUpdateSettings) {
-                                onUpdateSettings({ ...settings, theme: th.id });
+                                if (th.id === "custom") {
+                                  const p =
+                                    settings.customTheme?.primary ||
+                                    settings.customThemeColors?.primary ||
+                                    "#10b981";
+                                  const b =
+                                    settings.customTheme?.background ||
+                                    settings.customThemeColors?.background ||
+                                    "#0b0f19";
+                                  onUpdateSettings({
+                                    ...settings,
+                                    theme: "custom",
+                                    customTheme: { primary: p, background: b },
+                                    customThemeColors: { primary: p, background: b },
+                                  });
+                                } else {
+                                  onUpdateSettings({ ...settings, theme: th.id });
+                                }
                               }
                             }}
                             className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-2 transition-all ${

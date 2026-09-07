@@ -733,7 +733,26 @@ export default function App() {
       "sunset",
       "graphite",
       "frost",
+      "custom",
+      "custom-light",
     ];
+
+    const isHexLight = (hex: string): boolean => {
+      const cleanHex = hex.replace("#", "").trim();
+      if (cleanHex.length !== 3 && cleanHex.length !== 6) return false;
+      const fullHex =
+        cleanHex.length === 3
+          ? cleanHex
+              .split("")
+              .map((c) => c + c)
+              .join("")
+          : cleanHex;
+      const r = parseInt(fullHex.substring(0, 2), 16) || 0;
+      const g = parseInt(fullHex.substring(2, 4), 16) || 0;
+      const b = parseInt(fullHex.substring(4, 6), 16) || 0;
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness > 155;
+    };
 
     const applyTheme = () => {
       let active = settings.theme || "dark";
@@ -754,8 +773,33 @@ export default function App() {
       }
 
       themeClasses.forEach((cls) => root.classList.remove(cls));
-      if (active !== "dark" && themeClasses.includes(active)) {
-        root.classList.add(active);
+
+      if (active === "custom") {
+        const primary =
+          settings.customTheme?.primary ||
+          settings.customThemeColors?.primary ||
+          "#10b981";
+        const bg =
+          settings.customTheme?.background ||
+          settings.customThemeColors?.background ||
+          "#0b0f19";
+
+        root.style.setProperty("--custom-primary", primary);
+        root.style.setProperty("--custom-bg", bg);
+        root.style.setProperty("--bg-main", bg);
+
+        root.classList.add("custom");
+        if (isHexLight(bg)) {
+          root.classList.add("custom-light");
+        }
+      } else {
+        root.style.removeProperty("--custom-primary");
+        root.style.removeProperty("--custom-bg");
+        root.style.removeProperty("--bg-main");
+
+        if (active !== "dark" && themeClasses.includes(active)) {
+          root.classList.add(active);
+        }
       }
     };
 
@@ -1974,8 +2018,8 @@ export default function App() {
         <main
           className={`flex-1 min-w-0 ${
             activeTab === "abya"
-              ? "p-2 sm:p-4 lg:p-6 flex flex-col min-h-0"
-              : "p-4 sm:p-6 lg:p-8"
+              ? "p-2 sm:p-4 lg:p-6 pb-20 md:pb-6 flex flex-col min-h-0"
+              : "p-3 sm:p-6 lg:p-8 pb-28 md:pb-8"
           }`}
         >
           <ErrorBoundary>

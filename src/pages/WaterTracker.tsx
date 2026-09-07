@@ -105,30 +105,32 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
         </div>
 
         {/* Water Control Buttons */}
-        <div className="flex items-center gap-4 mt-6">
+        <div className="flex items-center justify-center gap-2.5 sm:gap-4 mt-6 w-full max-w-md">
           <button
             onClick={handleRemoveGlass}
             disabled={water.glasses === 0}
-            className="p-4 rounded-2xl glass-pill text-slate-300 hover:text-white disabled:opacity-40 hover:bg-white/10 transition-colors border border-white/10"
+            className="p-3 sm:p-4 rounded-2xl glass-pill text-slate-300 hover:text-white disabled:opacity-40 hover:bg-white/10 transition-colors border border-white/10 shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="Remove 1 glass"
+            aria-label="Remove 1 glass"
           >
-            <Minus className="w-6 h-6" />
+            <Minus className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           <button
             onClick={handleAddGlass}
-            className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-400 text-slate-900 font-extrabold text-base flex items-center gap-2 shadow-xl shadow-blue-500/25 hover:scale-105 transition-all active:scale-95"
+            className="flex-1 py-3 sm:py-4 px-4 sm:px-8 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-400 text-slate-900 font-extrabold text-xs sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-blue-500/25 hover:scale-105 transition-all active:scale-95 min-h-[44px]"
           >
-            <Plus className="w-6 h-6" />
-            <span>Drink Glass (+250ml)</span>
+            <Plus className="w-4 h-4 sm:w-6 sm:h-6 shrink-0" />
+            <span className="whitespace-nowrap">Drink Glass (+250ml)</span>
           </button>
 
           <button
             onClick={handleReset}
-            className="p-4 rounded-2xl glass-pill text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-white/10"
+            className="p-3 sm:p-4 rounded-2xl glass-pill text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-white/10 shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="Reset today's water counter"
+            aria-label="Reset today's water counter"
           >
-            <RotateCcw className="w-6 h-6" />
+            <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 

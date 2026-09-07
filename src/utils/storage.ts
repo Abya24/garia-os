@@ -220,6 +220,14 @@ const defaultSettings: UserSettings = {
   defaultFocusDuration: 25,
   defaultBreakDuration: 5,
   language: "WhatsApp Language",
+  customTheme: {
+    primary: "#10b981",
+    background: "#0b0f19",
+  },
+  customThemeColors: {
+    primary: "#10b981",
+    background: "#0b0f19",
+  },
 };
 
 const defaultTasks: Task[] = [
@@ -1437,6 +1445,14 @@ export const loadSettings = (profileId?: string): UserSettings => {
       ...defaultSettings.security!,
       ...(stored?.security || {}),
     },
+    customTheme:
+      stored?.customTheme ||
+      stored?.customThemeColors ||
+      defaultSettings.customTheme,
+    customThemeColors:
+      stored?.customThemeColors ||
+      stored?.customTheme ||
+      defaultSettings.customThemeColors,
   };
 };
 export const saveSettings = (settings: UserSettings, profileId?: string): void => {

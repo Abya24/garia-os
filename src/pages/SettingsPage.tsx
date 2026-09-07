@@ -42,6 +42,9 @@ import {
   ShieldCheck,
   KeyRound,
   ShieldAlert,
+  Palette,
+  Pipette,
+  RotateCcw,
 } from "lucide-react";
 import {
   UserSettings,
@@ -321,8 +324,114 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     );
   };
 
+  const defaultCustomPrimary = "#10B981";
+  const defaultCustomBg = "#0B0F19";
+  const savedPrimary =
+    settings.customTheme?.primary ||
+    settings.customThemeColors?.primary ||
+    defaultCustomPrimary;
+  const savedBg =
+    settings.customTheme?.background ||
+    settings.customThemeColors?.background ||
+    defaultCustomBg;
+
+  const [customPrimaryHex, setCustomPrimaryHex] = useState(savedPrimary);
+  const [customBgHex, setCustomBgHex] = useState(savedBg);
+  const [hexError, setHexError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCustomPrimaryHex(savedPrimary);
+  }, [savedPrimary]);
+
+  useEffect(() => {
+    setCustomBgHex(savedBg);
+  }, [savedBg]);
+
+  const isValidHex = (hex: string): boolean => {
+    return /^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(hex.trim());
+  };
+
+  const normalizeHex = (hex: string): string => {
+    let clean = hex.trim();
+    if (!clean.startsWith("#")) {
+      clean = "#" + clean;
+    }
+    return clean.toUpperCase();
+  };
+
+  const handleUpdateCustomColors = (
+    newPrimary: string,
+    newBg: string,
+    setAsActiveTheme: boolean = true
+  ) => {
+    const validP = isValidHex(newPrimary);
+    const validB = isValidHex(newBg);
+
+    if (!validP || !validB) {
+      setHexError(
+        currentLanguage === "hi"
+          ? "कृपया मान्य 3 या 6-अंकीय हेक्स कोड दर्ज करें (उदा. #10B981)"
+          : "Please enter valid 3 or 6-character hex codes (e.g. #10B981)"
+      );
+      return;
+    }
+
+    setHexError(null);
+    const p = normalizeHex(newPrimary);
+    const b = normalizeHex(newBg);
+    setCustomPrimaryHex(p);
+    setCustomBgHex(b);
+
+    const updatedConfig = {
+      primary: p,
+      background: b,
+    };
+
+    onUpdateSettings({
+      ...settings,
+      theme: setAsActiveTheme ? "custom" : settings.theme,
+      customTheme: updatedConfig,
+      customThemeColors: updatedConfig,
+    });
+  };
+
+  const handleResetCustomTheme = () => {
+    setCustomPrimaryHex(defaultCustomPrimary);
+    setCustomBgHex(defaultCustomBg);
+    setHexError(null);
+    const updatedConfig = {
+      primary: defaultCustomPrimary,
+      background: defaultCustomBg,
+    };
+    onUpdateSettings({
+      ...settings,
+      theme: "custom",
+      customTheme: updatedConfig,
+      customThemeColors: updatedConfig,
+    });
+  };
+
   const handleThemeChange = (theme: AppTheme) => {
-    onUpdateSettings({ ...settings, theme });
+    if (theme === "custom") {
+      const p =
+        settings.customTheme?.primary ||
+        settings.customThemeColors?.primary ||
+        customPrimaryHex ||
+        defaultCustomPrimary;
+      const b =
+        settings.customTheme?.background ||
+        settings.customThemeColors?.background ||
+        customBgHex ||
+        defaultCustomBg;
+      onUpdateSettings({
+        ...settings,
+        theme: "custom",
+        customTheme: { primary: p, background: b },
+        customThemeColors: { primary: p, background: b },
+      });
+    } else {
+      onUpdateSettings({ ...settings, theme });
+    }
   };
 
   // Solar Theme State and Handlers
@@ -1209,7 +1318,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </h4>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
           {[
             { id: "amoled", label: "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
             { id: "purple", label: "Royal Purple", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
@@ -1219,13 +1328,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             { id: "frost", label: "Frost Glass", desc: "Translucent Ice", color: "bg-slate-800/60 border-cyan-500/30", dot: "bg-cyan-200" },
             { id: "emerald", label: "Emerald Green", desc: "Calm Focus", color: "bg-emerald-950 border-emerald-800", dot: "bg-emerald-400" },
             { id: "sunset", label: "Sunset Orange", desc: "Warm Twilight", color: "bg-orange-950 border-orange-800", dot: "bg-orange-400" },
+            { id: "custom", label: currentLanguage === "hi" ? "कस्टम थीम" : "Custom Theme", desc: currentLanguage === "hi" ? "हेक्स रंग स्टूडियो" : "Custom Hex Studio", color: "", dot: "", isCustom: true },
           ].map((themeItem) => {
+            const isCustom = themeItem.id === "custom";
             const isActive =
               settings.theme === themeItem.id ||
-              (themeItem.id === "arctic" && settings.theme === "light") ||
-              (themeItem.id === "midnight" && settings.theme === "ocean") ||
-              (themeItem.id === "emerald" && settings.theme === "forest") ||
-              (themeItem.id === "graphite" && settings.theme === "dark");
+              (!isCustom && themeItem.id === "arctic" && settings.theme === "light") ||
+              (!isCustom && themeItem.id === "midnight" && settings.theme === "ocean") ||
+              (!isCustom && themeItem.id === "emerald" && settings.theme === "forest") ||
+              (!isCustom && themeItem.id === "graphite" && settings.theme === "dark");
 
             return (
               <button
@@ -1238,9 +1349,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className={`w-6 h-6 rounded-lg ${themeItem.color} border flex items-center justify-center`}>
-                    <span className={`w-2 h-2 rounded-full ${themeItem.dot}`} />
-                  </div>
+                  {isCustom ? (
+                    <div
+                      className="w-6 h-6 rounded-lg border border-white/20 flex items-center justify-center shadow-inner relative overflow-hidden shrink-0"
+                      style={{ backgroundColor: customBgHex }}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full ring-1 ring-white/30 shadow-sm"
+                        style={{ backgroundColor: customPrimaryHex }}
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-6 h-6 rounded-lg ${themeItem.color} border flex items-center justify-center shrink-0`}>
+                      <span className={`w-2 h-2 rounded-full ${themeItem.dot}`} />
+                    </div>
+                  )}
                   {isActive && (
                     <span className="w-4 h-4 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-[10px] font-bold">
                       ✓
@@ -1248,12 +1371,379 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   )}
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold font-heading">{themeItem.label}</h4>
+                  <h4 className="text-xs font-bold font-heading flex items-center gap-1.5">
+                    {themeItem.label}
+                    {isCustom && <Palette className="w-3 h-3 text-emerald-400 inline" />}
+                  </h4>
                   <p className="text-[10px] opacity-70 mt-0.5">{themeItem.desc}</p>
                 </div>
               </button>
             );
           })}
+        </div>
+
+        {/* CUSTOM THEME HEX COLOR PICKER STUDIO */}
+        <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-white border border-white/15 shadow-sm"
+                style={{ backgroundColor: customPrimaryHex }}
+              >
+                <Palette className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>{currentLanguage === "hi" ? "कस्टम थीम हेक्स कलर पिकर" : "Custom Theme Hex Color Studio"}</span>
+                  {settings.theme === "custom" && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                      {currentLanguage === "hi" ? "सक्रिय थीम" : "Active Theme"}
+                    </span>
+                  )}
+                </h4>
+                <p className="text-xs text-slate-400">
+                  {currentLanguage === "hi"
+                    ? "प्राइमरी एक्सेंट और बैकग्राउंड के लिए अपनी पसंद के हेक्स कोड चुनें या टाइप करें"
+                    : "Pick or enter custom hex color codes for primary accent and background canvas"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetCustomTheme}
+                className="text-xs px-3 py-1.5 rounded-xl border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1.5 active:scale-95"
+                title={currentLanguage === "hi" ? "डिफ़ॉल्ट हेक्स रीसेट करें" : "Reset to default colors"}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{currentLanguage === "hi" ? "डिफ़ॉल्ट रीसेट" : "Reset Defaults"}</span>
+              </button>
+
+              {settings.theme !== "custom" && (
+                <button
+                  type="button"
+                  onClick={() => handleThemeChange("custom")}
+                  className="text-xs px-3.5 py-1.5 rounded-xl font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+                >
+                  {currentLanguage === "hi" ? "कस्टम थीम लागू करें" : "Apply Custom Theme"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {hexError && (
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{hexError}</span>
+            </div>
+          )}
+
+          {/* TWO PRIMARY COLOR PICKER CARDS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 1. PRIMARY ACCENT COLOR */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Pipette className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{currentLanguage === "hi" ? "प्राइमरी एक्सेंट रंग (Primary Color)" : "Primary Accent Color"}</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {currentLanguage === "hi"
+                      ? "बटन, बैज, लिंक और हाइलाइट्स के लिए उपयोग किया जाता है"
+                      : "Used for buttons, active tabs, badges, icons & glowing highlights"}
+                  </p>
+                </div>
+                <div
+                  className="w-5 h-5 rounded-lg border border-white/20 shadow-sm shrink-0"
+                  style={{ backgroundColor: customPrimaryHex }}
+                />
+              </div>
+
+              {/* Color input + Hex Text input */}
+              <div className="flex items-center gap-2.5">
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    value={isValidHex(customPrimaryHex) ? normalizeHex(customPrimaryHex) : "#10B981"}
+                    onChange={(e) => handleUpdateCustomColors(e.target.value, customBgHex)}
+                    className="w-11 h-10 rounded-xl cursor-pointer bg-transparent border border-white/15 p-0.5 overflow-hidden"
+                    title={currentLanguage === "hi" ? "रंग पैलेट खोलें" : "Open Color Picker"}
+                  />
+                </div>
+
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={customPrimaryHex}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomPrimaryHex(val);
+                      if (isValidHex(val)) {
+                        handleUpdateCustomColors(val, customBgHex);
+                      }
+                    }}
+                    placeholder="#10B981"
+                    maxLength={7}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-sm tracking-wider uppercase focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Preset Swatches for Primary */}
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block mb-1.5">
+                  {currentLanguage === "hi" ? "त्वरित एक्सेंट स्वैचेस:" : "Quick Accent Swatches:"}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { label: "Emerald", hex: "#10B981" },
+                    { label: "Cyan", hex: "#06B6D4" },
+                    { label: "Indigo", hex: "#6366F1" },
+                    { label: "Purple", hex: "#A855F7" },
+                    { label: "Rose", hex: "#F43F5E" },
+                    { label: "Amber", hex: "#F59E0B" },
+                    { label: "Coral", hex: "#F97316" },
+                    { label: "Sky", hex: "#0EA5E9" },
+                    { label: "Lime", hex: "#84CC16" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => handleUpdateCustomColors(preset.hex, customBgHex)}
+                      className={`h-6 px-2 rounded-lg border text-[10px] font-mono flex items-center gap-1.5 transition-all ${
+                        normalizeHex(customPrimaryHex) === preset.hex
+                          ? "border-white text-white font-bold bg-white/10 scale-105"
+                          : "border-white/10 text-slate-400 hover:text-white hover:border-white/25"
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: preset.hex }}
+                      />
+                      <span>{preset.hex}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. BACKGROUND CANVAS COLOR */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Moon className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{currentLanguage === "hi" ? "बैकग्राउंड कैनवास रंग (Background Color)" : "Background Canvas Color"}</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {currentLanguage === "hi"
+                      ? "मुख्य पृष्ठ और कंटेनर पृष्ठभूमि के लिए उपयोग किया जाता है"
+                      : "Used for application backdrop, cards, modals & panel base"}
+                  </p>
+                </div>
+                <div
+                  className="w-5 h-5 rounded-lg border border-white/20 shadow-sm shrink-0"
+                  style={{ backgroundColor: customBgHex }}
+                />
+              </div>
+
+              {/* Color input + Hex Text input */}
+              <div className="flex items-center gap-2.5">
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    value={isValidHex(customBgHex) ? normalizeHex(customBgHex) : "#0B0F19"}
+                    onChange={(e) => handleUpdateCustomColors(customPrimaryHex, e.target.value)}
+                    className="w-11 h-10 rounded-xl cursor-pointer bg-transparent border border-white/15 p-0.5 overflow-hidden"
+                    title={currentLanguage === "hi" ? "रंग पैलेट खोलें" : "Open Color Picker"}
+                  />
+                </div>
+
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={customBgHex}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomBgHex(val);
+                      if (isValidHex(val)) {
+                        handleUpdateCustomColors(customPrimaryHex, val);
+                      }
+                    }}
+                    placeholder="#0B0F19"
+                    maxLength={7}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-sm tracking-wider uppercase focus:outline-none focus:border-cyan-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Preset Swatches for Background */}
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block mb-1.5">
+                  {currentLanguage === "hi" ? "त्वरित बैकग्राउंड स्वैचेस:" : "Quick Background Swatches:"}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { label: "Slate", hex: "#0B0F19" },
+                    { label: "Pure Black", hex: "#000000" },
+                    { label: "Navy", hex: "#040C1A" },
+                    { label: "Twilight", hex: "#0C071A" },
+                    { label: "Charcoal", hex: "#18181B" },
+                    { label: "Espresso", hex: "#18090F" },
+                    { label: "Forest", hex: "#03140D" },
+                    { label: "Paper", hex: "#F8FAFC" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => handleUpdateCustomColors(customPrimaryHex, preset.hex)}
+                      className={`h-6 px-2 rounded-lg border text-[10px] font-mono flex items-center gap-1.5 transition-all ${
+                        normalizeHex(customBgHex) === preset.hex
+                          ? "border-white text-white font-bold bg-white/10 scale-105"
+                          : "border-white/10 text-slate-400 hover:text-white hover:border-white/25"
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20"
+                        style={{ backgroundColor: preset.hex }}
+                      />
+                      <span>{preset.hex}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 1-TAP CURATED COMBOS */}
+          <div className="pt-2 border-t border-white/10">
+            <span className="text-[11px] font-semibold text-slate-300 block mb-2">
+              {currentLanguage === "hi" ? "लोकप्रिय 1-टैप कॉम्बो पैलेट्स:" : "Curated 1-Tap Theme Combos:"}
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              {[
+                { name: "Cyberpunk", primary: "#06B6D4", bg: "#000000" },
+                { name: "Neon Matrix", primary: "#00FF66", bg: "#020B05" },
+                { name: "Sunset Glow", primary: "#F97316", bg: "#18090F" },
+                { name: "Royal Violet", primary: "#C084FC", bg: "#0C071A" },
+                { name: "Ocean Deep", primary: "#38BDF8", bg: "#040C1A" },
+                { name: "Emerald Pro", primary: "#10B981", bg: "#0B0F19" },
+                { name: "Clean Ivory", primary: "#059669", bg: "#F8FAFC" },
+              ].map((combo) => (
+                <button
+                  key={combo.name}
+                  type="button"
+                  onClick={() => handleUpdateCustomColors(combo.primary, combo.bg)}
+                  className="p-2 rounded-xl border border-white/10 bg-slate-950/50 hover:bg-slate-800/80 transition-all text-left flex flex-col gap-1.5 active:scale-95 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div
+                      className="w-5 h-5 rounded-md border border-white/20 flex items-center justify-center"
+                      style={{ backgroundColor: combo.bg }}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: combo.primary }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-slate-400 group-hover:text-slate-200">
+                      {combo.primary}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-200 group-hover:text-white truncate">
+                    {combo.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* LIVE THEME PREVIEW CARD */}
+          <div className="pt-2 border-t border-white/10">
+            <span className="text-[11px] font-semibold text-slate-400 block mb-2">
+              {currentLanguage === "hi" ? "लाइव थीम पूर्वावलोकन (Live Preview):" : "Live Custom Theme Preview:"}
+            </span>
+            <div
+              className="p-4 rounded-2xl border border-white/15 transition-all shadow-xl"
+              style={{ backgroundColor: customBgHex }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: customPrimaryHex }}
+                  />
+                  <span
+                    className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border"
+                    style={{
+                      color: customPrimaryHex,
+                      borderColor: `${customPrimaryHex}40`,
+                      backgroundColor: `${customPrimaryHex}15`,
+                    }}
+                  >
+                    Custom Preview
+                  </span>
+                </div>
+                <span className="text-[10px] opacity-70 font-mono" style={{ color: customPrimaryHex }}>
+                  Primary: {normalizeHex(customPrimaryHex)} | Bg: {normalizeHex(customBgHex)}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 mb-3">
+                <h5
+                  className="text-base font-bold font-heading"
+                  style={{
+                    color: isValidHex(customBgHex) && (parseInt(normalizeHex(customBgHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
+                      ? "#0F172A"
+                      : "#FFFFFF",
+                  }}
+                >
+                  {currentLanguage === "hi" ? "अकादमिक अध्ययन डैशबोर्ड पूर्वावलोकन" : "Academic Study Dashboard Preview"}
+                </h5>
+                <p
+                  className="text-xs opacity-75"
+                  style={{
+                    color: isValidHex(customBgHex) && (parseInt(normalizeHex(customBgHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
+                      ? "#334155"
+                      : "#94A3B8",
+                  }}
+                >
+                  {currentLanguage === "hi"
+                    ? "यह पूर्वावलोकन दर्शाता है कि आपके चुने हुए रंग गारियाओएस के बटनों, कार्डों और बैकग्राउंड पर कैसे दिखाई देंगे।"
+                    : "This live preview demonstrates how your chosen custom primary and background hex colors look across GariaOS."}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  className="px-3.5 py-1.5 rounded-xl font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: customPrimaryHex,
+                    color: isValidHex(customPrimaryHex) && (parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
+                      ? "#0F172A"
+                      : "#FFFFFF",
+                  }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Primary Accent Action</span>
+                </button>
+
+                <span
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border"
+                  style={{
+                    borderColor: `${customPrimaryHex}40`,
+                    color: customPrimaryHex,
+                    backgroundColor: `${customPrimaryHex}10`,
+                  }}
+                >
+                  Interactive Tag
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

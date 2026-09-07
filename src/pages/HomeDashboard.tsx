@@ -1,35 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  Sparkles,
-  CheckCircle2,
-  Circle,
-  Plus,
-  Play,
-  Pause,
-  RotateCcw,
-  Flame,
-  Droplet,
-  ShieldAlert,
-  Clock,
-  ArrowRight,
-  TrendingUp,
-  Award,
-  Check,
-  Calendar,
-  Layers,
-  ChevronRight,
-  SlidersHorizontal,
-  Bot,
-  Zap,
-  Quote as QuoteIcon,
-  RefreshCw,
-  Search,
-  Bell,
-  Menu,
-  PlusCircle,
-  LayoutGrid,
-  Columns,
-} from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Task,
   Subject,
@@ -46,14 +15,6 @@ import {
   ExamTestRecord,
   ExamProfile,
   CareerProfile,
-  Priority,
-  TaskCategory,
-  DashboardWidgetConfig,
-  HomeWidgetId,
-  WidgetColSpan,
-  AcademicChapter,
-  AcademicSubject,
-  AcademicRevisionItem,
 } from "../types";
 import {
   getTodayString,
@@ -66,33 +27,9 @@ import {
 import { calculateGamificationState } from "../utils/gamificationEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
 import { AppLanguage, translations } from "../utils/i18n";
-import { GariaLogo } from "../components/GariaLogo";
 import { fetchDailyQuote, fetchNextQuote, MOTIVATIONAL_QUOTES, MotivationalQuote } from "../utils/quotes";
-import {
-  loadDashboardWidgets,
-  saveDashboardWidgets,
-  toggleWidgetEnabled,
-  moveWidgetPosition,
-  resizeWidgetColSpan,
-  WIDGET_METADATA,
-  DEFAULT_DASHBOARD_WIDGETS,
-} from "../utils/dashboardWidgets";
-import { DashboardWidgetCustomizer } from "../components/home/DashboardWidgetCustomizer";
-import { WidgetCardWrapper } from "../components/home/widgets/WidgetCardWrapper";
-import { TodaysTasksWidget } from "../components/home/widgets/TodaysTasksWidget";
-import { QuickActionsWidget } from "../components/home/widgets/QuickActionsWidget";
-import { StudyProgressWidget } from "../components/home/widgets/StudyProgressWidget";
-import { WaterIntakeWidget } from "../components/home/widgets/WaterIntakeWidget";
-import { GamificationWidget } from "../components/home/widgets/GamificationWidget";
-import { QuoteWidget } from "../components/home/widgets/QuoteWidget";
-import { QuickAccessWidget } from "../components/home/widgets/QuickAccessWidget";
-import { ContinueLearningWidget } from "../components/home/widgets/ContinueLearningWidget";
-import { FocusTimerWidget } from "../components/home/widgets/FocusTimerWidget";
-import { RevisionDueWidget } from "../components/home/widgets/RevisionDueWidget";
-import { AbyaSuggestionsWidget } from "../components/home/widgets/AbyaSuggestionsWidget";
-import { HabitTrackerWidget } from "../components/home/widgets/HabitTrackerWidget";
-import { generateSmartSuggestions, SmartSuggestion } from "../utils/suggestionsEngine";
 import { HeroSection } from "../components/home/sections/HeroSection";
+import { QuickActionsWidget } from "../components/home/widgets/QuickActionsWidget";
 import { DailyExecutionSection } from "../components/home/sections/DailyExecutionSection";
 import { AcademicDecisionEngineSection } from "../components/home/sections/AcademicDecisionEngineSection";
 import { WellnessSection } from "../components/home/sections/WellnessSection";
@@ -152,37 +89,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 }) => {
   const todayStr = getTodayString();
   const t = translations[currentLanguage] || translations.en;
-
-  // Customizable Widgets State
-  const [widgets, setWidgets] = useState<DashboardWidgetConfig[]>(() =>
-    loadDashboardWidgets(activeStudent?.id)
-  );
-  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
-
-  // Sync widgets whenever active profile changes
-  useEffect(() => {
-    setWidgets(loadDashboardWidgets(activeStudent?.id));
-  }, [activeStudent?.id]);
-
-  const handleSaveWidgets = useCallback((updated: DashboardWidgetConfig[]) => {
-    setWidgets(updated);
-    saveDashboardWidgets(updated, activeStudent?.id);
-  }, [activeStudent?.id]);
-
-  const handleToggleWidget = useCallback((id: HomeWidgetId, forceState?: boolean) => {
-    const updated = toggleWidgetEnabled(widgets, id, forceState, activeStudent?.id);
-    setWidgets(updated);
-  }, [widgets, activeStudent?.id]);
-
-  const handleMoveWidget = useCallback((id: HomeWidgetId, direction: "up" | "down") => {
-    const updated = moveWidgetPosition(widgets, id, direction, activeStudent?.id);
-    setWidgets(updated);
-  }, [widgets, activeStudent?.id]);
-
-  const handleResizeWidget = useCallback((id: HomeWidgetId, colSpan: WidgetColSpan) => {
-    const updated = resizeWidgetColSpan(widgets, id, colSpan, activeStudent?.id);
-    setWidgets(updated);
-  }, [widgets, activeStudent?.id]);
 
   // Academic Dataset for Decision Engine
   const academicSubjects = useMemo(
@@ -333,232 +239,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     return Math.round(studySecs / 60) + todayFocusMinutes;
   }, [studySessions, todayFocusMinutes, todayStr]);
 
-  // Smart suggestions generator
-  const smartSuggestions: SmartSuggestion[] = useMemo(() => {
-    if (!activeStudent) return [];
-    return generateSmartSuggestions(
-      activeStudent,
-      tasks,
-      subjects,
-      [],
-      [],
-      goals,
-      water,
-      habits,
-      [],
-      examTestRecords,
-      [],
-      examReport
-    );
-  }, [activeStudent, tasks, subjects, goals, water, habits, examTestRecords, examReport]);
-
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
-  const visibleSuggestions = useMemo(() => {
-    return smartSuggestions.filter((s) => !dismissedSuggestions.includes(s.id));
-  }, [smartSuggestions, dismissedSuggestions]);
-
-  const handleDismissSuggestion = (id: string) => {
-    setDismissedSuggestions((prev) => [...prev, id]);
-  };
-
-  // Mock revisions due for spaced repetition widget
-  const dummyRevisions: AcademicRevisionItem[] = useMemo(() => {
-    return [
-      {
-        id: "rev-1",
-        subjectId: subjects[0]?.id || "sub-1",
-        subjectName: subjects[0]?.name || "Accountancy",
-        chapterId: "ch-1",
-        chapterName: "Financial Statements & Analysis",
-        topicName: "Cash Flow Statements (Operating Activities)",
-        intervalStage: 3,
-        scheduledDate: todayStr,
-        completed: false,
-        confidenceLevel: "medium",
-      },
-      {
-        id: "rev-2",
-        subjectId: subjects[1]?.id || "sub-2",
-        subjectName: subjects[1]?.name || "Economics",
-        chapterId: "ch-2",
-        chapterName: "Macroeconomics: National Income",
-        topicName: "Gross Domestic Product (GDP) Deflator",
-        intervalStage: 7,
-        scheduledDate: todayStr,
-        completed: false,
-        confidenceLevel: "needs_review",
-      },
-    ];
-  }, [subjects, todayStr]);
-
-  // Filter and sort active enabled widgets
-  const enabledWidgets = useMemo(() => {
-    return [...widgets]
-      .filter((w) => w.enabled)
-      .sort((a, b) => a.order - b.order);
-  }, [widgets]);
-
-  const hiddenWidgets = useMemo(() => {
-    return widgets.filter((w) => !w.enabled);
-  }, [widgets]);
-
-  // Function to render each individual widget component dynamically
-  const renderWidgetContent = (widgetId: HomeWidgetId) => {
-    switch (widgetId) {
-      case "quick_actions":
-        return (
-          <QuickActionsWidget
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-            onQuickAddTask={onQuickAddTask || (() => onNavigate("tasks"))}
-          />
-        );
-
-      case "todays_tasks":
-        return (
-          <TodaysTasksWidget
-            tasks={tasks}
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-            onQuickAddTask={onQuickAddTask || (() => onNavigate("tasks"))}
-            onToggleTask={onToggleTask}
-          />
-        );
-
-      case "study_progress":
-        return (
-          <StudyProgressWidget
-            subjects={subjects}
-            studySessions={studySessions}
-            focusLogs={focusLogs}
-            tasks={tasks}
-            streamLabel={activeStudent ? `${activeStudent.classLevel} ${activeStudent.stream}` : "Syllabus"}
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-          />
-        );
-
-      case "water_intake":
-        return (
-          <WaterIntakeWidget
-            water={water}
-            currentLanguage={currentLanguage}
-            onAddWaterGlass={onAddWaterGlass}
-            onRemoveWaterGlass={onRemoveWaterGlass}
-          />
-        );
-
-      case "gamification_card":
-        return (
-          <GamificationWidget
-            gamification={gamification}
-            examReport={examReport || {
-              overallReadinessScore: 85,
-              predictedScoreMin: 80,
-              predictedScoreMax: 92,
-              readinessTier: "good",
-              daysUntilExam: 60,
-              subjectBreakdowns: [],
-              weakestSubject: null,
-              strongestSubject: null,
-              highYieldRecommendations: [],
-              lastUpdated: new Date().toISOString(),
-            }}
-            targetExamName={examProfile?.targetExamName || `${activeStudent?.stream || "Board"} Final Exams`}
-            daysUntilExam={examReport?.daysUntilExam || 60}
-            onNavigate={onNavigate}
-          />
-        );
-
-      case "quote_card":
-        return (
-          <QuoteWidget
-            quote={{
-              id: activeQuote.id,
-              quote: activeQuote.quote,
-              author: activeQuote.author,
-              category: activeQuote.category as any,
-              hindiTranslation: activeQuote.hindiTranslation,
-            }}
-            currentLanguage={currentLanguage}
-          />
-        );
-
-      case "quick_access":
-        return <QuickAccessWidget onNavigate={onNavigate} />;
-
-      case "continue_learning":
-        return (
-          <ContinueLearningWidget
-            activeChapter={{
-              id: "active-ch-1",
-              subjectId: subjects[0]?.id || "sub-1",
-              title: "Financial Statements of a Company & Accounting Ratios",
-              description: "Deep dive into Balance Sheet heads, Liquidity, Solvency and Profitability ratios with NCERT solutions.",
-              order: 1,
-              completed: false,
-              isVVI: true,
-              totalQuestions: 24,
-              completedQuestions: 14,
-            }}
-            activeChapterSubject={{
-              id: subjects[0]?.id || "sub-1",
-              name: subjects[0]?.name || "Accountancy",
-              code: "ACC-12",
-              icon: "BookOpen",
-              color: "emerald",
-              stream: "Commerce",
-              totalChapters: 8,
-              completedChapters: 4,
-            }}
-            chapterProgress={65}
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-          />
-        );
-
-      case "focus_timer":
-        return (
-          <FocusTimerWidget
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-          />
-        );
-
-      case "revision_due":
-        return (
-          <RevisionDueWidget
-            revisions={dummyRevisions}
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-          />
-        );
-
-      case "abya_suggestions":
-        return (
-          <AbyaSuggestionsWidget
-            smartSuggestions={visibleSuggestions}
-            currentLanguage={currentLanguage}
-            onNavigate={onNavigate}
-            onDismissSuggestion={handleDismissSuggestion}
-          />
-        );
-
-      case "habit_tracker":
-        return (
-          <HabitTrackerWidget
-            habits={habits}
-            currentLanguage={currentLanguage}
-            onToggleHabit={onToggleHabit}
-            onNavigate={onNavigate}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="space-y-7 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
       {/* ========================================================================= */}
@@ -586,7 +266,15 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         totalHabitsCount={habits.length}
         onNavigate={onNavigate}
         onOpenSliderMenu={onOpenSliderMenu}
-        onOpenCustomizer={() => setIsCustomizerOpen(true)}
+      />
+
+      {/* ========================================================================= */}
+      {/* 1-TAP QUICK ACTIONS (Start Study, + Add Task, Focus Timer, Exam, Ask Abya) */}
+      {/* ========================================================================= */}
+      <QuickActionsWidget
+        currentLanguage={currentLanguage}
+        onNavigate={onNavigate}
+        onQuickAddTask={onQuickAddTask || (() => onNavigate("tasks"))}
       />
 
       {/* ========================================================================= */}
@@ -635,16 +323,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         onAddWaterGlass={onAddWaterGlass}
         onRemoveWaterGlass={onRemoveWaterGlass}
         onNavigate={onNavigate}
-      />
-
-      {/* Dashboard Widget Customizer Modal & Workspace Configurator */}
-      <DashboardWidgetCustomizer
-        isOpen={isCustomizerOpen}
-        onClose={() => setIsCustomizerOpen(false)}
-        widgets={widgets}
-        onSave={handleSaveWidgets}
-        currentLanguage={currentLanguage}
-        profileId={activeStudent?.id}
       />
     </div>
   );

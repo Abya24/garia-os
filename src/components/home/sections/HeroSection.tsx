@@ -50,7 +50,6 @@ interface HeroSectionProps {
   totalHabitsCount: number;
   onNavigate: (tab: ActiveTab) => void;
   onOpenSliderMenu?: () => void;
-  onOpenCustomizer?: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -73,7 +72,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   totalHabitsCount,
   onNavigate,
   onOpenSliderMenu,
-  onOpenCustomizer,
 }) => {
   const targetExamName =
     examProfile?.targetExamName ||

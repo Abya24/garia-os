@@ -245,7 +245,13 @@ export type AppTheme =
   | "light"
   | "ocean"
   | "forest"
-  | "system";
+  | "system"
+  | "custom";
+
+export interface CustomThemeConfig {
+  primary: string;
+  background: string;
+}
 
 export type HomeWidgetId =
   | "quick_actions"
@@ -284,6 +290,8 @@ export interface UserSettings {
   defaultBreakDuration: number;
   language?: AbyaLanguageSetting;
   dashboardWidgets?: DashboardWidgetConfig[];
+  customTheme?: CustomThemeConfig;
+  customThemeColors?: CustomThemeConfig;
 }
 
 export interface StudentProfile {
