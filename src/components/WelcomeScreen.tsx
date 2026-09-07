@@ -18,7 +18,7 @@ import {
 import { StreamType } from "../types";
 import { GariaLogo } from "./GariaLogo";
 import { APP_VERSION } from "../constants/version";
-import { signInWithGoogle } from "../utils/firebase";
+import { signInWithGoogle, getFriendlyAuthErrorMessage } from "../utils/firebase";
 import { capitalizeWords } from "../utils/studentNameUtils";
 
 interface WelcomeScreenProps {
@@ -73,8 +73,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         board,
       });
     } catch (err: any) {
-      console.error("Google login error:", err);
-      setErrorMessage(err.message || "Failed to sign in with Google.");
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        console.info("[WelcomeScreen] Google sign-in popup was closed by user.");
+        setErrorMessage(
+          "Google sign-in popup was closed before completing. You can try again or use email below."
+        );
+      } else {
+        console.error("Google login error:", err);
+        setErrorMessage(getFriendlyAuthErrorMessage(err));
+      }
     } finally {
       setIsLoading(false);
     }

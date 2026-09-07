@@ -96,8 +96,15 @@ export const CalendarSyncDropdown: React.FC<CalendarSyncDropdownProps> = ({
         setDirectSynced(false);
         setIsOpen(false);
       }, 2000);
-    } catch (err) {
-      console.error("Direct sync error", err);
+    } catch (err: any) {
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        console.info("[Calendar Direct Sync] Sign-in popup was closed by user.");
+      } else {
+        console.error("Direct sync error", err);
+      }
     } finally {
       setIsDirectSyncing(false);
     }

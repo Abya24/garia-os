@@ -283,7 +283,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // Auto sync
       await performAutoSync(u);
     } catch (err: any) {
-      console.error("Google Auth error:", err);
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        console.info("[AuthModal] Google Sign-In popup closed by user.");
+      } else {
+        console.error("Google Auth error:", err);
+      }
       setErrorMessage(getFriendlyAuthErrorMessage(err));
     } finally {
       setIsLoading(false);

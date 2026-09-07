@@ -169,7 +169,11 @@ export function getFriendlyAuthErrorMessage(error: any): string {
     case "auth/too-many-requests":
       return "Too many failed attempts. Please wait a few minutes and try again.";
     case "auth/popup-closed-by-user":
-      return "Sign-in popup was closed before completing.";
+      return "Sign-in popup was closed before completing. You can try again or use email sign-in.";
+    case "auth/cancelled-popup-request":
+      return "Sign-in popup request was canceled. Please try again.";
+    case "auth/popup-blocked":
+      return "Sign-in popup was blocked by your browser. Please allow popups or open in a new tab.";
     case "auth/network-request-failed":
       return "Network error. Please check your internet connection.";
     default:
@@ -248,8 +252,15 @@ export async function signInWithGoogle(): Promise<UserCredential> {
       await upsertUserProfileDoc(cred.user);
     }
     return cred;
-  } catch (error) {
-    console.error("Error signing in with Google:", error);
+  } catch (error: any) {
+    if (
+      error?.code === "auth/popup-closed-by-user" ||
+      error?.code === "auth/cancelled-popup-request"
+    ) {
+      console.info("[Firebase Auth] Google sign-in was dismissed or closed by the user.");
+    } else {
+      console.error("Error signing in with Google:", error);
+    }
     throw error;
   }
 }

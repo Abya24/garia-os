@@ -275,10 +275,11 @@ export default function App() {
   }, []);
 
   const handleNavigate = (tab: ActiveTab) => {
-    if (tab !== activeTab) {
-      setTabHistory((prev) => [...prev, tab]);
-      setActiveTab(tab);
-      window.history.pushState({ tab }, "", `#${tab}`);
+    const resolvedTab = (tab === "questionbank" || tab === "gmail") ? "exam" : tab;
+    if (resolvedTab !== activeTab) {
+      setTabHistory((prev) => [...prev, resolvedTab]);
+      setActiveTab(resolvedTab);
+      window.history.pushState({ tab: resolvedTab }, "", `#${resolvedTab}`);
     }
   };
 

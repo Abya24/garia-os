@@ -134,7 +134,14 @@ export const signInWithGoogle = async (): Promise<{
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    console.error("Google sign in error:", error);
+    if (
+      error?.code === "auth/popup-closed-by-user" ||
+      error?.code === "auth/cancelled-popup-request"
+    ) {
+      console.info("[Google Calendar] Google sign-in popup was dismissed or closed by user.");
+    } else {
+      console.error("Google sign in error:", error);
+    }
     throw error;
   } finally {
     isSigningIn = false;

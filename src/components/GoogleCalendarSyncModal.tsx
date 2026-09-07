@@ -144,11 +144,19 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
         setAccessToken(res.accessToken);
       }
     } catch (e: any) {
-      console.error("Google Auth failed", e);
-      setAuthError(
-        e?.message ||
-          "Could not authenticate with Google Calendar. Please check popup permissions and try again."
-      );
+      if (
+        e?.code === "auth/popup-closed-by-user" ||
+        e?.code === "auth/cancelled-popup-request"
+      ) {
+        console.info("[Google Calendar] Auth popup closed by user.");
+        setAuthError("Google sign-in popup was closed before completion. Please try again.");
+      } else {
+        console.error("Google Auth failed", e);
+        setAuthError(
+          e?.message ||
+            "Could not authenticate with Google Calendar. Please check popup permissions and try again."
+        );
+      }
     } finally {
       setIsAuthenticating(false);
     }

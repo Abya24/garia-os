@@ -889,35 +889,6 @@ export interface QuestionBankProfileProgress {
   updatedAt: number;
 }
 
-export interface GmailMessageSummary {
-  id: string;
-  threadId: string;
-  snippet: string;
-  subject: string;
-  from: string;
-  to: string;
-  date: string;
-  timestamp: number;
-  isUnread: boolean;
-  isStarred: boolean;
-  labelIds: string[];
-  hasAttachments?: boolean;
-}
-
-export interface GmailFullMessage extends GmailMessageSummary {
-  bodyHtml?: string;
-  bodyText?: string;
-  headers: Record<string, string>;
-}
-
-export interface AcademicEmailTemplate {
-  id: string;
-  title: string;
-  category: "School & College" | "Teacher & Doubt" | "Exams & Deadlines" | "Career & Recommendations" | "Study Group";
-  subject: string;
-  body: string;
-}
-
 export type ActiveTab =
   | "home"
   | "exam"

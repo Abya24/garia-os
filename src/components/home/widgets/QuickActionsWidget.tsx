@@ -3,7 +3,7 @@ import {
   BookOpen,
   Plus,
   Timer,
-  Mail,
+  GraduationCap,
   Bot,
   Zap,
 } from "lucide-react";
@@ -87,19 +87,19 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         </button>
 
         <button
-          onClick={() => onNavigate("gmail")}
-          id="quick-action-gmail"
+          onClick={() => onNavigate("exam")}
+          id="quick-action-exam-center"
           className="p-3.5 rounded-2xl bg-gradient-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 border border-red-500/40 text-left flex items-center gap-3 transition-all card-press group shadow-sm"
         >
           <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-400/40 text-red-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-            <Mail className="w-5 h-5" />
+            <GraduationCap className="w-5 h-5" />
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold font-heading text-white truncate">
-              {currentLanguage === "hi" ? "स्टूडेंट मेल" : "Student Mail"}
+              {currentLanguage === "hi" ? "परीक्षा केंद्र" : "Exam Center"}
             </div>
             <div className="text-[10px] text-red-300/80 truncate">
-              {currentLanguage === "hi" ? "गूगल जीमेल इनबॉक्स" : "Gmail & templates"}
+              {currentLanguage === "hi" ? "मॉक टेस्ट व PYQs" : "Mock tests & PYQs"}
             </div>
           </div>
         </button>
