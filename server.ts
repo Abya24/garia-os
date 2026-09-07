@@ -108,8 +108,12 @@ async function startServer() {
         return res.status(400).json({ error: "Prompt or image is required" });
       }
 
-      // Use user-provided custom API key if present, otherwise environment variable
-      const apiKey = customApiKey || process.env.GEMINI_API_KEY;
+      // Use user-provided custom API key if present, valid and non-empty, otherwise environment variable
+      let apiKey = process.env.GEMINI_API_KEY;
+      if (typeof customApiKey === "string" && customApiKey.trim().length > 0) {
+        // Isolated client-supplied key for this specific request only
+        apiKey = customApiKey.trim();
+      }
 
       if (!apiKey) {
         console.warn("[Abya AI Server] GEMINI_API_KEY is missing/unconfigured.");
@@ -327,7 +331,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
 
       for (const candidate of candidates) {
         console.log(
-          `[Abya AI Server] Dispatching request with model="${candidate.model}", mode="${mode}", hasImage=${!!image} for student "${studentProfileContext?.name || "Student"}"...`
+          `[Abya AI Server] Dispatching request with model="${candidate.model}", mode="${mode}", hasImage=${!!image}...`
         );
         try {
           response = await ai.models.generateContent({
@@ -490,7 +494,7 @@ Guidelines:
 - If the student is practicing for oral exams/viva, ask them 1 question at a time and provide encouraging instant spoken feedback.
 - Use natural conversational pacing suitable for spoken audio.`;
 
-      console.log(`[Abya Live Voice] Initializing session with gemini-3.1-flash-live-preview for ${studentName}...`);
+      console.log(`[Abya Live Voice] Initializing session with gemini-3.1-flash-live-preview...`);
 
       liveSession = await ai.live.connect({
         model: "gemini-3.1-flash-live-preview",

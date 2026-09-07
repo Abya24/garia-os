@@ -127,10 +127,92 @@ service cloud.firestore {
         data.joinCode is string && data.joinCode.size() <= 32 &&
         data.ownerId is string && data.ownerId.size() <= 128 &&
         data.memberIds is list && data.memberIds.size() <= 100 &&
+        (!('allowInviteLink' in data) || data.allowInviteLink is bool) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 1000)) &&
         (!('noteContent' in data) || (data.noteContent is string && data.noteContent.size() <= 50000)) &&
         (!('tasks' in data) || (data.tasks is list && data.tasks.size() <= 500)) &&
         data.createdAt is number;
+    }
+
+    function getWorkspaceDoc(wsId) {
+      return get(/databases/$(database)/documents/shared_workspaces/$(wsId));
+    }
+
+    function isParentWorkspaceMemberOrOwner(wsId) {
+      return isSignedIn() && (
+        request.auth.uid == getWorkspaceDoc(wsId).data.ownerId ||
+        request.auth.uid in getWorkspaceDoc(wsId).data.memberIds
+      );
+    }
+
+    // Check if security-sensitive workspace metadata fields are unmodified
+    function isWorkspaceSecurityMetadataUnchanged() {
+      return incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().id == existing().id &&
+        incoming().type == existing().type &&
+        incoming().joinCode == existing().joinCode &&
+        incoming().memberIds == existing().memberIds &&
+        (
+          (!('allowInviteLink' in existing()) && !('allowInviteLink' in incoming())) ||
+          incoming().allowInviteLink == existing().allowInviteLink
+        ) &&
+        (
+          (!('members' in existing()) && !('members' in incoming())) ||
+          incoming().members == existing().members
+        ) &&
+        (
+          (!('description' in existing()) && !('description' in incoming())) ||
+          incoming().description == existing().description
+        );
+    }
+
+    // Member collaborative edit: only tasks, noteContent, noteTags, title, updatedAt, lastModifiedBy
+    function isLegitimateMemberUpdate() {
+      return isSignedIn() &&
+        request.auth.uid in existing().memberIds &&
+        request.auth.uid != existing().ownerId &&
+        isWorkspaceSecurityMetadataUnchanged();
+    }
+
+    // Owner edit: owner cannot transfer ownership or mutate immutable creation/type/id metadata
+    function isLegitimateOwnerUpdate() {
+      return isSignedIn() &&
+        request.auth.uid == existing().ownerId &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().id == existing().id &&
+        incoming().type == existing().type;
+    }
+
+    // Self-join: active invite link allows an unjoined user to ONLY add their own UID to memberIds
+    function isLegitimateSelfJoin() {
+      return isSignedIn() &&
+        existing().allowInviteLink == true &&
+        !(request.auth.uid in existing().memberIds) &&
+        request.auth.uid != existing().ownerId &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().id == existing().id &&
+        incoming().type == existing().type &&
+        incoming().title == existing().title &&
+        incoming().joinCode == existing().joinCode &&
+        incoming().allowInviteLink == existing().allowInviteLink &&
+        incoming().memberIds.size() == existing().memberIds.size() + 1 &&
+        incoming().memberIds.hasAll(existing().memberIds) &&
+        request.auth.uid in incoming().memberIds &&
+        (
+          (!('tasks' in existing()) && !('tasks' in incoming())) ||
+          incoming().tasks == existing().tasks
+        ) &&
+        (
+          (!('noteContent' in existing()) && !('noteContent' in incoming())) ||
+          incoming().noteContent == existing().noteContent
+        ) &&
+        (
+          (!('description' in existing()) && !('description' in incoming())) ||
+          incoming().description == existing().description
+        );
     }
 
     function isValidActivityLog(data, wsId) {
@@ -274,22 +356,24 @@ service cloud.firestore {
       );
       allow create: if isSignedIn() && isValidId(workspaceId) &&
         isValidSharedWorkspace(incoming()) &&
-        incoming().ownerId == request.auth.uid;
+        incoming().ownerId == request.auth.uid &&
+        incoming().id == workspaceId &&
+        request.auth.uid in incoming().memberIds;
       allow update: if isSignedIn() && isValidId(workspaceId) &&
         isValidSharedWorkspace(incoming()) &&
-        incoming().ownerId == existing().ownerId &&
         (
-          request.auth.uid == existing().ownerId ||
-          request.auth.uid in existing().memberIds ||
-          existing().allowInviteLink == true
+          isLegitimateOwnerUpdate() ||
+          isLegitimateMemberUpdate() ||
+          isLegitimateSelfJoin()
         );
       allow delete: if isSignedIn() && isValidId(workspaceId) &&
         resource.data.ownerId == request.auth.uid;
 
-      // Activity logs subcollection
+      // Activity logs subcollection (requires membership/ownership of parent workspace)
       match /activities/{activityId} {
-        allow get, list: if isSignedIn() && isValidId(activityId);
-        allow create: if isSignedIn() && isValidId(activityId) &&
+        allow get, list: if isParentWorkspaceMemberOrOwner(workspaceId) && isValidId(activityId);
+        allow create: if isParentWorkspaceMemberOrOwner(workspaceId) &&
+          isValidId(activityId) &&
           isValidActivityLog(incoming(), workspaceId) &&
           incoming().userId == request.auth.uid;
         allow update, delete: if false;
