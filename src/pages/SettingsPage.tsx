@@ -507,7 +507,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 max-w-3xl mx-auto animate-in fade-in duration-300">
+    <div className="space-y-6 pb-4 md:pb-0 max-w-4xl mx-auto w-full animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div>

@@ -435,7 +435,7 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
     CAREER_CATALOG[0];
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 max-w-6xl mx-auto animate-in fade-in duration-300">
+    <div className="space-y-6 pb-4 md:pb-0 max-w-6xl mx-auto w-full animate-in fade-in duration-300">
       {/* Top Banner Header */}
       <div className="relative overflow-hidden rounded-3xl p-6 md:p-8 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/20 shadow-2xl">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />

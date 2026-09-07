@@ -240,7 +240,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   }, [studySessions, todayFocusMinutes, todayStr]);
 
   return (
-    <div className="space-y-7 pb-24 md:pb-8 animate-in fade-in duration-200 max-w-6xl mx-auto">
+    <div className="space-y-7 pb-4 md:pb-0 animate-in fade-in duration-200 max-w-6xl mx-auto w-full">
       {/* ========================================================================= */}
       {/* SECTION 1: HERO AREA (Greeting, Productivity Score, Countdown, Focus)     */}
       {/* ========================================================================= */}

@@ -6,6 +6,7 @@ import {
   GraduationCap,
   Bot,
   Zap,
+  FileText,
 } from "lucide-react";
 import { ActiveTab } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
@@ -31,7 +32,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         <span className="text-[10px] text-slate-500 font-mono">1-Tap Shortcuts</span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <button
           onClick={() => onNavigate("study")}
           id="quick-action-start-study"
@@ -78,7 +79,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold font-heading text-white truncate">
-              {currentLanguage === "hi" ? "पोमोडोरो फोकस" : "Focus Timer"}
+              {currentLanguage === "hi" ? "पोमोडोरो" : "Focus Timer"}
             </div>
             <div className="text-[10px] text-amber-300/80 truncate">
               {currentLanguage === "hi" ? "25m / 50m सत्र" : "25m / 50m sessions"}
@@ -105,19 +106,37 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         </button>
 
         <button
+          onClick={() => onNavigate("notes")}
+          id="quick-action-notes"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-violet-500/20 hover:from-indigo-500/30 hover:to-violet-500/30 border border-indigo-500/40 text-left flex items-center gap-3 transition-all card-press group shadow-sm"
+        >
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "नोट्स व डॉक्स" : "Notes & Docs"}
+            </div>
+            <div className="text-[10px] text-indigo-300/80 truncate">
+              {currentLanguage === "hi" ? "रिवीजन नोट्स" : "Quick summaries"}
+            </div>
+          </div>
+        </button>
+
+        <button
           onClick={() => onNavigate("abya")}
           id="quick-action-ask-abya"
-          className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-left flex items-center gap-3 transition-all card-press group shadow-sm col-span-2 sm:col-span-1"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-left flex items-center gap-3 transition-all card-press group shadow-sm"
         >
           <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
             <Bot className="w-5 h-5" />
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold font-heading text-white truncate">
-              {currentLanguage === "hi" ? "अव्या एआई चैट" : "Ask Abya AI"}
+              {currentLanguage === "hi" ? "अव्या एआई" : "Ask Abya AI"}
             </div>
             <div className="text-[10px] text-purple-300/80 truncate">
-              {currentLanguage === "hi" ? "डाउट व प्रश्न पूछें" : "Instant doubt solver"}
+              {currentLanguage === "hi" ? "डाउट व प्रश्न पूछें" : "Instant solver"}
             </div>
           </div>
         </button>

@@ -435,7 +435,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   const studyMilestones = getStudyMilestones(studySessions, subjects);
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-300">
+    <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
       {/* Notification Toast */}
       {toastMessage && (
         <div className="fixed top-16 right-4 z-50 bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top duration-200">

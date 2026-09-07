@@ -99,8 +99,8 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
       {/* Section Header */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
-            2
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4" />
           </div>
           <h2 className="text-base sm:text-lg font-bold font-heading text-white">
             {currentLanguage === "hi" ? "दैनिक कार्य व अध्ययन" : "Daily Execution"}

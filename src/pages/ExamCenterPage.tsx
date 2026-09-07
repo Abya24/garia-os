@@ -330,7 +330,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
       {/* Header Banner */}
       <div className="glass-card p-5 sm:p-6 rounded-3xl relative overflow-hidden border border-cyan-500/30 bg-gradient-to-br from-cyan-950/40 via-slate-900/60 to-purple-950/30">
         <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full filter blur-3xl pointer-events-none" />

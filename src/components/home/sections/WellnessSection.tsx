@@ -57,8 +57,8 @@ export const WellnessSection: React.FC<WellnessSectionProps> = ({
       {/* Section Header */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
-            5
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <HeartPulse className="w-4 h-4" />
           </div>
           <h2 className="text-base sm:text-lg font-bold font-heading text-white">
             {currentLanguage === "hi" ? "स्वास्थ्य व दैनिक आदतें" : "Wellness & Consistency"}

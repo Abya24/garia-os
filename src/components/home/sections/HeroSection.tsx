@@ -352,7 +352,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Exam Countdown Card (5 cols) */}
         <div
           id="hero-exam-countdown-card"
-          className="md:col-span-5 glass-card rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/90 to-slate-900/90 flex flex-col justify-between space-y-3 shadow-md"
+          className="md:col-span-5 glass-card rounded-3xl p-5 border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/90 to-slate-900/90 flex flex-col justify-between space-y-3 shadow-md h-full"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -378,14 +378,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </button>
           </div>
 
-          <div className="flex items-baseline gap-2 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+          <div className="flex items-baseline gap-2 bg-slate-950/60 p-3 rounded-2xl border border-white/5">
             <span className="text-3xl font-black text-cyan-300 font-mono tracking-tight">
               {daysUntilExam}
             </span>
             <span className="text-sm font-bold text-slate-300 font-heading">
               Days Remaining
             </span>
-            <span className="ml-auto text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            <span className="ml-auto text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
               {examReport?.overallReadinessScore || 82}% Readiness
             </span>
           </div>
@@ -394,7 +394,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Today's Focus Message & Motivational Quote (7 cols) */}
         <div
           id="hero-focus-message-card"
-          className="md:col-span-7 glass-card rounded-2xl p-4 sm:p-5 border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/90 to-slate-900/90 flex flex-col justify-between space-y-3 shadow-md"
+          className="md:col-span-7 glass-card rounded-3xl p-5 border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/90 to-slate-900/90 flex flex-col justify-between space-y-3 shadow-md h-full"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

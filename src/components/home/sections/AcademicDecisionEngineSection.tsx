@@ -124,8 +124,8 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
       {/* Section Header with Stream Badge & Engine Indicator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">
-            3
+          <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <GraduationCap className="w-4 h-4" />
           </div>
           <h2 className="text-base sm:text-lg font-bold font-heading text-white flex items-center gap-2">
             <span>Academic Decision Engine</span>
@@ -253,11 +253,11 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
       {/* Grid for Sections 2, 3, 4, 5 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* ========================================================================= */}
-        {/* SECTION 2: 📚 Revision Due                                                */}
+        {/* Revision Due                                                              */}
         {/* ========================================================================= */}
         <div
           id="section-2-revision-due"
-          className="rounded-2xl p-4 sm:p-5 border border-amber-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3"
+          className="rounded-2xl p-4 sm:p-5 border border-amber-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3 h-full"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -266,7 +266,7 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
                   <RotateCcw className="w-3.5 h-3.5" />
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white font-heading">
-                  SECTION 2 • Revision Due
+                  Revision Due
                 </h3>
               </div>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
@@ -331,11 +331,11 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 3: 🎯 Exam Readiness                                              */}
+        {/* Exam Readiness                                                            */}
         {/* ========================================================================= */}
         <div
           id="section-3-exam-readiness"
-          className="rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3"
+          className="rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3 h-full"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -344,7 +344,7 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
                   <Target className="w-3.5 h-3.5" />
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white font-heading">
-                  SECTION 3 • Exam Readiness
+                  Exam Readiness
                 </h3>
               </div>
               <span
@@ -413,11 +413,11 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 4: 📊 Predicted Performance                                       */}
+        {/* Predicted Performance                                                     */}
         {/* ========================================================================= */}
         <div
           id="section-4-predicted-performance"
-          className="rounded-2xl p-4 sm:p-5 border border-emerald-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3"
+          className="rounded-2xl p-4 sm:p-5 border border-emerald-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3 h-full"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -426,7 +426,7 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
                   <BarChart3 className="w-3.5 h-3.5" />
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white font-heading">
-                  SECTION 4 • Predicted Performance
+                  Predicted Performance
                 </h3>
               </div>
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
@@ -490,11 +490,11 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 5: 🏆 Career Alignment                                            */}
+        {/* Career Alignment                                                          */}
         {/* ========================================================================= */}
         <div
           id="section-5-career-alignment"
-          className="rounded-2xl p-4 sm:p-5 border border-violet-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3"
+          className="rounded-2xl p-4 sm:p-5 border border-violet-500/30 bg-slate-900/90 shadow-sm flex flex-col justify-between space-y-3 h-full"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -503,7 +503,7 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
                   <Award className="w-3.5 h-3.5" />
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white font-heading">
-                  SECTION 5 • Career Alignment
+                  Career Alignment
                 </h3>
               </div>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 font-bold">

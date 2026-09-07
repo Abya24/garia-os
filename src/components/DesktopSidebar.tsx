@@ -122,9 +122,13 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const defaultFallback = currentLanguage === "hi" ? "विद्यार्थी" : "Student";
   const studentName = getStudentDisplayName(activeStudent, settings, defaultFallback);
 
+  const hasTopHeader = activeTab !== "home";
+
   return (
     <aside
-      className={`hidden md:flex flex-col glass-card border-r border-white/10 h-[calc(100vh-48px)] sticky top-[48px] shrink-0 transition-all duration-300 ${
+      className={`hidden md:flex flex-col glass-card border-r border-white/10 ${
+        hasTopHeader ? "h-[calc(100vh-49px)] sticky top-[49px]" : "h-screen sticky top-0"
+      } shrink-0 transition-all duration-300 ${
         isExpanded ? "w-64 p-3.5" : isCompact ? "w-48 p-2.5" : "w-[68px] p-2 items-center"
       }`}
     >
