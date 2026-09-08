@@ -280,7 +280,7 @@ export interface UserSettings {
   userName: string;
   theme: AppTheme;
   autoSolarTheme?: boolean;
-  customApiKey: string;
+  customApiKey?: string;
   notificationsEnabled: boolean;
   notifications?: NotificationSettings;
   account?: UserAccount;

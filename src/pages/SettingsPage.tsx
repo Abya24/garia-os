@@ -142,7 +142,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const t = translations[currentLanguage] || translations.en;
   const initialStudentName = getStudentDisplayName(activeStudent, settings, "Student");
   const [userName, setUserName] = useState(initialStudentName);
-  const [apiKey, setApiKey] = useState(settings.customApiKey || "");
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
   const [pinModalMode, setPinModalMode] = useState<PinModalMode | null>(null);
@@ -299,7 +298,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     const updatedSettings = {
       ...settings,
       userName: userName.trim() || activeStudent?.name || "Student",
-      customApiKey: apiKey.trim(),
     };
     onUpdateSettings(updatedSettings);
     if (fbUser) {
@@ -319,8 +317,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     showToast(
       currentLanguage === "hi"
-        ? "सेटिंग्स और एपीआई कुंजी सुरक्षित रूप से सहेजी गईं!"
-        : "Settings & API key saved securely!"
+        ? "सेटिंग्स सफलतापूर्वक सहेजी गईं!"
+        : "Settings saved successfully!"
     );
   };
 
@@ -1754,25 +1752,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <span>{t.abyaAICoach} {currentLanguage === "hi" ? "कॉन्फ़िगरेशन" : "Configuration"}</span>
         </h3>
 
-        <div>
-          <label className="block text-slate-300 text-xs font-medium mb-1">
-            {currentLanguage === "hi" ? "कस्टम जेमिनी एपीआई कुंजी (वैकल्पिक)" : "Custom Gemini API Key (Optional)"}
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              placeholder={currentLanguage === "hi" ? "सिस्टम डिफ़ॉल्ट सक्रिय है (या कस्टम कुंजी दर्ज करें)" : "System default active (or enter custom key)"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-2xl glass-pill text-white text-xs border border-white/10 focus:outline-none"
-            />
-            <button
-              onClick={handleSaveProfile}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold text-xs shrink-0"
-            >
-              {currentLanguage === "hi" ? "सहेजें" : "Save Key"}
-            </button>
+        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div>
+              <div className="font-bold text-white">
+                {currentLanguage === "hi" ? "सर्वर-साइड सुरक्षित एआई प्रॉक्सी" : "Server-Side Secure AI Proxy"}
+              </div>
+              <div className="text-[11px] text-slate-400">
+                {currentLanguage === "hi"
+                  ? "जेमिनी एपीआई कुंजी सर्वर पर सुरक्षित रूप से प्रबंधित है। किसी क्लाइंट कुंजी की आवश्यकता नहीं है।"
+                  : "Gemini API credentials are securely managed server-side. No client-side key storage."}
+              </div>
+            </div>
           </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+            Active
+          </span>
         </div>
 
         {/* Language Selection */}

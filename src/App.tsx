@@ -1339,7 +1339,6 @@ export default function App() {
       history: recentHistory,
       mode,
       image,
-      customApiKey: settings.customApiKey,
       contextNote,
       curriculumContext,
       abyaLanguage,

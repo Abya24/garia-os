@@ -190,7 +190,6 @@ const defaultSettings: UserSettings = {
   userName: "Student",
   theme: "dark",
   autoSolarTheme: false,
-  customApiKey: "",
   notificationsEnabled: true,
   notifications: {
     master: true,

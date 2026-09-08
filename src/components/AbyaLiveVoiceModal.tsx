@@ -26,8 +26,6 @@ interface AbyaLiveVoiceModalProps {
   classLevel?: string;
   stream?: string;
   board?: string;
-  customApiKey?: string;
-  apiKey?: string;
 }
 
 type VoiceSessionMode = "tutor" | "viva" | "rapid_quiz";
@@ -40,14 +38,11 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
   classLevel: propClassLevel,
   stream: propStream,
   board: propBoard,
-  customApiKey,
-  apiKey,
 }) => {
   const effectiveName = propStudentName || activeStudent?.name || "Student";
   const effectiveClass = propClassLevel || activeStudent?.classLevel || "Class 12";
   const effectiveStream = propStream || activeStudent?.stream || "Commerce";
   const effectiveBoard = propBoard || activeStudent?.board || "CBSE";
-  const effectiveApiKey = customApiKey || apiKey;
   const [status, setStatus] = useState<
     "idle" | "connecting" | "connected" | "speaking" | "listening" | "error"
   >("idle");
@@ -159,7 +154,19 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       // 3. Initialize 24kHz Output Live Audio Player
       liveAudioPlayerRef.current = new LiveAudioPlayer();
 
-      // 4. Connect to Backend WebSocket
+      // 4. Request single-use ticket from backend
+      let ticket = "";
+      try {
+        const ticketRes = await fetch("/api/live-voice/ticket", { method: "POST" });
+        if (ticketRes.ok) {
+          const ticketData = await ticketRes.json();
+          ticket = ticketData.ticket || "";
+        }
+      } catch (err) {
+        console.warn("[Abya Live Voice] Ticket request error:", err);
+      }
+
+      // Connect to Backend WebSocket
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
       const queryParams = new URLSearchParams({
@@ -169,8 +176,8 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
         board: effectiveBoard,
         mode: sessionMode,
       });
-      if (effectiveApiKey) {
-        queryParams.set("apiKey", effectiveApiKey);
+      if (ticket) {
+        queryParams.set("ticket", ticket);
       }
 
       const wsUrl = `${protocol}//${host}/api/live-voice?${queryParams.toString()}`;
@@ -274,7 +281,6 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
     effectiveClass,
     effectiveStream,
     effectiveBoard,
-    effectiveApiKey,
     sessionMode,
     cleanupAudio,
   ]);

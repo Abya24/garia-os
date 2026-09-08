@@ -27,8 +27,23 @@ import {
 import firebaseConfig from "../../firebase-applet-config.json";
 import { APP_VERSION } from "../constants/version";
 
+// Resolve Firebase API key securely from environment variable or configuration
+const resolvedApiKey: string =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FIREBASE_API_KEY) ||
+  (firebaseConfig as any).apiKey ||
+  "";
+
+export const isFirebaseConfigured: boolean = Boolean(
+  resolvedApiKey && firebaseConfig.projectId && firebaseConfig.appId
+);
+
+const resolvedConfig = {
+  ...firebaseConfig,
+  apiKey: resolvedApiKey || "UNCONFIGURED_API_KEY",
+};
+
 // Initialize Firebase App
-export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const app = getApps().length === 0 ? initializeApp(resolvedConfig) : getApp();
 
 // Initialize Firestore with Database ID (Mandatory per skill instructions)
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -192,6 +207,9 @@ export async function signUpWithEmail(
   password: string,
   displayName: string
 ): Promise<UserCredential> {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase Authentication is not configured. Please set VITE_FIREBASE_API_KEY.");
+  }
   try {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     if (cred.user && displayName.trim()) {
@@ -218,6 +236,9 @@ export async function signInWithEmail(
   email: string,
   password: string
 ): Promise<UserCredential> {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase Authentication is not configured. Please set VITE_FIREBASE_API_KEY.");
+  }
   try {
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
     if (cred.user) {
@@ -234,6 +255,9 @@ export async function signInWithEmail(
  * Send password reset email
  */
 export async function resetPassword(email: string): Promise<void> {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase Authentication is not configured. Please set VITE_FIREBASE_API_KEY.");
+  }
   try {
     await sendPasswordResetEmail(auth, email.trim());
   } catch (error) {
@@ -246,6 +270,9 @@ export async function resetPassword(email: string): Promise<void> {
  * Google Sign-In via Firebase Auth
  */
 export async function signInWithGoogle(): Promise<UserCredential> {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase Authentication is not configured. Please set VITE_FIREBASE_API_KEY.");
+  }
   try {
     const cred = await signInWithPopup(auth, googleAuthProvider);
     if (cred.user) {

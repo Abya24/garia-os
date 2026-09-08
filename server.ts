@@ -65,6 +65,31 @@ async function startServer() {
     ]);
   });
 
+  // Live Voice Ephemeral Single-Use Ticket Store
+  const liveVoiceTickets = new Map<string, { expiresAt: number }>();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [t, entry] of liveVoiceTickets.entries()) {
+      if (entry.expiresAt < now) {
+        liveVoiceTickets.delete(t);
+      }
+    }
+  }, 30000);
+
+  // Endpoint to obtain a secure, short-lived single-use ticket for Live Voice WebSocket
+  app.post("/api/live-voice/ticket", (req, res) => {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
+        error: "Abya Live Voice is not configured on the server.",
+        code: "MISSING_SERVER_KEY",
+      });
+    }
+    const ticket = crypto.randomBytes(32).toString("hex");
+    const expiresAt = Date.now() + 60 * 1000; // 60-second single-use validity
+    liveVoiceTickets.set(ticket, { expiresAt });
+    res.json({ ticket, expiresInSeconds: 60 });
+  });
+
   // Abya AI Provider Diagnostics & Health Check Endpoint
   app.get("/api/ai/diagnostics", (req, res) => {
     const hasEnvKey = !!process.env.GEMINI_API_KEY;
@@ -93,7 +118,6 @@ async function startServer() {
         history,
         mode = "standard", // 'standard' | 'high_thinking' | 'fast_lite' | 'search_grounded'
         image, // { data: base64, mimeType: string }
-        customApiKey,
         contextNote,
         curriculumContext,
         careerContext,
@@ -108,12 +132,8 @@ async function startServer() {
         return res.status(400).json({ error: "Prompt or image is required" });
       }
 
-      // Use user-provided custom API key if present, valid and non-empty, otherwise environment variable
-      let apiKey = process.env.GEMINI_API_KEY;
-      if (typeof customApiKey === "string" && customApiKey.trim().length > 0) {
-        // Isolated client-supplied key for this specific request only
-        apiKey = customApiKey.trim();
-      }
+      // Strictly utilize server-side environment variable only
+      const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
         console.warn("[Abya AI Server] GEMINI_API_KEY is missing/unconfigured.");
@@ -463,14 +483,34 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       const classLevel = url.searchParams.get("classLevel") || "Class 12";
       const stream = url.searchParams.get("stream") || "Science";
       const board = url.searchParams.get("board") || "CBSE";
-      const customKey = url.searchParams.get("apiKey");
+      const ticket = url.searchParams.get("ticket");
 
-      const apiKey = customKey || process.env.GEMINI_API_KEY;
+      // Verify single-use ticket if ticket-based handshake is used
+      if (ticket) {
+        const ticketData = liveVoiceTickets.get(ticket);
+        if (!ticketData || ticketData.expiresAt < Date.now()) {
+          clientWs.send(
+            JSON.stringify({
+              type: "error",
+              error: "Invalid or expired live voice session ticket.",
+              code: "INVALID_TICKET",
+            })
+          );
+          clientWs.close(1008, "Invalid ticket");
+          return;
+        }
+        // Consume ticket immediately (single-use guarantee)
+        liveVoiceTickets.delete(ticket);
+      }
+
+      // Strictly use server-side environment variable only
+      const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         clientWs.send(
           JSON.stringify({
             type: "error",
-            error: "GEMINI_API_KEY is not configured for Live Voice API.",
+            error: "GEMINI_API_KEY is not configured on the server for Live Voice API.",
+            code: "MISSING_SERVER_KEY",
           })
         );
         clientWs.close();
