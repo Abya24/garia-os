@@ -117,7 +117,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const goalsForSelectedDate = goals.filter((g) => g.targetDate === selectedDateStr);
   const eventsForSelectedDate = events.filter((e) => e.date === selectedDateStr);
 
-  const resetForm = () => {
+  const resetCalendarEventForm = () => {
     setEventTitle("");
     setEventDesc("");
     setEventCategory("event");
@@ -127,7 +127,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   };
 
   const handleOpenAdd = () => {
-    resetForm();
+    resetCalendarEventForm();
     setEventDate(selectedDateStr);
     setIsAddEventModalOpen(true);
   };
@@ -166,7 +166,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
       });
     }
 
-    resetForm();
+    resetCalendarEventForm();
     setIsAddEventModalOpen(false);
   };
 
@@ -567,14 +567,14 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
       {/* Add / Edit Calendar Event Modal */}
       {isAddEventModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl">
+          <div className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <h3 className="text-lg font-bold font-heading text-white">
                 {editingEvent ? "Edit Event" : "Add Calendar Event"}
               </h3>
               <button
                 onClick={() => {
-                  resetForm();
+                  resetCalendarEventForm();
                   setIsAddEventModalOpen(false);
                 }}
                 className="p-1.5 rounded-full text-slate-400 hover:text-white"
@@ -648,7 +648,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    resetForm();
+                    resetCalendarEventForm();
                     setIsAddEventModalOpen(false);
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"

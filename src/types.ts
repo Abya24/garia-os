@@ -233,6 +233,7 @@ export type AbyaLanguageSetting =
   | "WhatsApp Language";
 
 export type AppTheme =
+  | "classic"
   | "amoled"
   | "purple"
   | "midnight"

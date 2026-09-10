@@ -11,6 +11,7 @@ import {
   Check,
 } from "lucide-react";
 import { CareerQuizAnswers, StreamType } from "../types";
+import { toggleStateItem } from "../utils/uiUtils";
 
 interface CareerQuizModalProps {
   stream: StreamType;
@@ -54,14 +55,6 @@ export const CareerQuizModal: React.FC<CareerQuizModalProps> = ({
   const [peopleHelpingInterest, setPeopleHelpingInterest] = useState<number>(initialAnswers.peopleHelpingInterest || 3);
   const [researchInterest, setResearchInterest] = useState<number>(initialAnswers.researchInterest || 3);
 
-  const togglePill = (list: string[], setList: (val: string[]) => void, item: string) => {
-    if (list.includes(item)) {
-      setList(list.filter((i) => i !== item));
-    } else {
-      setList([...list, item]);
-    }
-  };
-
   const handleSave = () => {
     const quiz: CareerQuizAnswers = {
       favoriteSubjects,
@@ -102,7 +95,7 @@ export const CareerQuizModal: React.FC<CareerQuizModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="glass-card w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900 p-6 sm:p-8 space-y-6 shadow-2xl my-8 relative animate-in fade-in zoom-in-95 duration-200">
+      <div className="glass-card w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900 p-6 sm:p-8 space-y-6 shadow-2xl my-8 relative animate-slide-up">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10">
@@ -146,7 +139,7 @@ export const CareerQuizModal: React.FC<CareerQuizModalProps> = ({
                 <button
                   key={subj}
                   type="button"
-                  onClick={() => togglePill(favoriteSubjects, setFavoriteSubjects, subj)}
+                  onClick={() => toggleStateItem(favoriteSubjects, setFavoriteSubjects, subj)}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
                     active
                       ? "bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md"
@@ -174,7 +167,7 @@ export const CareerQuizModal: React.FC<CareerQuizModalProps> = ({
                 <button
                   key={subj}
                   type="button"
-                  onClick={() => togglePill(strongSubjects, setStrongSubjects, subj)}
+                  onClick={() => toggleStateItem(strongSubjects, setStrongSubjects, subj)}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
                     active
                       ? "bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md"

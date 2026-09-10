@@ -314,7 +314,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   };
 
   // Status Badge Helper
-  const getStatusBadge = (status: string) => {
+  const getExamReadinessStatusBadge = (status: string) => {
     switch (status) {
       case "🟢 On Track":
         return <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">🟢 On Track</span>;
@@ -391,7 +391,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
               <Calendar className="w-4 h-4" />
               Board Exam Countdown
             </div>
-            {getStatusBadge(readiness.status)}
+            {getExamReadinessStatusBadge(readiness.status)}
           </div>
 
           <div className="my-2">

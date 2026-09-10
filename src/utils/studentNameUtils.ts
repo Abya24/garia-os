@@ -54,3 +54,19 @@ export function getStudentAvatarInitials(
   const firstChar = Array.from(cleanName)[0] || fallback;
   return firstChar.toUpperCase();
 }
+
+export interface AvatarGradientOption {
+  label: string;
+  value: string;
+}
+
+export const AVATAR_GRADIENT_OPTIONS: readonly AvatarGradientOption[] = [
+  { label: "Cyan Emerald", value: "from-cyan-500 to-emerald-500" },
+  { label: "Purple Indigo", value: "from-purple-500 to-indigo-500" },
+  { label: "Amber Orange", value: "from-amber-500 to-orange-500" },
+  { label: "Rose Pink", value: "from-rose-500 to-pink-500" },
+  { label: "Blue Cyan", value: "from-blue-500 to-cyan-500" },
+  { label: "Emerald Teal", value: "from-emerald-500 to-teal-500" },
+] as const;
+
+export const AVATAR_GRADIENT_VALUES: readonly string[] = AVATAR_GRADIENT_OPTIONS.map((g) => g.value);

@@ -233,7 +233,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="glass-card max-w-2xl w-full p-6 rounded-3xl border border-amber-500/30 shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between overflow-hidden">
+      <div className="glass-card max-w-2xl w-full p-6 rounded-3xl border border-amber-500/30 shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between overflow-hidden animate-slide-up">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -682,7 +682,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
       {/* Confirmation Dialog before batch write */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="glass-card max-w-md w-full p-6 rounded-3xl border border-amber-500/40 shadow-2xl space-y-4">
+          <div className="glass-card max-w-md w-full p-6 rounded-3xl border border-amber-500/40 shadow-2xl space-y-4 animate-slide-up">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center">
               <Shield className="w-6 h-6" />
             </div>

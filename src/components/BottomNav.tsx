@@ -66,7 +66,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   return (
     <nav
       id="mobile-bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1 py-1 safe-pb backdrop-blur-xl pointer-events-auto shadow-2xl"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-card border-t border-white/10 px-1 py-1 safe-pb backdrop-blur-xl pointer-events-auto shadow-2xl animate-slide-up-sheet"
     >
       <div className="flex items-center justify-around max-w-md mx-auto">
         {coreNavItems.map((item) => {

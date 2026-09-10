@@ -13,7 +13,7 @@ export const ExamReadinessScoreCard: React.FC<ExamReadinessScoreCardProps> = ({
 }) => {
   const { overallReadinessScore, readinessCategory, hasSufficientData, nextBestAction } = report;
 
-  const getCategoryBadge = (cat: ExamIntelligenceReport["readinessCategory"]) => {
+  const getReadinessCategoryBadge = (cat: ExamIntelligenceReport["readinessCategory"]) => {
     switch (cat) {
       case "Strong Preparation":
         return (
@@ -59,7 +59,7 @@ export const ExamReadinessScoreCard: React.FC<ExamReadinessScoreCardProps> = ({
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
               <Zap className="w-3.5 h-3.5" /> Exam Intelligence Engine v1.9
             </span>
-            {getCategoryBadge(readinessCategory)}
+            {getReadinessCategoryBadge(readinessCategory)}
           </div>
 
           <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">

@@ -46,7 +46,7 @@ export const SubjectPerformanceAnalysisSection: React.FC<SubjectPerformanceAnaly
     }
   };
 
-  const getStatusBadge = (status: SubjectPerformanceAnalysis["status"]) => {
+  const getSubjectPerformanceStatusBadge = (status: SubjectPerformanceAnalysis["status"]) => {
     switch (status) {
       case "Strong":
         return (
@@ -157,7 +157,7 @@ export const SubjectPerformanceAnalysisSection: React.FC<SubjectPerformanceAnaly
             {/* Status Footer */}
             <div className="pt-3 border-t border-white/5 flex items-center justify-between">
               <span className="text-[11px] text-slate-400 font-semibold">Status:</span>
-              {getStatusBadge(s.status)}
+              {getSubjectPerformanceStatusBadge(s.status)}
             </div>
           </div>
         ))}

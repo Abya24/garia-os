@@ -44,6 +44,7 @@ import {
   getDefaultSubjectsForStream,
 } from "./academicEngine";
 import { CAREER_CATALOG, generateDefaultRoadmap } from "./careerEngine";
+import { AVATAR_GRADIENT_VALUES } from "./studentNameUtils";
 
 export const PROFILES_KEY = "garia_profiles_v1";
 export const ACTIVE_PROFILE_KEY = "garia_active_profile_v1";
@@ -83,19 +84,15 @@ export const STORAGE_KEYS = {
   DASHBOARD_WIDGETS_LEGACY: "garia_dashboard_widgets_v1",
 };
 
-export const getTodayString = (): string => {
-  const d = new Date();
+export const formatLocalDate = (d: Date = new Date()): string => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
-export const formatLocalDate = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+export const getTodayString = (): string => {
+  return formatLocalDate();
 };
 
 export const parseDateStringToLocal = (dateStr: string): Date => {
@@ -858,20 +855,11 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
 }
 
 
-const AVATAR_GRADIENTS = [
-  "from-cyan-500 to-emerald-500",
-  "from-purple-500 to-indigo-500",
-  "from-amber-500 to-orange-500",
-  "from-rose-500 to-pink-500",
-  "from-blue-500 to-cyan-500",
-  "from-emerald-500 to-teal-500",
-];
-
 export const addStudentProfile = (
   data: Omit<StudentProfile, "id" | "createdAt" | "updatedAt">
 ): StudentProfile => {
   const profiles = loadProfiles();
-  const avatarIndex = profiles.length % AVATAR_GRADIENTS.length;
+  const avatarIndex = profiles.length % AVATAR_GRADIENT_VALUES.length;
   const rawName = data.name ? data.name.trim() : "";
   const sanitizedName = rawName || "Student";
 
@@ -879,7 +867,7 @@ export const addStudentProfile = (
     ...data,
     name: sanitizedName,
     id: `student-${Date.now()}`,
-    avatarColor: data.avatarColor || AVATAR_GRADIENTS[avatarIndex],
+    avatarColor: data.avatarColor || AVATAR_GRADIENT_VALUES[avatarIndex],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

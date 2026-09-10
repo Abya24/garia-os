@@ -722,6 +722,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     const themeClasses = [
+      "classic",
       "light",
       "arctic",
       "amoled",

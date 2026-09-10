@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { Subject, StudySession, AcademicChapter, StudentProfile } from "../types";
 import { getTodayString } from "../utils/storage";
+import { formatSecondsToMSS, formatDurationCompact } from "../utils/dateTimeUtils";
+import { useTransientToast } from "../utils/uiUtils";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
 import { getStudyMilestones } from "../utils/gamificationEngine";
 import { MilestoneBadgesCard } from "../components/MilestoneBadgesCard";
@@ -74,7 +76,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   const [accumulatedSeconds, setAccumulatedSeconds] = useState<number>(0);
   const [sessionNotes, setSessionNotes] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { toastMessage, showToast } = useTransientToast(3000);
 
   // Subject Modal
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -102,11 +104,6 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   // Search & Filter for Sessions
   const [sessionSearch, setSessionSearch] = useState<string>("");
   const [sessionSubjectFilter, setSessionSubjectFilter] = useState<string>("ALL");
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
 
   // 1. Re-hydrate Timer State on Mount or Profile Switch
   useEffect(() => {
@@ -397,22 +394,6 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     }
   };
 
-  const formatTimer = (totalSec: number) => {
-    const hrs = Math.floor(totalSec / 3600);
-    const mins = Math.floor((totalSec % 3600) / 60);
-    const secs = totalSec % 60;
-    return `${hrs > 0 ? String(hrs).padStart(2, "0") + ":" : ""}${String(
-      mins
-    ).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-
-  const formatDurationDisplay = (totalSec: number) => {
-    const hrs = Math.floor(totalSec / 3600);
-    const mins = Math.round((totalSec % 3600) / 60);
-    if (hrs > 0) return `${hrs}h ${mins}m`;
-    return `${mins} mins`;
-  };
-
   // Filtered Sessions List
   const filteredSessions = studySessions.filter((s) => {
     const matchesSearch =
@@ -438,7 +419,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
       {/* Notification Toast */}
       {toastMessage && (
-        <div className="fixed top-16 right-4 z-50 bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top duration-200">
+        <div className="fixed top-16 right-4 z-50 bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 animate-slide-up-toast duration-200">
           <CheckCircle2 className="w-5 h-5" />
           <span className="text-xs sm:text-sm">{toastMessage}</span>
         </div>
@@ -598,7 +579,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
             </span>
 
             <div className="text-4xl sm:text-6xl font-extrabold font-mono tracking-wider text-white py-2">
-              {formatTimer(secondsElapsed)}
+              {formatSecondsToMSS(secondsElapsed)}
             </div>
 
             <div className="flex items-center justify-center md:justify-start gap-2">
@@ -883,7 +864,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
                           {session.date}
                         </span>
                         <span className="text-xs font-bold font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                          {formatDurationDisplay(session.durationSeconds)}
+                          {formatDurationCompact(session.durationSeconds)}
                         </span>
                       </div>
 
@@ -900,7 +881,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
                       event={{
                         id: session.id,
                         title: `Study Session: ${session.subjectName}`,
-                        description: `Duration: ${formatDurationDisplay(session.durationSeconds)}${session.notes ? `\nNotes: ${session.notes}` : ""}`,
+                        description: `Duration: ${formatDurationCompact(session.durationSeconds)}${session.notes ? `\nNotes: ${session.notes}` : ""}`,
                         date: session.date,
                         category: "STUDY",
                       }}
@@ -933,7 +914,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
       {isSubjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div
-            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -1027,7 +1008,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div
-            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -1141,7 +1122,7 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
       {editingSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div
-            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl space-y-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-white/10">

@@ -90,7 +90,17 @@
     --accent-glow: rgba(249, 115, 22, 0.2);
   }
 
-  /* 9. Custom Theme */
+  /* 9. Classic Scholar (Timeless Heritage Ivory & Bronze) */
+  .classic {
+    --bg-main: #0c1017;
+    --card-bg: rgba(18, 24, 38, 0.92);
+    --card-border: rgba(212, 175, 55, 0.22);
+    --text-primary: #fdfbf7;
+    --text-secondary: #c7bda9;
+    --accent-glow: rgba(217, 119, 6, 0.2);
+  }
+
+  /* 10. Custom Theme */
   .custom {
     --bg-main: var(--custom-bg, #0b0f19);
     --card-bg: var(--custom-card-bg, rgba(15, 23, 42, 0.88));
@@ -368,4 +378,103 @@ h1, h2, h3, h4, .font-heading {
 .animate-shake {
   animation: pin-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+
+/* ==========================================================================
+   Globally Classic Look & Typography
+   ========================================================================== */
+.font-classic,
+.classic .font-heading,
+.classic h1,
+.classic h2,
+.classic h3,
+.classic h4 {
+  font-family: 'Playfair Display', 'Cinzel', Georgia, 'Times New Roman', serif;
+}
+
+.font-serif-classic {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+.classic-frame {
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.classic-badge {
+  font-family: 'Cinzel', 'Playfair Display', serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(180, 130, 40, 0.06));
+  color: #f6e05e;
+}
+
+.classic-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.35), transparent);
+}
+
+/* ==========================================================================
+   Universal Slide-Up Animations System
+   ========================================================================== */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-sm {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-sheet {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(32px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-up-sm {
+  animation: slide-up-sm 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-up-sheet {
+  animation: slide-up-sheet 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-up-toast {
+  animation: slide-up-toast 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 

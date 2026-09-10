@@ -46,7 +46,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   const [targetDate, setTargetDate] = useState<string>(getTodayString());
   const [progress, setProgress] = useState<number>(0);
 
-  const resetForm = () => {
+  const resetGoalForm = () => {
     setTitle("");
     setDescription("");
     setCategory("Academic");
@@ -94,7 +94,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
       });
     }
 
-    resetForm();
+    resetGoalForm();
     setIsAddModalOpen(false);
   };
 
@@ -151,7 +151,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
 
         <button
           onClick={() => {
-            resetForm();
+            resetGoalForm();
             setIsAddModalOpen(true);
           }}
           className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all self-start sm:self-auto"
@@ -387,14 +387,14 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
       {/* Goal Add/Edit Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl">
+          <div className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <h3 className="text-lg font-bold font-heading text-white">
                 {editingGoal ? "Edit Goal" : "Create New Goal"}
               </h3>
               <button
                 onClick={() => {
-                  resetForm();
+                  resetGoalForm();
                   setIsAddModalOpen(false);
                 }}
                 className="p-1.5 rounded-full text-slate-400 hover:text-white"
@@ -491,7 +491,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    resetForm();
+                    resetGoalForm();
                     setIsAddModalOpen(false);
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"

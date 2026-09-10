@@ -94,6 +94,7 @@ import {
   getTodayString,
 } from "../utils/storage";
 import { getStudentDisplayName } from "../utils/studentNameUtils";
+import { getTimeOfDayGreeting } from "../utils/dateTimeUtils";
 
 interface AbyaAIPageProps {
   messages: AbyaMessage[];
@@ -396,14 +397,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  // Time of day greeting helper
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
   };
 
   // Student Intelligence & Briefing Calculations
@@ -822,7 +815,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                       <Sparkles className="w-4 h-4 text-slate-950 font-bold" />
                     </div>
                     <h1 className="text-lg sm:text-xl font-black text-white font-heading tracking-tight">
-                      {getGreeting()}, <span className="inline-block" dir="ltr">{getStudentDisplayName(activeStudent, settings, "Student")}</span> 👋
+                      {getTimeOfDayGreeting()}, <span className="inline-block" dir="ltr">{getStudentDisplayName(activeStudent, settings, "Student")}</span> 👋
                     </h1>
                   </div>
 
@@ -1573,7 +1566,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       {/* Academic Intelligence Decision Engine Drawer / Modal */}
       {isIntelligenceDrawerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-          <div className="relative w-full max-w-5xl my-auto rounded-3xl bg-slate-950/95 border border-indigo-500/30 p-4 sm:p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-5xl my-auto rounded-3xl bg-slate-950/95 border border-indigo-500/30 p-4 sm:p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between sticky top-0 bg-slate-950/95 py-2 z-10 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">

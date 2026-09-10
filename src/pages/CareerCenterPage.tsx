@@ -243,18 +243,6 @@ export const CareerCenterPage: React.FC<CareerCenterPageProps> = ({
   // Custom milestone input
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
 
-  const togglePill = (
-    list: string[],
-    setList: React.Dispatch<React.SetStateAction<string[]>>,
-    value: string
-  ) => {
-    if (list.includes(value)) {
-      setList(list.filter((item) => item !== value));
-    } else {
-      setList([...list, value]);
-    }
-  };
-
   const handleSaveAssessment = () => {
     const newAssessment: CareerAssessment = {
       strongSubjects,

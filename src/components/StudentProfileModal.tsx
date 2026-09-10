@@ -23,7 +23,12 @@ import { StreamSelector } from "./StreamSelector";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import { AppLanguage, translations, saveStoredLanguage } from "../utils/i18n";
-import { getStudentAvatarInitials, formatStudentDisplayName, capitalizeWords } from "../utils/studentNameUtils";
+import {
+  getStudentAvatarInitials,
+  formatStudentDisplayName,
+  capitalizeWords,
+  AVATAR_GRADIENT_OPTIONS,
+} from "../utils/studentNameUtils";
 
 interface StudentProfileModalProps {
   isOpen: boolean;
@@ -37,15 +42,6 @@ interface StudentProfileModalProps {
   onExportProfile: (profileId: string) => void;
   onImportProfile: (jsonString: string) => void;
 }
-
-const AVATAR_GRADIENTS = [
-  { label: "Cyan Emerald", value: "from-cyan-500 to-emerald-500" },
-  { label: "Purple Indigo", value: "from-purple-500 to-indigo-500" },
-  { label: "Amber Orange", value: "from-amber-500 to-orange-500" },
-  { label: "Rose Pink", value: "from-rose-500 to-pink-500" },
-  { label: "Blue Cyan", value: "from-blue-500 to-cyan-500" },
-  { label: "Emerald Teal", value: "from-emerald-500 to-teal-500" },
-];
 
 export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   isOpen,
@@ -68,7 +64,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const [stream, setStream] = useState<StreamType>("General");
   const [board, setBoard] = useState<ExamBoard | string>("CBSE");
   const [language, setLanguage] = useState<AppLanguage>("en");
-  const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENTS[0].value);
+  const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENT_OPTIONS[0].value);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,18 +81,18 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const resetForm = () => {
+  const resetStudentProfileForm = () => {
     setName("");
     setClassLevel("Class 10");
     setStream("General");
     setBoard("CBSE");
     setLanguage("en");
-    setAvatarColor(AVATAR_GRADIENTS[0].value);
+    setAvatarColor(AVATAR_GRADIENT_OPTIONS[0].value);
     setEditingProfile(null);
   };
 
   const handleStartAdd = () => {
-    resetForm();
+    resetStudentProfileForm();
     setActiveTab("add");
   };
 
@@ -107,7 +103,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
     setLanguage((p.language as AppLanguage) || "en");
-    setAvatarColor(p.avatarColor || AVATAR_GRADIENTS[0].value);
+    setAvatarColor(p.avatarColor || AVATAR_GRADIENT_OPTIONS[0].value);
     setActiveTab("edit");
   };
 
@@ -134,7 +130,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       avatarColor,
     });
     saveStoredLanguage(language);
-    resetForm();
+    resetStudentProfileForm();
     setActiveTab("list");
   };
 
@@ -153,7 +149,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       avatarColor,
     });
     saveStoredLanguage(language);
-    resetForm();
+    resetStudentProfileForm();
     setActiveTab("list");
   };
 
@@ -182,7 +178,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     >
       <div
         id="student-profile-modal-card"
-        className="relative w-full max-w-2xl glass-card rounded-3xl border border-emerald-500/30 p-4 sm:p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto"
+        className="relative w-full max-w-2xl glass-card rounded-3xl border border-emerald-500/30 p-4 sm:p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -512,7 +508,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     Avatar Theme Color
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {AVATAR_GRADIENTS.map((g) => (
+                    {AVATAR_GRADIENT_OPTIONS.map((g) => (
                       <button
                         type="button"
                         key={g.value}

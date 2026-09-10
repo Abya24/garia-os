@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { FocusSessionLog, UserSettings } from "../types";
 import { sendNotification } from "../utils/notifications";
 import { getTodayString } from "../utils/storage";
+import { formatSecondsToMSS } from "../utils/dateTimeUtils";
 import {
   ambientAudio,
   AMBIENT_SOUND_OPTIONS,
@@ -233,12 +234,6 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   // Remaining Time Fraction & Angle for CSS Conic Gradient Ring
   const remainingFraction = totalModeSeconds > 0 ? timeLeftSeconds / totalModeSeconds : 0;
   const remainingDegrees = Math.round(remainingFraction * 360);
-
-  const formatMinutesSeconds = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  };
 
   const handleStart = () => {
     playChime(false);
@@ -533,7 +528,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
             {/* Countdown Digits */}
             <span className="text-4xl sm:text-6xl font-black font-mono tracking-wider text-white tabular-nums drop-shadow-sm">
-              {formatMinutesSeconds(timeLeftSeconds)}
+              {formatSecondsToMSS(timeLeftSeconds)}
             </span>
 
             {/* Mode & State Badge */}

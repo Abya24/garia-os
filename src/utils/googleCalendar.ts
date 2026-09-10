@@ -1,13 +1,11 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
 import {
-  getAuth,
   signInWithPopup,
   signOut,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
 } from "firebase/auth";
-import firebaseConfig from "../../firebase-applet-config.json";
+import { auth } from "./firebase";
 import { Task, StudySession, CalendarEvent, Goal } from "../types";
 import { APP_VERSION } from "../constants/version";
 
@@ -35,9 +33,8 @@ export const GMAIL_SCOPES = [
 
 export const WORKSPACE_SCOPES = [...CALENDAR_SCOPES, ...GMAIL_SCOPES];
 
-// Initialize Firebase app singleton
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+// Re-export single canonical auth instance from firebase.ts
+export { auth };
 
 const provider = new GoogleAuthProvider();
 WORKSPACE_SCOPES.forEach((scope) => provider.addScope(scope));

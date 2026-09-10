@@ -74,6 +74,7 @@ import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { PWAInstallOption } from "../components/PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
 import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
+import { useTransientToast } from "../utils/uiUtils";
 import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
 import { PinManagementModal, PinModalMode } from "../components/PinManagementModal";
 import { lockSession } from "../utils/security";
@@ -262,15 +263,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     });
   };
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { toastMessage, showToast } = useTransientToast(3500);
   const [isClearingCache, setIsClearingCache] = useState(false);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
-  };
 
   const handleClearOfflineCache = async () => {
     setIsClearingCache(true);
@@ -1318,6 +1312,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
           {[
+            { id: "classic", label: currentLanguage === "hi" ? "क्लासिक स्कॉलर" : "Classic Scholar", desc: "Heritage Ivory & Bronze", color: "bg-[#0c1017] border-amber-500/40 text-amber-200", dot: "bg-amber-400" },
             { id: "amoled", label: "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
             { id: "purple", label: "Royal Purple", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
             { id: "midnight", label: "Midnight Blue", desc: "Navy Horizon", color: "bg-sky-950 border-sky-800", dot: "bg-cyan-400" },

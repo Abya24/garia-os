@@ -378,7 +378,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     }
   };
 
-  const getCategoryBadge = (c: string) => {
+  const getTaskCategoryBadgeClasses = (c: string) => {
     const norm = (c || "").toLowerCase().trim();
     switch (norm) {
       case "study":
@@ -1090,7 +1090,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
                             {/* Dynamic / Custom Category Badge */}
                             <span
-                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold capitalize tracking-wide ${getCategoryBadge(
+                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold capitalize tracking-wide ${getTaskCategoryBadgeClasses(
                                 task.category
                               )}`}
                             >
@@ -1187,7 +1187,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto"
+            className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-slide-up max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1350,7 +1350,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                         onClick={() => setCategory(cat)}
                         className={`px-3 py-2 rounded-xl border text-xs font-bold capitalize transition-all ${
                           category === cat
-                            ? `${getCategoryBadge(cat)} ring-1 ring-white/20 font-extrabold shadow-sm`
+                            ? `${getTaskCategoryBadgeClasses(cat)} ring-1 ring-white/20 font-extrabold shadow-sm`
                             : "bg-slate-950 border-white/10 text-slate-400 hover:text-white"
                         }`}
                       >
@@ -1386,7 +1386,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       {taskToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            className="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3.5">
@@ -1443,7 +1443,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       {isBulkDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3.5">
@@ -1488,7 +1488,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                           {task.title}
                         </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize shrink-0 ${getCategoryBadge(task.category)}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize shrink-0 ${getTaskCategoryBadgeClasses(task.category)}`}>
                         {task.category}
                       </span>
                     </div>

@@ -27,6 +27,7 @@ import {
 import { calculateGamificationState } from "../utils/gamificationEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
 import { AppLanguage, translations } from "../utils/i18n";
+import { getTimeOfDayGreeting } from "../utils/dateTimeUtils";
 import { fetchDailyQuote, fetchNextQuote, MOTIVATIONAL_QUOTES, MotivationalQuote } from "../utils/quotes";
 import { HeroSection } from "../components/home/sections/HeroSection";
 import { QuickActionsWidget } from "../components/home/widgets/QuickActionsWidget";
@@ -141,27 +142,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
   const activeQuote: MotivationalQuote = MOTIVATIONAL_QUOTES[quoteIndex] || MOTIVATIONAL_QUOTES[0];
 
-  // Dynamic Greeting based on time of day
-  const hour = currentDateTime.getHours();
-  let timeGreeting = "Good Morning";
-  if (hour >= 12 && hour < 17) {
-    timeGreeting = "Good Afternoon";
-  } else if (hour >= 17 && hour < 21) {
-    timeGreeting = "Good Evening";
-  } else if (hour >= 21 || hour < 5) {
-    timeGreeting = "Good Night";
-  }
-
-  const hindiGreeting =
-    hour >= 4 && hour < 12
-      ? "सुप्रभात"
-      : hour >= 12 && hour < 17
-      ? "शुभ दोपहर"
-      : hour >= 17 && hour < 21
-      ? "शुभ संध्या"
-      : "शुभ रात्रि";
-
-  const displayGreeting = currentLanguage === "hi" ? hindiGreeting : timeGreeting;
+  // Dynamic Greeting based on time of day via centralized utility
+  const displayGreeting = getTimeOfDayGreeting(currentDateTime, currentLanguage === "hi" ? "hi" : "en");
 
   const formattedDate = currentDateTime.toLocaleDateString(
     currentLanguage === "hi" ? "hi-IN" : "en-US",
