@@ -91,25 +91,31 @@ export function handleFirestoreError(
   path: string | null
 ): never {
   const currentUser = auth.currentUser;
+  const isDev = Boolean(typeof import.meta !== "undefined" && (import.meta as any).env?.DEV);
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: currentUser?.uid,
-      email: currentUser?.email,
+      email: isDev ? currentUser?.email : undefined,
       emailVerified: currentUser?.emailVerified,
       isAnonymous: currentUser?.isAnonymous,
       tenantId: currentUser?.tenantId,
       providerInfo:
         currentUser?.providerData?.map((p) => ({
           providerId: p.providerId,
-          email: p.email,
+          email: isDev ? p.email : undefined,
         })) || [],
     },
     operationType,
     path,
   };
 
-  console.error("Firestore Error: ", JSON.stringify(errInfo));
+  if (isDev) {
+    console.error("Firestore Error: ", JSON.stringify(errInfo));
+  } else {
+    console.error(`[Firestore Error] ${operationType} on ${path || "unknown"}: ${errInfo.error}`);
+  }
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -223,8 +229,8 @@ export async function signUpWithEmail(
       await upsertUserProfileDoc(cred.user, displayName.trim());
     }
     return cred;
-  } catch (error) {
-    console.error("Error signing up with email:", error);
+  } catch (error: any) {
+    console.error("[Firebase Auth] Error signing up:", error?.code || "SIGNUP_FAILED");
     throw error;
   }
 }
@@ -245,8 +251,8 @@ export async function signInWithEmail(
       await upsertUserProfileDoc(cred.user);
     }
     return cred;
-  } catch (error) {
-    console.error("Error signing in with email:", error);
+  } catch (error: any) {
+    console.error("[Firebase Auth] Error signing in:", error?.code || "SIGNIN_FAILED");
     throw error;
   }
 }
@@ -260,8 +266,8 @@ export async function resetPassword(email: string): Promise<void> {
   }
   try {
     await sendPasswordResetEmail(auth, email.trim());
-  } catch (error) {
-    console.error("Error sending password reset email:", error);
+  } catch (error: any) {
+    console.error("[Firebase Auth] Error sending password reset:", error?.code || "RESET_FAILED");
     throw error;
   }
 }
@@ -286,7 +292,7 @@ export async function signInWithGoogle(): Promise<UserCredential> {
     ) {
       console.info("[Firebase Auth] Google sign-in was dismissed or closed by the user.");
     } else {
-      console.error("Error signing in with Google:", error);
+      console.error("[Firebase Auth] Error signing in with Google:", error?.code || "GOOGLE_SIGNIN_FAILED");
     }
     throw error;
   }

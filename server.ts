@@ -65,6 +65,88 @@ async function startServer() {
     ]);
   });
 
+  // Bounded Memory Rate Limiter for abuse prevention
+  interface RateLimitRecord {
+    count: number;
+    resetAt: number;
+  }
+
+  class MemoryRateLimiter {
+    private store = new Map<string, RateLimitRecord>();
+    private maxEntries: number;
+    private windowMs: number;
+    private maxRequests: number;
+
+    constructor(options: { windowMs: number; maxRequests: number; maxEntries?: number }) {
+      this.windowMs = options.windowMs;
+      this.maxRequests = options.maxRequests;
+      this.maxEntries = options.maxEntries || 2000;
+
+      const timer = setInterval(() => this.cleanup(), 30000);
+      if (timer.unref) timer.unref();
+    }
+
+    private cleanup() {
+      const now = Date.now();
+      for (const [key, record] of this.store.entries()) {
+        if (record.resetAt <= now) {
+          this.store.delete(key);
+        }
+      }
+    }
+
+    public check(ip: string): { allowed: boolean; remaining: number; resetInMs: number } {
+      const now = Date.now();
+      let record = this.store.get(ip);
+
+      if (!record || record.resetAt <= now) {
+        if (this.store.size >= this.maxEntries) {
+          this.cleanup();
+          if (this.store.size >= this.maxEntries) {
+            const firstKey = this.store.keys().next().value;
+            if (firstKey) this.store.delete(firstKey);
+          }
+        }
+        record = { count: 1, resetAt: now + this.windowMs };
+        this.store.set(ip, record);
+        return { allowed: true, remaining: this.maxRequests - 1, resetInMs: this.windowMs };
+      }
+
+      if (record.count >= this.maxRequests) {
+        return { allowed: false, remaining: 0, resetInMs: Math.max(0, record.resetAt - now) };
+      }
+
+      record.count += 1;
+      return {
+        allowed: true,
+        remaining: this.maxRequests - record.count,
+        resetInMs: Math.max(0, record.resetAt - now),
+      };
+    }
+  }
+
+  function getClientIp(req: express.Request): string {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string") {
+      const first = forwarded.split(",")[0].trim();
+      if (first) return first;
+    }
+    return req.ip || req.socket.remoteAddress || "127.0.0.1";
+  }
+
+  // Rate Limiters
+  const liveVoiceTicketLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 10,
+    maxEntries: 1000,
+  });
+
+  const aiChatLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    maxEntries: 2000,
+  });
+
   // Live Voice Ephemeral Single-Use Ticket Store
   const liveVoiceTickets = new Map<string, { expiresAt: number }>();
   setInterval(() => {
@@ -78,12 +160,37 @@ async function startServer() {
 
   // Endpoint to obtain a secure, short-lived single-use ticket for Live Voice WebSocket
   app.post("/api/live-voice/ticket", (req, res) => {
+    const clientIp = getClientIp(req);
+    const rateCheck = liveVoiceTicketLimiter.check(clientIp);
+    if (!rateCheck.allowed) {
+      res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
+      return res.status(429).json({
+        error: "Too many voice session ticket requests. Please wait a moment before reconnecting.",
+        code: "RATE_LIMITED",
+      });
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({
         error: "Abya Live Voice is not configured on the server.",
         code: "MISSING_SERVER_KEY",
       });
     }
+
+    // Bounded ticket store cleanup if capacity reached
+    if (liveVoiceTickets.size >= 500) {
+      const now = Date.now();
+      for (const [t, entry] of liveVoiceTickets.entries()) {
+        if (entry.expiresAt <= now) {
+          liveVoiceTickets.delete(t);
+        }
+      }
+      if (liveVoiceTickets.size >= 500) {
+        const oldestKey = liveVoiceTickets.keys().next().value;
+        if (oldestKey) liveVoiceTickets.delete(oldestKey);
+      }
+    }
+
     const ticket = crypto.randomBytes(32).toString("hex");
     const expiresAt = Date.now() + 60 * 1000; // 60-second single-use validity
     liveVoiceTickets.set(ticket, { expiresAt });
@@ -113,10 +220,20 @@ async function startServer() {
   app.post("/api/ai/chat", async (req, res) => {
     const startTime = Date.now();
     try {
+      const clientIp = getClientIp(req);
+      const rateCheck = aiChatLimiter.check(clientIp);
+      if (!rateCheck.allowed) {
+        res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
+        return res.status(429).json({
+          error: "Too many AI requests. Please wait a moment before sending another query.",
+          code: "RATE_LIMITED",
+        });
+      }
+
       const {
         prompt,
         history,
-        mode = "standard", // 'standard' | 'high_thinking' | 'fast_lite' | 'search_grounded'
+        mode = "standard", // 'standard' | 'high_thinking' | 'fast_lite' | 'search_grounded' | 'exam_coach' | 'career_coach' | 'mentor'
         image, // { data: base64, mimeType: string }
         contextNote,
         curriculumContext,
@@ -126,10 +243,122 @@ async function startServer() {
         studentProfileContext,
         todayContext,
         abyaLanguage,
-      } = req.body;
+      } = req.body || {};
 
+      // 1. Validate prompt and image presence
       if (!prompt && !image) {
-        return res.status(400).json({ error: "Prompt or image is required" });
+        return res.status(400).json({
+          error: "Prompt or image is required.",
+          code: "MISSING_INPUT",
+        });
+      }
+
+      // 2. Validate prompt type and bounds
+      if (prompt !== undefined && prompt !== null) {
+        if (typeof prompt !== "string") {
+          return res.status(400).json({
+            error: "Prompt must be a string.",
+            code: "INVALID_PROMPT",
+          });
+        }
+        if (prompt.length > 20000) {
+          return res.status(400).json({
+            error: "Prompt exceeds maximum allowed length of 20,000 characters.",
+            code: "PROMPT_TOO_LARGE",
+          });
+        }
+      }
+
+      // 3. Validate mode allowlist
+      const ALLOWED_MODES = [
+        "standard",
+        "high_thinking",
+        "fast_lite",
+        "search_grounded",
+        "exam_coach",
+        "career_coach",
+        "mentor",
+      ];
+      if (typeof mode !== "string" || !ALLOWED_MODES.includes(mode)) {
+        return res.status(400).json({
+          error: "Invalid AI mode specified.",
+          code: "INVALID_MODE",
+        });
+      }
+
+      // 4. Validate image payload if provided
+      if (image !== undefined && image !== null) {
+        if (typeof image !== "object" || Array.isArray(image)) {
+          return res.status(400).json({
+            error: "Image payload must be an object with data and mimeType.",
+            code: "INVALID_IMAGE_PAYLOAD",
+          });
+        }
+        const ALLOWED_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+        if (!ALLOWED_MIMES.includes(image.mimeType)) {
+          return res.status(400).json({
+            error: "Unsupported image MIME type. Supported types: JPEG, PNG, WebP, GIF.",
+            code: "INVALID_IMAGE_TYPE",
+          });
+        }
+        if (typeof image.data !== "string" || image.data.length === 0) {
+          return res.status(400).json({
+            error: "Image data must be a non-empty base64 string.",
+            code: "INVALID_IMAGE_DATA",
+          });
+        }
+        if (image.data.length > 8000000) {
+          return res.status(400).json({
+            error: "Image payload exceeds maximum allowed size (~6MB).",
+            code: "IMAGE_TOO_LARGE",
+          });
+        }
+        const sample = image.data.slice(0, 500);
+        if (!/^[A-Za-z0-9+/=_\-\r\n]+$/.test(sample)) {
+          return res.status(400).json({
+            error: "Image data contains invalid base64 encoding.",
+            code: "MALFORMED_IMAGE_BASE64",
+          });
+        }
+      }
+
+      // 5. Validate history array if provided
+      if (history !== undefined && history !== null) {
+        if (!Array.isArray(history)) {
+          return res.status(400).json({
+            error: "History must be an array of message objects.",
+            code: "INVALID_HISTORY",
+          });
+        }
+        if (history.length > 50) {
+          return res.status(400).json({
+            error: "History cannot exceed 50 messages.",
+            code: "HISTORY_TOO_LARGE",
+          });
+        }
+        for (let i = 0; i < history.length; i++) {
+          const item = history[i];
+          if (!item || typeof item !== "object" || !item.role || typeof item.content !== "string") {
+            return res.status(400).json({
+              error: `History message at index ${i} is invalid. Expected { role, content }.`,
+              code: "MALFORMED_HISTORY_ITEM",
+            });
+          }
+          if (item.content.length > 15000) {
+            return res.status(400).json({
+              error: `History message at index ${i} exceeds 15,000 characters.`,
+              code: "HISTORY_ITEM_TOO_LARGE",
+            });
+          }
+        }
+      }
+
+      // 6. Validate context bounds
+      if (contextNote && (typeof contextNote !== "string" || contextNote.length > 5000)) {
+        return res.status(400).json({
+          error: "contextNote exceeds maximum length of 5,000 characters.",
+          code: "CONTEXT_NOTE_TOO_LARGE",
+        });
       }
 
       // Strictly utilize server-side environment variable only
@@ -464,44 +693,59 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
 
   server.on("upgrade", (request, socket, head) => {
     try {
-      const { pathname } = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
+      const url = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
+      const pathname = url.pathname;
       if (pathname === "/api/live-voice" || pathname === "/api/live" || pathname === "/live") {
+        const ticket = url.searchParams.get("ticket");
+        if (!ticket) {
+          socket.write(
+            "HTTP/1.1 401 Unauthorized\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nLive Voice requires a valid session ticket.\r\n"
+          );
+          socket.destroy();
+          return;
+        }
+
+        const ticketData = liveVoiceTickets.get(ticket);
+        const now = Date.now();
+        if (!ticketData || ticketData.expiresAt < now) {
+          if (ticketData) {
+            liveVoiceTickets.delete(ticket);
+          }
+          socket.write(
+            "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nInvalid or expired session ticket.\r\n"
+          );
+          socket.destroy();
+          return;
+        }
+
+        // Atomically consume ticket (strictly single-use)
+        liveVoiceTickets.delete(ticket);
+        (request as any)._liveVoiceTicketValidated = true;
+
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit("connection", ws, request);
         });
       }
     } catch (e) {
-      // Ignored for non-websocket upgrade errors
+      socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      socket.destroy();
     }
   });
 
   wss.on("connection", async (clientWs, req) => {
     let liveSession: any = null;
     try {
+      // Re-verify that upgrade-level ticket authentication succeeded
+      if (!(req as any)._liveVoiceTicketValidated) {
+        clientWs.close(1008, "Missing or invalid ticket");
+        return;
+      }
+
       const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
       const studentName = url.searchParams.get("studentName") || "Student";
       const classLevel = url.searchParams.get("classLevel") || "Class 12";
       const stream = url.searchParams.get("stream") || "Science";
       const board = url.searchParams.get("board") || "CBSE";
-      const ticket = url.searchParams.get("ticket");
-
-      // Verify single-use ticket if ticket-based handshake is used
-      if (ticket) {
-        const ticketData = liveVoiceTickets.get(ticket);
-        if (!ticketData || ticketData.expiresAt < Date.now()) {
-          clientWs.send(
-            JSON.stringify({
-              type: "error",
-              error: "Invalid or expired live voice session ticket.",
-              code: "INVALID_TICKET",
-            })
-          );
-          clientWs.close(1008, "Invalid ticket");
-          return;
-        }
-        // Consume ticket immediately (single-use guarantee)
-        liveVoiceTickets.delete(ticket);
-      }
 
       // Strictly use server-side environment variable only
       const apiKey = process.env.GEMINI_API_KEY;

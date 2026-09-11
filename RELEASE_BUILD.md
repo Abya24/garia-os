@@ -1,71 +1,50 @@
-# Garia OS v2.4.0 — Android Release Build & Deployment Guide
+# Garia OS — Web, PWA & Production Deployment Guide
 
 ## Overview
-Garia OS is configured as a native Android Trusted Web Activity (TWA) application package with complete branding, profile isolation, and offline PWA capabilities.
+Garia OS is designed and distributed as a modern Progressive Web App (PWA) and web application, featuring offline-first data synchronization, local IndexedDB/localStorage storage, and profile isolation.
 
 - **App Name:** Garia OS
+- **Official Distribution:** Progressive Web App (PWA) via web browser install flow
+- **Platform Architecture:** React 18, TypeScript, Vite, Tailwind CSS, Express backend proxy for Abya AI
+- **Offline Capabilities:** Comprehensive Service Worker cache (`/public/sw.js`) and queue-backed offline mutations
+
+---
+
+## 1. Web & PWA Production Deployment (Official)
+
+The official distribution model for Garia OS is directly through modern web browsers:
+
+1. **Production Build:**
+   ```bash
+   npm run build
+   ```
+   Compiles static frontend assets to `dist/` and bundles `dist/server.cjs` for backend execution.
+
+2. **Production Run:**
+   ```bash
+   npm start
+   ```
+   Binds Express to port 3000 with hardened security headers, single-use WebSocket voice tickets, rate limiters, and SPA routing.
+
+3. **PWA Installation:**
+   - On Android/Chrome: Tap "Install app" or "Add to Home screen" via the browser prompt.
+   - On iOS/Safari: Tap the Share button and select "Add to Home Screen".
+   - On Desktop (Chrome/Edge): Click the install icon in the URL bar.
+
+---
+
+## 2. Android Trusted Web Activity (Optional Packaging)
+
+For Google Play Store distribution, the repository contains a standard Android Trusted Web Activity (`android/` directory) that encapsulates the hosted PWA origin (`https://garia-os.ai.studio`):
+
 - **Package ID:** `com.gariaos.app`
-- **Version Name:** `2.4.0`
-- **Version Code:** `7`
-- **Launcher Icon:** Official Garia OS logo (`@mipmap/ic_launcher` and `@mipmap/ic_launcher_round`)
+- **Target SDK:** 36 (Android 15)
+- **Digital Asset Links:** Requires `.well-known/assetlinks.json` configured with the release signing key's SHA-256 fingerprint for full-screen borderless display.
 
 ---
 
-## 1. Cloud APK Build via GitHub Actions (Recommended)
+## 3. Offline Data & Synchronization Guarantee
 
-This project includes an automated GitHub Actions CI/CD pipeline in `.github/workflows/build-apk.yml`.
-
-### How to trigger the APK build on GitHub:
-1. Push this repository to **GitHub**.
-2. Go to the **Actions** tab in your GitHub repository.
-3. Select **Build Garia OS Android APK** workflow.
-4. Click **Run workflow** (or simply push to `main`/`master` branch).
-5. Once complete (approx 2–3 minutes), download the generated artifact:
-   **`Garia_OS_v2.4.0_Release_APK`**
-
-The generated APK artifact will be located in:
-`android/app/build/outputs/apk/release/`
-
----
-
-## 2. Local Android APK Build Instructions
-
-If you have JDK 17 and Android SDK installed on your local machine:
-
-```bash
-# 1. Navigate to the android directory
-cd android
-
-# 2. Make gradlew executable (macOS / Linux)
-chmod +x gradlew
-
-# 3. Build release APK
-./gradlew assembleRelease
-```
-
-Output binary path:
-`android/app/build/outputs/apk/release/app-release-unsigned.apk`
-
----
-
-## 3. How to Sign the APK for Android Installation / Play Store
-
-To install directly on Android devices or publish to Google Play:
-
-```bash
-# Generate a release keystore if you don't have one
-keytool -genkey -v -keystore garia-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias gariaos
-
-# Align the APK
-zipalign -v -p 4 app-release-unsigned.apk Garia_OS_v2.4.0_Aligned.apk
-
-# Sign the APK using apksigner (from Android SDK build-tools)
-apksigner sign --ks garia-release-key.jks --out Garia_OS_v2.4.0_Signed.apk Garia_OS_v2.4.0_Aligned.apk
-```
-
----
-
-## 4. Android Device Installation
-1. Transfer `Garia_OS_v2.4.0_Signed.apk` (or debug build) to your Android phone.
-2. Enable **"Install from unknown sources"** in Android Settings if prompted.
-3. Tap the file to install Garia OS v2.4.0 with full offline support and Abya AI access.
+- **Shell & UI:** Precached on install by the Service Worker, allowing instant boot even in airplane mode.
+- **Data Persistence:** Tasks, habits, syllabus progress, and timers persist locally per active student profile.
+- **Offline Sync Queue:** When network connectivity is restored, mutations queued during offline sessions sync seamlessly with cloud storage.

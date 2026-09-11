@@ -154,16 +154,19 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       // 3. Initialize 24kHz Output Live Audio Player
       liveAudioPlayerRef.current = new LiveAudioPlayer();
 
-      // 4. Request single-use ticket from backend
-      let ticket = "";
-      try {
-        const ticketRes = await fetch("/api/live-voice/ticket", { method: "POST" });
-        if (ticketRes.ok) {
-          const ticketData = await ticketRes.json();
-          ticket = ticketData.ticket || "";
+      // 4. Request single-use ticket from backend (mandatory)
+      const ticketRes = await fetch("/api/live-voice/ticket", { method: "POST" });
+      if (!ticketRes.ok) {
+        const errJson = await ticketRes.json().catch(() => ({}));
+        if (ticketRes.status === 429) {
+          throw new Error("Too many voice connection attempts. Please wait a moment before reconnecting.");
         }
-      } catch (err) {
-        console.warn("[Abya Live Voice] Ticket request error:", err);
+        throw new Error(errJson.error || "Failed to obtain a Live Voice session ticket.");
+      }
+      const ticketData = await ticketRes.json().catch(() => ({}));
+      const ticket = ticketData.ticket;
+      if (!ticket || typeof ticket !== "string") {
+        throw new Error("Invalid session ticket received from server.");
       }
 
       // Connect to Backend WebSocket
@@ -175,10 +178,8 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
         stream: effectiveStream,
         board: effectiveBoard,
         mode: sessionMode,
+        ticket: ticket,
       });
-      if (ticket) {
-        queryParams.set("ticket", ticket);
-      }
 
       const wsUrl = `${protocol}//${host}/api/live-voice?${queryParams.toString()}`;
       const ws = new WebSocket(wsUrl);
@@ -223,13 +224,18 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
 
       ws.onerror = (err) => {
         console.error("[Abya Live Voice] WebSocket error:", err);
-        setErrorMessage("Could not connect to Live Voice session.");
+        setErrorMessage("Could not connect to Live Voice session. Please verify permissions and try again.");
         setStatus("error");
       };
 
-      ws.onclose = () => {
-        console.log("[Abya Live Voice] WebSocket closed.");
-        setStatus((current) => (current === "error" ? "error" : "idle"));
+      ws.onclose = (event) => {
+        console.log(`[Abya Live Voice] WebSocket closed (code: ${event?.code}).`);
+        if (event?.code === 1008 || event?.code === 4401 || event?.code === 4403) {
+          setErrorMessage("Live Voice session ticket expired or unauthorized. Please re-open the microphone.");
+          setStatus("error");
+        } else {
+          setStatus((current) => (current === "error" ? "error" : "idle"));
+        }
       };
 
       // 5. Connect Audio Processing Pipeline
