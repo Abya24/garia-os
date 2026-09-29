@@ -7,6 +7,7 @@ import {
   Bot,
   Zap,
   FileText,
+  Layers,
 } from "lucide-react";
 import { ActiveTab } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
@@ -32,7 +33,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         <span className="text-[10px] text-slate-500 font-mono">1-Tap Shortcuts</span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
         <button
           onClick={() => onNavigate("study")}
           id="quick-action-start-study"
@@ -101,6 +102,24 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
             </div>
             <div className="text-[10px] text-red-300/80 truncate">
               {currentLanguage === "hi" ? "मॉक टेस्ट व PYQs" : "Mock tests & PYQs"}
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate("flashcards")}
+          id="quick-action-flashcards"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 border border-teal-500/40 text-left flex items-center gap-3 transition-all card-press group shadow-sm"
+        >
+          <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Layers className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold font-heading text-white truncate">
+              {currentLanguage === "hi" ? "फ़्लैशकार्ड" : "Flashcards"}
+            </div>
+            <div className="text-[10px] text-teal-300/80 truncate">
+              {currentLanguage === "hi" ? "स्पेस्ड रिपीटीशन" : "Spaced Repetition"}
             </div>
           </div>
         </button>

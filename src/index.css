@@ -60,6 +60,16 @@
     --accent-glow: rgba(16, 185, 129, 0.08);
   }
 
+  /* 5b. High Contrast Daylight Mode */
+  .high-contrast {
+    --bg-main: #ffffff;
+    --card-bg: #ffffff;
+    --card-border: #0f172a;
+    --text-primary: #000000;
+    --text-secondary: #1e293b;
+    --accent-glow: rgba(4, 120, 87, 0.18);
+  }
+
   /* 6. Frost Glass */
   .frost {
     --bg-main: #08101d;
@@ -214,11 +224,31 @@
   color: #0f172a !important;
 }
 
-/* Light mode text contrast overrides */
+.high-contrast body, .high-contrast {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast .glass-card {
+  background: #ffffff !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 0 2px 0 0 #0f172a !important;
+}
+
+.high-contrast .glass-pill {
+  background: #f1f5f9 !important;
+  border: 1.5px solid #0f172a !important;
+  color: #000000 !important;
+}
+
+/* Light & High-Contrast mode text contrast overrides */
 .light .text-white,
 .light .text-slate-100,
-.light .text-slate-200 {
-  color: #0f172a !important;
+.light .text-slate-200,
+.high-contrast .text-white,
+.high-contrast .text-slate-100,
+.high-contrast .text-slate-200 {
+  color: #000000 !important;
 }
 
 .light .text-slate-300,
@@ -226,25 +256,37 @@
   color: #334155 !important;
 }
 
+.high-contrast .text-slate-300,
+.high-contrast .text-slate-400,
+.high-contrast .text-slate-500 {
+  color: #0f172a !important;
+  font-weight: 500;
+}
+
 .light .text-slate-500 {
   color: #475569 !important;
 }
 
-/* Inputs, Textareas, Selects in Light mode */
+/* Inputs, Textareas, Selects in Light & High-Contrast mode */
 .light input,
 .light textarea,
-.light select {
+.light select,
+.high-contrast input,
+.high-contrast textarea,
+.high-contrast select {
   background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  color: #000000 !important;
+  border-color: #0f172a !important;
 }
 
 .light input::placeholder,
-.light textarea::placeholder {
-  color: #64748b !important;
+.light textarea::placeholder,
+.high-contrast input::placeholder,
+.high-contrast textarea::placeholder {
+  color: #475569 !important;
 }
 
-/* Light mode backgrounds for dark containers */
+/* Light & High-Contrast mode backgrounds for dark containers */
 .light .bg-slate-950,
 .light .bg-slate-900,
 .light .bg-slate-900\/90,
@@ -252,7 +294,15 @@
 .light .bg-slate-900\/60,
 .light .bg-slate-900\/50,
 .light .bg-slate-900\/40,
-.light .bg-slate-900\/30 {
+.light .bg-slate-900\/30,
+.high-contrast .bg-slate-950,
+.high-contrast .bg-slate-900,
+.high-contrast .bg-slate-900\/90,
+.high-contrast .bg-slate-900\/80,
+.high-contrast .bg-slate-900\/60,
+.high-contrast .bg-slate-900\/50,
+.high-contrast .bg-slate-900\/40,
+.high-contrast .bg-slate-900\/30 {
   background-color: #ffffff !important;
 }
 
@@ -262,15 +312,28 @@
 .light .bg-slate-800\/60,
 .light .bg-slate-800\/50,
 .light .bg-slate-800\/40,
-.light .bg-slate-800\/30 {
-  background-color: #f8fafc !important;
+.light .bg-slate-800\/30,
+.high-contrast .bg-slate-800,
+.high-contrast .bg-slate-800\/90,
+.high-contrast .bg-slate-800\/80,
+.high-contrast .bg-slate-800\/60,
+.high-contrast .bg-slate-800\/50,
+.high-contrast .bg-slate-800\/40,
+.high-contrast .bg-slate-800\/30 {
+  background-color: #f1f5f9 !important;
 }
 
 .light .border-slate-800,
 .light .border-slate-800\/80,
 .light .border-slate-800\/50,
-.light .border-slate-700 {
-  border-color: #cbd5e1 !important;
+.light .border-slate-700,
+.high-contrast .border-slate-800,
+.high-contrast .border-slate-800\/80,
+.high-contrast .border-slate-800\/50,
+.high-contrast .border-slate-700,
+.high-contrast .border-white\/10,
+.high-contrast .border-white\/5 {
+  border-color: #0f172a !important;
 }
 
 body {

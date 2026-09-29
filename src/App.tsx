@@ -37,6 +37,7 @@ import {
   AbyaFallbackReason,
   AbyaProvider,
   AbyaExecutedAction,
+  FlashcardDeck,
 } from "./types";
 import {
   loadTasks,
@@ -110,6 +111,8 @@ import {
   exportStudentProfileJSON,
   importStudentProfileJSON,
   getDefaultStudySubjectsForStream,
+  loadFlashcardDecks,
+  saveFlashcardDecks,
 } from "./utils/storage";
 
 import {
@@ -134,7 +137,12 @@ import { auth } from "./utils/firebase";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
 import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./utils/offlineQueue";
-import { getSolarInfo } from "./utils/solarTheme";
+import {
+  getSolarInfo,
+  requestDeviceLocation,
+  getCachedSolarCoordinates,
+  resolvePreferredNightTheme,
+} from "./utils/solarTheme";
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
@@ -222,6 +230,9 @@ const CareerCenterPage = lazyWithRetry(() =>
 );
 const ExamCenterPage = lazyWithRetry(() =>
   import("./pages/ExamCenterPage").then((m) => ({ default: m.ExamCenterPage }))
+);
+const FlashcardsPage = lazyWithRetry(() =>
+  import("./pages/FlashcardsPage").then((m) => ({ default: m.FlashcardsPage }))
 );
 import {
   calculateExamCountdown,
@@ -494,6 +505,7 @@ export default function App() {
   const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
   const [studySessions, setStudySessions] = useState<StudySession[]>(() => loadStudySessions());
   const [notes, setNotes] = useState<Note[]>(() => loadNotes());
+  const [flashcardDecks, setFlashcardDecks] = useState<FlashcardDeck[]>(() => loadFlashcardDecks());
   const [habits, setHabits] = useState<Habit[]>(() => loadHabits());
   const [water, setWater] = useState<WaterLog>(() => loadWater());
   const [focusLogs, setFocusLogs] = useState<FocusSessionLog[]>(() => loadFocusSessions());
@@ -608,6 +620,7 @@ export default function App() {
     setSubjects(syncedSubs);
     setStudySessions(loadedSessions);
     setNotes(loadNotes(profileId));
+    setFlashcardDecks(loadFlashcardDecks(profileId));
     setHabits(loadHabits(profileId));
     setWater(loadWater(profileId));
     setFocusLogs(loadFocusSessions(profileId));
@@ -699,29 +712,13 @@ export default function App() {
     try {
       cookiesPresent = !!document.cookie;
     } catch (e) {}
-
-    console.log("[GARIA DEBUG]", {
-      localStorageKeys: lsKeys,
-      sessionStorageKeys: ssKeys,
-      cookiesPresent,
-      initialProfiles: profiles,
-      initialActiveProfileId: activeProfileId,
-      initialActiveStudent: activeStudent,
-      sourceOfActiveStudent: profiles.length === 0 ? "None (Fresh Context)" : (activeStudent ? "Loaded from profiles" : "None"),
-      sourceOfProfileName: activeStudent ? activeStudent.name : "None (Welcome Screen Active)",
-    });
-
-    console.log("[GARIA SESSION]", {
-      profilesCount: profiles.length,
-      activeProfileId,
-      activeStudentName: activeStudent?.name || null,
-    });
   }, [profiles, activeProfileId, activeStudent]);
 
-  // Sync Multi-Theme System with DOM
+  // Sync Multi-Theme System & Geolocation High-Contrast/Night Theme Switcher with DOM
   useEffect(() => {
     const root = document.documentElement;
     const themeClasses = [
+      "high-contrast",
       "classic",
       "light",
       "arctic",
@@ -759,15 +756,13 @@ export default function App() {
       let active = settings.theme || "dark";
 
       if (settings.autoSolarTheme) {
-        const solar = getSolarInfo(new Date());
+        const preferredNight = resolvePreferredNightTheme(settings);
+        const simMode = settings.solarSimulationMode || "auto";
+        const solar = getSolarInfo(new Date(), undefined, preferredNight, simMode);
         if (solar.isDaytime) {
-          active = "light";
+          active = "high-contrast";
         } else {
-          // Nighttime: use user's chosen dark theme or default to dark
-          active =
-            settings.theme === "light" || settings.theme === "arctic" || !settings.theme
-              ? "dark"
-              : settings.theme;
+          active = preferredNight;
         }
       } else if (active === "system") {
         active = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
@@ -798,13 +793,22 @@ export default function App() {
         root.style.removeProperty("--custom-bg");
         root.style.removeProperty("--bg-main");
 
-        if (active !== "dark" && themeClasses.includes(active)) {
+        if (active === "high-contrast") {
+          root.classList.add("high-contrast");
+          root.classList.add("light");
+        } else if (active !== "dark" && themeClasses.includes(active)) {
           root.classList.add(active);
         }
       }
     };
 
     applyTheme();
+
+    if (settings.autoSolarTheme && !getCachedSolarCoordinates()) {
+      requestDeviceLocation().then((coords) => {
+        if (coords) applyTheme();
+      });
+    }
 
     let intervalId: any = null;
     if (settings.autoSolarTheme) {
@@ -1107,6 +1111,11 @@ export default function App() {
       profileId: activeProfileId,
       payload: { id },
     });
+  };
+
+  const handleUpdateFlashcardDecks = (updatedDecks: FlashcardDeck[]) => {
+    setFlashcardDecks(updatedDecks);
+    saveFlashcardDecks(updatedDecks, activeProfileId);
   };
 
   const handleAddHabit = (
@@ -1442,9 +1451,26 @@ export default function App() {
 
         try {
           console.log(`[Abya AI Client] Calling Online AI (attempt ${attempt}/${maxAttempts}, mode=${mode})...`);
+
+          let idToken: string | null = null;
+          if (auth.currentUser) {
+            try {
+              idToken = await auth.currentUser.getIdToken();
+            } catch (tokErr) {
+              console.warn("[Abya AI Client] Error obtaining ID token:", tokErr);
+            }
+          }
+
+          const reqHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (idToken) {
+            reqHeaders["Authorization"] = `Bearer ${idToken}`;
+          }
+
           const res = await fetch("/api/ai/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: reqHeaders,
             body: JSON.stringify(requestPayload),
             signal: controller.signal,
           });
@@ -1466,10 +1492,12 @@ export default function App() {
             break;
           }
 
-          if (res.status === 401 || data.code === "MISSING_API_KEY") {
+          if (res.status === 401 || data.code === "UNAUTHENTICATED" || data.code === "MISSING_API_KEY") {
             fallbackReason = "api_error";
-            failureDetail = "API key unconfigured on server";
-            console.warn("[Abya AI Client] Missing API key. Triggering fallback.");
+            failureDetail = data.code === "UNAUTHENTICATED"
+              ? "Sign in to your Garia OS account to access online Gemini AI. Using local offline mentor."
+              : "API key unconfigured on server";
+            console.warn("[Abya AI Client] Online AI unauthenticated or unconfigured. Triggering local mentor fallback.");
             break;
           }
 
@@ -2048,6 +2076,8 @@ export default function App() {
                 }}
                 onQuickAddTask={() => handleNavigate("tasks")}
                 onAddTask={handleAddTask}
+                onAddNote={handleAddNote}
+                onUpdateSettings={handleUpdateSettings}
                 onAddWaterGlass={() =>
                   handleUpdateWater({ ...water, glasses: water.glasses + 1 })
                 }
@@ -2189,6 +2219,16 @@ export default function App() {
                 currentUserId={activeStudent?.id || "guest"}
                 currentUserName={activeStudent?.name || "Student"}
                 currentUserEmail={auth.currentUser?.email || undefined}
+              />
+            )}
+
+            {activeTab === "flashcards" && (
+              <FlashcardsPage
+                decks={flashcardDecks}
+                subjects={subjects}
+                academicSubjects={academicSubjects}
+                onUpdateDecks={handleUpdateFlashcardDecks}
+                onBack={handleGoBack}
               />
             )}
 

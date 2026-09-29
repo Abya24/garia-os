@@ -101,6 +101,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       title: currentLanguage === "hi" ? "अध्ययन उपकरण" : "Productivity",
       items: [
         { id: "exam" as ActiveTab, label: t.examIntelligence || "Exam Intelligence", icon: ShieldAlert },
+        { id: "flashcards" as ActiveTab, label: currentLanguage === "hi" ? "फ़्लैशकार्ड" : "Flashcards", icon: Layers, badge: "SR" },
         { id: "habits" as ActiveTab, label: t.habits || "Habits & Streaks", icon: Flame },
         { id: "water" as ActiveTab, label: "Water Tracker", icon: Droplet },
         { id: "notes" as ActiveTab, label: t.notes || "Notes", icon: FileText },

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Flame,
   Plus,
@@ -14,11 +14,281 @@ import {
   Trophy,
   Gift,
   Zap,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Bar,
+  Line,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  Legend,
+} from "recharts";
 import { Habit } from "../types";
-import { getTodayString } from "../utils/storage";
+import { getTodayString, formatLocalDate } from "../utils/storage";
 import { HabitStreakGoalModal } from "../components/HabitStreakGoalModal";
 import { SwipeableItemCard } from "../components/SwipeableItemCard";
+import {
+  HabitWeeklySparkline,
+  calculateHabitWeeklySparkline,
+} from "../components/HabitWeeklySparkline";
+
+export { HabitWeeklySparkline, calculateHabitWeeklySparkline };
+
+export interface DailyHabitTrendPoint {
+  dateStr: string;
+  dayShort: string;
+  dayFull: string;
+  completionPercentage: number;
+  rollingAvgPercentage: number;
+  completedCheckIns: number;
+  possibleCheckIns: number;
+  targetPercentage: number;
+  isToday: boolean;
+}
+
+export interface WeeklyHabitTrendPoint {
+  weekNumber: number;
+  weekLabel: string;
+  shortLabel: string;
+  dateRange: string;
+  completionPercentage: number;
+  completedCheckIns: number;
+  possibleCheckIns: number;
+  habitsCount: number;
+  targetPercentage: number;
+  isCurrentWeek: boolean;
+}
+
+export interface MonthlyHabitTrendSummary {
+  weeks: WeeklyHabitTrendPoint[];
+  weeklyDailyPoints: DailyHabitTrendPoint[];
+  monthlyDailyPoints: DailyHabitTrendPoint[];
+  currentWeekPct: number;
+  previousWeekPct: number;
+  weeklyDeltaPct: number;
+  monthlyAveragePct: number;
+  last30DaysPct: number;
+  bestWeekPct: number;
+  bestWeekLabel: string;
+  totalWeeklyCheckIns: number;
+  totalWeeklyPossible: number;
+  totalMonthlyCheckIns: number;
+  totalMonthlyPossible: number;
+}
+
+/**
+ * Calculates both Weekly (last 7 days daily) and Monthly (last 4 weeks + 30 days daily)
+ * habit completion trends for Recharts visualization.
+ */
+export function calculateMonthlyHabitWeeklyTrends(
+  habits: Habit[],
+  categoryFilter: string = "all"
+): MonthlyHabitTrendSummary {
+  const safeHabits = (Array.isArray(habits) ? habits : []).filter((h) => {
+    if (!h) return false;
+    if (categoryFilter !== "all" && h.category !== categoryFilter) return false;
+    return true;
+  });
+
+  const habitsCount = safeHabits.length;
+  const weeks: WeeklyHabitTrendPoint[] = [];
+
+  // Build 30-day daily points (-29..0)
+  const monthlyDailyPoints: DailyHabitTrendPoint[] = [];
+  for (let offset = -29; offset <= 0; offset++) {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    const dateStr = formatLocalDate(d);
+    const isToday = offset === 0;
+    const dayShort = isToday
+      ? "Today"
+      : d.toLocaleDateString("en-US", { weekday: "short" });
+    const dayFull = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+    let completedOnDay = 0;
+    safeHabits.forEach((habit) => {
+      if (Array.isArray(habit.completedDates) && habit.completedDates.includes(dateStr)) {
+        completedOnDay += 1;
+      }
+    });
+
+    const completionPercentage =
+      habitsCount > 0 ? Math.min(100, Math.round((completedOnDay / habitsCount) * 100)) : 0;
+
+    monthlyDailyPoints.push({
+      dateStr,
+      dayShort: offset >= -6 ? dayShort : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      dayFull,
+      completionPercentage,
+      rollingAvgPercentage: completionPercentage,
+      completedCheckIns: completedOnDay,
+      possibleCheckIns: habitsCount,
+      targetPercentage: 80,
+      isToday,
+    });
+  }
+
+  // Compute 7-day rolling average across the 30-day series
+  monthlyDailyPoints.forEach((pt, idx) => {
+    const sliceStart = Math.max(0, idx - 6);
+    const windowSlice = monthlyDailyPoints.slice(sliceStart, idx + 1);
+    const avg =
+      windowSlice.length > 0
+        ? Math.round(
+            windowSlice.reduce((acc, item) => acc + item.completionPercentage, 0) /
+              windowSlice.length
+          )
+        : 0;
+    pt.rollingAvgPercentage = avg;
+  });
+
+  // Extract the last 7 days for the Weekly Daily Trend view
+  const weeklyDailyPoints: DailyHabitTrendPoint[] = monthlyDailyPoints.slice(-7).map((pt) => {
+    const d = new Date(pt.dateStr + "T00:00:00");
+    return {
+      ...pt,
+      dayShort: pt.isToday
+        ? "Today"
+        : d.toLocaleDateString("en-US", { weekday: "short" }),
+    };
+  });
+
+  // Build 4 chronological 7-day weeks over the last 28 days
+  for (let w = 0; w < 4; w++) {
+    const startOffset = -27 + w * 7;
+    const endOffset = startOffset + 6;
+
+    const weekDates: string[] = [];
+    let startDateObj = new Date();
+    let endDateObj = new Date();
+
+    for (let offset = startOffset; offset <= endOffset; offset++) {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      if (offset === startOffset) startDateObj = new Date(d);
+      if (offset === endOffset) endDateObj = new Date(d);
+      weekDates.push(formatLocalDate(d));
+    }
+
+    const startLabel = startDateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    const endLabel = endDateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+    let completedCheckIns = 0;
+    safeHabits.forEach((habit) => {
+      const completedSet = new Set(
+        Array.isArray(habit.completedDates) ? habit.completedDates : []
+      );
+      weekDates.forEach((dateStr) => {
+        if (completedSet.has(dateStr)) {
+          completedCheckIns += 1;
+        }
+      });
+    });
+
+    const possibleCheckIns = habitsCount * 7;
+    const completionPercentage =
+      possibleCheckIns > 0
+        ? Math.min(100, Math.round((completedCheckIns / possibleCheckIns) * 100))
+        : 0;
+
+    const weekNumber = w + 1;
+    const isCurrentWeek = w === 3;
+
+    weeks.push({
+      weekNumber,
+      weekLabel: isCurrentWeek ? `Week 4 (This Week)` : `Week ${weekNumber}`,
+      shortLabel: isCurrentWeek ? `W4 (${startLabel})` : `W${weekNumber} (${startLabel})`,
+      dateRange: `${startLabel} – ${endLabel}`,
+      completionPercentage,
+      completedCheckIns,
+      possibleCheckIns,
+      habitsCount,
+      targetPercentage: 80,
+      isCurrentWeek,
+    });
+  }
+
+  const currentWeekPct = weeks[3]?.completionPercentage ?? 0;
+  const previousWeekPct = weeks[2]?.completionPercentage ?? 0;
+  const weeklyDeltaPct = currentWeekPct - previousWeekPct;
+  const monthlyAveragePct =
+    weeks.length > 0
+      ? Math.round(
+          weeks.reduce((sum, item) => sum + item.completionPercentage, 0) /
+            weeks.length
+        )
+      : 0;
+
+  const last30DaysPct =
+    monthlyDailyPoints.length > 0
+      ? Math.round(
+          monthlyDailyPoints.reduce((sum, item) => sum + item.completionPercentage, 0) /
+            monthlyDailyPoints.length
+        )
+      : 0;
+
+  let bestWeekPct = 0;
+  let bestWeekLabel = "Week 1";
+  weeks.forEach((wk) => {
+    if (wk.completionPercentage >= bestWeekPct) {
+      bestWeekPct = wk.completionPercentage;
+      bestWeekLabel = wk.weekLabel;
+    }
+  });
+
+  const totalWeeklyCheckIns = weeklyDailyPoints.reduce(
+    (sum, item) => sum + item.completedCheckIns,
+    0
+  );
+  const totalWeeklyPossible = weeklyDailyPoints.reduce(
+    (sum, item) => sum + item.possibleCheckIns,
+    0
+  );
+
+  const totalMonthlyCheckIns = weeks.reduce(
+    (sum, item) => sum + item.completedCheckIns,
+    0
+  );
+  const totalMonthlyPossible = weeks.reduce(
+    (sum, item) => sum + item.possibleCheckIns,
+    0
+  );
+
+  return {
+    weeks,
+    weeklyDailyPoints,
+    monthlyDailyPoints,
+    currentWeekPct,
+    previousWeekPct,
+    weeklyDeltaPct,
+    monthlyAveragePct,
+    last30DaysPct,
+    bestWeekPct,
+    bestWeekLabel,
+    totalWeeklyCheckIns,
+    totalWeeklyPossible,
+    totalMonthlyCheckIns,
+    totalMonthlyPossible,
+  };
+}
 
 interface HabitsPageProps {
   habits: Habit[];
@@ -44,10 +314,19 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
   const [streakRewardInput, setStreakRewardInput] = useState<string>("");
   const [enableGoalInCreate, setEnableGoalInCreate] = useState<boolean>(true);
 
+  // Trend Visualization Filters & Mode
+  const [trendCategoryFilter, setTrendCategoryFilter] = useState<string>("all");
+  const [trendChartMode, setTrendChartMode] = useState<"area" | "bar">("area");
+
   // Streak Goal Modal State
   const [goalModalHabit, setGoalModalHabit] = useState<Habit | null>(null);
 
   const todayStr = getTodayString();
+
+  const monthlyTrendSummary = useMemo(
+    () => calculateMonthlyHabitWeeklyTrends(habits, trendCategoryFilter),
+    [habits, trendCategoryFilter]
+  );
 
   // Get last 7 days strings
   const getLast7Days = () => {
@@ -125,6 +404,293 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
           <span>New Habit</span>
         </button>
       </div>
+
+      {/* Monthly Habit Completion Trend Visualization Chart (Recharts) */}
+      <section
+        id="habits-monthly-trend-chart"
+        aria-label="Weekly Habit Completion Percentage Trend Over Last Month"
+        className="glass-card rounded-3xl p-5 sm:p-6 border border-white/10 shadow-lg space-y-5"
+      >
+        {/* Header & Category / Chart Mode Controls */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-rose-400 shrink-0" />
+              <h2 className="text-base sm:text-lg font-bold text-white font-heading">
+                Weekly Habit Completion Trend (Last Month)
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400">
+              Weekly completion percentage across your habits over the last 4 weeks (28 days).
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Category Filter Segmented Control */}
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-950/90 border border-white/10">
+              {(
+                [
+                  { id: "all", label: "All Habits" },
+                  { id: "study", label: "Study" },
+                  { id: "health", label: "Health" },
+                  { id: "mindset", label: "Mindset" },
+                ] as const
+              ).map((catItem) => (
+                <button
+                  key={catItem.id}
+                  type="button"
+                  onClick={() => setTrendCategoryFilter(catItem.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                    trendCategoryFilter === catItem.id
+                      ? "bg-rose-500 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {catItem.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Style Toggle */}
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-950/90 border border-white/10">
+              <button
+                type="button"
+                onClick={() => setTrendChartMode("area")}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                  trendChartMode === "area"
+                    ? "bg-white/15 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-rose-400" />
+                <span>Trend Line</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrendChartMode("bar")}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                  trendChartMode === "bar"
+                    ? "bg-white/15 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Weekly Bars</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 Summary Metrics Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-1">
+            <span className="text-[11px] text-slate-400">This Week Completion</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span
+                id="habits-current-week-pct"
+                className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums text-rose-400"
+              >
+                {monthlyTrendSummary.currentWeekPct}%
+              </span>
+              <span
+                className={`text-xs font-mono tabular-nums font-semibold ${
+                  monthlyTrendSummary.weeklyDeltaPct >= 0
+                    ? "text-emerald-400"
+                    : "text-amber-400"
+                }`}
+              >
+                {monthlyTrendSummary.weeklyDeltaPct >= 0 ? "+" : ""}
+                {monthlyTrendSummary.weeklyDeltaPct}% vs W3
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-1">
+            <span className="text-[11px] text-slate-400">4-Week Monthly Avg</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span
+                id="habits-monthly-avg-pct"
+                className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums text-white"
+              >
+                {monthlyTrendSummary.monthlyAveragePct}%
+              </span>
+              <span className="text-xs text-slate-400 font-mono tabular-nums">
+                Target: 80%
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-1">
+            <span className="text-[11px] text-slate-400">Best Weekly Rate</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums text-emerald-400">
+                {monthlyTrendSummary.bestWeekPct}%
+              </span>
+              <span className="text-xs text-slate-400 truncate">
+                {monthlyTrendSummary.bestWeekLabel}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-1">
+            <span className="text-[11px] text-slate-400">Monthly Check-ins</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums text-amber-300">
+                {monthlyTrendSummary.totalMonthlyCheckIns}
+              </span>
+              <span className="text-xs text-slate-400 font-mono tabular-nums">
+                / {monthlyTrendSummary.totalMonthlyPossible} total
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Recharts Weekly Completion Percentage Chart */}
+        <div className="h-64 w-full bg-slate-950/70 rounded-2xl p-3 sm:p-4 border border-white/5">
+          <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={180}>
+            <ComposedChart
+              data={monthlyTrendSummary.weeks}
+              margin={{ top: 12, right: 16, left: -12, bottom: 4 }}
+            >
+              <defs>
+                <linearGradient id="habitWeeklyAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(255,255,255,0.06)"
+              />
+              <XAxis
+                dataKey="shortLabel"
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tickLine={false}
+                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickFormatter={(val) => `${val}%`}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const point = payload[0].payload as WeeklyHabitTrendPoint;
+                  return (
+                    <div className="bg-slate-900/95 border border-rose-500/40 rounded-2xl p-3 shadow-xl text-xs space-y-1">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-bold text-white">{point.weekLabel}</span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {point.dateRange}
+                        </span>
+                      </div>
+                      <div className="text-rose-300 font-mono tabular-nums font-bold text-sm">
+                        {point.completionPercentage}% Weekly Completion
+                      </div>
+                      <div className="text-slate-300 font-mono tabular-nums text-[11px]">
+                        {point.completedCheckIns} / {point.possibleCheckIns} habit check-ins completed
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <ReferenceLine
+                y={80}
+                stroke="#10b981"
+                strokeDasharray="4 4"
+                strokeOpacity={0.6}
+                label={{
+                  value: "80% Goal",
+                  position: "insideTopRight",
+                  fill: "#10b981",
+                  fontSize: 10,
+                }}
+              />
+              {trendChartMode === "bar" ? (
+                <Bar
+                  dataKey="completionPercentage"
+                  name="Weekly Completion %"
+                  radius={[8, 8, 2, 2]}
+                  maxBarSize={48}
+                >
+                  {monthlyTrendSummary.weeks.map((entry) => (
+                    <Cell
+                      key={entry.weekNumber}
+                      fill={
+                        entry.completionPercentage >= 80
+                          ? "#10b981"
+                          : entry.isCurrentWeek
+                          ? "#f43f5e"
+                          : "#fb7185"
+                      }
+                    />
+                  ))}
+                </Bar>
+              ) : (
+                <Area
+                  type="monotone"
+                  dataKey="completionPercentage"
+                  name="Weekly Completion %"
+                  stroke="#f43f5e"
+                  strokeWidth={3}
+                  fill="url(#habitWeeklyAreaGrad)"
+                  activeDot={{ r: 6, fill: "#f43f5e", stroke: "#ffffff", strokeWidth: 2 }}
+                />
+              )}
+              <Line
+                type="monotone"
+                dataKey="completionPercentage"
+                stroke="#fda4af"
+                strokeWidth={2}
+                dot={{ r: 4, fill: "#f43f5e", stroke: "#0f172a", strokeWidth: 2 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* 4-Week Breakdown Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {monthlyTrendSummary.weeks.map((wk) => (
+            <div
+              key={wk.weekNumber}
+              className={`p-3 rounded-2xl border flex flex-col justify-between gap-1 ${
+                wk.isCurrentWeek
+                  ? "bg-rose-500/10 border-rose-500/40 text-white"
+                  : "bg-slate-950/60 border-white/5 text-slate-300"
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold truncate">{wk.weekLabel}</span>
+                <span className="font-mono tabular-nums font-bold text-rose-300">
+                  {wk.completionPercentage}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    wk.completionPercentage >= 80
+                      ? "bg-emerald-400"
+                      : "bg-rose-500"
+                  }`}
+                  style={{ width: `${Math.max(4, wk.completionPercentage)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono tabular-nums">
+                <span>{wk.dateRange}</span>
+                <span>
+                  {wk.completedCheckIns}/{wk.possibleCheckIns}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Habit List */}
       <div className="space-y-4">
@@ -282,6 +848,12 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Weekly 7-Day Consistency Sparkline Chart */}
+                  <HabitWeeklySparkline
+                    habit={habit}
+                    onToggleDate={(dateStr) => onToggleHabitDate(habit.id, dateStr)}
+                  />
 
                   {/* 7-Day Weekly Check Grid */}
                   <div className="pt-3 border-t border-white/10">
@@ -457,4 +1029,7 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
     </div>
   );
 };
+
+export const HabitTracker = HabitsPage;
+export default HabitsPage;
 

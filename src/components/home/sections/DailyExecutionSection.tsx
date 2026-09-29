@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Timer,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { Task, StudySession, FocusSessionLog, ActiveTab, Priority } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
@@ -19,6 +20,7 @@ import { getTodayString } from "../../../utils/storage";
 
 interface DailyExecutionSectionProps {
   tasks: Task[];
+  subjects?: { id: string; name: string }[];
   studySessions?: StudySession[];
   focusLogs?: FocusSessionLog[];
   currentLanguage: AppLanguage;
@@ -30,6 +32,7 @@ interface DailyExecutionSectionProps {
 
 export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
   tasks,
+  subjects = [],
   studySessions = [],
   focusLogs = [],
   currentLanguage,
@@ -42,6 +45,7 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all");
   const [quickTitle, setQuickTitle] = useState("");
   const [quickPriority, setQuickPriority] = useState<Priority>("medium");
+  const [quickSubjectId, setQuickSubjectId] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
 
   // Today's tasks
@@ -79,6 +83,8 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
     e.preventDefault();
     if (!quickTitle.trim()) return;
 
+    const assignedSub = subjects.find((s) => s.id === quickSubjectId);
+
     if (onAddTask) {
       onAddTask({
         title: quickTitle.trim(),
@@ -86,6 +92,8 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
         priority: quickPriority,
         category: "study",
         completed: false,
+        subjectId: assignedSub?.id,
+        subjectName: assignedSub?.name,
       });
       setQuickTitle("");
       setIsAdding(false);
@@ -188,15 +196,30 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
                 onSubmit={handleInlineAddTask}
                 className="p-3 rounded-2xl bg-slate-950/80 border border-emerald-500/30 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <input
                     type="text"
                     value={quickTitle}
                     onChange={(e) => setQuickTitle(e.target.value)}
                     placeholder="Enter today's task or topic to study..."
                     autoFocus
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-emerald-500"
+                    className="flex-1 min-w-[180px] px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-emerald-500"
                   />
+                  {subjects.length > 0 && (
+                    <select
+                      aria-label="Inline Quick Assign Subject"
+                      value={quickSubjectId}
+                      onChange={(e) => setQuickSubjectId(e.target.value)}
+                      className="px-2.5 py-2 rounded-xl bg-slate-900 border border-indigo-500/30 text-xs text-indigo-300 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">Any Subject</option>
+                      {subjects.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <select
                     value={quickPriority}
                     onChange={(e) => setQuickPriority(e.target.value as Priority)}
@@ -263,6 +286,12 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {task.subjectName && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span>{task.subjectName}</span>
+                        </span>
+                      )}
                       {task.time && (
                         <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-500" />

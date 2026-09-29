@@ -23,6 +23,7 @@ import {
   Star,
   Check,
   RotateCw,
+  Layers,
 } from "lucide-react";
 import { ActiveTab, StudentProfile, UserSettings, AppTheme } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -99,6 +100,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
     "#10b981";
 
   const themes: { id: AppTheme; label: string; color: string }[] = [
+    { id: "high-contrast", label: "High Contrast", color: "#ffffff" },
     { id: "dark", label: "Dark Modern", color: "#0f172a" },
     { id: "amoled", label: "AMOLED Pure Black", color: "#000000" },
     { id: "midnight", label: "Midnight Navy", color: "#0b132b" },
@@ -111,6 +113,13 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
   ];
 
   const specialTools = [
+    {
+      id: "flashcards" as ActiveTab,
+      label: "Flashcards & Spaced Repetition",
+      desc: "Study decks, terms, definitions & SM-2 mastery quiz",
+      icon: Layers,
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    },
     {
       id: "career" as ActiveTab,
       label: t.careerCenter || "Career Center",

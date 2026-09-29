@@ -1,5 +1,16 @@
 export type Priority = "high" | "medium" | "low";
+export const TASK_PRIORITY_LEVELS: { value: Priority; label: "High" | "Medium" | "Low"; weight: number }[] = [
+  { value: "high", label: "High", weight: 3 },
+  { value: "medium", label: "Medium", weight: 2 },
+  { value: "low", label: "Low", weight: 1 },
+];
 export type TaskCategory = "study" | "personal" | "work" | "urgent" | "other" | (string & {});
+
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 export interface Task {
   id: string;
@@ -7,10 +18,13 @@ export interface Task {
   description?: string;
   date: string; // YYYY-MM-DD
   time?: string; // HH:mm
-  priority: Priority;
+  priority: Priority; // Task Priority Level: High ("high"), Medium ("medium"), Low ("low")
   category: TaskCategory;
   completed: boolean;
   createdAt: number;
+  subtasks?: Subtask[];
+  subjectId?: string;
+  subjectName?: string;
 }
 
 export interface Subject {
@@ -233,6 +247,7 @@ export type AbyaLanguageSetting =
   | "WhatsApp Language";
 
 export type AppTheme =
+  | "high-contrast"
   | "classic"
   | "amoled"
   | "purple"
@@ -281,6 +296,9 @@ export interface UserSettings {
   userName: string;
   theme: AppTheme;
   autoSolarTheme?: boolean;
+  preferredNightTheme?: AppTheme;
+  solarSimulationMode?: "auto" | "daylight" | "night";
+  focusMode?: boolean;
   customApiKey?: string;
   notificationsEnabled: boolean;
   notifications?: NotificationSettings;
@@ -898,6 +916,80 @@ export interface QuestionBankProfileProgress {
   updatedAt: number;
 }
 
+export type FlashcardMasteryStatus = "new" | "learning" | "reviewing" | "mastered";
+export type SpacedRepetitionRating = "again" | "hard" | "good" | "easy";
+
+export interface StudyFlashcard {
+  id: string;
+  deckId: string;
+  term: string;
+  definition: string;
+  hint?: string;
+  category?: string;
+  // Spaced Repetition (SM-2) tracking fields
+  intervalDays: number;
+  easeFactor: number;
+  repetitions: number;
+  nextReviewAt: number;
+  lastReviewedAt?: number;
+  masteryLevel: number; // 0 to 100
+  status: FlashcardMasteryStatus;
+  createdAt: number;
+  recallHistory?: {
+    rating: SpacedRepetitionRating;
+    timestamp: number;
+  }[];
+}
+
+export interface FlashcardQuizSession {
+  id: string;
+  deckId: string;
+  deckTitle: string;
+  timestamp: number;
+  date: string;
+  totalCards: number;
+  reviewedCount: number;
+  recallAccuracyPct: number;
+  durationSeconds: number;
+  masteryGain: number;
+  ratings: {
+    again: number;
+    hard: number;
+    good: number;
+    easy: number;
+  };
+}
+
+export interface FlashcardDeckPerformanceStats {
+  totalQuizzesTaken: number;
+  totalCardsReviewed: number;
+  averageRecallAccuracy: number;
+  bestRecallAccuracy: number;
+  lastQuizAccuracy?: number;
+  lastQuizAt?: number;
+  totalStudySeconds: number;
+  ratingCounts: {
+    again: number;
+    hard: number;
+    good: number;
+    easy: number;
+  };
+  quizHistory: FlashcardQuizSession[];
+}
+
+export interface FlashcardDeck {
+  id: string;
+  title: string;
+  subjectName: string;
+  description?: string;
+  color: string;
+  cards: StudyFlashcard[];
+  createdAt: number;
+  updatedAt: number;
+  lastStudiedAt?: number;
+  performanceStats?: FlashcardDeckPerformanceStats;
+}
+
 export type ActiveTab =
   | "home"
   | "exam"
@@ -905,6 +997,7 @@ export type ActiveTab =
   | "tasks"
   | "study"
   | "notes"
+  | "flashcards"
   | "goals"
   | "calendar"
   | "abya"

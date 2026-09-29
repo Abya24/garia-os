@@ -61,6 +61,9 @@ import {
   requestDeviceLocation,
   getCachedSolarCoordinates,
   SolarInfo,
+  DARK_THEME_OPTIONS,
+  resolvePreferredNightTheme,
+  isLightOrDayTheme,
 } from "../utils/solarTheme";
 import {
   exportStudentProfileJSON,
@@ -404,6 +407,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleThemeChange = (theme: AppTheme) => {
+    const nextNightTheme = !isLightOrDayTheme(theme) && theme !== "system" ? theme : settings.preferredNightTheme || "dark";
     if (theme === "custom") {
       const p =
         settings.customTheme?.primary ||
@@ -418,33 +422,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       onUpdateSettings({
         ...settings,
         theme: "custom",
+        preferredNightTheme: "custom",
         customTheme: { primary: p, background: b },
         customThemeColors: { primary: p, background: b },
       });
     } else {
-      onUpdateSettings({ ...settings, theme });
+      onUpdateSettings({
+        ...settings,
+        theme,
+        preferredNightTheme: nextNightTheme,
+      });
     }
   };
 
   // Solar Theme State and Handlers
-  const [solarInfo, setSolarInfo] = useState<SolarInfo>(() => getSolarInfo());
+  const preferredNight = resolvePreferredNightTheme(settings);
+  const simMode = settings.solarSimulationMode || "auto";
+  const [solarInfo, setSolarInfo] = useState<SolarInfo>(() =>
+    getSolarInfo(new Date(), undefined, preferredNight, simMode)
+  );
   const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
+    setSolarInfo(getSolarInfo(new Date(), undefined, preferredNight, simMode));
     const interval = setInterval(() => {
-      setSolarInfo(getSolarInfo());
+      setSolarInfo(getSolarInfo(new Date(), undefined, preferredNight, simMode));
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [preferredNight, simMode]);
 
   const handleToggleAutoSolar = (enabled: boolean) => {
     onUpdateSettings({
       ...settings,
       autoSolarTheme: enabled,
+      preferredNightTheme: preferredNight,
+      solarSimulationMode: "auto",
     });
     if (enabled && !solarInfo.isUsingGeolocation) {
       handleDetectLocation();
     }
+  };
+
+  const handlePreferredNightThemeChange = (nightTheme: AppTheme) => {
+    onUpdateSettings({
+      ...settings,
+      preferredNightTheme: nightTheme,
+      theme: !settings.autoSolarTheme ? nightTheme : settings.theme,
+    });
+  };
+
+  const handleSimulationModeChange = (mode: "auto" | "daylight" | "night") => {
+    onUpdateSettings({
+      ...settings,
+      autoSolarTheme: true,
+      solarSimulationMode: mode,
+    });
   };
 
   const handleDetectLocation = async () => {
@@ -498,6 +530,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     reader.readAsText(file);
   };
 
+  const isFocusModeEnabled = Boolean(settings.focusMode);
+
+  const handleToggleFocusMode = () => {
+    const nextFocusMode = !isFocusModeEnabled;
+    onUpdateSettings({
+      ...settings,
+      focusMode: nextFocusMode,
+    });
+    showToast(
+      nextFocusMode
+        ? currentLanguage === "hi"
+          ? "फोकस मोड सक्रिय — गैर-जरूरी डैशबोर्ड विजेट छिपा दिए गए हैं।"
+          : "Focus Mode enabled — Non-essential dashboard widgets hidden."
+        : currentLanguage === "hi"
+        ? "फोकस मोड निष्क्रिय — सभी डैशबोर्ड विजेट बहाल किए गए।"
+        : "Focus Mode disabled — All dashboard widgets restored."
+    );
+  };
+
   return (
     <div className="space-y-6 pb-4 md:pb-0 max-w-4xl mx-auto w-full animate-in fade-in duration-300">
       {/* Header */}
@@ -511,6 +562,121 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               ? "प्राथमिकताएं, भाषा, एआई क्रेडेंशियल्स और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
               : "Configure preferences, language, AI credentials, and multi-student profiles."}
           </p>
+        </div>
+      </div>
+
+      {/* Focus Mode Toggle Card (Hides Non-Essential Dashboard Widgets) */}
+      <div
+        id="settings-focus-mode-card"
+        data-testid="settings-focus-mode-card"
+        className={`glass-card p-6 rounded-3xl border transition-all space-y-4 ${
+          isFocusModeEnabled
+            ? "border-indigo-500/50 bg-gradient-to-br from-indigo-950/35 via-slate-900/90 to-emerald-950/20 shadow-lg shadow-indigo-500/10"
+            : "border-white/10 bg-slate-900/80"
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div
+              className={`w-10 h-10 rounded-2xl p-2 flex items-center justify-center font-bold shadow-md shrink-0 transition-colors ${
+                isFocusModeEnabled
+                  ? "bg-gradient-to-tr from-indigo-500 to-emerald-400 text-slate-950"
+                  : "bg-slate-800 text-indigo-400 border border-white/10"
+              }`}
+            >
+              <Target className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold font-heading text-white">
+                  {currentLanguage === "hi" ? "फोकस मोड (Focus Mode)" : "Focus Mode"}
+                </h3>
+                <span className="text-xs text-slate-500">·</span>
+                <span
+                  id="settings-focus-mode-status"
+                  className={`text-xs font-mono font-semibold ${
+                    isFocusModeEnabled ? "text-emerald-400" : "text-slate-400"
+                  }`}
+                >
+                  {isFocusModeEnabled
+                    ? currentLanguage === "hi"
+                      ? "सक्रिय (Distraction-Free)"
+                      : "Active — Distractions Hidden"
+                    : currentLanguage === "hi"
+                    ? "निष्क्रिय (Standard View)"
+                    : "Off — Full Dashboard"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                {currentLanguage === "hi"
+                  ? "गहन अध्ययन सत्रों के दौरान विकर्षणों को कम करने के लिए गैर-जरूरी डैशबोर्ड विजेट (प्रेरणा कोट्स, त्वरित लिंक, विस्तारित एनालिटिक्स और वेलनेस कार्ड) को छिपाता है।"
+                  : "When enabled, hides non-essential dashboard widgets (Daily Motivation quotes, Quick Action strip, extended Career/Decision cards, and Wellness widgets) to reduce distractions during intensive study sessions."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
+            <button
+              type="button"
+              id="settings-focus-mode-toggle"
+              data-testid="focus-mode-toggle"
+              role="switch"
+              aria-checked={isFocusModeEnabled}
+              aria-label="Focus Mode"
+              onClick={handleToggleFocusMode}
+              className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isFocusModeEnabled ? "bg-emerald-500" : "bg-slate-700"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  isFocusModeEnabled ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              id="settings-focus-mode-action-btn"
+              onClick={handleToggleFocusMode}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isFocusModeEnabled
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
+                  : "bg-indigo-500 hover:bg-indigo-400 text-white shadow-sm"
+              }`}
+            >
+              {isFocusModeEnabled
+                ? currentLanguage === "hi"
+                  ? "फोकस मोड बंद करें"
+                  : "Disable Focus Mode"
+                : currentLanguage === "hi"
+                ? "फोकस मोड सक्षम करें"
+                : "Enable Focus Mode"}
+            </button>
+          </div>
+        </div>
+
+        {/* Summary of Visible vs Hidden Widgets in Focus Mode */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10 text-xs">
+          <div className="p-3 rounded-2xl bg-slate-950/70 border border-emerald-500/20 space-y-1">
+            <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Kept Visible (Essential Study Tools)</span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Focus Session Timer & Streak, Study Hours Progress, Daily Academic Revision Insight, Quick Task Input & Today's Tasks, Floating Quick-Note Capture.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-slate-950/70 border border-indigo-500/20 space-y-1">
+            <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span>Hidden When Active (Non-Essential Widgets)</span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Daily Motivation Quote Banner, Hero Gamification & Level Scoreboard, 1-Tap Quick Actions Bar, Multi-Card Career/Decision Engine, Water & Wellness Section.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -1176,11 +1342,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             : "Switch instantly between 8 high-contrast student-focused themes designed for focus and low eye strain."}
         </p>
 
-        {/* Sunrise / Sunset Automatic Toggle Option */}
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/20 space-y-3.5">
+        {/* Geolocation-Based Theme Switcher (Daylight High Contrast & Night Preferred Dark) */}
+        <div
+          id="geolocation-theme-switcher-card"
+          data-testid="geolocation-theme-switcher-card"
+          className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-amber-500/30 space-y-4"
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                 {solarInfo.isDaytime ? (
                   <Sunrise className="w-5 h-5 text-amber-400" />
                 ) : (
@@ -1188,20 +1358,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 )}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs sm:text-sm font-bold text-white font-heading">
                     {currentLanguage === "hi"
-                      ? "सूर्योदय / सूर्यास्त ऑटो-थीम टॉगल"
-                      : "Automatic Sunrise / Sunset Theme"}
+                      ? "जियोलोकेशन-आधारित थीम स्विचर (हाई कॉन्ट्रास्ट दिन / डार्क रात)"
+                      : "Geolocation-Based Theme Switcher (High Contrast Daylight / Night Dark)"}
                   </h4>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-                    Day & Night
+                  <span className="text-xs text-slate-500">·</span>
+                  <span className="text-[11px] font-mono text-amber-300 font-semibold">
+                    {settings.autoSolarTheme
+                      ? solarInfo.isDaytime
+                        ? "Active: High Contrast (Daylight)"
+                        : `Active: ${preferredNight} (Night)`
+                      : "Manual Mode"}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   {currentLanguage === "hi"
-                    ? "दिन में लाइट मोड और शाम के बाद डार्क मोड में स्वचालित रूप से स्विच करें।"
-                    : "Automatically switches to Light mode during daylight hours and Dark mode at dusk."}
+                    ? "आपके GPS स्थान के सूर्योदय/सूर्यास्त के आधार पर दिन के उजाले में 'हाई कॉन्ट्रास्ट' मोड और रात में आपकी पसंदीदा डार्क थीम में स्वचालित रूप से स्विच करता है।"
+                    : "Automatically transitions the app to High Contrast mode during daylight hours and your preferred dark theme at night using GPS solar coordinates."}
                 </p>
               </div>
             </div>
@@ -1210,8 +1385,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <button
               onClick={() => handleToggleAutoSolar(!settings.autoSolarTheme)}
               id="auto-solar-theme-toggle"
-              aria-label="Toggle Auto Solar Theme"
-              className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-200 ease-in-out shrink-0 focus:outline-none flex items-center ${
+              data-testid="geolocation-theme-toggle"
+              role="switch"
+              aria-checked={Boolean(settings.autoSolarTheme)}
+              aria-label="Toggle Geolocation-Based Theme Switcher"
+              className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-200 ease-in-out shrink-0 focus:outline-none flex items-center cursor-pointer ${
                 settings.autoSolarTheme ? "bg-amber-500" : "bg-slate-700"
               }`}
             >
@@ -1225,77 +1403,115 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </button>
           </div>
 
-          {/* Solar Live Status Banner */}
-          {settings.autoSolarTheme && (
-            <div className="pt-2 border-t border-white/10 space-y-2.5 animate-in fade-in duration-300">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full animate-pulse ${
-                      solarInfo.isDaytime ? "bg-amber-400" : "bg-indigo-400"
-                    }`}
-                  />
-                  <span className="font-semibold text-white">
-                    {solarInfo.isDaytime
-                      ? currentLanguage === "hi"
-                        ? "☀️ दिन का समय सक्रिय: लाइट मोड लागू है"
-                        : "☀️ Daytime Active: Light Mode is currently active"
-                      : currentLanguage === "hi"
-                      ? "🌙 रात का समय सक्रिय: डार्क मोड लागू है"
-                      : "🌙 Nighttime Active: Dark Mode is currently active"}
-                  </span>
-                </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-lg bg-white/10 text-slate-300">
-                  {solarInfo.nextTransitionLabel}
-                </span>
+          {/* Preferred Nighttime Dark Theme & Phase Controls */}
+          <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <label
+                  htmlFor="preferred-night-theme-select"
+                  className="text-xs font-semibold text-slate-300"
+                >
+                  Preferred Night Dark Theme:
+                </label>
+                <select
+                  id="preferred-night-theme-select"
+                  data-testid="preferred-night-theme-select"
+                  value={preferredNight}
+                  onChange={(e) => handlePreferredNightThemeChange(e.target.value as AppTheme)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-white/15 text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer"
+                >
+                  {DARK_THEME_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id} className="bg-slate-900 text-white">
+                      {opt.label} ({opt.desc})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Sunrise & Sunset Times & Location */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                  <Sunrise className="w-4 h-4 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="text-[10px] text-slate-400">Sunrise</div>
-                    <div className="font-bold font-mono text-white text-xs">
-                      {solarInfo.sunriseFormatted}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                  <Sunset className="w-4 h-4 text-orange-400 shrink-0" />
-                  <div>
-                    <div className="text-[10px] text-slate-400">Sunset</div>
-                    <div className="font-bold font-mono text-white text-xs">
-                      {solarInfo.sunsetFormatted}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2 sm:col-span-1 p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="text-[11px] text-slate-300 truncate">
-                      {solarInfo.isUsingGeolocation ? "GPS Calibrated" : "Regional Solar"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleDetectLocation}
-                    disabled={isLocating}
-                    className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition-all shrink-0 active:scale-95"
-                  >
-                    {isLocating
-                      ? currentLanguage === "hi"
-                        ? "खोज रहा है..."
-                        : "Detecting..."
-                      : currentLanguage === "hi"
-                      ? "स्थान अपडेट"
-                      : "Sync GPS"}
-                  </button>
-                </div>
+              {/* Phase Preview / Geolocation Mode Selector */}
+              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => handleSimulationModeChange("auto")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                    settings.autoSolarTheme && simMode === "auto"
+                      ? "bg-amber-500 text-slate-950 font-bold"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Auto GPS Solar
+                </button>
+                <button
+                  type="button"
+                  data-testid="simulate-daylight-high-contrast-btn"
+                  onClick={() => handleSimulationModeChange("daylight")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                    settings.autoSolarTheme && simMode === "daylight"
+                      ? "bg-amber-400 text-slate-950 font-bold"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Daylight (High Contrast)
+                </button>
+                <button
+                  type="button"
+                  data-testid="simulate-night-dark-btn"
+                  onClick={() => handleSimulationModeChange("night")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                    settings.autoSolarTheme && simMode === "night"
+                      ? "bg-indigo-500 text-white font-bold"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Night ({preferredNight})
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Solar Live Status & GPS Calibration Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <Sunrise className="w-4 h-4 text-amber-400 shrink-0" />
+                <div>
+                  <div className="text-[10px] text-slate-400">Daylight High-Contrast Start</div>
+                  <div className="font-bold font-mono tabular-nums text-white text-xs">
+                    Sunrise · {solarInfo.sunriseFormatted}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <Sunset className="w-4 h-4 text-indigo-400 shrink-0" />
+                <div>
+                  <div className="text-[10px] text-slate-400">Night Dark Theme Start</div>
+                  <div className="font-bold font-mono tabular-nums text-white text-xs">
+                    Sunset · {solarInfo.sunsetFormatted}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="text-[11px] text-slate-300 truncate font-mono tabular-nums">
+                    {solarInfo.isUsingGeolocation && solarInfo.coordinatesUsed
+                      ? `${solarInfo.coordinatesUsed.lat.toFixed(2)}°, ${solarInfo.coordinatesUsed.lng.toFixed(2)}°`
+                      : "Regional Solar"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={isLocating}
+                  data-testid="sync-gps-location-btn"
+                  className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition-all shrink-0 cursor-pointer"
+                >
+                  {isLocating ? "Detecting..." : "Sync GPS"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="pt-2">
@@ -1312,6 +1528,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
           {[
+            { id: "high-contrast", label: "High Contrast", desc: "Daylight Crisp AAA", color: "bg-white border-2 border-slate-950 text-black", dot: "bg-black" },
             { id: "classic", label: currentLanguage === "hi" ? "क्लासिक स्कॉलर" : "Classic Scholar", desc: "Heritage Ivory & Bronze", color: "bg-[#0c1017] border-amber-500/40 text-amber-200", dot: "bg-amber-400" },
             { id: "amoled", label: "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
             { id: "purple", label: "Royal Purple", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
@@ -2070,3 +2287,5 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     </div>
   );
 };
+
+export default SettingsPage;

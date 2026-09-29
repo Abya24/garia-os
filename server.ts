@@ -6,6 +6,8 @@ import crypto from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
+import { verifyFirebaseIdToken } from "./server/firebaseAuth.ts";
+import { MOTIVATIONAL_QUOTES, fetchDailyQuote } from "./src/utils/quotes.ts";
 
 dotenv.config();
 
@@ -19,8 +21,9 @@ process.on("uncaughtException", (err) => {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "25mb" }));
 
   // API Health Endpoint
@@ -36,6 +39,74 @@ async function startServer() {
         "search_grounding (gemini-3.5-flash)",
         "live_voice (gemini-3.1-flash-live-preview)",
       ],
+    });
+  });
+
+  // Daily Morning Motivation & Affirmation Endpoint (Public Quote API + Curated Fallback)
+  app.get("/api/motivation/daily", async (req, res) => {
+    const dateParam = typeof req.query.date === "string" ? req.query.date : undefined;
+    const categoryParam = typeof req.query.category === "string" ? req.query.category : undefined;
+    const refreshParam = req.query.refresh === "true";
+    const excludeId = typeof req.query.excludeId === "string" ? req.query.excludeId : undefined;
+
+    const dailyQuote = fetchDailyQuote(dateParam, categoryParam);
+
+    // Attempt public quotes API when no specific sub-category filter is constraining the pool
+    if (!categoryParam || categoryParam === "all") {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2200);
+        const publicEndpoint = refreshParam
+          ? "https://dummyjson.com/quotes/random"
+          : "https://zenquotes.io/api/today";
+        const extRes = await fetch(publicEndpoint, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (extRes.ok) {
+          const extData = await extRes.json();
+          const item = Array.isArray(extData) ? extData[0] : extData;
+          const qText = (item?.q || item?.quote || "").trim();
+          const qAuthor = (item?.a || item?.author || "").trim();
+          if (qText && qAuthor) {
+            return res.json({
+              status: "ok",
+              source: "public_api",
+              date: dateParam || new Date().toISOString().slice(0, 10),
+              quote: {
+                ...dailyQuote,
+                id: `api-${dateParam || "today"}-${refreshParam ? Date.now() : "morning"}`,
+                quote: qText,
+                author: qAuthor,
+              },
+            });
+          }
+        }
+      } catch {
+        // Graceful fallback to curated local quotes below
+      }
+    }
+
+    if (refreshParam) {
+      const pool =
+        categoryParam && categoryParam !== "all"
+          ? MOTIVATIONAL_QUOTES.filter((q) => q.category === categoryParam)
+          : MOTIVATIONAL_QUOTES;
+      const candidates = pool.filter((q) => q.id !== excludeId);
+      const activePool =
+        candidates.length > 0 ? candidates : pool.length > 0 ? pool : MOTIVATIONAL_QUOTES;
+      const randomQuote = activePool[Math.floor(Math.random() * activePool.length)];
+      return res.json({
+        status: "ok",
+        source: "curated_pool",
+        date: dateParam || new Date().toISOString().slice(0, 10),
+        quote: randomQuote,
+      });
+    }
+
+    return res.json({
+      status: "ok",
+      source: "curated_pool",
+      date: dateParam || new Date().toISOString().slice(0, 10),
+      quote: dailyQuote,
     });
   });
 
@@ -126,11 +197,6 @@ async function startServer() {
   }
 
   function getClientIp(req: express.Request): string {
-    const forwarded = req.headers["x-forwarded-for"];
-    if (typeof forwarded === "string") {
-      const first = forwarded.split(",")[0].trim();
-      if (first) return first;
-    }
     return req.ip || req.socket.remoteAddress || "127.0.0.1";
   }
 
@@ -148,7 +214,7 @@ async function startServer() {
   });
 
   // Live Voice Ephemeral Single-Use Ticket Store
-  const liveVoiceTickets = new Map<string, { expiresAt: number }>();
+  const liveVoiceTickets = new Map<string, { uid: string; expiresAt: number }>();
   setInterval(() => {
     const now = Date.now();
     for (const [t, entry] of liveVoiceTickets.entries()) {
@@ -159,9 +225,21 @@ async function startServer() {
   }, 30000);
 
   // Endpoint to obtain a secure, short-lived single-use ticket for Live Voice WebSocket
-  app.post("/api/live-voice/ticket", (req, res) => {
-    const clientIp = getClientIp(req);
-    const rateCheck = liveVoiceTicketLimiter.check(clientIp);
+  app.post("/api/live-voice/ticket", async (req, res) => {
+    // 1. Mandatory Firebase ID Token Verification
+    const authResult = await verifyFirebaseIdToken(req.headers.authorization);
+    if (!authResult.valid || !authResult.user?.uid) {
+      return res.status(401).json({
+        error: authResult.error || "Authentication required to request a Live Voice session ticket.",
+        code: authResult.code || "UNAUTHENTICATED",
+      });
+    }
+
+    const uid = authResult.user.uid;
+
+    // 2. Authoritative UID-keyed rate limiting
+    const rateKey = `uid:${uid}:live_voice_ticket`;
+    const rateCheck = liveVoiceTicketLimiter.check(rateKey);
     if (!rateCheck.allowed) {
       res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
       return res.status(429).json({
@@ -193,8 +271,8 @@ async function startServer() {
 
     const ticket = crypto.randomBytes(32).toString("hex");
     const expiresAt = Date.now() + 60 * 1000; // 60-second single-use validity
-    liveVoiceTickets.set(ticket, { expiresAt });
-    res.json({ ticket, expiresInSeconds: 60 });
+    liveVoiceTickets.set(ticket, { uid, expiresAt });
+    res.json({ ticket, uid, expiresInSeconds: 60 });
   });
 
   // Abya AI Provider Diagnostics & Health Check Endpoint
@@ -220,8 +298,20 @@ async function startServer() {
   app.post("/api/ai/chat", async (req, res) => {
     const startTime = Date.now();
     try {
-      const clientIp = getClientIp(req);
-      const rateCheck = aiChatLimiter.check(clientIp);
+      // 1. Mandatory Firebase ID Token Verification
+      const authResult = await verifyFirebaseIdToken(req.headers.authorization);
+      if (!authResult.valid || !authResult.user?.uid) {
+        return res.status(401).json({
+          error: authResult.error || "Authentication required. Please provide a valid Firebase ID token.",
+          code: authResult.code || "UNAUTHENTICATED",
+        });
+      }
+
+      const verifiedUid = authResult.user.uid;
+
+      // 2. Authoritative UID-keyed rate limiting
+      const rateKey = `uid:${verifiedUid}:ai_chat`;
+      const rateCheck = aiChatLimiter.check(rateKey);
       if (!rateCheck.allowed) {
         res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
         return res.status(429).json({
@@ -489,7 +579,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         candidates.push(
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
           { model: "gemini-3.7-flash", config: { systemInstruction } },
-          { model: "gemini-2.5-flash", config: { systemInstruction } }
+          { model: "gemini-3.5-flash", config: { systemInstruction } }
         );
       } else if (mode === "search_grounded") {
         candidates.push(
@@ -508,8 +598,8 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         candidates.push(
           { model: "gemini-3.7-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
-          { model: "gemini-2.5-flash", config: { systemInstruction } },
-          { model: "gemini-3.5-flash", config: { systemInstruction } }
+          { model: "gemini-3.5-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-pro-preview", config: { systemInstruction } }
         );
       }
 
@@ -646,7 +736,13 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
   });
 
   // Static asset serving & SPA routing in production / Vite middleware in development
-  const isProduction = process.env.NODE_ENV === "production";
+  const distPath = path.join(process.cwd(), "dist");
+  const indexPath = path.join(distPath, "index.html");
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    Boolean(process.env.K_SERVICE) ||
+    Boolean(process.env.K_REVISION) ||
+    (process.env.npm_lifecycle_event === "start" && fs.existsSync(indexPath));
 
   // Cache & PWA Headers Middleware
   app.use((req, res, next) => {
@@ -673,8 +769,6 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
     app.use(vite.middlewares);
   } else {
     console.log("[Garia OS Server] Starting in PRODUCTION mode with static dist assets...");
-    const distPath = path.join(process.cwd(), "dist");
-    const indexPath = path.join(distPath, "index.html");
 
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -721,6 +815,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
         // Atomically consume ticket (strictly single-use)
         liveVoiceTickets.delete(ticket);
         (request as any)._liveVoiceTicketValidated = true;
+        (request as any)._liveVoiceUid = ticketData.uid;
 
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit("connection", ws, request);

@@ -19,14 +19,57 @@ import {
   Filter,
   CheckCircle2,
   ArrowLeft,
+  Flame,
+  TrendingUp,
+  Trophy,
+  Share2,
+  Copy,
+  Check,
+  Download,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+} from "recharts";
+import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
 import { Subject, StudySession, AcademicChapter, StudentProfile } from "../types";
 import { getTodayString } from "../utils/storage";
 import { formatSecondsToMSS, formatDurationCompact } from "../utils/dateTimeUtils";
 import { useTransientToast } from "../utils/uiUtils";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
-import { getStudyMilestones } from "../utils/gamificationEngine";
+import {
+  getStudyMilestones,
+  calculateStudyStreak,
+  generateStudyStreakShareSnippet,
+  StudyStreakStats,
+} from "../utils/gamificationEngine";
 import { MilestoneBadgesCard } from "../components/MilestoneBadgesCard";
+import {
+  generateStudySessionsCSV,
+  downloadStudySessionsCSV,
+} from "../utils/studySessionCsvExport";
+
+export {
+  calculateStudyStreak,
+  generateStudyStreakShareSnippet,
+  generateStudySessionsCSV,
+  downloadStudySessionsCSV,
+  type StudyStreakStats,
+};
+
+/**
+ * Counts consecutive days with logged study sessions up to today (or yesterday if today is still pending).
+ */
+export function calculateConsecutiveStudyDays(studySessions: StudySession[] = []): number {
+  return calculateStudyStreak(studySessions).currentStreak;
+}
 
 interface StudyTrackerProps {
   subjects: Subject[];
@@ -76,7 +119,63 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   const [accumulatedSeconds, setAccumulatedSeconds] = useState<number>(0);
   const [sessionNotes, setSessionNotes] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const { toastMessage, showToast } = useTransientToast(3000);
+  const { toastMessage, showToast } = useTransientToast(3500);
+
+  // Framer Motion Study Streak scale-up animation & Milestone Congratulations Toast state
+  const [isStreakBadgeAnimating, setIsStreakBadgeAnimating] = useState<boolean>(false);
+  const [streakAnimCount, setStreakAnimCount] = useState<number>(0);
+  const [streakCongratsToast, setStreakCongratsToast] = useState<{
+    streakDays: number;
+    title: string;
+    message: string;
+  } | null>(null);
+  const prevStreakRef = React.useRef<number | null>(null);
+
+  const triggerStreakMilestoneToast = React.useCallback((days: number) => {
+    if (days !== 3 && days !== 7) return;
+    const title =
+      days === 7
+        ? "Congratulations! 7-Day Study Streak Unlocked!"
+        : "Congratulations! 3-Day Study Streak Reached!";
+    const message =
+      days === 7
+        ? "Congratulations on logging study sessions for 7 consecutive days! A full week of academic consistency!"
+        : "Congratulations on hitting a 3-day consecutive study streak! Keep building your daily study momentum!";
+
+    setStreakCongratsToast({ streakDays: days, title, message });
+    try {
+      confetti({
+        particleCount: days === 7 ? 80 : 50,
+        spread: 70,
+        origin: { y: 0.7 },
+        colors: ["#f59e0b", "#10b981", "#06b6d4"],
+      });
+    } catch {
+      // Ignore confetti errors in headless browsers
+    }
+  }, []);
+
+  const triggerSessionLoggedStreakAnimation = React.useCallback(
+    (loggedSession: Omit<StudySession, "id" | "timestamp">) => {
+      setStreakAnimCount((c) => c + 1);
+      setIsStreakBadgeAnimating(true);
+      setTimeout(() => setIsStreakBadgeAnimating(false), 850);
+
+      const simulatedSessions: StudySession[] = [
+        ...studySessions,
+        {
+          ...loggedSession,
+          id: `temp-${Date.now()}`,
+          timestamp: Date.now(),
+        },
+      ];
+      const nextStreak = calculateStudyStreak(simulatedSessions).currentStreak;
+      if (nextStreak === 3 || nextStreak === 7) {
+        triggerStreakMilestoneToast(nextStreak);
+      }
+    },
+    [studySessions, triggerStreakMilestoneToast]
+  );
 
   // Subject Modal
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -235,13 +334,15 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
     setIsSaving(true);
     const activeSubj = subjects.find((s) => s.id === activeSubjectId);
     if (activeSubj) {
-      onLogStudySession({
+      const sessionPayload = {
         subjectId: activeSubj.id,
         subjectName: activeSubj.name,
         durationSeconds: secondsElapsed,
         date: getTodayString(),
         notes: sessionNotes,
-      });
+      };
+      onLogStudySession(sessionPayload);
+      triggerSessionLoggedStreakAnimation(sessionPayload);
       showToast(`Study session saved! (${Math.round(secondsElapsed / 60)} mins for ${activeSubj.name})`);
     }
 
@@ -334,13 +435,15 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
       return;
     }
 
-    onLogStudySession({
+    const sessionPayload = {
       subjectId: selectedSubj.id,
       subjectName: selectedSubj.name,
       durationSeconds: totalSecs,
       date: manualDate || getTodayString(),
       notes: manualNotes,
-    });
+    };
+    onLogStudySession(sessionPayload);
+    triggerSessionLoggedStreakAnimation(sessionPayload);
 
     showToast(`Logged ${hrs > 0 ? `${hrs}h ` : ""}${mins}m for ${selectedSubj.name}!`);
     setIsManualModalOpen(false);
@@ -414,6 +517,73 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   }, [academicChapters, sessionSubjectFilter]);
 
   const studyMilestones = getStudyMilestones(studySessions, subjects);
+  const studyStreak = React.useMemo(
+    () => calculateStudyStreak(studySessions),
+    [studySessions]
+  );
+
+  // Shareable Study Consistency Snippet state
+  const [shareSnippetText, setShareSnippetText] = useState<string | null>(null);
+  const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
+
+  const handleExportStudyHistoryCSV = (useFilteredOnly: boolean = false) => {
+    const targetList =
+      useFilteredOnly && (sessionSearch.trim() !== "" || sessionSubjectFilter !== "ALL")
+        ? filteredSessions
+        : studySessions;
+    const result = downloadStudySessionsCSV(targetList, subjects, activeStudent);
+    showToast(
+      `Exported ${result.rowCount} study session${result.rowCount === 1 ? "" : "s"} (${result.totalHours}h total) to ${result.filename}`
+    );
+  };
+
+  const handleShareStudyStreak = async () => {
+    const snippet = generateStudyStreakShareSnippet(
+      studyStreak,
+      activeStudent?.name
+    );
+    setShareSnippetText(snippet);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(snippet);
+      }
+      setIsShareCopied(true);
+      setTimeout(() => setIsShareCopied(false), 2500);
+    } catch {
+      setIsShareCopied(true);
+      setTimeout(() => setIsShareCopied(false), 2500);
+    }
+    showToast("Study consistency summary generated & copied to clipboard!");
+  };
+
+  // Automatically trigger congratulations toast when user hits a 3-day or 7-day study streak
+  useEffect(() => {
+    const current = studyStreak.currentStreak;
+    const prev = prevStreakRef.current;
+    prevStreakRef.current = current;
+
+    if (current === 3 || current === 7) {
+      const storageFlagKey = `garia_streak_congrats_${profileId}_${getTodayString()}_${current}`;
+      const alreadyShown = sessionStorage.getItem(storageFlagKey);
+      if ((prev !== null && prev !== current) || !alreadyShown) {
+        try {
+          sessionStorage.setItem(storageFlagKey, "1");
+        } catch {
+          // Ignore storage errors
+        }
+        triggerStreakMilestoneToast(current);
+      }
+    }
+  }, [studyStreak.currentStreak, profileId, triggerStreakMilestoneToast]);
+
+  // Auto-dismiss streak congratulations toast after 5.5s
+  useEffect(() => {
+    if (!streakCongratsToast) return;
+    const timer = setTimeout(() => {
+      setStreakCongratsToast(null);
+    }, 5500);
+    return () => clearTimeout(timer);
+  }, [streakCongratsToast]);
 
   return (
     <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
@@ -424,6 +594,44 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           <span className="text-xs sm:text-sm">{toastMessage}</span>
         </div>
       )}
+
+      {/* 3-Day / 7-Day Study Streak Congratulations Toast Notification */}
+      <AnimatePresence>
+        {streakCongratsToast && (
+          <motion.div
+            id="study-streak-congratulations-toast"
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: -16, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed top-28 right-4 z-50 max-w-sm w-full bg-slate-900/95 border border-amber-500/50 text-white p-4 rounded-2xl shadow-2xl flex items-start gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-amber-300">
+              <Trophy className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-extrabold text-amber-300 tracking-tight">
+                  {streakCongratsToast.title}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStreakCongratsToast(null)}
+                  className="text-slate-400 hover:text-white p-0.5 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Dismiss streak notification"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-200 leading-relaxed">
+                {streakCongratsToast.message}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -446,6 +654,67 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <motion.div
+            key={`streak-badge-${streakAnimCount}`}
+            id="study-streak-header-badge"
+            initial={{ scale: 1 }}
+            animate={
+              isStreakBadgeAnimating
+                ? { scale: [1, 1.18, 0.96, 1.08, 1] }
+                : { scale: 1 }
+            }
+            transition={{ duration: 0.55, ease: "easeOut" }}
+            className={`flex items-center gap-2 pl-3.5 pr-2 py-1.5 rounded-2xl border text-xs font-bold font-mono tabular-nums transition-colors ${
+              studyStreak.currentStreak > 0
+                ? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm"
+                : "bg-slate-900/80 border-white/10 text-slate-400"
+            }`}
+            title="Current consecutive days of study sessions"
+          >
+            <Flame
+              className={`w-4 h-4 shrink-0 ${
+                studyStreak.currentStreak > 0
+                  ? "text-amber-400 fill-amber-400"
+                  : "text-slate-500"
+              }`}
+            />
+            <span>
+              {studyStreak.currentStreak}{" "}
+              {studyStreak.currentStreak === 1 ? "Day Streak" : "Days Streak"}
+            </span>
+            <button
+              type="button"
+              id="share-study-streak-btn"
+              onClick={handleShareStudyStreak}
+              className="ml-1 px-2 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-white/10 text-[11px] font-sans font-semibold text-amber-200 hover:text-white flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
+              title="Share study streak & consistency summary"
+            >
+              {isShareCopied ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-300">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3 h-3 text-amber-400" />
+                  <span>Share</span>
+                </>
+              )}
+            </button>
+          </motion.div>
+
+          <button
+            type="button"
+            id="export-study-sessions-csv-header-btn"
+            data-testid="export-study-csv-header-btn"
+            onClick={() => handleExportStudyHistoryCSV(false)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl glass-pill border border-cyan-500/30 text-cyan-300 text-xs font-bold hover:bg-cyan-500/20 transition-all cursor-pointer"
+            title="Export complete study session history as a CSV spreadsheet"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+
           <button
             onClick={handleOpenManualModal}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl glass-pill border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition-all"
@@ -479,6 +748,394 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Study Streak Visual Indicator Card */}
+      <section
+        id="study-streak-visual-indicator"
+        aria-label="Study Streak Visual Indicator"
+        className="glass-card rounded-3xl p-5 sm:p-6 border border-amber-500/30 bg-gradient-to-br from-slate-900/95 via-slate-900/90 to-amber-950/25 shadow-lg space-y-5"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+          {/* Left: Primary Consecutive Days Counter, Progress Circle & Flame Badge (5 cols) */}
+          <div className="lg:col-span-5 flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-white/10 pb-4 lg:pb-0 lg:pr-5">
+            <motion.div
+              key={`streak-circle-${streakAnimCount}`}
+              id="study-streak-progress-circle"
+              initial={{ scale: 1 }}
+              animate={
+                isStreakBadgeAnimating
+                  ? { scale: [1, 1.15, 0.97, 1.06, 1] }
+                  : { scale: 1 }
+              }
+              transition={{ duration: 0.55, ease: "easeOut" }}
+              className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center shrink-0"
+              title={`Streak Milestone Progress: ${studyStreak.currentStreak}/${studyStreak.nextMilestone} consecutive days (${studyStreak.milestoneProgressPercent}%)`}
+            >
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 88 88" aria-hidden="true">
+                <circle
+                  cx="44"
+                  cy="44"
+                  r="37"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  className="text-slate-800"
+                />
+                <circle
+                  cx="44"
+                  cy="44"
+                  r="37"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 37}
+                  strokeDashoffset={
+                    2 * Math.PI * 37 * (1 - Math.min(100, Math.max(0, studyStreak.milestoneProgressPercent)) / 100)
+                  }
+                  className={`transition-all duration-500 ${
+                    studyStreak.currentStreak > 0 ? "text-amber-400" : "text-slate-600"
+                  }`}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Flame
+                  className={`w-6 h-6 sm:w-7 sm:h-7 ${
+                    studyStreak.currentStreak > 0
+                      ? "text-amber-400 fill-amber-400"
+                      : "text-slate-500"
+                  }`}
+                />
+                <span className="text-[10px] font-mono font-bold text-amber-300 tabular-nums mt-0.5">
+                  {studyStreak.milestoneProgressPercent}%
+                </span>
+              </div>
+            </motion.div>
+
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 text-xs text-amber-300 font-semibold">
+                <span>Study Streak</span>
+                <span aria-hidden="true">·</span>
+                <span className="text-slate-400 font-normal">
+                  {studyStreak.studiedToday ? "Logged Today ✓" : "Today Pending"}
+                </span>
+              </div>
+
+              <div className="flex items-baseline gap-2">
+                <span
+                  id="study-streak-consecutive-days-count"
+                  className="text-3xl sm:text-4xl font-extrabold font-mono tabular-nums text-white tracking-tight"
+                >
+                  {studyStreak.currentStreak}
+                </span>
+                <span className="text-sm sm:text-base font-bold text-slate-200 font-heading">
+                  {studyStreak.currentStreak === 1
+                    ? "Consecutive Day"
+                    : "Consecutive Days"}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {studyStreak.studiedToday
+                  ? `Great consistency! You've logged ${studyStreak.todayMinutes}m across ${studyStreak.todaySessionsCount} study session${studyStreak.todaySessionsCount === 1 ? "" : "s"} today.`
+                  : studyStreak.currentStreak > 0
+                  ? `You're on a ${studyStreak.currentStreak}-day study streak! Complete a session today to reach ${studyStreak.currentStreak + 1} consecutive days.`
+                  : "Complete a study timer or manual log today to ignite your consecutive day study streak."}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: 7-Day Visual Calendar Grid & Milestone Progress (7 cols) */}
+          <div className="lg:col-span-7 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-semibold text-slate-200">
+                  7-Day Study Session Calendar Grid
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-slate-400 font-mono tabular-nums">
+                <span>
+                  7-Day Logged:{" "}
+                  <strong className="text-amber-300">
+                    {studyStreak.last7Days.filter((d) => d.studied).length}/7
+                  </strong>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Best Streak:{" "}
+                  <strong className="text-amber-300">
+                    {studyStreak.longestStreak}d
+                  </strong>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Total Days:{" "}
+                  <strong className="text-emerald-300">
+                    {studyStreak.totalStudyDays}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            {/* 7-Day Visual Calendar Grid */}
+            <div
+              id="study-streak-7day-calendar-grid"
+              role="grid"
+              aria-label="7-Day Study Session Visual Calendar Grid"
+              className="grid grid-cols-7 gap-1.5 sm:gap-2"
+            >
+              {studyStreak.last7Days.map((dayItem) => {
+                const isSelectedDate = sessionSearch === dayItem.date;
+                const dayNumber = dayItem.date.slice(8);
+                return (
+                  <button
+                    key={dayItem.date}
+                    type="button"
+                    role="gridcell"
+                    aria-selected={dayItem.studied}
+                    onClick={() =>
+                      setSessionSearch((prev) =>
+                        prev === dayItem.date ? "" : dayItem.date
+                      )
+                    }
+                    className={`p-2 sm:p-2.5 rounded-2xl border text-center flex flex-col items-center justify-between gap-1 transition-all cursor-pointer ${
+                      dayItem.studied
+                        ? "bg-amber-500/15 border-amber-500/40 text-white hover:border-amber-400"
+                        : dayItem.isToday
+                        ? "bg-slate-950/90 border-cyan-500/40 text-slate-300 hover:border-cyan-400"
+                        : "bg-slate-950/60 border-white/5 text-slate-500 hover:border-white/15"
+                    } ${isSelectedDate ? "ring-2 ring-cyan-400" : ""}`}
+                    title={`${dayItem.date}: ${
+                      dayItem.studied
+                        ? `${dayItem.minutes}m studied across ${dayItem.sessionsCount} session${dayItem.sessionsCount === 1 ? "" : "s"}`
+                        : "No study sessions logged"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full px-0.5 text-[10px]">
+                      <span
+                        className={`font-semibold truncate ${
+                          dayItem.isToday ? "text-cyan-300 font-bold" : "text-slate-400"
+                        }`}
+                      >
+                        {dayItem.isToday ? "Today" : dayItem.dayLabel}
+                      </span>
+                      <span className="font-mono tabular-nums text-[9px] text-slate-400">
+                        {dayNumber}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center ${
+                        dayItem.studied
+                          ? "bg-amber-500 text-slate-950 shadow-sm"
+                          : "bg-slate-900 text-slate-600 border border-white/5"
+                      }`}
+                    >
+                      {dayItem.studied ? (
+                        <CheckCircle2 className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                      ) : (
+                        <span className="text-[10px] font-mono tabular-nums text-slate-500">
+                          —
+                        </span>
+                      )}
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-mono tabular-nums ${
+                        dayItem.studied ? "text-amber-300 font-semibold" : "text-slate-500"
+                      }`}
+                    >
+                      {dayItem.studied ? `${dayItem.minutes}m` : "0m"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Streak Milestone Progress Bar */}
+            <div className="space-y-1 pt-0.5">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono tabular-nums">
+                <span className="flex items-center gap-1 text-slate-300 font-sans font-medium">
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+                  <span>
+                    Next Target: {studyStreak.nextMilestone}-Day Consecutive Streak
+                  </span>
+                </span>
+                <span>
+                  {studyStreak.currentStreak} / {studyStreak.nextMilestone} days (
+                  {studyStreak.milestoneProgressPercent}%)
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.max(4, studyStreak.milestoneProgressPercent)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Shareable Study Consistency Text Snippet Box */}
+        {shareSnippetText && (
+          <div
+            id="study-streak-shareable-snippet-panel"
+            className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/40 space-y-2.5"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Shareable Study Consistency Summary</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleShareStudyStreak}
+                  className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{isShareCopied ? "Copied!" : "Copy Text"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShareSnippetText(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+                  aria-label="Close shareable snippet"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <pre
+              id="study-streak-shareable-snippet-text"
+              className="text-xs text-slate-200 font-mono whitespace-pre-wrap leading-relaxed bg-slate-900/80 p-3 rounded-xl border border-white/5"
+            >
+              {shareSnippetText}
+            </pre>
+          </div>
+        )}
+
+        {/* 30-Day Study Session Duration & Streak Consistency Bar Chart (Recharts) */}
+        <div
+          id="study-streak-30day-chart-card"
+          className="pt-4 border-t border-white/10 space-y-3"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white font-heading flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-amber-400" />
+                <span>30-Day Daily Study Session Duration & Streak Consistency</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Daily study minutes over the last 30 days, highlighting days where your study streak was maintained.
+              </p>
+            </div>
+
+            {/* Legend & 30-Day Totals */}
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" />
+                <span className="text-slate-300">Streak Maintained</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-cyan-400 inline-block" />
+                <span className="text-slate-300">Single Study Day</span>
+              </div>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span className="font-mono tabular-nums text-slate-300">
+                This Week: <strong className="text-amber-300">{studyStreak.weeklyStudyHours}h</strong>
+              </span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span className="font-mono tabular-nums text-slate-300">
+                30d Total: <strong className="text-emerald-300">{studyStreak.monthlyStudyHours}h</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="h-52 sm:h-60 w-full bg-slate-950/70 rounded-2xl p-3 border border-white/5">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={studyStreak.last30Days}
+                margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.06)"
+                />
+                <XAxis
+                  dataKey="shortDate"
+                  tick={{ fill: "#94a3b8", fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  interval={4}
+                />
+                <YAxis
+                  tick={{ fill: "#94a3b8", fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  unit="m"
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const item = payload[0].payload;
+                    return (
+                      <div className="bg-slate-900 border border-white/15 rounded-xl p-2.5 shadow-xl text-xs space-y-1">
+                        <div className="font-bold text-white flex items-center justify-between gap-3">
+                          <span>
+                            {item.dayLabel}, {item.shortDate} ({item.date})
+                          </span>
+                          {item.streakMaintained && (
+                            <span className="text-amber-300 font-mono">
+                              🔥 Streak Day {item.streakLengthOnDay}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-slate-300 font-mono tabular-nums">
+                          Duration:{" "}
+                          <strong className="text-white">
+                            {item.minutes} mins ({item.hours} hrs)
+                          </strong>
+                        </div>
+                        <div className="text-slate-400">
+                          {item.studied
+                            ? `${item.sessionsCount} study session${
+                                item.sessionsCount === 1 ? "" : "s"
+                              } logged · ${
+                                item.streakMaintained
+                                  ? "Streak Maintained"
+                                  : "Session Logged"
+                              }`
+                            : "No study sessions logged"}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="minutes" name="Study Duration (mins)" radius={[4, 4, 0, 0]}>
+                  {studyStreak.last30Days.map((entry) => (
+                    <Cell
+                      key={entry.date}
+                      fill={
+                        entry.streakMaintained
+                          ? "#f59e0b"
+                          : entry.studied
+                          ? "#06b6d4"
+                          : "#1e293b"
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
 
       {/* Universal Dropdown Navigation Ribbon (Rule 1 & Rule 2) */}
       <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
@@ -832,6 +1489,18 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
                 </option>
               ))}
             </select>
+
+            <button
+              type="button"
+              id="export-study-sessions-csv-btn"
+              data-testid="export-study-csv-btn"
+              onClick={() => handleExportStudyHistoryCSV(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Export study session history as CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV ({filteredSessions.length})</span>
+            </button>
           </div>
         </div>
 

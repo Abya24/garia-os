@@ -27,9 +27,12 @@ import {
   Square,
   Layers,
   CheckCheck,
+  ArrowUpDown,
+  Flag,
+  BookOpen,
 } from "lucide-react";
 import confetti from "canvas-confetti";
-import { Task, Priority, TaskCategory, SharedWorkspace, WorkspaceMember } from "../types";
+import { Task, Subtask, Priority, TaskCategory, SharedWorkspace, WorkspaceMember } from "../types";
 import { getTodayString } from "../utils/storage";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
 import { getTaskMilestones } from "../utils/gamificationEngine";
@@ -43,6 +46,51 @@ import { CreateSharedWorkspaceModal } from "../components/collaboration/CreateSh
 import { JoinWorkspaceModal } from "../components/collaboration/JoinWorkspaceModal";
 import { SharedTasksWorkspaceView } from "../components/collaboration/SharedTasksWorkspaceView";
 import { SwipeableItemCard } from "../components/SwipeableItemCard";
+
+export type TaskPrioritySortMode =
+  | "priority_high_to_low"
+  | "priority_low_to_high"
+  | "due_date_asc"
+  | "created_desc";
+
+const TASK_PRIORITY_WEIGHT_MAP: Record<string, number> = {
+  high: 3,
+  High: 3,
+  medium: 2,
+  Medium: 2,
+  low: 1,
+  Low: 1,
+};
+
+/**
+ * Organizes and sorts tasks by Priority Levels (High, Medium, Low) or date.
+ */
+export function sortTasksByPriority(
+  taskList: Task[],
+  sortOrder: TaskPrioritySortMode = "priority_high_to_low"
+): Task[] {
+  return [...taskList].sort((a, b) => {
+    const weightA = TASK_PRIORITY_WEIGHT_MAP[a.priority] ?? 2;
+    const weightB = TASK_PRIORITY_WEIGHT_MAP[b.priority] ?? 2;
+
+    if (sortOrder === "priority_high_to_low") {
+      if (weightB !== weightA) return weightB - weightA;
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return (a.date || "").localeCompare(b.date || "");
+    }
+    if (sortOrder === "priority_low_to_high") {
+      if (weightA !== weightB) return weightA - weightB;
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return (a.date || "").localeCompare(b.date || "");
+    }
+    if (sortOrder === "due_date_asc") {
+      const dateCmp = (a.date || "").localeCompare(b.date || "");
+      if (dateCmp !== 0) return dateCmp;
+      return weightB - weightA;
+    }
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+}
 
 interface TaskManagerProps {
   tasks: Task[];
@@ -73,11 +121,14 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   const [isCreateWsOpen, setIsCreateWsOpen] = useState(false);
   const [isJoinWsOpen, setIsJoinWsOpen] = useState(false);
 
-  // Search & Filter State
+  // Search, Filter & Sort State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<
+    "priority_high_to_low" | "priority_low_to_high" | "due_date_asc" | "created_desc"
+  >("priority_high_to_low");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -101,6 +152,64 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   const [category, setCategory] = useState<TaskCategory>("study");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+
+  // Inline Subtask Quick-Add State per Task Card
+  const [inlineSubtaskInputs, setInlineSubtaskInputs] = useState<Record<string, string>>({});
+  const [openInlineSubtaskTaskId, setOpenInlineSubtaskTaskId] = useState<string | null>(null);
+
+  // Quick Task Creation Bar State
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickPriority, setQuickPriority] = useState<Priority>("medium");
+  const [quickCategory, setQuickCategory] = useState<TaskCategory>("study");
+  const [showQuickSubtasks, setShowQuickSubtasks] = useState(false);
+  const [quickSubtaskInput, setQuickSubtaskInput] = useState("");
+  const [quickSubtasks, setQuickSubtasks] = useState<Subtask[]>([]);
+
+  const handleAddQuickSubtask = () => {
+    const trimmed = quickSubtaskInput.trim();
+    if (!trimmed) return;
+    setQuickSubtasks((prev) => [
+      ...prev,
+      {
+        id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        title: trimmed,
+        completed: false,
+      },
+    ]);
+    setQuickSubtaskInput("");
+  };
+
+  const handleQuickCreateTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTitle.trim()) return;
+    const finalQuickSubtasks = quickSubtaskInput.trim()
+      ? [
+          ...quickSubtasks,
+          {
+            id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            title: quickSubtaskInput.trim(),
+            completed: false,
+          },
+        ]
+      : quickSubtasks;
+
+    onAddTask({
+      title: quickTitle.trim(),
+      description: "",
+      date: todayStr,
+      time: "12:00",
+      priority: quickPriority,
+      category: quickCategory,
+      completed: false,
+      subtasks: finalQuickSubtasks.length > 0 ? finalQuickSubtasks : undefined,
+    });
+    setQuickTitle("");
+    setQuickSubtasks([]);
+    setQuickSubtaskInput("");
+    setShowQuickSubtasks(false);
+  };
 
   const todayStr = getTodayString();
 
@@ -148,6 +257,8 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     setCategory("study");
     setIsCustomCategory(false);
     setCustomCategoryInput("");
+    setSubtasks([]);
+    setNewSubtaskTitle("");
     setIsModalOpen(true);
   };
 
@@ -158,6 +269,8 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     setDate(task.date);
     setTime(task.time || "12:00");
     setPriority(task.priority);
+    setSubtasks(Array.isArray(task.subtasks) ? [...task.subtasks] : []);
+    setNewSubtaskTitle("");
     
     const isStandard = standardCategories.includes((task.category || "").toLowerCase());
     if (isStandard) {
@@ -172,6 +285,67 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     setIsModalOpen(true);
   };
 
+  const handleAddModalSubtask = () => {
+    const trimmed = newSubtaskTitle.trim();
+    if (!trimmed) return;
+    setSubtasks((prev) => [
+      ...prev,
+      {
+        id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        title: trimmed,
+        completed: false,
+      },
+    ]);
+    setNewSubtaskTitle("");
+  };
+
+  const handleToggleModalSubtask = (subtaskId: string) => {
+    setSubtasks((prev) =>
+      prev.map((st) =>
+        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+      )
+    );
+  };
+
+  const handleRemoveModalSubtask = (subtaskId: string) => {
+    setSubtasks((prev) => prev.filter((st) => st.id !== subtaskId));
+  };
+
+  const handleToggleTaskSubtask = (task: Task, subtaskId: string) => {
+    const currentSubtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+    const updatedSubtasks = currentSubtasks.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+    onUpdateTask({
+      ...task,
+      subtasks: updatedSubtasks,
+    });
+  };
+
+  const handleAddInlineSubtask = (task: Task) => {
+    const rawTitle = (inlineSubtaskInputs[task.id] || "").trim();
+    if (!rawTitle) return;
+    const currentSubtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+    const newSub: Subtask = {
+      id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      title: rawTitle,
+      completed: false,
+    };
+    onUpdateTask({
+      ...task,
+      subtasks: [...currentSubtasks, newSub],
+    });
+    setInlineSubtaskInputs((prev) => ({ ...prev, [task.id]: "" }));
+  };
+
+  const handleDeleteTaskSubtask = (task: Task, subtaskId: string) => {
+    const currentSubtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+    onUpdateTask({
+      ...task,
+      subtasks: currentSubtasks.filter((st) => st.id !== subtaskId),
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -179,6 +353,18 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     const finalCategory = isCustomCategory
       ? (customCategoryInput.trim() || "personal").toLowerCase()
       : category;
+
+    // Include any typed subtask in the input box if user didn't click "+" yet
+    const finalSubtasks = newSubtaskTitle.trim()
+      ? [
+          ...subtasks,
+          {
+            id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            title: newSubtaskTitle.trim(),
+            completed: false,
+          },
+        ]
+      : subtasks;
 
     if (editingTask) {
       onUpdateTask({
@@ -189,6 +375,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         time,
         priority,
         category: finalCategory,
+        subtasks: finalSubtasks,
       });
     } else {
       onAddTask({
@@ -199,6 +386,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         priority,
         category: finalCategory,
         completed: false,
+        subtasks: finalSubtasks,
       });
     }
 
@@ -312,69 +500,99 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     }
   };
 
-  // Filter & Search Logic (Title + Description)
-  const filteredTasks = tasks.filter((task) => {
-    const q = searchQuery.toLowerCase().trim();
-    if (q) {
-      const matchesTitle = task.title.toLowerCase().includes(q);
-      const matchesDesc = (task.description || "").toLowerCase().includes(q);
-      if (!matchesTitle && !matchesDesc) return false;
-    }
+  // Filter, Search & Sort Logic (Title + Description + Priority Sorting)
+  const filteredTasks = sortTasksByPriority(
+    tasks.filter((task) => {
+      const q = searchQuery.toLowerCase().trim();
+      if (q) {
+        const matchesTitle = task.title.toLowerCase().includes(q);
+        const matchesDesc = (task.description || "").toLowerCase().includes(q);
+        if (!matchesTitle && !matchesDesc) return false;
+      }
 
-    // Status filter
-    if (selectedStatusFilter === "today" && (task.date !== todayStr || task.completed)) return false;
-    if (selectedStatusFilter === "upcoming" && (task.date <= todayStr || task.completed)) return false;
-    if (selectedStatusFilter === "completed" && !task.completed) return false;
-    if (selectedStatusFilter === "pending" && task.completed) return false;
+      // Status filter
+      if (selectedStatusFilter === "today" && (task.date !== todayStr || task.completed)) return false;
+      if (selectedStatusFilter === "upcoming" && (task.date <= todayStr || task.completed)) return false;
+      if (selectedStatusFilter === "completed" && !task.completed) return false;
+      if (selectedStatusFilter === "pending" && task.completed) return false;
 
-    // Priority filter
-    if (selectedPriorityFilter !== "all" && task.priority !== selectedPriorityFilter) return false;
+      // Priority filter
+      if (
+        selectedPriorityFilter !== "all" &&
+        (task.priority || "medium").toLowerCase() !== selectedPriorityFilter.toLowerCase()
+      )
+        return false;
 
-    // Category filter
-    if (selectedCategoryFilter !== "all" && (task.category || "").toLowerCase() !== selectedCategoryFilter.toLowerCase()) return false;
+      // Category filter
+      if (selectedCategoryFilter !== "all" && (task.category || "").toLowerCase() !== selectedCategoryFilter.toLowerCase()) return false;
 
-    return true;
-  });
+      return true;
+    }),
+    sortBy
+  );
 
-  const highPriorityCount = tasks.filter((t) => !t.completed && t.priority === "high").length;
-  const mediumPriorityCount = tasks.filter((t) => !t.completed && t.priority === "medium").length;
-  const lowPriorityCount = tasks.filter((t) => !t.completed && t.priority === "low").length;
+  const highPriorityCount = tasks.filter((t) => !t.completed && (t.priority || "medium").toLowerCase() === "high").length;
+  const mediumPriorityCount = tasks.filter((t) => !t.completed && (t.priority || "medium").toLowerCase() === "medium").length;
+  const lowPriorityCount = tasks.filter((t) => !t.completed && (t.priority || "medium").toLowerCase() === "low").length;
 
   const renderPriorityBadge = (p: Priority) => {
-    switch (p) {
+    const norm = (p || "medium").toLowerCase();
+    switch (norm) {
       case "high":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 ring-1 ring-rose-500/20 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-rose-950/40 shrink-0">
+          <span
+            data-priority-badge="high"
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl bg-rose-500/25 text-rose-200 border border-rose-500/50 ring-1 ring-rose-500/30 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-rose-950/40 shrink-0"
+          >
             <Flame className="w-3.5 h-3.5 text-rose-400 fill-rose-400 shrink-0" />
             <span>High Priority</span>
           </span>
         );
-      case "medium":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 ring-1 ring-amber-500/20 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-amber-950/40 shrink-0">
-            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Medium Priority</span>
-          </span>
-        );
       case "low":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 ring-1 ring-emerald-500/20 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-emerald-950/40 shrink-0">
+          <span
+            data-priority-badge="low"
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl bg-emerald-500/25 text-emerald-200 border border-emerald-500/50 ring-1 ring-emerald-500/30 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-emerald-950/40 shrink-0"
+          >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Low Priority</span>
+          </span>
+        );
+      case "medium":
+      default:
+        return (
+          <span
+            data-priority-badge="medium"
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl bg-amber-500/25 text-amber-200 border border-amber-500/50 ring-1 ring-amber-500/30 text-[11px] font-extrabold uppercase tracking-wide shadow-sm shadow-amber-950/40 shrink-0"
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Medium Priority</span>
           </span>
         );
     }
   };
 
   const getPriorityBorderClass = (p: Priority, isCompleted: boolean) => {
-    if (isCompleted) return "border-l-4 border-l-slate-700/50";
-    switch (p) {
+    const norm = (p || "medium").toLowerCase();
+    if (isCompleted) {
+      switch (norm) {
+        case "high":
+          return "border-l-4 border-l-rose-500/50 bg-rose-950/10 border-rose-500/20";
+        case "low":
+          return "border-l-4 border-l-emerald-500/50 bg-emerald-950/10 border-emerald-500/20";
+        case "medium":
+        default:
+          return "border-l-4 border-l-amber-500/50 bg-amber-950/10 border-amber-500/20";
+      }
+    }
+    switch (norm) {
       case "high":
-        return "border-l-4 border-l-rose-500 hover:border-l-rose-400 shadow-sm shadow-rose-950/20";
-      case "medium":
-        return "border-l-4 border-l-amber-500 hover:border-l-amber-400 shadow-sm shadow-amber-950/20";
+        return "border-l-4 border-l-rose-500 bg-gradient-to-r from-rose-950/35 via-slate-900/90 to-slate-900/90 border-rose-500/40 hover:border-rose-400/70 shadow-sm shadow-rose-950/25";
       case "low":
-        return "border-l-4 border-l-emerald-500 hover:border-l-emerald-400 shadow-sm shadow-emerald-950/20";
+        return "border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-950/30 via-slate-900/90 to-slate-900/90 border-emerald-500/35 hover:border-emerald-400/70 shadow-sm shadow-emerald-950/25";
+      case "medium":
+      default:
+        return "border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-950/30 via-slate-900/90 to-slate-900/90 border-amber-500/35 hover:border-amber-400/70 shadow-sm shadow-amber-950/25";
     }
   };
 
@@ -685,6 +903,254 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
             defaultExpanded={true}
           />
 
+          {/* Color-Coded Priority Levels Summary Strip (High / Medium / Low) */}
+          <div
+            id="task-priority-summary-strip"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+          >
+            <button
+              type="button"
+              id="priority-card-filter-high"
+              onClick={() =>
+                setSelectedPriorityFilter((prev) => (prev === "high" ? "all" : "high"))
+              }
+              className={`p-3.5 rounded-2xl border border-l-4 border-l-rose-500 text-left transition-all flex items-center justify-between cursor-pointer ${
+                selectedPriorityFilter === "high"
+                  ? "bg-rose-950/45 border-rose-500 ring-1 ring-rose-500/40 shadow-md"
+                  : "bg-rose-950/20 border-rose-500/30 hover:bg-rose-950/35"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                  <Flame className="w-4 h-4 text-rose-400 fill-rose-400" />
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-rose-200 uppercase tracking-wider">
+                    High Priority
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Critical & Urgent Tasks
+                  </div>
+                </div>
+              </div>
+              <span className="text-xl font-extrabold font-mono tabular-nums text-rose-300">
+                {highPriorityCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              id="priority-card-filter-medium"
+              onClick={() =>
+                setSelectedPriorityFilter((prev) => (prev === "medium" ? "all" : "medium"))
+              }
+              className={`p-3.5 rounded-2xl border border-l-4 border-l-amber-500 text-left transition-all flex items-center justify-between cursor-pointer ${
+                selectedPriorityFilter === "medium"
+                  ? "bg-amber-950/45 border-amber-500 ring-1 ring-amber-500/40 shadow-md"
+                  : "bg-amber-950/20 border-amber-500/30 hover:bg-amber-950/35"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-amber-200 uppercase tracking-wider">
+                    Medium Priority
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Scheduled Core Study
+                  </div>
+                </div>
+              </div>
+              <span className="text-xl font-extrabold font-mono tabular-nums text-amber-300">
+                {mediumPriorityCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              id="priority-card-filter-low"
+              onClick={() =>
+                setSelectedPriorityFilter((prev) => (prev === "low" ? "all" : "low"))
+              }
+              className={`p-3.5 rounded-2xl border border-l-4 border-l-emerald-500 text-left transition-all flex items-center justify-between cursor-pointer ${
+                selectedPriorityFilter === "low"
+                  ? "bg-emerald-950/45 border-emerald-500 ring-1 ring-emerald-500/40 shadow-md"
+                  : "bg-emerald-950/20 border-emerald-500/30 hover:bg-emerald-950/35"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-emerald-200 uppercase tracking-wider">
+                    Low Priority
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Flexible & Routine
+                  </div>
+                </div>
+              </div>
+              <span className="text-xl font-extrabold font-mono tabular-nums text-emerald-300">
+                {lowPriorityCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Quick Task Creation Bar with Priority Selector & Subtasks Builder */}
+          <form
+            id="quick-task-creation-form"
+            onSubmit={handleQuickCreateTask}
+            className={`glass-card p-3.5 sm:p-4 rounded-3xl border bg-slate-900/90 space-y-3 shadow-md transition-colors ${
+              quickPriority === "high"
+                ? "border-rose-500/40"
+                : quickPriority === "low"
+                ? "border-emerald-500/40"
+                : "border-amber-500/40"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Plus className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 pointer-events-none" />
+                <input
+                  id="quick-task-title-input"
+                  type="text"
+                  placeholder="Quick add a new task (e.g. Solve 20 Physics PYQs)..."
+                  value={quickTitle}
+                  onChange={(e) => setQuickTitle(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950/90 border border-white/10 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-slate-950/90 px-3 py-2 rounded-2xl border border-white/10">
+                  <Flag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <label htmlFor="quick-task-priority-select" className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                    Priority:
+                  </label>
+                  <select
+                    id="quick-task-priority-select"
+                    aria-label="New task priority level"
+                    value={quickPriority}
+                    onChange={(e) => setQuickPriority(e.target.value as Priority)}
+                    className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value="high" className="bg-slate-900 text-rose-300">
+                      High
+                    </option>
+                    <option value="medium" className="bg-slate-900 text-amber-300">
+                      Medium
+                    </option>
+                    <option value="low" className="bg-slate-900 text-emerald-300">
+                      Low
+                    </option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-slate-950/90 px-3 py-2 rounded-2xl border border-white/10">
+                  <Tag className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <select
+                    id="quick-task-category-select"
+                    aria-label="New task category"
+                    value={quickCategory}
+                    onChange={(e) => setQuickCategory(e.target.value as TaskCategory)}
+                    className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer capitalize"
+                  >
+                    <option value="study" className="bg-slate-900 text-white">Study</option>
+                    <option value="exam" className="bg-slate-900 text-white">Exam</option>
+                    <option value="urgent" className="bg-slate-900 text-white">Urgent</option>
+                    <option value="personal" className="bg-slate-900 text-white">Personal</option>
+                    <option value="work" className="bg-slate-900 text-white">Work</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  id="quick-task-subtasks-toggle-btn"
+                  onClick={() => setShowQuickSubtasks((prev) => !prev)}
+                  className={`px-3 py-2 rounded-2xl border text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
+                    showQuickSubtasks || quickSubtasks.length > 0
+                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200"
+                      : "bg-slate-950/90 border-white/10 text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>
+                    {quickSubtasks.length > 0
+                      ? `Subtasks (${quickSubtasks.length})`
+                      : "+ Subtasks"}
+                  </span>
+                </button>
+
+                <button
+                  type="submit"
+                  id="quick-add-task-submit-btn"
+                  disabled={!quickTitle.trim()}
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0"
+                >
+                  + Add Task
+                </button>
+              </div>
+            </div>
+
+            {(showQuickSubtasks || quickSubtasks.length > 0) && (
+              <div className="pt-2.5 border-t border-white/10 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="quick-task-subtask-input"
+                    type="text"
+                    placeholder="Add a smaller checkable subtask step..."
+                    value={quickSubtaskInput}
+                    onChange={(e) => setQuickSubtaskInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddQuickSubtask();
+                      }
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    id="quick-task-add-subtask-btn"
+                    onClick={handleAddQuickSubtask}
+                    className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-xs font-bold whitespace-nowrap cursor-pointer"
+                  >
+                    + Add Step
+                  </button>
+                </div>
+
+                {quickSubtasks.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickSubtasks.map((st) => (
+                      <span
+                        key={st.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border border-white/10 text-xs text-slate-200"
+                      >
+                        <CheckSquare className="w-3 h-3 text-cyan-400 shrink-0" />
+                        <span>{st.title}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickSubtasks((prev) =>
+                              prev.filter((item) => item.id !== st.id)
+                            )
+                          }
+                          className="text-slate-500 hover:text-rose-400 cursor-pointer"
+                          aria-label={`Remove subtask ${st.title}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
+
           {/* Prominent Local Search & Filter Hub */}
           <div className="glass-card p-4 sm:p-5 rounded-3xl border border-white/10 space-y-3.5 shadow-md">
             {/* Top Local Search Input Field */}
@@ -780,24 +1246,82 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                 </button>
               </div>
 
-              {(selectedPriorityFilter !== "all" || selectedCategoryFilter !== "all" || selectedStatusFilter !== "all" || searchQuery) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPriorityFilter("all");
-                    setSelectedCategoryFilter("all");
-                    setSelectedStatusFilter("all");
-                    setSearchQuery("");
-                  }}
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
-                >
-                  Reset all filters
-                </button>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+                  <span className="text-[10px] font-semibold text-slate-400 px-2 flex items-center gap-1">
+                    <ArrowUpDown className="w-3 h-3 text-emerald-400" />
+                    <span>Sort Priority:</span>
+                  </span>
+                  <button
+                    type="button"
+                    id="sort-priority-high-to-low-btn"
+                    onClick={() => setSortBy("priority_high_to_low")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                      sortBy === "priority_high_to_low"
+                        ? "bg-emerald-500 text-slate-950 font-bold"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    High → Low
+                  </button>
+                  <button
+                    type="button"
+                    id="sort-priority-low-to-high-btn"
+                    onClick={() => setSortBy("priority_low_to_high")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                      sortBy === "priority_low_to_high"
+                        ? "bg-emerald-500 text-slate-950 font-bold"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Low → High
+                  </button>
+                </div>
+
+                {(selectedPriorityFilter !== "all" || selectedCategoryFilter !== "all" || selectedStatusFilter !== "all" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPriorityFilter("all");
+                      setSelectedCategoryFilter("all");
+                      setSelectedStatusFilter("all");
+                      setSearchQuery("");
+                    }}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    Reset all filters
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Dropdown Filters Ribbon: Status & Category Groups */}
+            {/* Dropdown Filters Ribbon: Sort By, Status & Category Groups */}
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Sort By Dropdown */}
+              <div className="flex items-center gap-1.5 bg-slate-950/80 px-3.5 py-2 rounded-2xl border border-white/10 min-h-[44px]">
+                <ArrowUpDown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[11px] font-semibold text-slate-400">Sort By:</span>
+                <select
+                  id="tasks-sort-dropdown"
+                  aria-label="Sort tasks by priority or date"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="bg-transparent text-xs font-bold text-amber-300 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="priority_high_to_low" className="bg-slate-900 text-white">
+                    Priority: High → Low
+                  </option>
+                  <option value="priority_low_to_high" className="bg-slate-900 text-white">
+                    Priority: Low → High
+                  </option>
+                  <option value="due_date_asc" className="bg-slate-900 text-white">
+                    Due Date (Earliest First)
+                  </option>
+                  <option value="created_desc" className="bg-slate-900 text-white">
+                    Newest Created
+                  </option>
+                </select>
+              </div>
               {/* Status Dropdown */}
               <div className="flex items-center gap-1.5 bg-slate-950/80 px-3.5 py-2 rounded-2xl border border-white/10 min-h-[44px]">
                 <Filter className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -985,6 +1509,8 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                     uncompletedText="Mark as Pending"
                   >
                     <div
+                      data-testid={`task-card-${task.id}`}
+                      data-priority={task.priority}
                       onClick={isBulkMode ? () => toggleSelectTask(task.id) : undefined}
                       className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${
                         isBulkMode ? "cursor-pointer select-none" : ""
@@ -994,9 +1520,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                           : getPriorityBorderClass(task.priority, task.completed)
                       } ${
                         task.completed && !isSelected
-                          ? "opacity-70 bg-slate-900/40 border-slate-800"
+                          ? "opacity-75"
                           : !isSelected
-                          ? "border-white/10 hover:border-white/25 hover:shadow-lg"
+                          ? "hover:shadow-lg"
                           : ""
                       } ${isJustDone ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950 scale-[1.01]" : ""}`}
                     >
@@ -1059,6 +1585,12 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                             </h4>
                             {/* Visual Priority Badge */}
                             {renderPriorityBadge(task.priority)}
+                            {task.subjectName && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/35 text-indigo-300 text-[11px] font-bold">
+                                <BookOpen className="w-3 h-3 text-indigo-400 shrink-0" />
+                                <span>{task.subjectName}</span>
+                              </span>
+                            )}
                           </div>
 
                           {task.description && (
@@ -1102,7 +1634,141 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                                 <Sparkles className="w-3 h-3" /> Done!
                               </span>
                             )}
+
+                            {/* Subtasks Summary & Quick Add Trigger */}
+                            {!isBulkMode && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenInlineSubtaskTaskId((prev) =>
+                                    prev === task.id ? null : task.id
+                                  )
+                                }
+                                className="px-2 py-0.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 border border-white/10 text-[10px] font-sans font-semibold text-cyan-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Manage subtasks for this task"
+                              >
+                                <CheckSquare className="w-3 h-3 text-cyan-400" />
+                                <span>
+                                  {Array.isArray(task.subtasks) && task.subtasks.length > 0
+                                    ? `${
+                                        task.subtasks.filter((s) => s.completed).length
+                                      }/${task.subtasks.length} Subtasks`
+                                    : "+ Subtasks"}
+                                </span>
+                              </button>
+                            )}
                           </div>
+
+                          {/* Subtasks Checklist & Inline Breakdown Section */}
+                          {((Array.isArray(task.subtasks) && task.subtasks.length > 0) ||
+                            openInlineSubtaskTaskId === task.id) && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-2.5 pt-2.5 border-t border-white/10 space-y-2 w-full max-w-xl"
+                            >
+                              {Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
+                                <>
+                                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono tabular-nums">
+                                    <span className="font-sans font-semibold text-slate-300">
+                                      Subtasks Breakdown
+                                    </span>
+                                    <span>
+                                      {task.subtasks.filter((s) => s.completed).length}/
+                                      {task.subtasks.length} completed (
+                                      {Math.round(
+                                        (task.subtasks.filter((s) => s.completed).length /
+                                          task.subtasks.length) *
+                                          100
+                                      )}
+                                      %)
+                                    </span>
+                                  </div>
+
+                                  <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-300"
+                                      style={{
+                                        width: `${Math.round(
+                                          (task.subtasks.filter((s) => s.completed).length /
+                                            task.subtasks.length) *
+                                            100
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1.5 pt-0.5">
+                                    {task.subtasks.map((st) => (
+                                      <div
+                                        key={st.id}
+                                        className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/75 border border-white/5 hover:border-white/15 transition-colors"
+                                      >
+                                        <button
+                                          type="button"
+                                          role="checkbox"
+                                          aria-checked={st.completed}
+                                          onClick={() => handleToggleTaskSubtask(task, st.id)}
+                                          className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer"
+                                        >
+                                          {st.completed ? (
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                          ) : (
+                                            <Circle className="w-4 h-4 text-slate-500 hover:text-cyan-400 shrink-0" />
+                                          )}
+                                          <span
+                                            className={`text-xs truncate ${
+                                              st.completed
+                                                ? "line-through text-slate-500"
+                                                : "text-slate-200"
+                                            }`}
+                                          >
+                                            {st.title}
+                                          </span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteTaskSubtask(task, st.id)}
+                                          className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+                                          title="Remove subtask"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Inline Add Subtask Input */}
+                              <div className="flex items-center gap-1.5 pt-1">
+                                <input
+                                  type="text"
+                                  placeholder="Add a checkable subtask step..."
+                                  value={inlineSubtaskInputs[task.id] || ""}
+                                  onChange={(e) =>
+                                    setInlineSubtaskInputs((prev) => ({
+                                      ...prev,
+                                      [task.id]: e.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleAddInlineSubtask(task);
+                                    }
+                                  }}
+                                  className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddInlineSubtask(task)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-xs font-semibold whitespace-nowrap cursor-pointer"
+                                >
+                                  + Add Step
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1146,6 +1812,30 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                                 ))}
                               </select>
                             )}
+
+                            {/* Inline Quick Priority Level Selector */}
+                            <select
+                              aria-label={`Priority level for ${task.title}`}
+                              value={task.priority}
+                              onChange={(e) =>
+                                onUpdateTask({
+                                  ...task,
+                                  priority: e.target.value as Priority,
+                                })
+                              }
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-white/10 text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                              title="Change Task Priority Level"
+                            >
+                              <option value="high" className="bg-slate-900 text-rose-300">
+                                High Priority
+                              </option>
+                              <option value="medium" className="bg-slate-900 text-amber-300">
+                                Medium Priority
+                              </option>
+                              <option value="low" className="bg-slate-900 text-emerald-300">
+                                Low Priority
+                              </option>
+                            </select>
 
                             <CalendarSyncDropdown
                               event={{
@@ -1255,11 +1945,24 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                 </div>
               </div>
 
-              {/* Visual Priority Level Selector */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-400">
-                  Priority Level *
-                </label>
+              {/* Visual Priority Level Selector + Dropdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="modal-task-priority-select" className="block text-xs font-semibold text-slate-400">
+                    Priority Level (High, Medium, Low) *
+                  </label>
+                  <select
+                    id="modal-task-priority-select"
+                    aria-label="Priority Level"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as Priority)}
+                    className="px-3 py-1 rounded-xl bg-slate-950 border border-white/15 text-xs font-bold text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    <option value="high" className="bg-slate-900 text-rose-300">High</option>
+                    <option value="medium" className="bg-slate-900 text-amber-300">Medium</option>
+                    <option value="low" className="bg-slate-900 text-emerald-300">Low</option>
+                  </select>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -1356,6 +2059,84 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                       >
                         {cat}
                       </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Subtasks Breakdown Section in Add/Edit Task Modal */}
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Subtasks Breakdown (Optional)</span>
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {subtasks.filter((s) => s.completed).length}/{subtasks.length} completed
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="modal-subtask-input"
+                    type="text"
+                    placeholder="Add a smaller checkable step (e.g. Read theory notes)..."
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddModalSubtask();
+                      }
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    id="modal-add-subtask-btn"
+                    onClick={handleAddModalSubtask}
+                    className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-xs font-bold whitespace-nowrap cursor-pointer"
+                  >
+                    + Add Subtask
+                  </button>
+                </div>
+
+                {subtasks.length > 0 && (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {subtasks.map((st) => (
+                      <div
+                        key={st.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-950/90 border border-white/10"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleToggleModalSubtask(st.id)}
+                          className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer"
+                        >
+                          {st.completed ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-slate-500 shrink-0" />
+                          )}
+                          <span
+                            className={`text-xs truncate ${
+                              st.completed
+                                ? "line-through text-slate-500"
+                                : "text-slate-200"
+                            }`}
+                          >
+                            {st.title}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveModalSubtask(st.id)}
+                          className="p-1 text-slate-500 hover:text-rose-400 rounded-lg cursor-pointer"
+                          title="Delete subtask"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

@@ -143,6 +143,223 @@ export function getTaskMilestones(tasks: Task[] = []): {
   };
 }
 
+export interface StudyStreakDayItem {
+  date: string;
+  shortDate: string;
+  dayLabel: string;
+  studied: boolean;
+  minutes: number;
+  hours: number;
+  sessionsCount: number;
+  isToday: boolean;
+  streakMaintained: boolean;
+  streakLengthOnDay: number;
+}
+
+export interface StudyStreakStats {
+  currentStreak: number;
+  longestStreak: number;
+  studiedToday: boolean;
+  todayMinutes: number;
+  todaySessionsCount: number;
+  weeklyStudyMinutes: number;
+  weeklyStudyHours: number;
+  weeklySessionsCount: number;
+  monthlyStudyMinutes: number;
+  monthlyStudyHours: number;
+  totalStudyDays: number;
+  nextMilestone: number;
+  milestoneProgressPercent: number;
+  last7Days: StudyStreakDayItem[];
+  last30Days: StudyStreakDayItem[];
+}
+
+function formatLocalYMD(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function shiftDateYMD(ymd: string, deltaDays: number): string {
+  const parts = ymd.split("-").map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some(isNaN)) {
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + deltaDays);
+    return formatLocalYMD(fallback);
+  }
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d + deltaDays);
+  return formatLocalYMD(dt);
+}
+
+const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+export function calculateStudyStreak(
+  studySessions: StudySession[] = [],
+  referenceDateStr?: string
+): StudyStreakStats {
+  const safeSessions = Array.isArray(studySessions) ? studySessions : [];
+  const todayStr = referenceDateStr || formatLocalYMD(new Date());
+  const yesterdayStr = shiftDateYMD(todayStr, -1);
+
+  const dateMap = new Map<string, { totalSeconds: number; sessionsCount: number }>();
+
+  for (const s of safeSessions) {
+    if (!s || !s.date) continue;
+    const secs = typeof s.durationSeconds === "number" ? s.durationSeconds : 0;
+    if (secs <= 0) continue;
+    const prev = dateMap.get(s.date) || { totalSeconds: 0, sessionsCount: 0 };
+    dateMap.set(s.date, {
+      totalSeconds: prev.totalSeconds + secs,
+      sessionsCount: prev.sessionsCount + 1,
+    });
+  }
+
+  const studiedToday = dateMap.has(todayStr);
+  const todayEntry = dateMap.get(todayStr);
+  const todayMinutes = todayEntry ? Math.max(1, Math.round(todayEntry.totalSeconds / 60)) : 0;
+  const todaySessionsCount = todayEntry ? todayEntry.sessionsCount : 0;
+
+  // Calculate current consecutive days of study sessions
+  let currentStreak = 0;
+  let cursor: string | null = null;
+  if (studiedToday) {
+    cursor = todayStr;
+  } else if (dateMap.has(yesterdayStr)) {
+    cursor = yesterdayStr;
+  }
+
+  const activeStreakDates = new Set<string>();
+  while (cursor && dateMap.has(cursor)) {
+    currentStreak += 1;
+    activeStreakDates.add(cursor);
+    cursor = shiftDateYMD(cursor, -1);
+  }
+
+  // Calculate longest consecutive study streak and streak length on each active date
+  const sortedDates = Array.from(dateMap.keys()).sort();
+  const streakRunByDate = new Map<string, number>();
+  let longestStreak = 0;
+  let currentRun = 0;
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (i === 0) {
+      currentRun = 1;
+    } else if (sortedDates[i] === shiftDateYMD(sortedDates[i - 1], 1)) {
+      currentRun += 1;
+    } else {
+      currentRun = 1;
+    }
+    streakRunByDate.set(sortedDates[i], currentRun);
+    if (currentRun > longestStreak) {
+      longestStreak = currentRun;
+    }
+  }
+  longestStreak = Math.max(longestStreak, currentStreak);
+
+  // Build 30-day visual activity window ending today
+  const last30Days: StudyStreakDayItem[] = [];
+  for (let offset = -29; offset <= 0; offset++) {
+    const dStr = shiftDateYMD(todayStr, offset);
+    const parts = dStr.split("-").map((n) => parseInt(n, 10));
+    const dt = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    const dayEntry = dateMap.get(dStr);
+    const mins = dayEntry ? Math.max(1, Math.round(dayEntry.totalSeconds / 60)) : 0;
+    const hrs = Number((mins / 60).toFixed(1));
+    const studied = Boolean(dayEntry);
+    const runLen = streakRunByDate.get(dStr) || 0;
+    const nextDateStudied = dateMap.has(shiftDateYMD(dStr, 1));
+    const streakMaintained =
+      studied && (activeStreakDates.has(dStr) || runLen >= 2 || nextDateStudied);
+
+    last30Days.push({
+      date: dStr,
+      shortDate: `${MONTH_NAMES_SHORT[dt.getMonth()] || dStr.slice(5, 7)} ${String(
+        dt.getDate()
+      ).padStart(2, "0")}`,
+      dayLabel: DAY_NAMES_SHORT[dt.getDay()] || dStr.slice(5),
+      studied,
+      minutes: mins,
+      hours: hrs,
+      sessionsCount: dayEntry ? dayEntry.sessionsCount : 0,
+      isToday: dStr === todayStr,
+      streakMaintained,
+      streakLengthOnDay: runLen,
+    });
+  }
+
+  const last7Days = last30Days.slice(-7);
+
+  const weeklyStudyMinutes = last7Days.reduce((acc, d) => acc + d.minutes, 0);
+  const weeklyStudyHours = Number((weeklyStudyMinutes / 60).toFixed(1));
+  const weeklySessionsCount = last7Days.reduce((acc, d) => acc + d.sessionsCount, 0);
+
+  const monthlyStudyMinutes = last30Days.reduce((acc, d) => acc + d.minutes, 0);
+  const monthlyStudyHours = Number((monthlyStudyMinutes / 60).toFixed(1));
+
+  const milestones = [3, 7, 14, 21, 30, 60, 100];
+  const nextMilestone =
+    milestones.find((m) => m > currentStreak) || currentStreak + 10;
+  const milestoneProgressPercent = Math.min(
+    100,
+    Math.round((currentStreak / nextMilestone) * 100)
+  );
+
+  return {
+    currentStreak,
+    longestStreak,
+    studiedToday,
+    todayMinutes,
+    todaySessionsCount,
+    weeklyStudyMinutes,
+    weeklyStudyHours,
+    weeklySessionsCount,
+    monthlyStudyMinutes,
+    monthlyStudyHours,
+    totalStudyDays: dateMap.size,
+    nextMilestone,
+    milestoneProgressPercent,
+    last7Days,
+    last30Days,
+  };
+}
+
+/**
+ * Generates a shareable text snippet summarizing the user's current study consistency.
+ */
+export function generateStudyStreakShareSnippet(
+  stats: StudyStreakStats,
+  studentName?: string
+): string {
+  const activeWeekDays = stats.last7Days.filter((d) => d.studied).length;
+  const headerName = studentName && studentName.trim() ? `${studentName.trim()}'s ` : "My ";
+  const chainEmojis = stats.last7Days.map((d) => (d.studied ? "🔥" : "⚪")).join("");
+
+  return [
+    `🔥 ${headerName}Study Consistency Summary (Garia OS)`,
+    `• Current Study Streak: ${stats.currentStreak} Consecutive ${
+      stats.currentStreak === 1 ? "Day" : "Days"
+    } (Best: ${stats.longestStreak}d)`,
+    `• Total Study Hours This Week: ${stats.weeklyStudyHours}h (${stats.weeklyStudyMinutes} mins across ${activeWeekDays}/7 active days)`,
+    `• 7-Day Consistency: ${chainEmojis}`,
+    `• Next Milestone Target: ${stats.currentStreak}/${stats.nextMilestone} Days (${stats.milestoneProgressPercent}%)`,
+  ].join("\n");
+}
+
 export function getStudyMilestones(
   studySessions: StudySession[] = [],
   subjects: { id: string; name: string }[] = []
@@ -368,6 +585,10 @@ export function calculateGamificationState(
     totalHabitCompletions += (Array.isArray(h.completedDates) ? h.completedDates : []).length;
     if ((h.streak || 0) > maxStreak) maxStreak = h.streak || 0;
   });
+  const studyStreakStats = calculateStudyStreak(safeStudySessions);
+  if (studyStreakStats.currentStreak > maxStreak) {
+    maxStreak = studyStreakStats.currentStreak;
+  }
   const habitXP = totalHabitCompletions * 10;
 
   const completedGoalsCount = safeGoals.filter((g) => g && g.completed).length;

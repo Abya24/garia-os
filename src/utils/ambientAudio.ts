@@ -3,6 +3,7 @@
 export type AmbientSoundType =
   | "none"
   | "rain"
+  | "cafe"
   | "white_noise"
   | "pink_noise"
   | "brown_noise"
@@ -28,10 +29,17 @@ export const AMBIENT_SOUND_OPTIONS: AmbientSoundOption[] = [
   },
   {
     id: "rain",
-    name: "Gentle Rain",
+    name: "Rain",
     nameHi: "हल्की बारिश",
     description: "Soothing rhythmic rainfall for calm reading",
     icon: "CloudRain",
+  },
+  {
+    id: "cafe",
+    name: "Cafe",
+    nameHi: "स्टडी कैफे",
+    description: "Warm coffeehouse murmur and gentle study ambience",
+    icon: "Coffee",
   },
   {
     id: "white_noise",
@@ -178,6 +186,9 @@ class AmbientAudioEngine {
         break;
       case "rain":
         this.createRainSound();
+        break;
+      case "cafe":
+        this.createCafeAmbience();
         break;
       case "forest_stream":
         this.createStreamSound();
@@ -329,6 +340,71 @@ class AmbientAudioEngine {
         dropOsc.stop(this.ctx.currentTime + 0.09);
       } catch (e) {}
     }, 180);
+
+    this.intervalIds.push(interval);
+  }
+
+  private createCafeAmbience() {
+    if (!this.ctx || !this.masterGain) return;
+    const bufferSize = 2 * this.ctx.sampleRate;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let lastOut = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      data[i] = (lastOut + 0.035 * white) / 1.035;
+      lastOut = data[i];
+      data[i] *= 1.8;
+    }
+
+    const murmurBed = this.ctx.createBufferSource();
+    murmurBed.buffer = buffer;
+    murmurBed.loop = true;
+
+    const bandpass = this.ctx.createBiquadFilter();
+    bandpass.type = "bandpass";
+    bandpass.frequency.setValueAtTime(520, this.ctx.currentTime);
+    bandpass.Q.setValueAtTime(0.85, this.ctx.currentTime);
+
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    lfo.frequency.setValueAtTime(0.32, this.ctx.currentTime);
+    lfoGain.gain.setValueAtTime(140, this.ctx.currentTime);
+    lfo.connect(bandpass.frequency);
+    lfo.start();
+
+    const roomGain = this.ctx.createGain();
+    roomGain.gain.setValueAtTime(0.95, this.ctx.currentTime);
+
+    murmurBed.connect(bandpass);
+    bandpass.connect(roomGain);
+    roomGain.connect(this.masterGain);
+    murmurBed.start();
+    this.sourceNodes.push(murmurBed, bandpass, lfo, lfoGain, roomGain);
+
+    // Subtle periodic acoustic ceramic/cup chime textures
+    const interval = window.setInterval(() => {
+      if (!this.ctx || !this.masterGain || !this.isPlaying) return;
+      try {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const freq = 950 + Math.random() * 650;
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.025 + Math.random() * 0.03, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.14);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.onended = () => {
+          try {
+            osc.disconnect();
+            gain.disconnect();
+          } catch {}
+        };
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      } catch {}
+    }, 950);
 
     this.intervalIds.push(interval);
   }

@@ -172,7 +172,54 @@ export function enqueueOfflineAction(
     status: "pending",
   };
 
-  const updatedQueue = [...currentState.pendingActions, newAction];
+  // Deduplicate against existing pending actions for the same entity and document
+  let updatedQueue = [...currentState.pendingActions];
+  const targetDocId = (action.payload as any)?.id;
+  if (targetDocId && action.entityName) {
+    const existingIndex = updatedQueue.findIndex(
+      (a) =>
+        a.profileId === action.profileId &&
+        a.entityName === action.entityName &&
+        (a.payload as any)?.id === targetDocId
+    );
+
+    if (existingIndex >= 0) {
+      const existing = updatedQueue[existingIndex];
+      if (existing.action === "create" && action.action === "update") {
+        updatedQueue[existingIndex] = {
+          ...existing,
+          payload: { ...existing.payload, ...action.payload },
+          timestamp: Date.now(),
+        };
+        newAction.id = existing.id;
+      } else if (existing.action === "update" && action.action === "update") {
+        updatedQueue[existingIndex] = {
+          ...existing,
+          payload: { ...existing.payload, ...action.payload },
+          timestamp: Date.now(),
+        };
+        newAction.id = existing.id;
+      } else if (existing.action === "create" && action.action === "delete") {
+        // Created while offline then deleted while offline: eliminate both
+        updatedQueue.splice(existingIndex, 1);
+        saveStoredQueue(updatedQueue);
+        currentState = {
+          ...currentState,
+          pendingActions: updatedQueue,
+          pendingCount: updatedQueue.length,
+        };
+        notifyListeners();
+        return newAction;
+      } else {
+        updatedQueue[existingIndex] = newAction;
+      }
+    } else {
+      updatedQueue.push(newAction);
+    }
+  } else {
+    updatedQueue.push(newAction);
+  }
+
   saveStoredQueue(updatedQueue);
 
   currentState = {

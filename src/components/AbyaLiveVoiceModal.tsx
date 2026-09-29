@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { StudentProfile } from "../types";
 import { float32To16BitPCMBase64, LiveAudioPlayer } from "../utils/audioUtils";
+import { auth } from "../utils/firebase";
 
 interface AbyaLiveVoiceModalProps {
   isOpen: boolean;
@@ -154,12 +155,34 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       // 3. Initialize 24kHz Output Live Audio Player
       liveAudioPlayerRef.current = new LiveAudioPlayer();
 
-      // 4. Request single-use ticket from backend (mandatory)
-      const ticketRes = await fetch("/api/live-voice/ticket", { method: "POST" });
+      // 4. Request single-use ticket from backend (mandatory authentication)
+      let idToken: string | null = null;
+      if (auth.currentUser) {
+        try {
+          idToken = await auth.currentUser.getIdToken();
+        } catch (tokErr) {
+          console.warn("[Abya Live Voice] Failed to get ID token:", tokErr);
+        }
+      }
+
+      if (!idToken) {
+        throw new Error("Authentication required. Please sign in to your Garia OS account to use Abya Live Voice.");
+      }
+
+      const ticketRes = await fetch("/api/live-voice/ticket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
       if (!ticketRes.ok) {
         const errJson = await ticketRes.json().catch(() => ({}));
         if (ticketRes.status === 429) {
           throw new Error("Too many voice connection attempts. Please wait a moment before reconnecting.");
+        }
+        if (ticketRes.status === 401) {
+          throw new Error("Authentication session expired. Please sign in again.");
         }
         throw new Error(errJson.error || "Failed to obtain a Live Voice session ticket.");
       }

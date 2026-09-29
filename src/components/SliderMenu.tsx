@@ -108,6 +108,7 @@ export const SliderMenu: React.FC<SliderMenuProps> = ({
     "#10b981";
 
   const themes: { id: AppTheme; name: string; color: string }[] = [
+    { id: "high-contrast", name: "High Contrast", color: "#ffffff" },
     { id: "dark", name: "Dark Modern", color: "#0f172a" },
     { id: "amoled", name: "AMOLED Pure Black", color: "#000000" },
     { id: "midnight", name: "Midnight Navy", color: "#0b132b" },

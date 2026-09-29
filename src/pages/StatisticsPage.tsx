@@ -45,6 +45,7 @@ import { ReadinessTrendsSection } from "../components/analytics/ReadinessTrendsS
 import { ProductivityIntelligenceSection } from "../components/analytics/ProductivityIntelligenceSection";
 import { GoalTrackingSection } from "../components/analytics/GoalTrackingSection";
 import { AIInsightsSection } from "../components/analytics/AIInsightsSection";
+import { WeeklyProductivityInsightsDashboard } from "../components/analytics/WeeklyProductivityInsightsDashboard";
 
 interface StatisticsPageProps {
   tasks: Task[];
@@ -297,6 +298,14 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
         {/* SECTION 1: Performance Overview */}
         {(activeSubTab === "all" || activeSubTab === "overview") && (
           <PerformanceOverviewSection data={performanceData} />
+        )}
+
+        {/* SECTION 1B: Weekly Productivity Insights (Recharts: Hours Studied vs Goals Met) */}
+        {(activeSubTab === "all" ||
+          activeSubTab === "overview" ||
+          activeSubTab === "productivity" ||
+          activeSubTab === "goals") && (
+          <WeeklyProductivityInsightsDashboard data={performanceData} />
         )}
 
         {/* SECTION 2: Subject Analytics */}

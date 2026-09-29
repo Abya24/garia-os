@@ -58,6 +58,7 @@ export const SharedTasksWorkspaceView: React.FC<SharedTasksWorkspaceViewProps> =
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "completed">("all");
+  const [sortBy, setSortBy] = useState<"priority_desc" | "priority_asc" | "date_asc">("priority_desc");
 
   // New task form state
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -207,30 +208,51 @@ export const SharedTasksWorkspaceView: React.FC<SharedTasksWorkspaceViewProps> =
     }
   };
 
-  // Filter tasks
-  const filteredTasks = tasksList.filter((task) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = task.title.toLowerCase().includes(q);
-      const matchDesc = task.description?.toLowerCase().includes(q) || false;
-      const matchAssignee = task.assigneeName?.toLowerCase().includes(q) || false;
-      if (!matchTitle && !matchDesc && !matchAssignee) return false;
-    }
+  const PRIORITY_WEIGHT: Record<Priority, number> = {
+    high: 3,
+    medium: 2,
+    low: 1,
+  };
 
-    if (filterStatus === "active" && task.completed) return false;
-    if (filterStatus === "completed" && !task.completed) return false;
-    if (filterPriority !== "all" && task.priority !== filterPriority) return false;
+  // Filter & Sort tasks
+  const filteredTasks = tasksList
+    .filter((task) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = task.title.toLowerCase().includes(q);
+        const matchDesc = task.description?.toLowerCase().includes(q) || false;
+        const matchAssignee = task.assigneeName?.toLowerCase().includes(q) || false;
+        if (!matchTitle && !matchDesc && !matchAssignee) return false;
+      }
 
-    if (filterAssignee === "me") {
-      return task.assigneeId === currentUser.uid;
-    } else if (filterAssignee === "unassigned") {
-      return !task.assigneeId;
-    } else if (filterAssignee !== "all") {
-      return task.assigneeId === filterAssignee;
-    }
+      if (filterStatus === "active" && task.completed) return false;
+      if (filterStatus === "completed" && !task.completed) return false;
+      if (filterPriority !== "all" && task.priority !== filterPriority) return false;
 
-    return true;
-  });
+      if (filterAssignee === "me") {
+        return task.assigneeId === currentUser.uid;
+      } else if (filterAssignee === "unassigned") {
+        return !task.assigneeId;
+      } else if (filterAssignee !== "all") {
+        return task.assigneeId === filterAssignee;
+      }
+
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      const weightA = PRIORITY_WEIGHT[a.priority] || 2;
+      const weightB = PRIORITY_WEIGHT[b.priority] || 2;
+      if (sortBy === "priority_desc") {
+        if (weightB !== weightA) return weightB - weightA;
+        return (a.date || "").localeCompare(b.date || "");
+      }
+      if (sortBy === "priority_asc") {
+        if (weightA !== weightB) return weightA - weightB;
+        return (a.date || "").localeCompare(b.date || "");
+      }
+      return (a.date || "").localeCompare(b.date || "");
+    });
 
   const completedCount = tasksList.filter((t) => t.completed).length;
   const completionPercentage =
@@ -341,8 +363,32 @@ export const SharedTasksWorkspaceView: React.FC<SharedTasksWorkspaceViewProps> =
           />
         </div>
 
-        {/* Filters */}
+        {/* Filters & Sorting */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+          {/* Sort by Priority */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-3 py-2 bg-card border border-border rounded-xl text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-xs"
+            title="Sort tasks by priority"
+          >
+            <option value="priority_desc">Sort: High → Low Priority</option>
+            <option value="priority_asc">Sort: Low → High Priority</option>
+            <option value="date_asc">Sort: Due Date</option>
+          </select>
+
+          {/* Priority Filter */}
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="px-3 py-2 bg-card border border-border rounded-xl text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-xs"
+          >
+            <option value="all">All Priorities</option>
+            <option value="high">High Priority</option>
+            <option value="medium">Medium Priority</option>
+            <option value="low">Low Priority</option>
+          </select>
+
           {/* Status Filter */}
           <select
             value={filterStatus}

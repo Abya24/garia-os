@@ -21,6 +21,7 @@ import {
   Mail,
   Calendar,
   Target,
+  Layers,
 } from "lucide-react";
 import { ActiveTab, StudentProfile } from "../types";
 import { APP_VERSION } from "../constants/version";
@@ -79,6 +80,15 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       description: "Explore 50+ career paths across Science, Commerce, Arts, Govt Jobs & Scholarships",
       icon: Compass,
       tags: ["career", "roadmap", "jobs", "iit", "neet", "upsc", "ssc", "commerce", "ca", "scholarship", "study abroad", "salary"],
+    },
+    {
+      id: "nav-flashcards",
+      tab: "flashcards",
+      title: "Flashcards & Spaced Repetition",
+      category: "Academics",
+      description: "Create study card decks with terms & definitions and run SM-2 Spaced Repetition quizzes",
+      icon: Layers,
+      tags: ["flashcards", "decks", "spaced repetition", "quiz", "mastery", "cards", "terms", "definitions", "revision"],
     },
     {
       id: "nav-exam",

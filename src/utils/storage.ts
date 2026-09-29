@@ -35,6 +35,8 @@ import {
   DashboardWidgetConfig,
   HomeWidgetId,
   WidgetColSpan,
+  FlashcardDeck,
+  StudyFlashcard,
 } from "../types";
 import {
   DEFAULT_COMMERCE_SUBJECTS,
@@ -82,6 +84,7 @@ export const STORAGE_KEYS = {
   EXAM_PLAN: "garia_exam_plan_v1",
   DASHBOARD_WIDGETS: "garia_dashboard_widgets_v2",
   DASHBOARD_WIDGETS_LEGACY: "garia_dashboard_widgets_v1",
+  FLASHCARD_DECKS: "garia_flashcard_decks_v1",
 };
 
 export const formatLocalDate = (d: Date = new Date()): string => {
@@ -187,6 +190,9 @@ const defaultSettings: UserSettings = {
   userName: "Student",
   theme: "dark",
   autoSolarTheme: false,
+  preferredNightTheme: "dark",
+  solarSimulationMode: "auto",
+  focusMode: false,
   notificationsEnabled: true,
   notifications: {
     master: true,
@@ -237,6 +243,13 @@ const defaultTasks: Task[] = [
     category: "study",
     completed: false,
     createdAt: Date.now() - 3600000 * 5,
+    subjectId: "sub-1",
+    subjectName: "Accountancy",
+    subtasks: [
+      { id: "sub-101", title: "Read liquidity & solvency ratio formulas", completed: true },
+      { id: "sub-102", title: "Solve 5 Balance Sheet reconciliation problems", completed: true },
+      { id: "sub-103", title: "Verify working capital notes & adjustments", completed: false },
+    ],
   },
   {
     id: "task-2",
@@ -248,6 +261,12 @@ const defaultTasks: Task[] = [
     category: "study",
     completed: true,
     createdAt: Date.now() - 3600000 * 24,
+    subjectId: "sub-2",
+    subjectName: "Economics",
+    subtasks: [
+      { id: "sub-201", title: "Outline RBI monetary policy tools (Repo, CRR, SLR)", completed: true },
+      { id: "sub-202", title: "Compare government fiscal deficit types", completed: true },
+    ],
   },
   {
     id: "task-3",
@@ -259,6 +278,12 @@ const defaultTasks: Task[] = [
     category: "study",
     completed: false,
     createdAt: Date.now() - 3600000 * 2,
+    subjectId: "sub-3",
+    subjectName: "Business Studies",
+    subtasks: [
+      { id: "sub-301", title: "Revise Fayol's 14 principles flashcards", completed: true },
+      { id: "sub-302", title: "Attempt 20 MCQ case-study questions", completed: false },
+    ],
   },
   {
     id: "task-4",
@@ -468,8 +493,27 @@ const defaultHabits: Habit[] = [
     category: "study",
     iconName: "book-open",
     streak: 5,
-    completedDates: [getTodayString()],
-    createdAt: Date.now() - 86400000 * 10,
+    completedDates: [
+      getOffsetLocalDateString(0),
+      getOffsetLocalDateString(-1),
+      getOffsetLocalDateString(-2),
+      getOffsetLocalDateString(-3),
+      getOffsetLocalDateString(-4),
+      getOffsetLocalDateString(-6),
+      getOffsetLocalDateString(-8),
+      getOffsetLocalDateString(-9),
+      getOffsetLocalDateString(-11),
+      getOffsetLocalDateString(-12),
+      getOffsetLocalDateString(-13),
+      getOffsetLocalDateString(-15),
+      getOffsetLocalDateString(-17),
+      getOffsetLocalDateString(-19),
+      getOffsetLocalDateString(-20),
+      getOffsetLocalDateString(-22),
+      getOffsetLocalDateString(-25),
+      getOffsetLocalDateString(-27),
+    ],
+    createdAt: Date.now() - 86400000 * 30,
   },
   {
     id: "habit-2",
@@ -477,8 +521,23 @@ const defaultHabits: Habit[] = [
     category: "health",
     iconName: "activity",
     streak: 3,
-    completedDates: [getTodayString()],
-    createdAt: Date.now() - 86400000 * 7,
+    completedDates: [
+      getOffsetLocalDateString(0),
+      getOffsetLocalDateString(-1),
+      getOffsetLocalDateString(-2),
+      getOffsetLocalDateString(-5),
+      getOffsetLocalDateString(-7),
+      getOffsetLocalDateString(-9),
+      getOffsetLocalDateString(-10),
+      getOffsetLocalDateString(-12),
+      getOffsetLocalDateString(-15),
+      getOffsetLocalDateString(-16),
+      getOffsetLocalDateString(-18),
+      getOffsetLocalDateString(-21),
+      getOffsetLocalDateString(-24),
+      getOffsetLocalDateString(-26),
+    ],
+    createdAt: Date.now() - 86400000 * 30,
   },
   {
     id: "habit-3",
@@ -486,8 +545,22 @@ const defaultHabits: Habit[] = [
     category: "mindset",
     iconName: "book",
     streak: 4,
-    completedDates: [getTodayString()],
-    createdAt: Date.now() - 86400000 * 8,
+    completedDates: [
+      getOffsetLocalDateString(0),
+      getOffsetLocalDateString(-1),
+      getOffsetLocalDateString(-2),
+      getOffsetLocalDateString(-3),
+      getOffsetLocalDateString(-6),
+      getOffsetLocalDateString(-8),
+      getOffsetLocalDateString(-10),
+      getOffsetLocalDateString(-11),
+      getOffsetLocalDateString(-14),
+      getOffsetLocalDateString(-16),
+      getOffsetLocalDateString(-19),
+      getOffsetLocalDateString(-23),
+      getOffsetLocalDateString(-26),
+    ],
+    createdAt: Date.now() - 86400000 * 30,
   },
   {
     id: "habit-4",
@@ -495,8 +568,18 @@ const defaultHabits: Habit[] = [
     category: "health",
     iconName: "moon",
     streak: 2,
-    completedDates: [],
-    createdAt: Date.now() - 86400000 * 5,
+    completedDates: [
+      getOffsetLocalDateString(-1),
+      getOffsetLocalDateString(-2),
+      getOffsetLocalDateString(-4),
+      getOffsetLocalDateString(-8),
+      getOffsetLocalDateString(-11),
+      getOffsetLocalDateString(-14),
+      getOffsetLocalDateString(-18),
+      getOffsetLocalDateString(-22),
+      getOffsetLocalDateString(-25),
+    ],
+    createdAt: Date.now() - 86400000 * 30,
   },
   {
     id: "habit-5",
@@ -504,8 +587,26 @@ const defaultHabits: Habit[] = [
     category: "study",
     iconName: "rotate-cw",
     streak: 6,
-    completedDates: [getTodayString()],
-    createdAt: Date.now() - 86400000 * 12,
+    completedDates: [
+      getOffsetLocalDateString(0),
+      getOffsetLocalDateString(-1),
+      getOffsetLocalDateString(-2),
+      getOffsetLocalDateString(-3),
+      getOffsetLocalDateString(-4),
+      getOffsetLocalDateString(-5),
+      getOffsetLocalDateString(-7),
+      getOffsetLocalDateString(-8),
+      getOffsetLocalDateString(-10),
+      getOffsetLocalDateString(-12),
+      getOffsetLocalDateString(-13),
+      getOffsetLocalDateString(-15),
+      getOffsetLocalDateString(-17),
+      getOffsetLocalDateString(-20),
+      getOffsetLocalDateString(-21),
+      getOffsetLocalDateString(-24),
+      getOffsetLocalDateString(-27),
+    ],
+    createdAt: Date.now() - 86400000 * 30,
   },
 ];
 
@@ -1276,7 +1377,45 @@ export const saveSubjects = (subs: Subject[], profileId?: string): void => {
 
 export const loadStudySessions = (profileId?: string): StudySession[] => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.STUDY_SESSIONS), []);
+  const defaultStudySessions: StudySession[] = [
+    {
+      id: "study-seed-1",
+      subjectId: "sub-1",
+      subjectName: "Accountancy",
+      durationSeconds: 3600,
+      date: getOffsetLocalDateString(0),
+      timestamp: Date.now() - 3600000 * 2,
+      notes: "Completed ratio analysis & balance sheet adjustments.",
+    },
+    {
+      id: "study-seed-2",
+      subjectId: "sub-2",
+      subjectName: "Economics",
+      durationSeconds: 5400,
+      date: getOffsetLocalDateString(-1),
+      timestamp: Date.now() - 86400000,
+      notes: "Macroeconomics national income & monetary policy.",
+    },
+    {
+      id: "study-seed-3",
+      subjectId: "sub-3",
+      subjectName: "Business Studies",
+      durationSeconds: 4200,
+      date: getOffsetLocalDateString(-2),
+      timestamp: Date.now() - 86400000 * 2,
+      notes: "Principles of Management & case study practice.",
+    },
+    {
+      id: "study-seed-4",
+      subjectId: "sub-1",
+      subjectName: "Accountancy",
+      durationSeconds: 4800,
+      date: getOffsetLocalDateString(-3),
+      timestamp: Date.now() - 86400000 * 3,
+      notes: "Partnership accounts reconstitution practice.",
+    },
+  ];
+  return getItem(getProfileKey(pId, STORAGE_KEYS.STUDY_SESSIONS), defaultStudySessions);
 };
 export const saveStudySessions = (sessions: StudySession[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
@@ -1328,7 +1467,37 @@ export const saveWater = (water: WaterLog, profileId?: string): void => {
 
 export const loadFocusSessions = (profileId?: string): FocusSessionLog[] => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), []);
+  const defaultFocusLogs: FocusSessionLog[] = [
+    {
+      id: "focus-seed-1",
+      type: "focus",
+      durationMinutes: 25,
+      completedAt: Date.now() - 3600000 * 4,
+      date: getOffsetLocalDateString(0),
+    },
+    {
+      id: "focus-seed-2",
+      type: "focus",
+      durationMinutes: 25,
+      completedAt: Date.now() - 3600000 * 1.5,
+      date: getOffsetLocalDateString(0),
+    },
+    {
+      id: "focus-seed-3",
+      type: "focus",
+      durationMinutes: 50,
+      completedAt: Date.now() - 86400000,
+      date: getOffsetLocalDateString(-1),
+    },
+    {
+      id: "focus-seed-4",
+      type: "focus",
+      durationMinutes: 25,
+      completedAt: Date.now() - 86400000 * 2,
+      date: getOffsetLocalDateString(-2),
+    },
+  ];
+  return getItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), defaultFocusLogs);
 };
 export const saveFocusSessions = (focus: FocusSessionLog[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
@@ -1787,6 +1956,204 @@ export const saveExamAnalysis = (analysis: ExamIntelligenceReport | null, profil
   const pId = profileId || loadActiveProfileId();
   if (!pId) return;
   setItem(getProfileKey(pId, STORAGE_KEYS.EXAM_ANALYSIS_V19), analysis);
+};
+
+// =========================================================================
+// FLASHCARDS & SPACED REPETITION DECKS PERSISTENCE ENGINE
+// =========================================================================
+
+export const DEFAULT_FLASHCARD_DECKS: FlashcardDeck[] = [
+  {
+    id: "deck-accountancy-ratios",
+    title: "Accountancy: Financial Ratios & Partnership",
+    subjectName: "Accountancy",
+    description: "Core formulas, liquidity ratios, and partnership deed adjustments for board mastery.",
+    color: "#10b981",
+    createdAt: Date.now() - 86400000 * 5,
+    updatedAt: Date.now() - 3600000 * 4,
+    lastStudiedAt: Date.now() - 3600000 * 12,
+    cards: [
+      {
+        id: "fc-acc-1",
+        deckId: "deck-accountancy-ratios",
+        term: "Current Ratio Formula & Ideal Benchmark",
+        definition: "Current Ratio = Current Assets / Current Liabilities. The standard ideal benchmark for short-term solvency is 2 : 1.",
+        hint: "Compares short-term assets to short-term liabilities",
+        category: "Formula",
+        intervalDays: 1,
+        easeFactor: 2.5,
+        repetitions: 1,
+        nextReviewAt: Date.now() - 3600000, // Due now
+        lastReviewedAt: Date.now() - 86400000,
+        masteryLevel: 45,
+        status: "learning",
+        createdAt: Date.now() - 86400000 * 5,
+      },
+      {
+        id: "fc-acc-2",
+        deckId: "deck-accountancy-ratios",
+        term: "Sacrificing Ratio in Partnership Admission",
+        definition: "Sacrificing Ratio = Old Ratio − New Ratio. Used to distribute goodwill premium brought in by a newly admitted partner among existing partners.",
+        hint: "Old share minus New share",
+        category: "Definition",
+        intervalDays: 0,
+        easeFactor: 2.5,
+        repetitions: 0,
+        nextReviewAt: Date.now() - 1800000, // Due now
+        masteryLevel: 20,
+        status: "new",
+        createdAt: Date.now() - 86400000 * 4,
+      },
+      {
+        id: "fc-acc-3",
+        deckId: "deck-accountancy-ratios",
+        term: "Return on Investment (ROI) / Return on Capital Employed",
+        definition: "ROI = (Net Profit before Interest, Tax & Dividend / Capital Employed) × 100. Measures overall operational efficiency of capital utilization.",
+        hint: "EBIT divided by Capital Employed",
+        category: "Formula",
+        intervalDays: 7,
+        easeFactor: 2.65,
+        repetitions: 3,
+        nextReviewAt: Date.now() + 86400000 * 3,
+        lastReviewedAt: Date.now() - 86400000 * 2,
+        masteryLevel: 90,
+        status: "mastered",
+        createdAt: Date.now() - 86400000 * 5,
+      },
+      {
+        id: "fc-acc-4",
+        deckId: "deck-accountancy-ratios",
+        term: "Garner vs. Murray Rule (Insolvency of Partner)",
+        definition: "In the absence of agreement, the capital deficiency of an insolvent partner is borne by solvent partners in the ratio of their last agreed capitals.",
+        hint: "Insolvency loss distribution rule",
+        category: "Concept",
+        intervalDays: 3,
+        easeFactor: 2.4,
+        repetitions: 2,
+        nextReviewAt: Date.now() - 600000, // Due now
+        lastReviewedAt: Date.now() - 86400000 * 3,
+        masteryLevel: 65,
+        status: "reviewing",
+        createdAt: Date.now() - 86400000 * 4,
+      },
+    ],
+  },
+  {
+    id: "deck-economics-macro",
+    title: "Macroeconomics: Money, Banking & Fiscal Policy",
+    subjectName: "Economics",
+    description: "Central bank monetary instruments, multiplier mechanics, and national income aggregates.",
+    color: "#06b6d4",
+    createdAt: Date.now() - 86400000 * 4,
+    updatedAt: Date.now() - 3600000 * 6,
+    lastStudiedAt: Date.now() - 86400000,
+    cards: [
+      {
+        id: "fc-eco-1",
+        deckId: "deck-economics-macro",
+        term: "Investment Multiplier (k) & MPC Relationship",
+        definition: "k = 1 / (1 − MPC) = 1 / MPS, where MPC is Marginal Propensity to Consume and MPS is Marginal Propensity to Save. Higher MPC leads to a larger multiplier effect.",
+        hint: "Inversely related to MPS",
+        category: "Formula",
+        intervalDays: 1,
+        easeFactor: 2.5,
+        repetitions: 1,
+        nextReviewAt: Date.now() - 7200000, // Due now
+        lastReviewedAt: Date.now() - 86400000,
+        masteryLevel: 50,
+        status: "learning",
+        createdAt: Date.now() - 86400000 * 4,
+      },
+      {
+        id: "fc-eco-2",
+        deckId: "deck-economics-macro",
+        term: "Repo Rate vs. Reverse Repo Rate",
+        definition: "Repo Rate is the rate at which the Central Bank (RBI) lends short-term funds to commercial banks against government securities. Reverse Repo Rate is the rate at which commercial banks park surplus funds with the Central Bank.",
+        hint: "Central Bank lending vs borrowing rate",
+        category: "Concept",
+        intervalDays: 10,
+        easeFactor: 2.7,
+        repetitions: 4,
+        nextReviewAt: Date.now() + 86400000 * 5,
+        lastReviewedAt: Date.now() - 86400000 * 2,
+        masteryLevel: 95,
+        status: "mastered",
+        createdAt: Date.now() - 86400000 * 4,
+      },
+      {
+        id: "fc-eco-3",
+        deckId: "deck-economics-macro",
+        term: "Fiscal Deficit Definition & Significance",
+        definition: "Fiscal Deficit = Total Expenditure − Total Receipts excluding borrowings. It indicates the total borrowing requirements of the government from all sources during a fiscal year.",
+        hint: "Total government borrowing requirement",
+        category: "Definition",
+        intervalDays: 0,
+        easeFactor: 2.5,
+        repetitions: 0,
+        nextReviewAt: Date.now() - 300000, // Due now
+        masteryLevel: 15,
+        status: "new",
+        createdAt: Date.now() - 86400000 * 2,
+      },
+    ],
+  },
+  {
+    id: "deck-business-principles",
+    title: "Business Studies: Management Principles & Finance",
+    subjectName: "Business Studies",
+    description: "Fayol's 14 Principles, Taylor's Scientific Management, and Financial Leverage.",
+    color: "#8b5cf6",
+    createdAt: Date.now() - 86400000 * 3,
+    updatedAt: Date.now() - 3600000 * 2,
+    cards: [
+      {
+        id: "fc-bst-1",
+        deckId: "deck-business-principles",
+        term: "Unity of Command vs. Unity of Direction",
+        definition: "Unity of Command states each subordinate should receive orders from only one superior (prevents dual subordination). Unity of Direction states one head and one plan for a group of activities having the same objective.",
+        hint: "One boss vs One plan",
+        category: "Concept",
+        intervalDays: 1,
+        easeFactor: 2.5,
+        repetitions: 1,
+        nextReviewAt: Date.now() - 1200000, // Due now
+        lastReviewedAt: Date.now() - 86400000,
+        masteryLevel: 55,
+        status: "reviewing",
+        createdAt: Date.now() - 86400000 * 3,
+      },
+      {
+        id: "fc-bst-2",
+        deckId: "deck-business-principles",
+        term: "Trading on Equity (Financial Leverage)",
+        definition: "The practice of using fixed-cost borrowed funds (debt/debentures) in the capital structure to increase the return (EPS) for equity shareholders when Return on Investment (ROI) exceeds cost of debt.",
+        hint: "ROI > Cost of Debt boosts EPS",
+        category: "High-Yield Point",
+        intervalDays: 6,
+        easeFactor: 2.6,
+        repetitions: 3,
+        nextReviewAt: Date.now() + 86400000 * 4,
+        lastReviewedAt: Date.now() - 86400000,
+        masteryLevel: 85,
+        status: "mastered",
+        createdAt: Date.now() - 86400000 * 3,
+      },
+    ],
+  },
+];
+
+export const loadFlashcardDecks = (profileId?: string): FlashcardDeck[] => {
+  const pId = profileId || loadActiveProfileId() || "default";
+  return getItem<FlashcardDeck[]>(
+    getProfileKey(pId, STORAGE_KEYS.FLASHCARD_DECKS),
+    DEFAULT_FLASHCARD_DECKS
+  );
+};
+
+export const saveFlashcardDecks = (decks: FlashcardDeck[], profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId() || "default";
+  if (!pId) return;
+  setItem(getProfileKey(pId, STORAGE_KEYS.FLASHCARD_DECKS), decks);
 };
 
 // =========================================================================

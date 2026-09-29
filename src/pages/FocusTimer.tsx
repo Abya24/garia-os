@@ -22,8 +22,12 @@ import {
   Waves,
   Headphones,
   Sliders,
+  Trophy,
+  PartyPopper,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
 import { FocusSessionLog, UserSettings } from "../types";
 import { sendNotification } from "../utils/notifications";
 import { getTodayString } from "../utils/storage";
@@ -68,6 +72,47 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   const [ambientVolume, setAmbientVolume] = useState<number>(0.5);
   const [autoPlayAmbient, setAutoPlayAmbient] = useState<boolean>(true);
 
+  // Celebratory Confetti Overlay State when a study session reaches its planned duration
+  const [showConfettiOverlay, setShowConfettiOverlay] = useState<boolean>(false);
+  const [completedSessionSummary, setCompletedSessionSummary] = useState<{
+    durationMinutes: number;
+    mode: "focus" | "break";
+    sessionsCount: number;
+  } | null>(null);
+
+  const CONFETTI_PARTICLES = React.useMemo(
+    () =>
+      Array.from({ length: 28 }).map((_, idx) => ({
+        id: idx,
+        left: `${(idx * 37) % 96 + 2}%`,
+        delay: (idx % 7) * 0.08,
+        duration: 2.2 + (idx % 5) * 0.35,
+        color: [
+          "#fbbf24",
+          "#10b981",
+          "#06b6d4",
+          "#f43f5e",
+          "#a855f7",
+          "#3b82f6",
+        ][idx % 6],
+        rotate: (idx % 2 === 0 ? 1 : -1) * (180 + (idx % 4) * 60),
+      })),
+    []
+  );
+
+  const fireConfettiBurst = React.useCallback(() => {
+    try {
+      confetti({
+        particleCount: 85,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ["#fbbf24", "#10b981", "#06b6d4", "#f43f5e", "#a855f7"],
+      });
+    } catch {
+      // Safe fallback in headless environments
+    }
+  }, []);
+
   const todayStr = getTodayString();
 
   // Keep ambient audio engine volume in sync
@@ -101,11 +146,19 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   };
 
   const handleSelectAmbientSound = (soundType: AmbientSoundType) => {
-    setSelectedAmbientSound(soundType);
     if (soundType === "none") {
+      setSelectedAmbientSound("none");
       ambientAudio.stop();
       setIsAmbientPlaying(false);
-    } else if (isAmbientPlaying || (isRunning && autoPlayAmbient)) {
+      return;
+    }
+
+    // If clicking the currently playing soundscape, toggle pause; otherwise switch & play immediately
+    if (selectedAmbientSound === soundType && isAmbientPlaying) {
+      ambientAudio.stop();
+      setIsAmbientPlaying(false);
+    } else {
+      setSelectedAmbientSound(soundType);
       ambientAudio.setVolume(ambientVolume);
       ambientAudio.play(soundType);
       setIsAmbientPlaying(true);
@@ -177,38 +230,42 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     }
   };
 
-  // Timer Tick
-  useEffect(() => {
-    let interval: any = null;
-    if (isRunning && timeLeftSeconds > 0) {
-      interval = setInterval(() => {
-        setTimeLeftSeconds((prev) => prev - 1);
-      }, 1000);
-    } else if (isRunning && timeLeftSeconds === 0) {
-      // Session Completed
+  const completePlannedSession = React.useCallback(
+    (sessionMode: "focus" | "break", plannedMins: number) => {
       setIsRunning(false);
       playChime(true);
       if (isAmbientPlaying) {
         ambientAudio.stop();
         setIsAmbientPlaying(false);
       }
-      if (mode === "focus") {
+
+      if (sessionMode === "focus") {
+        const nextCount = sessionsCompletedToday + 1;
+        setSessionsCompletedToday(nextCount);
         onLogFocusSession({
           type: "focus",
-          durationMinutes: focusDurationMinutes,
+          durationMinutes: plannedMins,
           completedAt: Date.now(),
           date: todayStr,
         });
 
+        fireConfettiBurst();
+        setCompletedSessionSummary({
+          durationMinutes: plannedMins,
+          mode: "focus",
+          sessionsCount: nextCount,
+        });
+        setShowConfettiOverlay(true);
+
         sendNotification("🎉 Focus Session Finished!", {
-          body: `Great job! You stayed focused for ${focusDurationMinutes} minutes. Time for a ${breakDurationMinutes}-minute break.`,
+          body: `Great job! You stayed focused for ${plannedMins} minutes. Time for a ${breakDurationMinutes}-minute break.`,
         });
 
         setMode("break");
       } else {
         onLogFocusSession({
           type: "break",
-          durationMinutes: breakDurationMinutes,
+          durationMinutes: plannedMins,
           completedAt: Date.now(),
           date: todayStr,
         });
@@ -219,10 +276,40 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
         setMode("focus");
       }
+    },
+    [
+      isAmbientPlaying,
+      sessionsCompletedToday,
+      onLogFocusSession,
+      todayStr,
+      fireConfettiBurst,
+      breakDurationMinutes,
+    ]
+  );
+
+  // Timer Tick
+  useEffect(() => {
+    let interval: any = null;
+    if (isRunning && timeLeftSeconds > 0) {
+      interval = setInterval(() => {
+        setTimeLeftSeconds((prev) => prev - 1);
+      }, 1000);
+    } else if (isRunning && timeLeftSeconds === 0) {
+      // Session Reached Planned Duration -> Trigger Confetti Overlay & Log Session
+      const plannedMins =
+        mode === "focus" ? focusDurationMinutes : breakDurationMinutes;
+      completePlannedSession(mode, plannedMins);
     }
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeftSeconds, mode]);
+  }, [
+    isRunning,
+    timeLeftSeconds,
+    mode,
+    focusDurationMinutes,
+    breakDurationMinutes,
+    completePlannedSession,
+  ]);
 
   const totalModeSeconds =
     (mode === "focus" ? focusDurationMinutes : breakDurationMinutes) * 60;
@@ -344,6 +431,155 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
       {/* Main Timer Display */}
       <div className="glass-card rounded-3xl p-8 border border-white/10 text-center flex flex-col items-center justify-center relative overflow-hidden max-w-xl mx-auto shadow-2xl">
+        {/* Celebratory Confetti Animation Overlay when a study session reaches its planned duration */}
+        <AnimatePresence>
+          {showConfettiOverlay && completedSessionSummary && (
+            <motion.div
+              id="focus-confetti-celebration-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Focus Session Completed Celebration Overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center overflow-hidden"
+            >
+              {/* Animated Falling Confetti Particles Layer */}
+              <div
+                id="focus-confetti-particles-layer"
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+              >
+                {CONFETTI_PARTICLES.map((p) => (
+                  <motion.span
+                    key={p.id}
+                    data-testid="confetti-particle"
+                    initial={{ y: -24, opacity: 1, rotate: 0, scale: 0.9 }}
+                    animate={{
+                      y: ["0%", "420%"],
+                      opacity: [1, 1, 0],
+                      rotate: p.rotate,
+                      scale: [1, 1.15, 0.85],
+                    }}
+                    transition={{
+                      duration: p.duration,
+                      delay: p.delay,
+                      repeat: Infinity,
+                      ease: "easeOut",
+                    }}
+                    style={{
+                      left: p.left,
+                      backgroundColor: p.color,
+                    }}
+                    className="absolute top-0 w-2.5 h-4 rounded-sm shadow-sm"
+                  />
+                ))}
+              </div>
+
+              {/* Celebration Card Content */}
+              <motion.div
+                initial={{ scale: 0.85, y: 16, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                className="relative z-10 max-w-md w-full p-6 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-amber-950/30 border border-amber-500/40 shadow-2xl space-y-4"
+              >
+                <button
+                  type="button"
+                  id="confetti-overlay-close-btn"
+                  onClick={() => setShowConfettiOverlay(false)}
+                  aria-label="Close celebration overlay"
+                  className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <motion.div
+                  animate={{ scale: [1, 1.12, 1], rotate: [0, 6, -6, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-300 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20"
+                >
+                  <Trophy className="w-8 h-8 text-amber-400" />
+                </motion.div>
+
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">
+                    <PartyPopper className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Planned Duration Reached!</span>
+                  </div>
+                  <h2
+                    id="confetti-overlay-title"
+                    className="text-xl sm:text-2xl font-extrabold text-white font-heading"
+                  >
+                    Focus Session Complete!
+                  </h2>
+                  <p
+                    id="confetti-overlay-message"
+                    className="text-xs sm:text-sm text-slate-300 leading-relaxed"
+                  >
+                    Congratulations! You completed your planned{" "}
+                    <strong className="text-amber-300 font-mono">
+                      {completedSessionSummary.durationMinutes}-minute
+                    </strong>{" "}
+                    deep study session.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 p-3 rounded-2xl bg-slate-950/80 border border-white/10 text-xs font-mono tabular-nums">
+                  <div className="p-2 rounded-xl bg-white/5">
+                    <div className="text-slate-400 text-[10px] uppercase">
+                      Session Logged
+                    </div>
+                    <div className="text-base font-extrabold text-amber-300 mt-0.5">
+                      +{completedSessionSummary.durationMinutes} mins
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/5">
+                    <div className="text-slate-400 text-[10px] uppercase">
+                      Completed Today
+                    </div>
+                    <div className="text-base font-extrabold text-emerald-300 mt-0.5">
+                      {completedSessionSummary.sessionsCount}{" "}
+                      {completedSessionSummary.sessionsCount === 1
+                        ? "Session"
+                        : "Sessions"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    id="confetti-overlay-start-break-btn"
+                    onClick={() => {
+                      setShowConfettiOverlay(false);
+                      setMode("break");
+                      setTimeLeftSeconds(breakDurationMinutes * 60);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Coffee className="w-4 h-4" />
+                    <span>Take {breakDurationMinutes}m Break</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="confetti-overlay-new-focus-btn"
+                    onClick={() => {
+                      setShowConfettiOverlay(false);
+                      setMode("focus");
+                      setTimeLeftSeconds(focusDurationMinutes * 60);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 fill-slate-950" />
+                    <span>New Focus Session</span>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {/* Subtle Ambient Glow Blobs */}
         <div
           className={`absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-1000 ${
@@ -671,8 +907,85 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
           </motion.button>
         </div>
 
+        {/* Complete Planned Session Action (Triggers session completion & celebratory confetti overlay) */}
+        <div className="mt-3">
+          <button
+            type="button"
+            id="focus-complete-session-btn"
+            onClick={() =>
+              completePlannedSession(
+                "focus",
+                mode === "focus" ? focusDurationMinutes : breakDurationMinutes
+              )
+            }
+            className="px-4 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Complete planned study session duration now and log focus session"
+          >
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Complete Planned Session ({focusDurationMinutes}m)</span>
+          </button>
+        </div>
+
+        {/* Quick Focus Music Soundscape Bar inside Main Timer Card */}
+        <div
+          id="focus-music-quick-bar"
+          className="mt-6 pt-4 border-t border-white/10 w-full space-y-2.5 text-left"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <Headphones className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Focus Music Soundscapes</span>
+            </span>
+            <span className="text-[11px] font-mono text-slate-400">
+              {isAmbientPlaying
+                ? `Playing: ${
+                    AMBIENT_SOUND_OPTIONS.find((o) => o.id === selectedAmbientSound)?.name ||
+                    selectedAmbientSound
+                  }`
+                : "Tap to toggle audio"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {(
+              [
+                { id: "rain" as AmbientSoundType, label: "Rain" },
+                { id: "cafe" as AmbientSoundType, label: "Cafe" },
+                { id: "white_noise" as AmbientSoundType, label: "White Noise" },
+                { id: "none" as AmbientSoundType, label: "Off" },
+              ] as const
+            ).map((item) => {
+              const isActive =
+                item.id === "none"
+                  ? !isAmbientPlaying || selectedAmbientSound === "none"
+                  : selectedAmbientSound === item.id && isAmbientPlaying;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  id={`focus-music-toggle-${item.id}`}
+                  onClick={() => handleSelectAmbientSound(item.id)}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    isActive && item.id !== "none"
+                      ? "bg-indigo-500/25 border-indigo-400 text-indigo-200 shadow-sm"
+                      : isActive && item.id === "none"
+                      ? "bg-slate-900 border-white/20 text-slate-300"
+                      : "bg-slate-950/70 border-white/10 text-slate-400 hover:text-white hover:border-white/20"
+                  }`}
+                >
+                  {item.id === "rain" && <CloudRain className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                  {item.id === "cafe" && <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                  {item.id === "white_noise" && <Wind className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                  {item.id === "none" && <VolumeX className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  <span className="truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Daily Session Counter & Status */}
-        <div className="mt-8 pt-4 border-t border-white/10 w-full flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-4 pt-4 border-t border-white/10 w-full flex items-center justify-between text-xs text-slate-400">
           <span className="flex items-center gap-1.5 font-medium">
             <CheckCircle className="w-4 h-4 text-emerald-400" />
             Sessions Completed Today
@@ -683,8 +996,11 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
         </div>
       </div>
 
-      {/* Ambient Background Sounds Card */}
-      <div className="glass-card rounded-3xl p-6 border border-white/10 shadow-lg space-y-4">
+      {/* Focus Music & Ambient Background Soundscapes Card */}
+      <div
+        id="focus-music-player"
+        className="glass-card rounded-3xl p-6 border border-white/10 shadow-lg space-y-4"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
@@ -693,7 +1009,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white font-heading">
-                  Ambient Background Sounds
+                  Focus Music & Ambient Soundscapes
                 </h3>
                 {isAmbientPlaying && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase">
@@ -703,7 +1019,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                Continuous calming soundscapes (rain, white noise, binaural beats) to mask distractions and deepen focus.
+                Toggle calming background soundscapes (Rain, Cafe, White Noise, Binaural Beats) to mask distractions and deepen focus.
               </p>
             </div>
           </div>
@@ -744,6 +1060,8 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
               switch (option.id) {
                 case "rain":
                   return <CloudRain className="w-4 h-4 text-cyan-400" />;
+                case "cafe":
+                  return <Coffee className="w-4 h-4 text-amber-400" />;
                 case "white_noise":
                   return <Wind className="w-4 h-4 text-sky-400" />;
                 case "pink_noise":

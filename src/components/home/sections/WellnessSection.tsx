@@ -14,6 +14,7 @@ import {
 import { Habit, WaterLog, ActiveTab } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
 import { getTodayString } from "../../../utils/storage";
+import { HabitWeeklySparkline } from "../../HabitWeeklySparkline";
 
 interface WellnessSectionProps {
   habits: Habit[];
@@ -118,40 +119,51 @@ export const WellnessSection: React.FC<WellnessSectionProps> = ({
                     <div
                       key={habit.id}
                       onClick={() => onToggleHabit && onToggleHabit(habit.id, todayStr)}
-                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer card-press ${
+                      className={`p-3 rounded-2xl border transition-all flex flex-col gap-2 cursor-pointer card-press ${
                         isDoneToday
                           ? "bg-slate-950/50 border-amber-500/30"
                           : "bg-slate-900/60 hover:bg-slate-800/80 border-white/5 hover:border-amber-500/30"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleHabit && onToggleHabit(habit.id, todayStr);
-                          }}
-                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
-                            isDoneToday
-                              ? "bg-amber-500 border-amber-400 text-slate-950 shadow-sm"
-                              : "border-slate-600 hover:border-amber-400 text-transparent"
-                          }`}
-                        >
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </button>
-                        <span
-                          className={`text-xs font-medium truncate ${
-                            isDoneToday ? "text-slate-200 line-through opacity-80" : "text-white"
-                          }`}
-                        >
-                          {habit.title}
-                        </span>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleHabit && onToggleHabit(habit.id, todayStr);
+                            }}
+                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                              isDoneToday
+                                ? "bg-amber-500 border-amber-400 text-slate-950 shadow-sm"
+                                : "border-slate-600 hover:border-amber-400 text-transparent"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+                          <span
+                            className={`text-xs font-medium truncate ${
+                              isDoneToday ? "text-slate-200 line-through opacity-80" : "text-white"
+                            }`}
+                          >
+                            {habit.title}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/20 shrink-0">
+                          <Flame className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span>{habit.streak || 0}d</span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/20 shrink-0">
-                        <Flame className="w-3 h-3 fill-amber-400 text-amber-400" />
-                        <span>{habit.streak || 0}d</span>
-                      </div>
+                      {/* 7-Day Consistency Weekly Sparkline */}
+                      <HabitWeeklySparkline
+                        habit={habit}
+                        compact
+                        onToggleDate={(dateStr) =>
+                          onToggleHabit && onToggleHabit(habit.id, dateStr)
+                        }
+                      />
                     </div>
                   );
                 })}

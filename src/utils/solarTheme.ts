@@ -1,4 +1,4 @@
-import { AppTheme } from "../types";
+import { AppTheme, UserSettings } from "../types";
 
 export interface SolarCoordinates {
   lat: number;
@@ -19,6 +19,31 @@ export interface SolarInfo {
   solarProgress: number; // 0 to 100% through current phase
   coordinatesUsed: SolarCoordinates | null;
   isUsingGeolocation: boolean;
+}
+
+export const DARK_THEME_OPTIONS: { id: AppTheme; label: string; desc: string }[] = [
+  { id: "dark", label: "Graphite Dark", desc: "Balanced Deep Slate" },
+  { id: "amoled", label: "AMOLED Black", desc: "Pure #000000 Contrast" },
+  { id: "midnight", label: "Midnight Blue", desc: "Deep Navy Horizon" },
+  { id: "purple", label: "Royal Purple", desc: "Deep Violet" },
+  { id: "emerald", label: "Emerald Green", desc: "Calm Forest Night" },
+  { id: "classic", label: "Classic Scholar", desc: "Heritage Ivory & Bronze" },
+  { id: "frost", label: "Frost Glass", desc: "Translucent Night Ice" },
+  { id: "sunset", label: "Sunset Orange", desc: "Warm Twilight" },
+];
+
+export function isLightOrDayTheme(theme?: AppTheme): boolean {
+  return theme === "light" || theme === "arctic" || theme === "high-contrast";
+}
+
+export function resolvePreferredNightTheme(settings: UserSettings): AppTheme {
+  if (settings.preferredNightTheme && !isLightOrDayTheme(settings.preferredNightTheme)) {
+    return settings.preferredNightTheme;
+  }
+  if (settings.theme && !isLightOrDayTheme(settings.theme) && settings.theme !== "system") {
+    return settings.theme;
+  }
+  return "dark";
 }
 
 const SOLAR_COORDS_STORAGE_KEY = "garia_solar_coordinates";
@@ -189,7 +214,9 @@ function formatTime(d: Date): string {
  */
 export function getSolarInfo(
   currentDate: Date = new Date(),
-  overrideCoords?: SolarCoordinates | null
+  overrideCoords?: SolarCoordinates | null,
+  preferredNightTheme: AppTheme = "dark",
+  simulationMode: "auto" | "daylight" | "night" = "auto"
 ): SolarInfo {
   const cachedCoords = overrideCoords !== undefined ? overrideCoords : getCachedSolarCoordinates();
   const isUsingGeolocation = Boolean(cachedCoords && typeof cachedCoords.lat === "number");
@@ -202,8 +229,16 @@ export function getSolarInfo(
   const sunriseMs = sunrise.getTime();
   const sunsetMs = sunset.getTime();
 
-  const isDaytime = currentMs >= sunriseMs && currentMs < sunsetMs;
-  const suggestedTheme: AppTheme = isDaytime ? "light" : "dark";
+  const astronomicalDaytime = currentMs >= sunriseMs && currentMs < sunsetMs;
+  const isDaytime =
+    simulationMode === "daylight"
+      ? true
+      : simulationMode === "night"
+      ? false
+      : astronomicalDaytime;
+
+  const resolvedNight: AppTheme = isLightOrDayTheme(preferredNightTheme) ? "dark" : preferredNightTheme;
+  const suggestedTheme: AppTheme = isDaytime ? "high-contrast" : resolvedNight;
 
   let nextTransitionTime = "";
   let nextTransitionLabel = "";
@@ -218,9 +253,12 @@ export function getSolarInfo(
     nextTransitionTime = formatTime(sunset);
     nextTransitionLabel = hours > 0 ? `Sunset in ${hours}h ${mins}m` : `Sunset in ${mins}m`;
 
-    const totalDaylightMs = sunsetMs - sunriseMs;
+    const totalDaylightMs = Math.max(1, sunsetMs - sunriseMs);
     const elapsedDaylightMs = currentMs - sunriseMs;
-    solarProgress = Math.min(100, Math.max(0, Math.round((elapsedDaylightMs / totalDaylightMs) * 100)));
+    solarProgress =
+      simulationMode === "daylight" && !astronomicalDaytime
+        ? 50
+        : Math.min(100, Math.max(0, Math.round((elapsedDaylightMs / totalDaylightMs) * 100)));
   } else {
     // Next transition is sunrise
     let nextSunriseMs = sunriseMs;
@@ -234,9 +272,15 @@ export function getSolarInfo(
     nextTransitionTime = formatTime(new Date(nextSunriseMs));
     nextTransitionLabel = hours > 0 ? `Sunrise in ${hours}h ${mins}m` : `Sunrise in ${mins}m`;
 
-    const totalNightMs = 24 * 60 * 60 * 1000 - (sunsetMs - sunriseMs);
-    const elapsedNightMs = currentMs >= sunsetMs ? currentMs - sunsetMs : (currentMs + (24 * 60 * 60 * 1000 - sunsetMs));
-    solarProgress = Math.min(100, Math.max(0, Math.round((elapsedNightMs / totalNightMs) * 100)));
+    const totalNightMs = Math.max(1, 24 * 60 * 60 * 1000 - (sunsetMs - sunriseMs));
+    const elapsedNightMs =
+      currentMs >= sunsetMs
+        ? currentMs - sunsetMs
+        : currentMs + (24 * 60 * 60 * 1000 - sunsetMs);
+    solarProgress =
+      simulationMode === "night" && astronomicalDaytime
+        ? 50
+        : Math.min(100, Math.max(0, Math.round((elapsedNightMs / totalNightMs) * 100)));
   }
 
   return {

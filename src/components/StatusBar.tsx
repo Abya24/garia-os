@@ -64,6 +64,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         return t.abyaAI || "Abya AI";
       case "notes":
         return t.notes || "Notes";
+      case "flashcards":
+        return "Flashcards & Spaced Repetition";
       case "study":
         return t.studyTracker || "Study Tracker";
       case "goals":

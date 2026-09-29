@@ -71,7 +71,9 @@ self.addEventListener("fetch", (event) => {
           if (cachedResponse) return cachedResponse;
           // Only provide SPA fallback for navigation requests
           if (event.request.mode === "navigate") {
-            return caches.match("/index.html") || caches.match("/");
+            return caches.match("/index.html").then((htmlRes) => {
+              return htmlRes || caches.match("/");
+            });
           }
           return undefined;
         });
