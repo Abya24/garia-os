@@ -1,12 +1,18 @@
 import { PinSecuritySettings, UserSettings } from "../types";
-import { loadSettings, saveSettings } from "./storage";
+import { loadActiveProfileId, saveSettings } from "./storage";
 
 export const MIN_PIN_LENGTH = 4;
 export const MAX_PIN_LENGTH = 8;
 
-const SESSION_UNLOCKED_KEY = "garia_os_session_unlocked_v1";
-const SESSION_LAST_ACTIVE_KEY = "garia_os_session_last_active_v1";
+const SESSION_UNLOCKED_BASE_KEY = "garia_os_session_unlocked_v1";
+const SESSION_LAST_ACTIVE_BASE_KEY = "garia_os_session_last_active_v1";
+const SESSION_MANUAL_LOCK_BASE_KEY = "garia_os_session_manual_lock_v1";
 const PIN_SALT = "garia_os_secure_pin_salt_v2026";
+
+function getScopedSessionKey(baseKey: string, profileId?: string): string {
+  const pId = profileId || loadActiveProfileId() || "default";
+  return `${baseKey}_${pId}`;
+}
 
 /**
  * Generate a cryptographically strong, human-readable recovery code (e.g., GARIA-7K9P-4X2M)
@@ -139,10 +145,10 @@ export function verifyAccountEmail(
 /**
  * Check if the active session is currently unlocked in browser session storage
  */
-export function isSessionUnlocked(): boolean {
+export function isSessionUnlocked(profileId?: string): boolean {
   try {
     if (typeof window === "undefined") return false;
-    const status = sessionStorage.getItem(SESSION_UNLOCKED_KEY);
+    const status = sessionStorage.getItem(getScopedSessionKey(SESSION_UNLOCKED_BASE_KEY, profileId));
     return status === "true";
   } catch {
     return false;
@@ -152,15 +158,20 @@ export function isSessionUnlocked(): boolean {
 /**
  * Mark the current browser session as unlocked
  */
-export function setSessionUnlocked(unlocked: boolean): void {
+export function setSessionUnlocked(unlocked: boolean, profileId?: string): void {
   try {
     if (typeof window === "undefined") return;
+    const unlockedKey = getScopedSessionKey(SESSION_UNLOCKED_BASE_KEY, profileId);
+    const lastActiveKey = getScopedSessionKey(SESSION_LAST_ACTIVE_BASE_KEY, profileId);
+    const manualLockKey = getScopedSessionKey(SESSION_MANUAL_LOCK_BASE_KEY, profileId);
     if (unlocked) {
-      sessionStorage.setItem(SESSION_UNLOCKED_KEY, "true");
-      sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, Date.now().toString());
+      sessionStorage.setItem(unlockedKey, "true");
+      sessionStorage.setItem(lastActiveKey, Date.now().toString());
+      sessionStorage.removeItem(manualLockKey);
     } else {
-      sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
-      sessionStorage.removeItem(SESSION_LAST_ACTIVE_KEY);
+      sessionStorage.removeItem(unlockedKey);
+      sessionStorage.removeItem(lastActiveKey);
+      sessionStorage.setItem(manualLockKey, "true");
     }
   } catch {
     // ignore
@@ -170,32 +181,61 @@ export function setSessionUnlocked(unlocked: boolean): void {
 /**
  * Mark the current session as unlocked (alias)
  */
-export function markSessionUnlocked(): void {
-  setSessionUnlocked(true);
+export function markSessionUnlocked(profileId?: string): void {
+  setSessionUnlocked(true, profileId);
 }
 
 /**
  * Immediately lock the current session (triggers Lock Screen if PIN is enabled)
  */
-export function lockSession(): void {
-  setSessionUnlocked(false);
+export function lockSession(profileId?: string): void {
+  setSessionUnlocked(false, profileId);
 }
 
 /**
  * Determines whether the app should present the Lock Screen
  */
-export function shouldAppBeLocked(settings?: UserSettings): boolean {
+export function shouldAppBeLocked(settings?: UserSettings, profileId?: string): boolean {
   if (!settings?.security?.enabled || !settings.security.pinHash) {
     return false;
   }
 
-  // If PIN is enabled and lockOnLaunch is true:
-  if (settings.security.lockOnLaunch) {
-    return !isSessionUnlocked();
+  // Check auto-lock timeout if configured
+  const autoLockMinutes = settings.security.autoLockMinutes ?? 0;
+  if (autoLockMinutes > 0 && typeof window !== "undefined") {
+    try {
+      const lastActiveStr = sessionStorage.getItem(
+        getScopedSessionKey(SESSION_LAST_ACTIVE_BASE_KEY, profileId)
+      );
+      if (lastActiveStr) {
+        const elapsedMs = Date.now() - Number(lastActiveStr);
+        if (elapsedMs >= autoLockMinutes * 60 * 1000) {
+          setSessionUnlocked(false, profileId);
+          return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
-  // If lockOnLaunch is disabled, check if user manually locked session
-  return !isSessionUnlocked();
+  // If PIN is enabled and lockOnLaunch is true:
+  if (settings.security.lockOnLaunch) {
+    return !isSessionUnlocked(profileId);
+  }
+
+  // If lockOnLaunch is disabled, only lock if user manually locked session
+  try {
+    if (typeof window !== "undefined") {
+      const manuallyLocked =
+        sessionStorage.getItem(getScopedSessionKey(SESSION_MANUAL_LOCK_BASE_KEY, profileId)) ===
+        "true";
+      return manuallyLocked;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
 }
 
 /**
@@ -204,7 +244,8 @@ export function shouldAppBeLocked(settings?: UserSettings): boolean {
 export async function setupNewPin(
   pin: string,
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  profileId?: string
 ): Promise<{ success: boolean; recoveryCode: string }> {
   if (!isValidPinFormat(pin)) return { success: false, recoveryCode: "" };
   const pinHash = await hashPin(pin);
@@ -227,8 +268,8 @@ export async function setupNewPin(
   };
 
   onUpdateSettings(newSettings);
-  saveSettings(newSettings);
-  setSessionUnlocked(true);
+  saveSettings(newSettings, profileId);
+  setSessionUnlocked(true, profileId);
   return { success: true, recoveryCode };
 }
 
@@ -239,7 +280,8 @@ export async function changeExistingPin(
   currentPin: string,
   newPin: string,
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  profileId?: string
 ): Promise<{ success: boolean; error?: string; recoveryCode?: string }> {
   if (!settings.security?.pinHash) {
     return { success: false, error: "No PIN currently set." };
@@ -271,8 +313,8 @@ export async function changeExistingPin(
   };
 
   onUpdateSettings(newSettings);
-  saveSettings(newSettings);
-  setSessionUnlocked(true);
+  saveSettings(newSettings, profileId);
+  setSessionUnlocked(true, profileId);
   return { success: true, recoveryCode };
 }
 
@@ -282,7 +324,8 @@ export async function changeExistingPin(
 export async function resetPinWithRecovery(
   newPin: string,
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  profileId?: string
 ): Promise<{ success: boolean; error?: string; recoveryCode: string }> {
   if (!isValidPinFormat(newPin)) {
     return { success: false, error: `New PIN must be between ${MIN_PIN_LENGTH} and ${MAX_PIN_LENGTH} digits (numbers only).`, recoveryCode: "" };
@@ -306,8 +349,8 @@ export async function resetPinWithRecovery(
   };
 
   onUpdateSettings(newSettings);
-  saveSettings(newSettings);
-  setSessionUnlocked(true);
+  saveSettings(newSettings, profileId);
+  setSessionUnlocked(true, profileId);
   return { success: true, recoveryCode };
 }
 
@@ -318,7 +361,8 @@ export async function resetPinWithRecovery(
 export async function removePin(
   currentPin: string,
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  profileId?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!settings.security?.pinHash) {
     // If no pin hash was stored, just disable
@@ -329,8 +373,8 @@ export async function removePin(
     };
     const newSettings: UserSettings = { ...settings, security: updatedSecurity };
     onUpdateSettings(newSettings);
-    saveSettings(newSettings);
-    setSessionUnlocked(true);
+    saveSettings(newSettings, profileId);
+    setSessionUnlocked(true, profileId);
     return { success: true };
   }
 
@@ -352,8 +396,8 @@ export async function removePin(
   };
 
   onUpdateSettings(newSettings);
-  saveSettings(newSettings);
-  setSessionUnlocked(true);
+  saveSettings(newSettings, profileId);
+  setSessionUnlocked(true, profileId);
   return { success: true };
 }
 
@@ -362,7 +406,8 @@ export async function removePin(
  */
 export function resetPinSecurity(
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  profileId?: string
 ): void {
   const updatedSecurity: PinSecuritySettings = {
     enabled: false,
@@ -377,6 +422,6 @@ export function resetPinSecurity(
   };
 
   onUpdateSettings(newSettings);
-  saveSettings(newSettings);
-  setSessionUnlocked(true);
+  saveSettings(newSettings, profileId);
+  setSessionUnlocked(true, profileId);
 }

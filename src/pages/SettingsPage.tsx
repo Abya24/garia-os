@@ -158,6 +158,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     loadCalendarSyncSettings(activeStudent?.id)
   );
 
+  // Sync local form states when active student profile switches
+  useEffect(() => {
+    setUserName(getStudentDisplayName(activeStudent, settings, "Student"));
+    setGcalSettings(loadCalendarSyncSettings(activeStudent?.id));
+  }, [activeStudent?.id, activeStudent?.name, settings.userName]);
+
   // Firebase Firestore Cloud Sync State
   const [fbUser, setFbUser] = useState<User | null>(auth.currentUser);
   const [isFbSyncing, setIsFbSyncing] = useState(false);
@@ -559,8 +565,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
             {currentLanguage === "hi"
-              ? "प्राथमिकताएं, भाषा, एआई क्रेडेंशियल्स और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
-              : "Configure preferences, language, AI credentials, and multi-student profiles."}
+              ? "प्राथमिकताएं, भाषा, पिन सुरक्षा और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
+              : "Configure preferences, language, PIN security, and multi-student profiles."}
           </p>
         </div>
       </div>
@@ -984,7 +990,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   Cloud Firestore
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  tokyo-pipe-lf6jr
+                  Real-Time Sync
                 </span>
               </div>
               <h3 className="text-lg font-bold font-heading text-white mt-0.5">

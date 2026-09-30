@@ -321,7 +321,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image file (PNG, JPEG, WebP).");
+      e.target.value = "";
       return;
     }
 

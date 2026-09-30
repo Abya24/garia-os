@@ -194,13 +194,14 @@ export async function verifyFirebaseIdToken(
     };
   }
 
-  // Check test token in non-production environments
+  // Check test token in non-production environments only if test keys were explicitly generated
   if (
     process.env.NODE_ENV !== "production" &&
-    header.kid === "garia-local-test-key"
+    header.kid === "garia-local-test-key" &&
+    fs.existsSync(TEST_KEYS_PATH)
   ) {
     try {
-      const { publicKey } = getDevTestAuth();
+      const { publicKey } = JSON.parse(fs.readFileSync(TEST_KEYS_PATH, "utf8"));
       const dataToVerify = Buffer.from(`${jwtSegments[0]}.${jwtSegments[1]}`, "utf8");
       const pubObj = crypto.createPublicKey(publicKey);
       const signatureBuf = Buffer.from(jwtSegments[2], "base64url");

@@ -310,16 +310,6 @@ export async function signOutFromFirebase(): Promise<void> {
   }
 }
 
-let customEntityPersister:
-  | ((userId: string, entityName: string, entityId: string, data: any, isDelete: boolean) => Promise<void>)
-  | null = null;
-
-export function __setTestEntityPersister(
-  fn: ((userId: string, entityName: string, entityId: string, data: any, isDelete: boolean) => Promise<void>) | null
-) {
-  customEntityPersister = fn;
-}
-
 /**
  * Persist an individual entity action to Firestore subcollections.
  */
@@ -330,9 +320,6 @@ export async function persistEntityToFirestore(
   data: any,
   isDelete: boolean
 ): Promise<void> {
-  if (customEntityPersister) {
-    return customEntityPersister(userId, entityName, entityId, data, isDelete);
-  }
   const sanitizedId = String(entityId).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128);
   const validCollections = ["tasks", "notes", "habits", "goals", "calendar_events", "profiles"];
   const targetCollection = validCollections.includes(entityName) ? entityName : "tasks";

@@ -175,6 +175,17 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   // Mode or Duration Change Reset
   useEffect(() => {
     if (!isRunning) {
+      if (settings.defaultFocusDuration && settings.defaultFocusDuration !== focusDurationMinutes) {
+        setFocusDurationMinutes(settings.defaultFocusDuration);
+      }
+      if (settings.defaultBreakDuration && settings.defaultBreakDuration !== breakDurationMinutes) {
+        setBreakDurationMinutes(settings.defaultBreakDuration);
+      }
+    }
+  }, [settings.defaultFocusDuration, settings.defaultBreakDuration]);
+
+  useEffect(() => {
+    if (!isRunning) {
       const targetMins =
         mode === "focus" ? focusDurationMinutes : breakDurationMinutes;
       setTimeLeftSeconds(targetMins * 60);

@@ -86,13 +86,13 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   const [isProcessingRecovery, setIsProcessingRecovery] = useState<boolean>(false);
 
   const triggerUnlock = useCallback(() => {
-    setSessionUnlocked(true);
+    setSessionUnlocked(true, activeStudent?.id);
     if (typeof onUnlocked === "function") {
       onUnlocked();
     } else if (typeof onUnlockSuccess === "function") {
       onUnlockSuccess();
     }
-  }, [onUnlocked, onUnlockSuccess]);
+  }, [onUnlocked, onUnlockSuccess, activeStudent?.id]);
 
   // Update clock & date
   useEffect(() => {
@@ -327,7 +327,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
     setIsProcessingRecovery(true);
     if (typeof onUpdateSettings === "function") {
-      const res = await resetPinWithRecovery(newRecoveryPin, settings, onUpdateSettings);
+      const res = await resetPinWithRecovery(newRecoveryPin, settings, onUpdateSettings, activeStudent?.id);
       setIsProcessingRecovery(false);
       if (res.success) {
         setFreshRecoveryCode(res.recoveryCode);

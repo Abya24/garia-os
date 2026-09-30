@@ -571,7 +571,7 @@ if (typeof window !== "undefined") {
     if (user && typeof navigator !== "undefined" && navigator.onLine) {
       const stored = loadStoredQueue();
       if (stored.length > 0 && !isReconcilingInProgress) {
-        console.log(`[OfflineQueue] User authenticated (${user.uid}). Reconciling ${stored.length} pending offline actions...`);
+        console.log(`[OfflineQueue] User authenticated. Reconciling ${stored.length} pending offline actions...`);
         setTimeout(() => {
           reconcilePendingQueueWithFirestore(user.uid).catch((err) => {
             console.warn("[OfflineQueue] Automatic reconciliation on auth change notice:", err);

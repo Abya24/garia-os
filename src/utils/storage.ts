@@ -949,8 +949,8 @@ function migrateAndInitDefaultProfile(): StudentProfile[] {
   });
 
   const profiles = [defaultProfile];
-  setItem(PROFILES_KEY, profiles);
-  setItem(ACTIVE_PROFILE_KEY, "student-default");
+  saveProfiles(profiles);
+  saveActiveProfileId("student-default");
 
   return profiles;
 }
@@ -964,10 +964,15 @@ export const addStudentProfile = (
   const rawName = data.name ? data.name.trim() : "";
   const sanitizedName = rawName || "Student";
 
+  let candidateId = `student-${Date.now()}`;
+  if (profiles.some((p) => p.id === candidateId)) {
+    candidateId = `student-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  }
+
   const newProfile: StudentProfile = {
     ...data,
     name: sanitizedName,
-    id: `student-${Date.now()}`,
+    id: candidateId,
     avatarColor: data.avatarColor || AVATAR_GRADIENT_VALUES[avatarIndex],
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -1116,7 +1121,7 @@ function seedNewProfileData(profile: StudentProfile): void {
   saveTasks(tasks, profId);
 
   // Subjects
-  saveSubjects(getDefaultStudySubjectsForStream(profile.stream), profId);
+  saveSubjects(getDefaultStudySubjectsForStream(profile.stream, profile.classLevel), profId);
 
   // Notes
   const notes: Note[] = [
@@ -1208,7 +1213,7 @@ Use this space to write formulas, key terms, or daily notes.`,
   saveCareerRoadmap(careerRoadmap, profId);
 
   // Academic Subjects & Chapters
-  const academicSubs = getDefaultSubjectsForStream(profile.stream);
+  const academicSubs = getDefaultSubjectsForStream(profile.stream, profile.classLevel);
   saveAcademicSubjects(academicSubs, profId);
 
   const academicChaps = DEFAULT_INITIAL_CHAPTERS.filter((c) =>
@@ -2323,7 +2328,16 @@ export const sanitizeSettingsForExport = (settings: UserSettings): UserSettings 
 export const exportStudentProfileJSON = (profileId?: string) => {
   const pId = profileId || loadActiveProfileId();
   const profiles = loadProfiles();
-  const student = profiles.find((p) => p.id === pId) || loadActiveProfile();
+  const student = profiles.find((p) => p.id === pId) || loadActiveProfile() || {
+    id: pId || "student-default",
+    name: "Student",
+    classLevel: "Class 12",
+    stream: "Commerce" as StreamType,
+    board: "BSEB",
+    avatarColor: "from-cyan-500 to-emerald-500",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
 
   const data = {
     studentProfile: student,
@@ -2331,19 +2345,22 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     subjects: loadSubjects(pId),
     studySessions: loadStudySessions(pId),
     notes: loadNotes(pId),
+    flashcardDecks: loadFlashcardDecks(pId),
     habits: loadHabits(pId),
     water: loadWater(pId),
     focusSessions: loadFocusSessions(pId),
     goals: loadGoals(pId),
     calendarEvents: loadCalendarEvents(pId),
     abyaChat: loadAbyaChat(pId),
+    abyaChatSessions: loadAbyaChatSessions(pId),
     abyaLanguage: loadAbyaLanguage(pId),
     settings: sanitizeSettingsForExport(loadSettings(pId)),
     dashboardWidgets: loadDashboardWidgets(pId),
     careerProfile: loadCareerProfile(pId),
     careerAssessment: loadCareerAssessment(pId),
     careerRoadmap: loadCareerRoadmap(pId),
-    academicSubjects: loadAcademicSubjects(student.stream, pId),
+    careerQuiz: loadCareerQuiz(pId),
+    academicSubjects: loadAcademicSubjects(student.stream, pId, student.classLevel),
     academicChapters: loadAcademicChapters(pId),
     academicTests: loadAcademicTests(pId),
     academicPlan: loadAcademicPlan(pId),
@@ -2361,7 +2378,7 @@ export const exportStudentProfileJSON = (profileId?: string) => {
     appVersion: "Garia OS v1.9 Exam Intelligence",
   };
 
-  const safeName = student.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const safeName = (student.name || "student").toLowerCase().replace(/[^a-z0-9]/g, "_");
   const dataStr =
     "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
   const downloadAnchor = document.createElement("a");
@@ -2418,18 +2435,21 @@ export const importStudentProfileJSON = (
     if (data.subjects) saveSubjects(data.subjects, newProfileId);
     if (data.studySessions) saveStudySessions(data.studySessions, newProfileId);
     if (data.notes) saveNotes(data.notes, newProfileId);
+    if (data.flashcardDecks) saveFlashcardDecks(data.flashcardDecks, newProfileId);
     if (data.habits) saveHabits(data.habits, newProfileId);
     if (data.water) saveWater(data.water, newProfileId);
     if (data.focusSessions) saveFocusSessions(data.focusSessions, newProfileId);
     if (data.goals) saveGoals(data.goals, newProfileId);
     if (data.calendarEvents) saveCalendarEvents(data.calendarEvents, newProfileId);
     if (data.abyaChat) saveAbyaChat(data.abyaChat, newProfileId);
+    if (data.abyaChatSessions) saveAbyaChatSessions(data.abyaChatSessions, newProfileId);
     if (data.abyaLanguage) saveAbyaLanguage(data.abyaLanguage, newProfileId);
     if (data.settings) saveSettings({ ...data.settings, userName: newStudentProfile.name }, newProfileId);
     if (data.dashboardWidgets) saveDashboardWidgets(data.dashboardWidgets, newProfileId);
     if (data.careerProfile) saveCareerProfile(data.careerProfile, newProfileId);
     if (data.careerAssessment) saveCareerAssessment(data.careerAssessment, newProfileId);
     if (data.careerRoadmap) saveCareerRoadmap(data.careerRoadmap, newProfileId);
+    if (data.careerQuiz) saveCareerQuiz(data.careerQuiz, newProfileId);
     if (data.academicSubjects) saveAcademicSubjects(data.academicSubjects, newProfileId);
     if (data.academicChapters) saveAcademicChapters(data.academicChapters, newProfileId);
     if (data.academicTests) saveAcademicTests(data.academicTests, newProfileId);
@@ -2566,12 +2586,16 @@ export const clearAllData = () => {
     });
     localStorage.removeItem(getWidgetsKey(p.id));
     localStorage.removeItem(`garia_p_${p.id}_dashboard_widgets_v1`);
+    localStorage.removeItem(`garia_p_${p.id}_abya_sessions_v1`);
+    localStorage.removeItem(`garia_p_${p.id}_abya_language_v1`);
   });
   Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem("garia_dashboard_widgets_v2");
   localStorage.removeItem("garia_dashboard_widgets_v1");
   localStorage.removeItem(PROFILES_KEY);
   localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  localStorage.removeItem(getProfilesKey());
+  localStorage.removeItem(getActiveProfileKey());
 };
 
 export const clearOfflineCache = async (): Promise<{ cachesCleared: number; storageFreedKb: number }> => {

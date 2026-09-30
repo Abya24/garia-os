@@ -473,6 +473,8 @@ export default function App() {
   // Multi-Student Profiles State (v1.5)
   const [profiles, setProfiles] = useState<StudentProfile[]>(loadProfiles);
   const [activeProfileId, setActiveProfileId] = useState<string>(loadActiveProfileId);
+  const activeProfileIdRef = useRef<string>(activeProfileId);
+  activeProfileIdRef.current = activeProfileId;
 
   const activeStudent =
     profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
@@ -499,7 +501,7 @@ export default function App() {
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings());
   const [isAppLocked, setIsAppLocked] = useState<boolean>(() => {
     const initialSettings = loadSettings();
-    return shouldAppBeLocked(initialSettings);
+    return shouldAppBeLocked(initialSettings, loadActiveProfileId());
   });
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
@@ -521,7 +523,7 @@ export default function App() {
 
   // Academic Center States
   const [academicSubjects, setAcademicSubjects] = useState<AcademicSubject[]>(() =>
-    loadAcademicSubjects(careerProfile.stream)
+    loadAcademicSubjects(careerProfile.stream, activeProfileId, activeStudent?.classLevel)
   );
   const [academicChapters, setAcademicChapters] = useState<AcademicChapter[]>(() => loadAcademicChapters());
   const [academicTests, setAcademicTests] = useState<AcademicTest[]>(() => loadAcademicTests());
@@ -615,7 +617,7 @@ export default function App() {
 
     const newSettings = loadSettings(profileId);
     setSettings(newSettings);
-    setIsAppLocked(shouldAppBeLocked(newSettings));
+    setIsAppLocked(shouldAppBeLocked(newSettings, profileId));
     setTasks(loadTasks(profileId));
     setSubjects(syncedSubs);
     setStudySessions(loadedSessions);
@@ -632,7 +634,7 @@ export default function App() {
     setCareerAssessment(loadCareerAssessment(profileId));
     setCareerRoadmap(loadCareerRoadmap(profileId));
     setCareerQuiz(loadCareerQuiz(profileId));
-    const loadedAcadSubs = loadAcademicSubjects(stream, profileId);
+    const loadedAcadSubs = loadAcademicSubjects(stream, profileId, curProf?.classLevel);
     const loadedAcadChaps = loadAcademicChapters(profileId);
     setAcademicSubjects(loadedAcadSubs);
     setAcademicChapters(loadedAcadChaps);
@@ -697,22 +699,6 @@ export default function App() {
       reloadAllDataForProfile(res.profileId);
     }
   };
-
-  // Diagnostic Session Isolation Log & GARIA DEBUG Initialization Path
-  useEffect(() => {
-    let lsKeys: string[] = [];
-    let ssKeys: string[] = [];
-    let cookiesPresent = false;
-    try {
-      lsKeys = Object.keys(localStorage);
-    } catch (e) {}
-    try {
-      ssKeys = Object.keys(sessionStorage);
-    } catch (e) {}
-    try {
-      cookiesPresent = !!document.cookie;
-    } catch (e) {}
-  }, [profiles, activeProfileId, activeStudent]);
 
   // Sync Multi-Theme System & Geolocation High-Contrast/Night Theme Switcher with DOM
   useEffect(() => {
@@ -1010,7 +996,7 @@ export default function App() {
 
   const handleResetSubjectsToDefaults = () => {
     const stream = activeStudent?.stream || "Commerce";
-    const defaults = getDefaultStudySubjectsForStream(stream);
+    const defaults = getDefaultStudySubjectsForStream(stream, activeStudent?.classLevel);
     setSubjects(defaults);
     saveSubjects(defaults, activeProfileId);
   };
@@ -1141,6 +1127,7 @@ export default function App() {
   };
 
   const handleToggleHabitDate = (habitId: string, dateStr: string) => {
+    let toggledHabit: Habit | null = null;
     const updated = habits.map((h) => {
       if (h.id === habitId) {
         const isDone = h.completedDates.includes(dateStr);
@@ -1148,23 +1135,42 @@ export default function App() {
           ? h.completedDates.filter((d) => d !== dateStr)
           : [...h.completedDates, dateStr];
 
-        return {
+        // Calculate consecutive day streak up to today/yesterday
+        const dateSet = new Set(newDates);
+        let consecutiveStreak = 0;
+        const cursor = new Date();
+        cursor.setHours(0, 0, 0, 0);
+        const formatLocal = (dt: Date) =>
+          `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+        if (!dateSet.has(formatLocal(cursor))) {
+          cursor.setDate(cursor.getDate() - 1);
+        }
+        while (dateSet.has(formatLocal(cursor))) {
+          consecutiveStreak++;
+          cursor.setDate(cursor.getDate() - 1);
+        }
+
+        const nextHabit: Habit = {
           ...h,
           completedDates: newDates,
-          streak: newDates.length,
+          streak: consecutiveStreak,
         };
+        toggledHabit = nextHabit;
+        return nextHabit;
       }
       return h;
     });
     setHabits(updated);
     saveHabits(updated, activeProfileId);
-    enqueueOfflineAction({
-      type: "UPDATE_HABIT",
-      entityName: "habits",
-      action: "update",
-      profileId: activeProfileId,
-      payload: { habitId, dateStr },
-    });
+    if (toggledHabit) {
+      enqueueOfflineAction({
+        type: "UPDATE_HABIT",
+        entityName: "habits",
+        action: "update",
+        profileId: activeProfileId,
+        payload: toggledHabit,
+      });
+    }
   };
 
   const handleUpdateHabit = (updatedHabit: Habit) => {
@@ -1325,6 +1331,7 @@ export default function App() {
       return;
     }
     isAbyaSubmittingRef.current = true;
+    const requestProfileId = activeProfileId;
 
     setLastUserPrompt(prompt);
     const userMsg: AbyaMessage = {
@@ -1339,7 +1346,7 @@ export default function App() {
 
     const newChatWithUser = [...abyaChat, userMsg];
     setAbyaChat(newChatWithUser);
-    saveAbyaChat(newChatWithUser);
+    saveAbyaChat(newChatWithUser, requestProfileId);
 
     // Context payload
     const recentHistory = abyaChat.slice(-10).map((m) => ({ role: m.role, content: m.content }));
@@ -1524,18 +1531,20 @@ export default function App() {
     }
 
     try {
-      // Prepare module action context
+      // Prepare module action context isolated to the profile that initiated the request
+      const isStillSameProfile = activeProfileIdRef.current === requestProfileId;
+      const noopSetter = () => {};
       const actionContext = {
-        tasks,
-        setTasks,
-        notes,
-        setNotes,
-        water,
-        setWater,
-        goals,
-        setGoals,
-        activeStudentId: activeStudent?.id,
-        onNavigate: handleNavigate,
+        tasks: isStillSameProfile ? tasks : loadTasks(requestProfileId),
+        setTasks: isStillSameProfile ? setTasks : noopSetter,
+        notes: isStillSameProfile ? notes : loadNotes(requestProfileId),
+        setNotes: isStillSameProfile ? setNotes : noopSetter,
+        water: isStillSameProfile ? water : loadWater(requestProfileId),
+        setWater: isStillSameProfile ? setWater : noopSetter,
+        goals: isStillSameProfile ? goals : loadGoals(requestProfileId),
+        setGoals: isStillSameProfile ? setGoals : noopSetter,
+        activeStudentId: requestProfileId,
+        onNavigate: isStillSameProfile ? handleNavigate : undefined,
         defaultSubject: academicSubjects[0]?.name || "General",
       };
 
@@ -1570,11 +1579,16 @@ export default function App() {
           executedAction,
         };
 
-        setAbyaChat((prev) => {
-          const updated = [...prev, modelMsg];
-          saveAbyaChat(updated);
-          return updated;
-        });
+        if (activeProfileIdRef.current === requestProfileId) {
+          setAbyaChat((prev) => {
+            const updated = [...prev, modelMsg];
+            saveAbyaChat(updated, requestProfileId);
+            return updated;
+          });
+        } else {
+          const existing = loadAbyaChat(requestProfileId);
+          saveAbyaChat([...existing, modelMsg], requestProfileId);
+        }
 
         setAbyaDiagnostics((prev) => ({
           ...prev,
@@ -1655,11 +1669,16 @@ export default function App() {
           executedAction,
         };
 
-        setAbyaChat((prev) => {
-          const updated = [...prev, modelMsg];
-          saveAbyaChat(updated);
-          return updated;
-        });
+        if (activeProfileIdRef.current === requestProfileId) {
+          setAbyaChat((prev) => {
+            const updated = [...prev, modelMsg];
+            saveAbyaChat(updated, requestProfileId);
+            return updated;
+          });
+        } else {
+          const existing = loadAbyaChat(requestProfileId);
+          saveAbyaChat([...existing, modelMsg], requestProfileId);
+        }
 
         setAbyaDiagnostics((prev) => ({
           ...prev,
@@ -1681,11 +1700,16 @@ export default function App() {
         provider: "local_fallback",
         fallbackReason: "api_error",
       };
-      setAbyaChat((prev) => {
-        const updated = [...prev, errorMsg];
-        saveAbyaChat(updated);
-        return updated;
-      });
+      if (activeProfileIdRef.current === requestProfileId) {
+        setAbyaChat((prev) => {
+          const updated = [...prev, errorMsg];
+          saveAbyaChat(updated, requestProfileId);
+          return updated;
+        });
+      } else {
+        const existing = loadAbyaChat(requestProfileId);
+        saveAbyaChat([...existing, errorMsg], requestProfileId);
+      }
     } finally {
       isAbyaSubmittingRef.current = false;
     }
@@ -1736,7 +1760,7 @@ export default function App() {
 
     const updated = [...abyaChat, fallbackMsg];
     setAbyaChat(updated);
-    saveAbyaChat(updated);
+    saveAbyaChat(updated, activeProfileId);
   };
 
   const handleClearChatHistory = () => {
@@ -1750,7 +1774,7 @@ export default function App() {
       },
     ];
     setAbyaChat(initial);
-    saveAbyaChat(initial);
+    saveAbyaChat(initial, activeProfileId);
   };
 
   // Goal Handlers
@@ -1762,7 +1786,7 @@ export default function App() {
     };
     const updated = [created, ...goals];
     setGoals(updated);
-    saveGoals(updated);
+    saveGoals(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_GOAL",
       entityName: "goals",
@@ -1775,7 +1799,7 @@ export default function App() {
   const handleUpdateGoal = (updatedGoal: Goal) => {
     const updated = goals.map((g) => (g.id === updatedGoal.id ? updatedGoal : g));
     setGoals(updated);
-    saveGoals(updated);
+    saveGoals(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_GOAL",
       entityName: "goals",
@@ -1788,7 +1812,7 @@ export default function App() {
   const handleDeleteGoal = (id: string) => {
     const updated = goals.filter((g) => g.id !== id);
     setGoals(updated);
-    saveGoals(updated);
+    saveGoals(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_GOAL",
       entityName: "goals",
@@ -1807,7 +1831,7 @@ export default function App() {
     };
     const updated = [created, ...calendarEvents];
     setCalendarEvents(updated);
-    saveCalendarEvents(updated);
+    saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
       entityName: "calendarEvents",
@@ -1820,7 +1844,7 @@ export default function App() {
   const handleUpdateCalendarEvent = (updatedEvent: CalendarEvent) => {
     const updated = calendarEvents.map((e) => (e.id === updatedEvent.id ? updatedEvent : e));
     setCalendarEvents(updated);
-    saveCalendarEvents(updated);
+    saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
       entityName: "calendarEvents",
@@ -1833,7 +1857,7 @@ export default function App() {
   const handleDeleteCalendarEvent = (id: string) => {
     const updated = calendarEvents.filter((e) => e.id !== id);
     setCalendarEvents(updated);
-    saveCalendarEvents(updated);
+    saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
       entityName: "calendarEvents",
@@ -1845,44 +1869,26 @@ export default function App() {
 
   const handleClearAllOSData = () => {
     clearAllData();
+    setProfiles([]);
+    setActiveProfileId("");
     setTasks([]);
     setSubjects([]);
     setStudySessions([]);
     setNotes([]);
+    setFlashcardDecks([]);
     setHabits([]);
     setWater({ date: getTodayString(), glasses: 0, goal: 8 });
     setFocusLogs([]);
     setGoals([]);
     setCalendarEvents([]);
-    setCareerProfile(loadCareerProfile());
-    setCareerAssessment(loadCareerAssessment());
-    setCareerRoadmap(loadCareerRoadmap());
-    setAcademicSubjects(loadAcademicSubjects());
-    setAcademicChapters(loadAcademicChapters());
-    setAcademicTests(loadAcademicTests());
-    setAcademicPlan(loadAcademicPlan());
-    handleClearChatHistory();
+    setAbyaChat([]);
   };
 
   const handleReloadData = () => {
-    setTasks(loadTasks());
-    setSubjects(loadSubjects());
-    setStudySessions(loadStudySessions());
-    setNotes(loadNotes());
-    setHabits(loadHabits());
-    setWater(loadWater());
-    setFocusLogs(loadFocusSessions());
-    setGoals(loadGoals());
-    setCalendarEvents(loadCalendarEvents());
-    setAbyaChat(loadAbyaChat());
-    setSettings(loadSettings());
-    setCareerProfile(loadCareerProfile());
-    setCareerAssessment(loadCareerAssessment());
-    setCareerRoadmap(loadCareerRoadmap());
-    setAcademicSubjects(loadAcademicSubjects());
-    setAcademicChapters(loadAcademicChapters());
-    setAcademicTests(loadAcademicTests());
-    setAcademicPlan(loadAcademicPlan());
+    const targetProfId = loadActiveProfileId() || activeProfileId;
+    if (targetProfId) {
+      reloadAllDataForProfile(targetProfId);
+    }
   };
 
   const handleAskAbyaWithContext = (contextText: string) => {
@@ -1930,7 +1936,8 @@ export default function App() {
       if (
         profSettings.account &&
         profSettings.account.email.toLowerCase() === email.toLowerCase() &&
-        (!profSettings.account.passwordHash || profSettings.account.passwordHash === hashed)
+        Boolean(profSettings.account.passwordHash) &&
+        profSettings.account.passwordHash === hashed
       ) {
         reloadAllDataForProfile(prof.id);
         return true;
@@ -2346,7 +2353,7 @@ export default function App() {
                 onReloadData={handleReloadData}
                 onBack={handleGoBack}
                 onLockApp={() => {
-                  lockSession();
+                  lockSession(activeProfileId);
                   setIsAppLocked(true);
                 }}
               />
@@ -2399,7 +2406,7 @@ export default function App() {
           setIsStudentModalOpen(true);
         }}
         onLockApp={() => {
-          lockSession();
+          lockSession(activeProfileId);
           setIsAppLocked(true);
         }}
       />
@@ -2494,11 +2501,11 @@ export default function App() {
           activeStudent={activeStudent}
           studentName={activeStudent?.name || settings.userName}
           onUnlocked={() => {
-            markSessionUnlocked();
+            markSessionUnlocked(activeProfileId);
             setIsAppLocked(false);
           }}
           onUnlockSuccess={() => {
-            markSessionUnlocked();
+            markSessionUnlocked(activeProfileId);
             setIsAppLocked(false);
           }}
           onUpdateSettings={handleUpdateSettings}
