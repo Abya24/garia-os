@@ -1,5 +1,14 @@
 export type AppLanguage = "en" | "hi";
 
+export const SUPPORTED_UI_LANGUAGES: {
+  code: AppLanguage;
+  label: string;
+  nativeLabel: string;
+}[] = [
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "hi", label: "Hindi", nativeLabel: "हिन्दी" },
+];
+
 export interface TranslationStrings {
   appName: string;
   tagline: string;
@@ -552,4 +561,17 @@ export function saveStoredLanguage(lang: AppLanguage): void {
   } catch (e) {
     console.error(e);
   }
+}
+
+export function resolveEffectiveLanguage(
+  profile?: { uiLanguage?: string; language?: string } | null
+): AppLanguage {
+  const raw = (profile?.uiLanguage || profile?.language || "").trim().toLowerCase();
+  if (raw === "hi" || raw === "hindi" || raw === "हिन्दी") {
+    return "hi";
+  }
+  if (raw === "en" || raw === "english") {
+    return "en";
+  }
+  return getStoredLanguage();
 }

@@ -369,6 +369,389 @@ async function runTests() {
     });
   }
 
+  // TEST 13: Unauthenticated /api/auth/student-session cannot mint privileged tokens from arbitrary profileId
+  try {
+    const res = await fetch(`${baseUrl}/api/auth/student-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: "arbitrary_admin_uid_001" }),
+    });
+    const data = await res.json();
+    const passed = res.status === 401 && data.code === "UNAUTHENTICATED" && !data.token;
+    results.push({
+      name: "TEST 13: Arbitrary profileId rejected on /api/auth/student-session",
+      passed,
+      details: `Status: ${res.status}, Code: ${data.code}, Token issued: ${Boolean(data.token)}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 13: Arbitrary profileId rejected on /api/auth/student-session",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 14: Unauthenticated POST /api/ai/smart-tags -> Expected: 401
+  try {
+    const res = await fetch(`${baseUrl}/api/ai/smart-tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Physics", content: "Kinematics formulas" }),
+    });
+    const data = await res.json();
+    const passed = res.status === 401 && data.code === "UNAUTHENTICATED";
+    results.push({
+      name: "TEST 14: Unauthenticated POST /api/ai/smart-tags rejected (401)",
+      passed,
+      details: `Status: ${res.status}, Code: ${data.code}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 14: Unauthenticated POST /api/ai/smart-tags rejected (401)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 15: Authenticated POST /api/ai/smart-tags + Input validation -> Expected: 200 & 400 on invalid input
+  try {
+    const smartToken = generateDevTestToken("student_smart_tags_user_01");
+    const validRes = await fetch(`${baseUrl}/api/ai/smart-tags`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${smartToken}`,
+        "X-Forwarded-For": "10.20.30.15",
+      },
+      body: JSON.stringify({
+        title: "Thermodynamics & Laws of Motion",
+        content: "First law of thermodynamics formula dU = dQ - dW for JEE Physics revision",
+        existingLabels: ["Science"],
+      }),
+    });
+    const validData = await validRes.json();
+
+    const oversizedRes = await fetch(`${baseUrl}/api/ai/smart-tags`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${smartToken}`,
+        "X-Forwarded-For": "10.20.30.15",
+      },
+      body: JSON.stringify({
+        title: "A".repeat(600),
+        content: "Valid content",
+      }),
+    });
+    const oversizedData = await oversizedRes.json();
+
+    const passed =
+      validRes.status === 200 &&
+      Array.isArray(validData.tags) &&
+      validData.tags.length > 0 &&
+      oversizedRes.status === 400 &&
+      oversizedData.code === "TITLE_TOO_LARGE";
+    results.push({
+      name: "TEST 15: Authenticated Smart Tags + Input Validation",
+      passed,
+      details: `Valid Status: ${validRes.status} (tags: ${validData.tags?.length}), Oversized Title Status: ${oversizedRes.status} (${oversizedData.code})`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 15: Authenticated Smart Tags + Input Validation",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 16: Smart Tags Rate Limiting (UID + IP) -> Expected: 429 + Retry-After
+  try {
+    const stAbuserToken = generateDevTestToken("smart_tags_rate_abuser_01");
+    let hit429 = false;
+    let retryAfter: string | null = null;
+    // Use empty note probe so requests 1..20 pass rate-limit check and fast-fail validation before calling external LLM
+    for (let i = 0; i < 25; i++) {
+      const res = await fetch(`${baseUrl}/api/ai/smart-tags`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${stAbuserToken}`,
+          "X-Forwarded-For": "10.20.30.16",
+        },
+        body: JSON.stringify({ title: "", content: "" }),
+      });
+      if (res.status === 429) {
+        hit429 = true;
+        retryAfter = res.headers.get("retry-after");
+        break;
+      }
+    }
+    const passed = hit429 && typeof retryAfter === "string" && parseInt(retryAfter, 10) > 0;
+    results.push({
+      name: "TEST 16: Smart Tags Rate Limiting (429 + Retry-After)",
+      passed,
+      details: `Hit 429: ${hit429}, Retry-After: ${retryAfter}s`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 16: Smart Tags Rate Limiting (429 + Retry-After)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 17: AI Chat IP-based Rate Limit (prevents multi-UID rotation from same IP)
+  try {
+    let hitIp429 = false;
+    let retryAfter: string | null = null;
+    // Send 50 requests from the same IP ("10.20.30.17") but rotating a fresh UID every request
+    // Use invalid mode so it hits rate limit check BEFORE invoking external LLM
+    for (let i = 0; i < 50; i++) {
+      const rotatedToken = generateDevTestToken(`rotated_chat_uid_${i}`);
+      const res = await fetch(`${baseUrl}/api/ai/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${rotatedToken}`,
+          "X-Forwarded-For": "10.20.30.17",
+        },
+        body: JSON.stringify({ prompt: "Test", mode: "invalid_mode_probe" }),
+      });
+      if (res.status === 429) {
+        hitIp429 = true;
+        retryAfter = res.headers.get("retry-after");
+        break;
+      }
+    }
+    const passed = hitIp429 && typeof retryAfter === "string" && parseInt(retryAfter, 10) > 0;
+    results.push({
+      name: "TEST 17: AI Chat IP Rate Limit (multi-UID rotation blocked)",
+      passed,
+      details: `Hit 429: ${hitIp429}, Retry-After: ${retryAfter}s`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 17: AI Chat IP Rate Limit (multi-UID rotation blocked)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 18: Live Voice Ticket IP Rate Limit (prevents multi-UID rotation from same IP)
+  try {
+    let hitVoiceIp429 = false;
+    let retryAfter: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      const rotatedToken = generateDevTestToken(`rotated_voice_uid_${i}`);
+      const res = await fetch(`${baseUrl}/api/live-voice/ticket`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${rotatedToken}`,
+          "X-Forwarded-For": "10.20.30.18",
+        },
+      });
+      if (res.status === 429) {
+        hitVoiceIp429 = true;
+        retryAfter = res.headers.get("retry-after");
+        break;
+      }
+    }
+    const passed = hitVoiceIp429 && typeof retryAfter === "string" && parseInt(retryAfter, 10) > 0;
+    results.push({
+      name: "TEST 18: Live Voice Ticket IP Rate Limit (multi-UID rotation blocked)",
+      passed,
+      details: `Hit 429: ${hitVoiceIp429}, Retry-After: ${retryAfter}s`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 18: Live Voice Ticket IP Rate Limit (multi-UID rotation blocked)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 19: Production Security Headers Verification
+  try {
+    const res = await fetch(`${baseUrl}/api/health`);
+    const nosniff = res.headers.get("x-content-type-options") === "nosniff";
+    const referrer = res.headers.get("referrer-policy") === "strict-origin-when-cross-origin";
+    const frame = res.headers.get("x-frame-options") === "SAMEORIGIN";
+    const hsts = (res.headers.get("strict-transport-security") || "").includes("max-age=31536000");
+    const perms = (res.headers.get("permissions-policy") || "").includes("camera=()");
+    const passed = nosniff && referrer && frame && hsts && perms;
+    results.push({
+      name: "TEST 19: Production Security Headers present",
+      passed,
+      details: `nosniff=${nosniff}, referrer=${referrer}, frame=${frame}, hsts=${hsts}, perms=${perms}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 19: Production Security Headers present",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 20: Endpoint-Specific 16kb Body Limit on /api/auth/student-session & /api/live-voice/ticket -> 413 PAYLOAD_TOO_LARGE
+  try {
+    const oversized32kb = JSON.stringify({ padding: "X".repeat(32 * 1024) });
+    const authRes = await fetch(`${baseUrl}/api/auth/student-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${validToken}`,
+        "X-Forwarded-For": "10.20.30.20",
+      },
+      body: oversized32kb,
+    });
+    const authData = await authRes.json();
+
+    const voiceRes = await fetch(`${baseUrl}/api/live-voice/ticket`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${validToken}`,
+        "X-Forwarded-For": "10.20.30.21",
+      },
+      body: oversized32kb,
+    });
+    const voiceData = await voiceRes.json();
+
+    const passed =
+      authRes.status === 413 &&
+      authData.code === "PAYLOAD_TOO_LARGE" &&
+      voiceRes.status === 413 &&
+      voiceData.code === "PAYLOAD_TOO_LARGE";
+    results.push({
+      name: "TEST 20: 16kb Body Limit enforced on /api/auth/student-session & /api/live-voice/ticket (413)",
+      passed,
+      details: `authStatus=${authRes.status} (${authData.code}), voiceStatus=${voiceRes.status} (${voiceData.code})`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 20: 16kb Body Limit enforced on /api/auth/student-session & /api/live-voice/ticket (413)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 21: Endpoint-Specific 100kb Body Limit on /api/ai/smart-tags -> 413 PAYLOAD_TOO_LARGE
+  try {
+    const oversized150kb = JSON.stringify({
+      title: "Note",
+      content: "Y".repeat(150 * 1024),
+    });
+    const stRes = await fetch(`${baseUrl}/api/ai/smart-tags`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${validToken}`,
+        "X-Forwarded-For": "10.20.30.22",
+      },
+      body: oversized150kb,
+    });
+    const stData = await stRes.json();
+    const passed = stRes.status === 413 && stData.code === "PAYLOAD_TOO_LARGE";
+    results.push({
+      name: "TEST 21: 100kb Body Limit enforced on /api/ai/smart-tags (413)",
+      passed,
+      details: `status=${stRes.status}, code=${stData.code}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 21: 100kb Body Limit enforced on /api/ai/smart-tags (413)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 22: Endpoint-Specific 12mb Body Limit on /api/ai/chat (allows 200kb image payload, rejects >12mb with 413)
+  try {
+    const chatLimitToken = generateDevTestToken("chat_body_limit_tester_01");
+    // 1) 200kb payload passes 12mb body parser (reaches route handler and fails mode validation with 400 INVALID_MODE, NOT 413)
+    const valid200kbBody = JSON.stringify({
+      prompt: "Solve this problem",
+      mode: "invalid_mode_probe_for_body_parser",
+      image: {
+        mimeType: "image/png",
+        data: "A".repeat(200 * 1024),
+      },
+    });
+    const allowedRes = await fetch(`${baseUrl}/api/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${chatLimitToken}`,
+        "X-Forwarded-For": "10.20.30.23",
+      },
+      body: valid200kbBody,
+    });
+    const allowedData = await allowedRes.json();
+
+    // 2) 13mb payload exceeds 12mb parser -> rejected with 413 PAYLOAD_TOO_LARGE
+    const oversized13mbBody = JSON.stringify({
+      prompt: "Oversized payload",
+      image: {
+        mimeType: "image/png",
+        data: "B".repeat(13 * 1024 * 1024),
+      },
+    });
+    const rejectedRes = await fetch(`${baseUrl}/api/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${chatLimitToken}`,
+        "X-Forwarded-For": "10.20.30.23",
+      },
+      body: oversized13mbBody,
+    });
+    const rejectedData = await rejectedRes.json();
+
+    const passed =
+      allowedRes.status === 400 &&
+      allowedData.code === "INVALID_MODE" &&
+      rejectedRes.status === 413 &&
+      rejectedData.code === "PAYLOAD_TOO_LARGE";
+    results.push({
+      name: "TEST 22: 12mb Body Limit on /api/ai/chat allows 200kb attachment & rejects 13mb (413)",
+      passed,
+      details: `200kb status=${allowedRes.status} (${allowedData.code}), 13mb status=${rejectedRes.status} (${rejectedData.code})`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 22: 12mb Body Limit on /api/ai/chat allows 200kb attachment & rejects 13mb (413)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 23: Malformed JSON Handling -> 400 MALFORMED_JSON
+  try {
+    const malformedRes = await fetch(`${baseUrl}/api/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${validToken}`,
+        "X-Forwarded-For": "10.20.30.24",
+      },
+      body: '{"prompt": "unterminated json...',
+    });
+    const malformedData = await malformedRes.json();
+    const passed = malformedRes.status === 400 && malformedData.code === "MALFORMED_JSON";
+    results.push({
+      name: "TEST 23: Malformed JSON returns 400 MALFORMED_JSON",
+      passed,
+      details: `status=${malformedRes.status}, code=${malformedData.code}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 23: Malformed JSON returns 400 MALFORMED_JSON",
+      passed: false,
+      details: err.message,
+    });
+  }
+
   // Summary
   console.log("\n--- TEST RESULTS SUMMARY ---");
   let allPassed = true;
@@ -380,7 +763,7 @@ async function runTests() {
 
   console.log("==================================================");
   if (allPassed) {
-    console.log("🎉 ALL 12 VERIFICATION TESTS PASSED SUCCESSFULLY!");
+    console.log(`🎉 ALL ${results.length} VERIFICATION TESTS PASSED SUCCESSFULLY!`);
     process.exit(0);
   } else {
     console.error("⚠️ SOME TESTS FAILED!");

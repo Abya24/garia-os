@@ -229,11 +229,13 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       // 1. Initialize 24kHz Output Live Audio Player
       liveAudioPlayerRef.current = new LiveAudioPlayer();
 
-      // 2. Obtain valid session token (Firebase ID token or signed local student session token)
-      const idToken = await getValidClientAuthToken(activeStudent?.id || "local_student");
+      // 2. Obtain valid Firebase Auth ID token (strictly requires real Firebase authentication)
+      const idToken = await getValidClientAuthToken();
       if (!idToken) {
-        setStatus("listening");
-        setMicPermissionNote("Connected in Offline Voice Studio mode.");
+        setErrorMessage(
+          "Authentication required. Please sign in to your Garia OS account to use Abya Live Voice."
+        );
+        setStatus("error");
         return;
       }
 
@@ -247,15 +249,22 @@ export const AbyaLiveVoiceModal: React.FC<AbyaLiveVoiceModalProps> = ({
       });
 
       if (!ticketRes.ok) {
-        setStatus("listening");
-        setMicPermissionNote("Connected in Interactive Voice Tutor mode.");
+        const errData = await ticketRes.json().catch(() => ({}));
+        setErrorMessage(
+          errData?.error ||
+            (ticketRes.status === 429
+              ? "Too many voice session requests. Please wait a moment."
+              : "Authentication required to start a Live Voice session.")
+        );
+        setStatus("error");
         return;
       }
 
       const ticketData = await ticketRes.json().catch(() => ({}));
       const ticket = ticketData.ticket;
       if (!ticket || typeof ticket !== "string") {
-        setStatus("listening");
+        setErrorMessage("Invalid session ticket received from server.");
+        setStatus("error");
         return;
       }
 

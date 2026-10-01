@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CloudCheck, CheckCircle2, Cloud, Sparkles, X, ArrowUpRight, Database } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { subscribeToOfflineQueue, OfflineQueueState } from "../utils/offlineQueue";
 import { AppLanguage } from "../utils/i18n";
 

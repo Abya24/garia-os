@@ -210,6 +210,56 @@
         "timestamp": { "type": "number" }
       },
       "required": ["id", "userId", "fromUserName", "workspaceId", "title", "message", "timestamp"]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Recorded student study session duration and subject metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 128 },
+        "durationSeconds": { "type": "number" },
+        "date": { "type": "string", "maxLength": 32 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId"]
+    },
+    "ExamResult": {
+      "title": "ExamResult",
+      "description": "Recorded mock or practice exam test result",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId"]
+    },
+    "CareerPlan": {
+      "title": "CareerPlan",
+      "description": "Student career roadmap and milestone plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId"]
+    },
+    "OfflineMutation": {
+      "title": "OfflineMutation",
+      "description": "Queued offline mutation record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId"]
     }
   },
   "firestore": {
@@ -228,6 +278,22 @@
     "/users/{userId}/subjects/{subjectId}": {
       "schema": "Subject",
       "description": "Subject tracking collection"
+    },
+    "/users/{userId}/study_sessions/{sessionId}": {
+      "schema": "StudySession",
+      "description": "Student study session logs"
+    },
+    "/users/{userId}/exam_results/{resultId}": {
+      "schema": "ExamResult",
+      "description": "Student exam test results"
+    },
+    "/users/{userId}/career_plans/{planId}": {
+      "schema": "CareerPlan",
+      "description": "Student career plans"
+    },
+    "/users/{userId}/offline_mutations/{mutationId}": {
+      "schema": "OfflineMutation",
+      "description": "Student offline mutation log"
     },
     "/users/{userId}/notes/{noteId}": {
       "schema": "Note",

@@ -951,7 +951,15 @@ export const NotesPage: React.FC<NotesPageProps> = ({
 
     setIsSmartTagging(true);
     try {
-      const result = await requestAbyaSmartTags(content, title, []);
+      let idToken: string | null = null;
+      if (auth.currentUser) {
+        try {
+          idToken = await auth.currentUser.getIdToken();
+        } catch {
+          idToken = null;
+        }
+      }
+      const result = await requestAbyaSmartTags(content, title, labels, idToken);
       if (result.tags && result.tags.length > 0) {
         setSmartSuggestedTags(result.tags);
         setLabels((prev) => {

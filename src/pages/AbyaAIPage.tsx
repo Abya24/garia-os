@@ -88,6 +88,7 @@ interface AbyaAIPageProps {
     mode?: AbyaAIMode,
     image?: { data: string; mimeType: string },
     curriculumContext?: {
+      board?: string;
       classLevel?: string;
       stream?: string;
       subject?: string;
@@ -165,6 +166,27 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // Ignore stop errors on unmount
+      }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Ignore speech synthesis cancel errors on unmount
+        }
+      }
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Responsive Virtual Keyboard Handling for mobile viewports
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -243,8 +265,12 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const [selectedTopId, setSelectedTopId] = useState<string>("");
 
   const curriculumSubjects = useMemo(() => {
-    return getCurriculumSubjects(activeStudent?.classLevel, activeStudent?.stream);
-  }, [activeStudent?.classLevel, activeStudent?.stream]);
+    return getCurriculumSubjects(
+      activeStudent?.classLevel,
+      activeStudent?.stream,
+      activeStudent?.board
+    );
+  }, [activeStudent?.classLevel, activeStudent?.stream, activeStudent?.board]);
 
   useEffect(() => {
     if (curriculumSubjects.length > 0 && !selectedSubId) {
@@ -359,6 +385,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     actionType?: AbyaQuickActionType,
     overrideMode?: AbyaAIMode,
     curriculumContextPayload?: {
+      board?: string;
       classLevel?: string;
       stream?: string;
       subject?: string;
@@ -515,6 +542,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
 
     setIsSidebarOpen(false);
     handleSend(prompt, undefined, undefined, {
+      board: activeStudent?.board || "CBSE",
       classLevel: activeStudent?.classLevel,
       stream: activeStudent?.stream,
       subject: currentSubject.name,

@@ -321,8 +321,20 @@ export async function persistEntityToFirestore(
   isDelete: boolean
 ): Promise<void> {
   const sanitizedId = String(entityId).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128);
-  const validCollections = ["tasks", "notes", "habits", "goals", "calendar_events", "profiles"];
-  const targetCollection = validCollections.includes(entityName) ? entityName : "tasks";
+  const validCollections = [
+    "tasks",
+    "notes",
+    "habits",
+    "goals",
+    "calendar_events",
+    "profiles",
+    "subjects",
+    "study_sessions",
+  ];
+  if (!validCollections.includes(entityName)) {
+    throw new Error(`Unsupported Firestore entity collection: ${entityName}`);
+  }
+  const targetCollection = entityName;
   const path = `users/${userId}/${targetCollection}/${sanitizedId}`;
   const docRef = doc(db, "users", userId, targetCollection, sanitizedId);
 
@@ -332,11 +344,24 @@ export async function persistEntityToFirestore(
       return;
     }
 
+    let resolvedCreatedAt = typeof data?.createdAt === "number" ? data.createdAt : Date.now();
+    try {
+      const existingSnap = await getDoc(docRef);
+      if (existingSnap.exists()) {
+        const existingCreatedAt = existingSnap.data()?.createdAt;
+        if (typeof existingCreatedAt === "number") {
+          resolvedCreatedAt = existingCreatedAt;
+        }
+      }
+    } catch {
+      // Proceed with data.createdAt if read check is unavailable
+    }
+
     // Format data based on collection requirements
     let payload: Record<string, any> = {
       userId,
       id: sanitizedId,
-      createdAt: typeof data?.createdAt === "number" ? data.createdAt : Date.now(),
+      createdAt: resolvedCreatedAt,
     };
 
     if (targetCollection === "tasks") {
@@ -348,6 +373,23 @@ export async function persistEntityToFirestore(
         priority: ["low", "medium", "high"].includes(data?.priority) ? data.priority : "medium",
         date: String(data?.date || "").slice(0, 32),
         time: String(data?.time || "").slice(0, 16),
+      };
+    } else if (targetCollection === "subjects") {
+      payload = {
+        userId,
+        id: sanitizedId,
+        name: String(data?.name || "Subject").slice(0, 128),
+        color: String(data?.color || "emerald").slice(0, 32),
+      };
+    } else if (targetCollection === "study_sessions") {
+      payload = {
+        ...payload,
+        subjectId: String(data?.subjectId || "").slice(0, 128),
+        subjectName: String(data?.subjectName || "Study Session").slice(0, 128),
+        durationSeconds:
+          typeof data?.durationSeconds === "number" ? Math.max(0, data.durationSeconds) : 0,
+        date: String(data?.date || "").slice(0, 32),
+        notes: String(data?.notes || "").slice(0, 1000),
       };
     } else if (targetCollection === "notes") {
       payload = {
@@ -476,59 +518,19 @@ export function subscribeToCloudSync(
   );
 }
 
-let cachedLocalSession: {
-  token: string;
-  profileId: string;
-  expiresAt: number;
-} | null = null;
-
 /**
- * Resolves a valid Bearer token for authenticated API endpoints (/api/ai/chat, /api/live-voice/ticket).
- * Uses Firebase Auth ID token if signed in, or requests a signed local student session token from the server.
+ * Resolves a valid Firebase Auth ID token for authenticated API endpoints.
+ * Relies strictly on real Firebase Authentication; never mints tokens from local profileIds.
  */
-export async function getValidClientAuthToken(
-  profileId: string = "local_student"
-): Promise<string | null> {
+export async function getValidClientAuthToken(): Promise<string | null> {
   if (auth.currentUser) {
     try {
       const fbToken = await auth.currentUser.getIdToken();
       if (fbToken) return fbToken;
     } catch (err) {
-      console.warn("[Auth] Could not obtain Firebase ID token, falling back to local student session:", err);
+      console.warn("[Auth] Could not obtain Firebase ID token:", err);
     }
   }
-
-  const safeProfileId = profileId || "local_student";
-  const now = Date.now();
-  if (
-    cachedLocalSession &&
-    cachedLocalSession.profileId === safeProfileId &&
-    cachedLocalSession.expiresAt > now + 60 * 1000
-  ) {
-    return cachedLocalSession.token;
-  }
-
-  try {
-    const res = await fetch("/api/auth/student-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileId: safeProfileId }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.token && typeof data.token === "string") {
-        cachedLocalSession = {
-          token: data.token,
-          profileId: safeProfileId,
-          expiresAt: now + (Number(data.expiresInSeconds) || 3600) * 1000,
-        };
-        return data.token;
-      }
-    }
-  } catch (err) {
-    console.warn("[Auth] Could not obtain local student session token:", err);
-  }
-
   return null;
 }
 

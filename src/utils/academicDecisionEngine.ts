@@ -27,7 +27,7 @@ import {
   StreamType,
 } from "../types";
 import { CAREER_CATALOG } from "./careerEngine";
-import { CLASS10_CURRICULUM, CurriculumSubject } from "../data/masterCurriculum";
+import { CLASS10_CURRICULUM, CurriculumSubject, getCurriculumSubjects } from "../data/masterCurriculum";
 
 export interface HighPriorityFocusDecision {
   subjectId: string;
@@ -394,8 +394,21 @@ export function generateAcademicDecisionReport(params: {
   const examProximityMultiplier =
     daysUntilExam <= 15 ? 1.6 : daysUntilExam <= 30 ? 1.35 : daysUntilExam <= 60 ? 1.15 : 1.0;
 
-  // 2. Filter / Seed Stream-Specific Curriculum Subjects (Rule 5)
-  const defaultStreamData = DEFAULT_STREAM_TOPICS[stream] || DEFAULT_STREAM_TOPICS.Commerce;
+  // 2. Filter / Seed Stream & Class-Specific Curriculum Subjects (Rule 5)
+  const board = student?.board || examProfile?.board || "CBSE";
+  const curriculumSubs = getCurriculumSubjects(classLevel, stream, board);
+  const defaultStreamData =
+    curriculumSubs.length > 0
+      ? curriculumSubs.map((cs) => ({
+          subject: cs.name,
+          color: cs.color,
+          chapters: cs.chapters.map((ch) => ({
+            title: ch.title,
+            topic: ch.topics[0]?.name || ch.title,
+            vvi: ch.priority === "VVI",
+          })),
+        }))
+      : DEFAULT_STREAM_TOPICS[stream] || DEFAULT_STREAM_TOPICS.Commerce;
 
   // Combine loaded academic subjects or fallback to default stream data
   const streamSubjectNames = defaultStreamData.map((d) => d.subject.toLowerCase());

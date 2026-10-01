@@ -138,7 +138,11 @@ import { hashPassword } from "./utils/auth";
 import { auth, getValidClientAuthToken } from "./utils/firebase";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
-import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./utils/offlineQueue";
+import {
+  enqueueOfflineAction,
+  reconcilePendingQueueWithFirestore,
+  clearPendingQueueForProfile,
+} from "./utils/offlineQueue";
 import {
   getSolarInfo,
   requestDeviceLocation,
@@ -159,21 +163,52 @@ import { PageSkeletonLoader } from "./components/PageSkeletonLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { shouldAppBeLocked, markSessionUnlocked, lockSession } from "./utils/security";
 
-import { HomeDashboard } from "./pages/HomeDashboard";
-import { TaskManager } from "./pages/TaskManager";
-import { StudyTracker } from "./pages/StudyTracker";
-import { FocusTimer } from "./pages/FocusTimer";
-import { NotesPage } from "./pages/NotesPage";
-import { WaterTracker } from "./pages/WaterTracker";
-import { HabitsPage } from "./pages/HabitsPage";
-import { GoalsPage } from "./pages/GoalsPage";
-import { CalendarPage } from "./pages/CalendarPage";
-import { AbyaAIPage } from "./pages/AbyaAIPage";
-import { StatisticsPage } from "./pages/StatisticsPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { CareerCenterPage } from "./pages/CareerCenterPage";
-import { ExamCenterPage } from "./pages/ExamCenterPage";
-import { FlashcardsPage } from "./pages/FlashcardsPage";
+const HomeDashboard = lazy(() =>
+  import("./pages/HomeDashboard").then((m) => ({ default: m.HomeDashboard }))
+);
+
+const TaskManager = lazy(() =>
+  import("./pages/TaskManager").then((m) => ({ default: m.TaskManager }))
+);
+const StudyTracker = lazy(() =>
+  import("./pages/StudyTracker").then((m) => ({ default: m.StudyTracker }))
+);
+const FocusTimer = lazy(() =>
+  import("./pages/FocusTimer").then((m) => ({ default: m.FocusTimer }))
+);
+const NotesPage = lazy(() =>
+  import("./pages/NotesPage").then((m) => ({ default: m.NotesPage }))
+);
+const WaterTracker = lazy(() =>
+  import("./pages/WaterTracker").then((m) => ({ default: m.WaterTracker }))
+);
+const HabitsPage = lazy(() =>
+  import("./pages/HabitsPage").then((m) => ({ default: m.HabitsPage }))
+);
+const GoalsPage = lazy(() =>
+  import("./pages/GoalsPage").then((m) => ({ default: m.GoalsPage }))
+);
+const CalendarPage = lazy(() =>
+  import("./pages/CalendarPage").then((m) => ({ default: m.CalendarPage }))
+);
+const AbyaAIPage = lazy(() =>
+  import("./pages/AbyaAIPage").then((m) => ({ default: m.AbyaAIPage }))
+);
+const StatisticsPage = lazy(() =>
+  import("./pages/StatisticsPage").then((m) => ({ default: m.StatisticsPage }))
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
+);
+const CareerCenterPage = lazy(() =>
+  import("./pages/CareerCenterPage").then((m) => ({ default: m.CareerCenterPage }))
+);
+const ExamCenterPage = lazy(() =>
+  import("./pages/ExamCenterPage").then((m) => ({ default: m.ExamCenterPage }))
+);
+const FlashcardsPage = lazy(() =>
+  import("./pages/FlashcardsPage").then((m) => ({ default: m.FlashcardsPage }))
+);
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -632,6 +667,7 @@ export default function App() {
   };
 
   const handleDeleteStudentProfile = (pId: string) => {
+    clearPendingQueueForProfile(pId);
     const remaining = deleteStudentProfile(pId);
     setProfiles(remaining);
     const curActive = loadActiveProfileId();
@@ -775,6 +811,13 @@ export default function App() {
   const handleUpdateSettings = (newSettings: UserSettings) => {
     setSettings(newSettings);
     saveSettings(newSettings, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_SETTINGS",
+      entityName: "settings",
+      action: "update",
+      profileId: activeProfileId,
+      payload: newSettings,
+    });
   };
 
   const handleUpdateCareerProfile = (p: CareerProfile) => {
@@ -929,18 +972,39 @@ export default function App() {
     const updated = [...subjects, created];
     setSubjects(updated);
     saveSubjects(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "CREATE_SUBJECT",
+      entityName: "subjects",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
   };
 
   const handleUpdateSubject = (updatedSubj: Subject) => {
     const updated = subjects.map((s) => (s.id === updatedSubj.id ? updatedSubj : s));
     setSubjects(updated);
     saveSubjects(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_SUBJECT",
+      entityName: "subjects",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedSubj,
+    });
   };
 
   const handleDeleteSubject = (id: string) => {
     const updated = subjects.filter((s) => s.id !== id);
     setSubjects(updated);
     saveSubjects(updated, activeProfileId);
+    enqueueOfflineAction({
+      type: "DELETE_SUBJECT",
+      entityName: "subjects",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id },
+    });
   };
 
   const handleResetSubjectsToDefaults = () => {
@@ -973,6 +1037,13 @@ export default function App() {
     const updatedSessions = [created, ...studySessions];
     setStudySessions(updatedSessions);
     saveStudySessions(updatedSessions, activeProfileId);
+    enqueueOfflineAction({
+      type: "CREATE_STUDY_SESSION",
+      entityName: "study_sessions",
+      action: "create",
+      profileId: activeProfileId,
+      payload: created,
+    });
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
@@ -983,6 +1054,13 @@ export default function App() {
     const updatedSessions = studySessions.filter((s) => s.id !== sessionId);
     setStudySessions(updatedSessions);
     saveStudySessions(updatedSessions, activeProfileId);
+    enqueueOfflineAction({
+      type: "DELETE_STUDY_SESSION",
+      entityName: "study_sessions",
+      action: "delete",
+      profileId: activeProfileId,
+      payload: { id: sessionId },
+    });
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
@@ -995,6 +1073,13 @@ export default function App() {
     );
     setStudySessions(updatedSessions);
     saveStudySessions(updatedSessions, activeProfileId);
+    enqueueOfflineAction({
+      type: "UPDATE_STUDY_SESSION",
+      entityName: "study_sessions",
+      action: "update",
+      profileId: activeProfileId,
+      payload: updatedSession,
+    });
 
     const updatedSubs = syncSubjectTotals(subjects, updatedSessions);
     setSubjects(updatedSubs);
@@ -1523,7 +1608,7 @@ export default function App() {
         try {
           console.log(`[Abya AI Client] Calling Online AI (attempt ${attempt}/${maxAttempts}, mode=${mode})...`);
 
-          const idToken = await getValidClientAuthToken(requestProfileId);
+          const idToken = await getValidClientAuthToken();
 
           const reqHeaders: Record<string, string> = {
             "Content-Type": "application/json",
@@ -1945,6 +2030,7 @@ export default function App() {
   const handleClearStudentWorkspace = () => {
     const targetProfId = loadActiveProfileId() || activeProfileId;
     if (!targetProfId) return;
+    clearPendingQueueForProfile(targetProfId);
     clearStudentWorkspaceData(targetProfId);
     reloadAllDataForProfile(targetProfId);
   };

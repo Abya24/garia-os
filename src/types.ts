@@ -358,6 +358,8 @@ export interface StudentProfile {
   stream: StreamType;
   board: ExamBoard | string;
   language?: string;
+  uiLanguage?: "en" | "hi" | string;
+  contentLanguage?: string;
   avatarColor?: string;
   currentClass?: string;
   createdAt: number;
@@ -708,7 +710,16 @@ export interface ExamIntelligenceReport {
 // GARIA OS v1.4.2 EXAM INTELLIGENCE TYPES
 // ==========================================
 
-export type ExamBoard = "BSEB" | "CBSE" | "Other";
+export type BoardType =
+  | "BSEB"
+  | "CBSE"
+  | "ICSE"
+  | "UP Board"
+  | "State Board"
+  | "NCERT"
+  | "Other";
+
+export type ExamBoard = BoardType;
 
 export type ExamReadinessStatus =
   | "🟢 On Track"

@@ -1666,13 +1666,14 @@ export function parseSmartTagsResponse(rawResponse: any): string[] {
 }
 
 /**
- * Requests smart tags from Abya AI (combining the `/api/ai/smart-tags` endpoint when available
+ * Requests smart tags from Abya AI (combining the authenticated `/api/ai/smart-tags` endpoint
  * with the instant local Abya AI curriculum tagger fallback).
  */
 export async function requestAbyaSmartTags(
   content: string,
   title: string = "",
-  existingLabels: string[] = []
+  existingLabels: string[] = [],
+  authToken?: string | null
 ): Promise<{ tags: string[]; source: "online_ai" | "abya_engine" }> {
   const localSuggestions = suggestSmartTagsFromContent(
     content,
@@ -1687,11 +1688,28 @@ export async function requestAbyaSmartTags(
       ? setTimeout(() => controller.abort(), 3500)
       : null;
     try {
+      let resolvedToken: string | null = authToken ?? null;
+      if (!resolvedToken && typeof window !== "undefined") {
+        try {
+          const fbMod = await import("./firebase");
+          if (fbMod?.auth?.currentUser) {
+            resolvedToken = await fbMod.auth.currentUser.getIdToken();
+          }
+        } catch {
+          resolvedToken = null;
+        }
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (resolvedToken) {
+        headers["Authorization"] = `Bearer ${resolvedToken}`;
+      }
+
       const res = await fetch("/api/ai/smart-tags", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           title,
           content,

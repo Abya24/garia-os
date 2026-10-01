@@ -13,6 +13,7 @@ import {
   StreamType,
 } from "../types";
 import { getTodayString, getOffsetLocalDateString } from "./storage";
+import { getCurriculumSubjects } from "../data/masterCurriculum";
 
 export const DEFAULT_COMMERCE_SUBJECTS: AcademicSubject[] = [
   { id: "sub-acc", name: "Accountancy", stream: "Commerce", color: "emerald" },
@@ -51,6 +52,50 @@ export function getDefaultSubjectsForStream(stream: StreamType, classLevel?: str
   if (stream === "Science") return DEFAULT_SCIENCE_SUBJECTS;
   if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_SUBJECTS;
   return DEFAULT_COMMERCE_SUBJECTS;
+}
+
+export function getDefaultChaptersForStream(
+  stream: StreamType,
+  classLevel?: string,
+  board?: string
+): AcademicChapter[] {
+  const subjects = getDefaultSubjectsForStream(stream, classLevel);
+  if (classLevel && classLevel.includes("11")) {
+    const curriculumSubs = getCurriculumSubjects("Class 11", stream, board);
+    const mappedChapters: AcademicChapter[] = [];
+    for (const cSub of curriculumSubs) {
+      const matchedAcademicSub =
+        subjects.find(
+          (s) =>
+            s.name.toLowerCase().includes(cSub.name.toLowerCase()) ||
+            cSub.name.toLowerCase().includes(s.name.toLowerCase())
+        ) || subjects[0];
+      if (!matchedAcademicSub) continue;
+      cSub.chapters.forEach((ch, idx) => {
+        mappedChapters.push({
+          id: ch.id,
+          subjectId: matchedAcademicSub.id,
+          chapterNumber: ch.chapterNumber || idx + 1,
+          title: ch.title,
+          topics: ch.topics.map((t) => t.name),
+          status: idx === 0 ? "Completed" : idx === 1 ? "In Progress" : "Not Started",
+          priority: ch.priority,
+          isWeak: idx === 1,
+          pyqStatus: idx === 0 ? "Completed" : "Pending",
+          revisionCount: idx === 0 ? 2 : idx === 1 ? 1 : 0,
+          testStatus: idx === 0 ? "Tested" : "Pending",
+          notes: ch.notesSummary,
+        });
+      });
+    }
+    if (mappedChapters.length > 0) {
+      return mappedChapters;
+    }
+  }
+  const filtered = DEFAULT_INITIAL_CHAPTERS.filter((c) =>
+    subjects.some((s) => s.id === c.subjectId)
+  );
+  return filtered.length > 0 ? filtered : DEFAULT_INITIAL_CHAPTERS;
 }
 
 export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [

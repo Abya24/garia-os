@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   Home,
@@ -55,6 +55,17 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.en;
   const [categoryFilter, setCategoryFilter] = useState<"all" | "core" | "academic" | "planning">("all");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   const allModules: ModuleNavItem[] = [
     {
@@ -242,6 +253,9 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 360, damping: 34 }}
             id="more-modules-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="more-modules-drawer-title"
             className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] bg-slate-950/98 text-slate-100 border-t border-amber-500/30 rounded-t-3xl shadow-2xl flex flex-col backdrop-blur-2xl overflow-hidden max-w-3xl mx-auto"
           >
             <div className="w-12 h-1.5 bg-amber-500/30 rounded-full mx-auto mt-3 mb-1 shrink-0" />
@@ -249,7 +263,10 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
             {/* Header with Category Filter Dropdown */}
             <div className="px-4 sm:px-6 py-3.5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white font-classic">
+                <h2
+                  id="more-modules-drawer-title"
+                  className="text-base sm:text-lg font-bold text-white font-classic"
+                >
                   {currentLanguage === "hi"
                     ? "मॉड्यूल निर्देशिका (Module Directory)"
                     : "Classic Module Directory"}

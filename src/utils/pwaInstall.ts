@@ -178,7 +178,13 @@ function notifySubscribers(): void {
 let isInitialized = false;
 
 export function initPWAInstallListener(): void {
-  if (isInitialized || typeof window === "undefined") return;
+  if (
+    isInitialized ||
+    typeof window === "undefined" ||
+    typeof window.addEventListener !== "function"
+  ) {
+    return;
+  }
   isInitialized = true;
 
   // 1. Capture beforeinstallprompt event

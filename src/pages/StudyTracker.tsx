@@ -37,7 +37,7 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Subject, StudySession, AcademicChapter, StudentProfile } from "../types";
 import { getTodayString } from "../utils/storage";

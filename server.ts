@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
-import { verifyFirebaseIdToken, generateDevTestToken } from "./server/firebaseAuth.ts";
+import { verifyFirebaseIdToken } from "./server/firebaseAuth.ts";
 import { MOTIVATIONAL_QUOTES, fetchDailyQuote } from "./src/utils/quotes.ts";
 import {
   suggestSmartTagsFromContent,
@@ -28,7 +28,73 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.set("trust proxy", 1);
-  app.use(express.json({ limit: "25mb" }));
+  app.disable("x-powered-by");
+
+  // Production Security Headers Middleware
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader(
+      "Permissions-Policy",
+      "camera=(), geolocation=(self), microphone=(self), payment=(), usb=()"
+    );
+    next();
+  });
+
+  // Endpoint-specific JSON body parsers to avoid an unnecessarily large global limit
+  const defaultJsonParser = express.json({ limit: "100kb" });
+  const smallAuthJsonParser = express.json({ limit: "16kb" });
+  const aiChatJsonParser = express.json({ limit: "12mb" });
+
+  app.use((req, res, next) => {
+    if (req.path === "/api/ai/chat") {
+      return aiChatJsonParser(req, res, next);
+    }
+    if (
+      req.path === "/api/live-voice/ticket" ||
+      req.path === "/api/auth/student-session"
+    ) {
+      return smallAuthJsonParser(req, res, next);
+    }
+    return defaultJsonParser(req, res, next);
+  });
+
+  // Handle malformed JSON or oversized request payloads cleanly
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err?.type === "entity.too.large" || err?.status === 413) {
+      return res.status(413).json({
+        error: "Request payload exceeds maximum allowed size.",
+        code: "PAYLOAD_TOO_LARGE",
+      });
+    }
+    if (err instanceof SyntaxError && "body" in err) {
+      return res.status(400).json({
+        error: "Malformed JSON request body.",
+        code: "MALFORMED_JSON",
+      });
+    }
+    next(err);
+  });
+
+  function isPlainObject(val: unknown): val is Record<string, any> {
+    return typeof val === "object" && val !== null && !Array.isArray(val);
+  }
+
+  function sanitizeMetadataField(
+    val: unknown,
+    maxLen: number = 120,
+    fallback: string = ""
+  ): string {
+    if (typeof val !== "string") return fallback;
+    const cleaned = val
+      .replace(/[\r\n\t\0\x08\x0B\x0C\x0E-\x1F\x7F]+/g, " ")
+      .replace(/```+/g, "")
+      .trim()
+      .slice(0, maxLen);
+    return cleaned || fallback;
+  }
 
   // API Health Endpoint
   app.get("/api/health", (req, res) => {
@@ -48,23 +114,36 @@ async function startServer() {
 
   // Daily Morning Motivation & Affirmation Endpoint (Public Quote API + Curated Fallback)
   app.get("/api/motivation/daily", async (req, res) => {
-    const dateParam = typeof req.query.date === "string" ? req.query.date : undefined;
-    const categoryParam = typeof req.query.category === "string" ? req.query.category : undefined;
+    const rawDate = typeof req.query.date === "string" ? req.query.date.trim() : undefined;
+    const rawCategory = typeof req.query.category === "string" ? req.query.category.trim() : undefined;
     const refreshParam = req.query.refresh === "true";
-    const excludeId = typeof req.query.excludeId === "string" ? req.query.excludeId : undefined;
+    const rawExcludeId = typeof req.query.excludeId === "string" ? req.query.excludeId.trim() : undefined;
+
+    if (rawDate && (rawDate.length > 32 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(rawDate))) {
+      return res.status(400).json({ error: "Invalid date parameter.", code: "INVALID_DATE" });
+    }
+    if (rawCategory && rawCategory.length > 64) {
+      return res.status(400).json({ error: "Invalid category parameter.", code: "INVALID_CATEGORY" });
+    }
+    if (rawExcludeId && rawExcludeId.length > 128) {
+      return res.status(400).json({ error: "Invalid excludeId parameter.", code: "INVALID_EXCLUDE_ID" });
+    }
+
+    const dateParam = rawDate;
+    const categoryParam = rawCategory;
+    const excludeId = rawExcludeId;
 
     const dailyQuote = fetchDailyQuote(dateParam, categoryParam);
 
     // Attempt public quotes API when no specific sub-category filter is constraining the pool
     if (!categoryParam || categoryParam === "all") {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2200);
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2200);
         const publicEndpoint = refreshParam
           ? "https://dummyjson.com/quotes/random"
           : "https://zenquotes.io/api/today";
         const extRes = await fetch(publicEndpoint, { signal: controller.signal });
-        clearTimeout(timeout);
         if (extRes.ok) {
           const extData = await extRes.json();
           const item = Array.isArray(extData) ? extData[0] : extData;
@@ -86,6 +165,8 @@ async function startServer() {
         }
       } catch {
         // Graceful fallback to curated local quotes below
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
@@ -204,14 +285,38 @@ async function startServer() {
     return req.ip || req.socket.remoteAddress || "127.0.0.1";
   }
 
-  // Rate Limiters
+  // Rate Limiters (Authenticated UID + IP Dual Protection)
   const liveVoiceTicketLimiter = new MemoryRateLimiter({
     windowMs: 60 * 1000,
     maxRequests: 10,
     maxEntries: 1000,
   });
 
+  const liveVoiceTicketIpLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 15,
+    maxEntries: 2000,
+  });
+
   const aiChatLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    maxEntries: 2000,
+  });
+
+  const aiChatIpLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 45,
+    maxEntries: 2000,
+  });
+
+  const smartTagsUidLimiter = new MemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 20,
+    maxEntries: 2000,
+  });
+
+  const smartTagsIpLimiter = new MemoryRateLimiter({
     windowMs: 60 * 1000,
     maxRequests: 30,
     maxEntries: 2000,
@@ -228,33 +333,17 @@ async function startServer() {
     }
   }, 30000);
 
-  // Endpoint to issue a signed local student session token when operating in local profile mode
-  app.post("/api/auth/student-session", (req, res) => {
-    const clientIp = getClientIp(req);
-    const rateCheck = aiChatLimiter.check(`ip:${clientIp}:student_session`);
-    if (!rateCheck.allowed) {
-      res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
-      return res.status(429).json({
-        error: "Too many session requests. Please wait a moment.",
-        code: "RATE_LIMITED",
-      });
-    }
-
-    const rawProfileId = typeof req.body?.profileId === "string" ? req.body.profileId : "local_student";
-    const safeProfileId = rawProfileId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "local_student";
-    const uid = `student_${safeProfileId}`;
-    const token = generateDevTestToken(uid);
-    return res.json({
-      status: "ok",
-      token,
-      uid,
-      expiresInSeconds: 3600,
+  // Reject unauthenticated attempts to exchange arbitrary local profileId values for server tokens
+  app.post("/api/auth/student-session", (_req, res) => {
+    return res.status(401).json({
+      error: "Arbitrary local profileId values cannot be exchanged for privileged server tokens. Please authenticate with Firebase Auth.",
+      code: "UNAUTHENTICATED",
     });
   });
 
   // Endpoint to obtain a secure, short-lived single-use ticket for Live Voice WebSocket
   app.post("/api/live-voice/ticket", async (req, res) => {
-    // 1. Mandatory Firebase / Session ID Token Verification
+    // 1. Mandatory Firebase ID Token Verification
     const authResult = await verifyFirebaseIdToken(req.headers.authorization);
     if (!authResult.valid || !authResult.user?.uid) {
       return res.status(401).json({
@@ -264,14 +353,26 @@ async function startServer() {
     }
 
     const uid = authResult.user.uid;
+    const clientIp = getClientIp(req);
 
     // 2. Authoritative UID-keyed rate limiting
     const rateKey = `uid:${uid}:live_voice_ticket`;
     const rateCheck = liveVoiceTicketLimiter.check(rateKey);
     if (!rateCheck.allowed) {
-      res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
+      res.setHeader("Retry-After", Math.max(1, Math.ceil(rateCheck.resetInMs / 1000)).toString());
       return res.status(429).json({
         error: "Too many voice session ticket requests. Please wait a moment before reconnecting.",
+        code: "RATE_LIMITED",
+      });
+    }
+
+    // 3. IP-based rate limiting to prevent multi-identity rotation abuse
+    const ipRateKey = `ip:${clientIp}:live_voice_ticket`;
+    const ipRateCheck = liveVoiceTicketIpLimiter.check(ipRateKey);
+    if (!ipRateCheck.allowed) {
+      res.setHeader("Retry-After", Math.max(1, Math.ceil(ipRateCheck.resetInMs / 1000)).toString());
+      return res.status(429).json({
+        error: "Too many voice session ticket requests from this IP address. Please wait a moment.",
         code: "RATE_LIMITED",
       });
     }
@@ -305,6 +406,7 @@ async function startServer() {
       defaultModel: "gemini-3.8-flash",
       supportedModels: [
         "gemini-3.8-flash",
+        "gemini-3-flash-preview",
         "gemini-3.1-pro-preview",
         "gemini-3.1-flash-lite",
         "gemini-3.8-live",
@@ -314,15 +416,131 @@ async function startServer() {
     });
   });
 
-  // Abya AI Note Smart Tagging Endpoint
+  let upstreamNetworkCooldownUntil = 0;
+
+  function withUpstreamTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    promise.catch(() => {});
+    if (Date.now() < upstreamNetworkCooldownUntil) {
+      const fastErr: any = new Error(`${label} skipped during upstream network cooldown`);
+      fastErr.code = "UPSTREAM_TIMEOUT";
+      fastErr.status = 504;
+      return Promise.reject(fastErr);
+    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        upstreamNetworkCooldownUntil = Date.now() + 60000;
+        const err: any = new Error(`${label} timed out after ${timeoutMs}ms`);
+        err.code = "UPSTREAM_TIMEOUT";
+        err.status = 504;
+        reject(err);
+      }, timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+  }
+
+  // Abya AI Note Smart Tagging Endpoint (Authenticated + Rate-Limited + Validated)
   app.post("/api/ai/smart-tags", async (req, res) => {
     try {
-      const { title = "", content = "", existingLabels = [] } = req.body || {};
-      const safeTitle = typeof title === "string" ? title.slice(0, 500) : "";
-      const safeContent = typeof content === "string" ? content.slice(0, 10000) : "";
+      // 1. Mandatory Firebase ID Token Verification
+      const authResult = await verifyFirebaseIdToken(req.headers.authorization);
+      if (!authResult.valid || !authResult.user?.uid) {
+        return res.status(401).json({
+          error: authResult.error || "Authentication required to use Abya AI Smart Tags.",
+          code: authResult.code || "UNAUTHENTICATED",
+        });
+      }
+
+      const verifiedUid = authResult.user.uid;
+      const clientIp = getClientIp(req);
+
+      // 2. Authoritative UID-based rate limiting
+      const uidRate = smartTagsUidLimiter.check(`uid:${verifiedUid}:smart_tags`);
+      if (!uidRate.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(uidRate.resetInMs / 1000)).toString());
+        return res.status(429).json({
+          error: "Too many Smart Tag requests. Please wait a moment.",
+          code: "RATE_LIMITED",
+        });
+      }
+
+      // 3. IP-based rate limiting
+      const ipRate = smartTagsIpLimiter.check(`ip:${clientIp}:smart_tags`);
+      if (!ipRate.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(ipRate.resetInMs / 1000)).toString());
+        return res.status(429).json({
+          error: "Too many Smart Tag requests from this IP address. Please wait a moment.",
+          code: "RATE_LIMITED",
+        });
+      }
+
+      // 4. Input Validation
+      if (!isPlainObject(req.body)) {
+        return res.status(400).json({
+          error: "Request body must be a JSON object.",
+          code: "INVALID_INPUT",
+        });
+      }
+
+      const { title = "", content = "", existingLabels = [] } = req.body;
+
+      if (title !== undefined && title !== null && typeof title !== "string") {
+        return res.status(400).json({
+          error: "Note title must be a string.",
+          code: "INVALID_TITLE",
+        });
+      }
+      if (typeof title === "string" && title.length > 500) {
+        return res.status(400).json({
+          error: "Note title exceeds maximum length of 500 characters.",
+          code: "TITLE_TOO_LARGE",
+        });
+      }
+
+      if (content !== undefined && content !== null && typeof content !== "string") {
+        return res.status(400).json({
+          error: "Note content must be a string.",
+          code: "INVALID_CONTENT",
+        });
+      }
+      if (typeof content === "string" && content.length > 10000) {
+        return res.status(400).json({
+          error: "Note content exceeds maximum length of 10,000 characters.",
+          code: "CONTENT_TOO_LARGE",
+        });
+      }
+
+      if (existingLabels !== undefined && existingLabels !== null) {
+        if (!Array.isArray(existingLabels) || existingLabels.length > 30) {
+          return res.status(400).json({
+            error: "existingLabels must be an array of at most 30 strings.",
+            code: "INVALID_EXISTING_LABELS",
+          });
+        }
+        for (const lbl of existingLabels) {
+          if (typeof lbl !== "string" || lbl.length > 64) {
+            return res.status(400).json({
+              error: "Each existing label must be a string of at most 64 characters.",
+              code: "INVALID_LABEL_ITEM",
+            });
+          }
+        }
+      }
+
+      const safeTitle = sanitizeMetadataField(title || "", 500, "");
+      const safeContent = typeof content === "string" ? content.trim().slice(0, 10000) : "";
       const safeExisting = Array.isArray(existingLabels)
-        ? existingLabels.filter((l) => typeof l === "string").slice(0, 20)
+        ? existingLabels.map((l) => sanitizeMetadataField(l, 64, "")).filter(Boolean).slice(0, 20)
         : [];
+
+      if (!safeTitle && !safeContent) {
+        return res.status(400).json({
+          error: "Note title or content is required to generate smart tags.",
+          code: "MISSING_INPUT",
+        });
+      }
 
       const fallbackTags = suggestSmartTagsFromContent(
         safeContent,
@@ -331,7 +549,7 @@ async function startServer() {
       );
 
       const apiKey = process.env.GEMINI_API_KEY;
-      if (apiKey && (safeTitle.trim() || safeContent.trim())) {
+      if (apiKey && (safeTitle || safeContent)) {
         try {
           const ai = new GoogleGenAI({
             apiKey,
@@ -342,10 +560,15 @@ async function startServer() {
             },
           });
           const prompt = `You are Abya AI, a student study assistant. Analyze the following study note and suggest 3 to 5 concise, relevant academic tags or labels (1-2 words each, Title Case). Return ONLY a JSON array of strings, e.g. ["Physics", "Thermodynamics", "Formula"].\n\nTitle: ${safeTitle}\nContent: ${safeContent}`;
-          const response = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: prompt,
-          });
+          const response = await withUpstreamTimeout(
+            ai.models.generateContent({
+              model: "gemini-3.8-flash",
+              contents: prompt,
+            }),
+            3500,
+            "Smart Tags Gemini request"
+          );
+          if (res.writableEnded || res.destroyed) return;
           const parsedAiTags = parseSmartTagsResponse(response.text || "");
           if (parsedAiTags.length > 0) {
             const combined = Array.from(
@@ -368,10 +591,9 @@ async function startServer() {
         provider: "abya_engine",
       });
     } catch {
-      return res.json({
-        status: "ok",
-        tags: ["Study Note", "Revision"],
-        provider: "abya_engine",
+      return res.status(500).json({
+        error: "Failed to process Smart Tag request.",
+        code: "SMART_TAG_ERROR",
       });
     }
   });
@@ -390,15 +612,34 @@ async function startServer() {
       }
 
       const verifiedUid = authResult.user.uid;
+      const clientIp = getClientIp(req);
 
       // 2. Authoritative UID-keyed rate limiting
       const rateKey = `uid:${verifiedUid}:ai_chat`;
       const rateCheck = aiChatLimiter.check(rateKey);
       if (!rateCheck.allowed) {
-        res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(rateCheck.resetInMs / 1000)).toString());
         return res.status(429).json({
           error: "Too many AI requests. Please wait a moment before sending another query.",
           code: "RATE_LIMITED",
+        });
+      }
+
+      // 3. IP-based rate limiting to prevent multi-identity rotation abuse
+      const ipRateKey = `ip:${clientIp}:ai_chat`;
+      const ipRateCheck = aiChatIpLimiter.check(ipRateKey);
+      if (!ipRateCheck.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(ipRateCheck.resetInMs / 1000)).toString());
+        return res.status(429).json({
+          error: "Too many AI requests from this IP address. Please wait a moment.",
+          code: "RATE_LIMITED",
+        });
+      }
+
+      if (!isPlainObject(req.body)) {
+        return res.status(400).json({
+          error: "Request body must be a JSON object.",
+          code: "INVALID_BODY",
         });
       }
 
@@ -525,20 +766,60 @@ async function startServer() {
         }
       }
 
-      // 6. Validate context bounds
-      if (contextNote && (typeof contextNote !== "string" || contextNote.length > 5000)) {
+      // 6. Validate and sanitize metadata context objects
+      if (contextNote !== undefined && contextNote !== null && (typeof contextNote !== "string" || contextNote.length > 5000)) {
         return res.status(400).json({
           error: "contextNote exceeds maximum length of 5,000 characters.",
           code: "CONTEXT_NOTE_TOO_LARGE",
         });
       }
+      if (abyaLanguage !== undefined && abyaLanguage !== null && (typeof abyaLanguage !== "string" || abyaLanguage.length > 64)) {
+        return res.status(400).json({
+          error: "Invalid abyaLanguage value.",
+          code: "INVALID_LANGUAGE",
+        });
+      }
+
+      const optionalObjects = [
+        { name: "curriculumContext", val: curriculumContext },
+        { name: "careerContext", val: careerContext },
+        { name: "academicContext", val: academicContext },
+        { name: "examContext", val: examContext },
+        { name: "studentProfileContext", val: studentProfileContext },
+        { name: "todayContext", val: todayContext },
+      ];
+      for (const obj of optionalObjects) {
+        if (obj.val !== undefined && obj.val !== null && !isPlainObject(obj.val)) {
+          return res.status(400).json({
+            error: `${obj.name} must be a plain object.`,
+            code: "INVALID_CONTEXT_OBJECT",
+          });
+        }
+      }
+
+      const safeStudentName = sanitizeMetadataField(studentProfileContext?.name, 80, "Student");
+      const safeClassLevel = sanitizeMetadataField(studentProfileContext?.classLevel, 40, "Class 12");
+      const safeStream = sanitizeMetadataField(studentProfileContext?.stream, 40, "Commerce");
+      const safeBoard = sanitizeMetadataField(studentProfileContext?.board, 40, "CBSE");
+      const safeContextNote = sanitizeMetadataField(contextNote, 2000, "");
+      const safeCurrSubject = sanitizeMetadataField(curriculumContext?.subject, 80, "N/A");
+      const safeCurrChapter = sanitizeMetadataField(curriculumContext?.chapter, 120, "N/A");
+      const safeCurrTopic = sanitizeMetadataField(curriculumContext?.topic, 120, "N/A");
+      const safeCareerGoal = sanitizeMetadataField(careerContext?.targetCareer, 100, "General");
+      const safeWeakChapters = sanitizeMetadataField(academicContext?.weakChapterTitles, 300, "None");
+      const safeExamName = sanitizeMetadataField(examContext?.examName, 80, "Board Exam");
+      const safePendingCount = Math.max(0, Math.min(999, Number(todayContext?.pendingTasksCount) || 0));
+      const safeCompletedCount = Math.max(0, Math.min(999, Number(todayContext?.completedTasksCount) || 0));
+      const safeOverallProgress = Math.max(0, Math.min(100, Number(academicContext?.overallProgress) || 0));
+      const safeDaysRemaining = Math.max(0, Math.min(3650, Number(examContext?.daysRemaining) || 0));
+      const safeReadinessScore = Math.max(0, Math.min(100, Number(examContext?.readinessScore) || 0));
 
       // Strictly utilize server-side environment variable only
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
         console.warn("[Abya AI Server] GEMINI_API_KEY is missing/unconfigured.");
-        return res.status(401).json({
+        return res.status(503).json({
           error:
             "Abya AI is not configured. Please configure GEMINI_API_KEY in the deployment environment.",
           code: "MISSING_API_KEY",
@@ -554,7 +835,7 @@ async function startServer() {
         },
       });
 
-      const selectedLanguage = abyaLanguage || "WhatsApp Language";
+      const selectedLanguage = sanitizeMetadataField(abyaLanguage, 40, "WhatsApp Language");
       let languageGuidance = "";
       if (selectedLanguage === "English") {
         languageGuidance = "🌐 LANGUAGE: Respond in clean, warm, student-friendly conversational English.";
@@ -589,7 +870,7 @@ CORE PERSONA RULES:
 2. 🚫 NO ROBOTIC LANGUAGE: Never say "As an AI model", "I have processed your query", "According to system data", "Executing request", or "Deterministic output". Speak directly, naturally, and warmly.
 3. 🚫 NO TECHNICAL AI TERMS: Never mention tokens, LLM, parameters, temperature, system prompts, API endpoints, or JSON objects.
 4. ⚡ SHORT ACTIONABLE GUIDANCE: Provide clear, bite-sized, high-yield guidance. Use 3-4 bullet points, simple step-by-step action items, and real-world analogies (daily life, sports, cricket, pocket money, everyday examples).
-5. 🎯 ACTIVE STUDENT FOCUS: Personalize all advice for student "${studentProfileContext?.name || "Student"}" (${studentProfileContext?.classLevel || "Class 12"} • ${studentProfileContext?.stream || "Commerce"} • ${studentProfileContext?.board || "CBSE"}). Keep all guidance aligned with their syllabus.
+5. 🎯 ACTIVE STUDENT FOCUS: Personalize all advice for student "${safeStudentName}" (${safeClassLevel} • ${safeStream} • ${safeBoard}). Keep all guidance aligned with their syllabus.
 6. 📚 CONCEPT EXPLANATIONS: Explain concepts simply with:
    - 💡 1-line Simple Core Idea
    - 🌟 Relatable Real-World Example
@@ -621,14 +902,14 @@ CORE PERSONA RULES:
 9. ${languageGuidance}
 
 Current Student Context:
-- Student Name: ${studentProfileContext?.name || "Student"}
-- Academic Tier: ${studentProfileContext?.classLevel || "Class 12"} (${studentProfileContext?.stream || "General"} Stream, ${studentProfileContext?.board || "CBSE"} Board)
-${curriculumContext ? `- Current Subject Focus: "${curriculumContext.subject || "N/A"}" › Chapter: "${curriculumContext.chapter || "N/A"}" › Topic: "${curriculumContext.topic || "N/A"}"` : ""}
-${todayContext ? `- Today's Study Tasks: ${todayContext.pendingTasksCount} pending, ${todayContext.completedTasksCount} done` : ""}
-${contextNote ? `- Attached Note Context: "${contextNote}"` : ""}
-${careerContext ? `- Target Career Goal: "${careerContext.targetCareer || "General"}"` : ""}
-${academicContext ? `- Syllabus Progress: ${academicContext.overallProgress}%, Weak Chapters: "${academicContext.weakChapterTitles || "None"}"` : ""}
-${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRemaining} days remaining, Readiness: ${examContext.readinessScore}%` : ""}`;
+- Student Name: ${safeStudentName}
+- Academic Tier: ${safeClassLevel} (${safeStream} Stream, ${safeBoard} Board)
+${curriculumContext ? `- Current Subject Focus: "${safeCurrSubject}" › Chapter: "${safeCurrChapter}" › Topic: "${safeCurrTopic}"` : ""}
+${todayContext ? `- Today's Study Tasks: ${safePendingCount} pending, ${safeCompletedCount} done` : ""}
+${safeContextNote ? `- Attached Note Context: "${safeContextNote}"` : ""}
+${careerContext ? `- Target Career Goal: "${safeCareerGoal}"` : ""}
+${academicContext ? `- Syllabus Progress: ${safeOverallProgress}%, Weak Chapters: "${safeWeakChapters}"` : ""}
+${examContext ? `- Target Exam: "${safeExamName}", ${safeDaysRemaining} days remaining, Readiness: ${safeReadinessScore}%` : ""}`;
 
       // Build ordered model candidates for automatic resiliency against 429 quota and 503 high-demand limits:
       interface ModelCandidate {
@@ -676,8 +957,9 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       } else {
         // Standard study mentor default
         candidates.push(
-          { model: "gemini-3.8-flash", config: { systemInstruction } },
+          { model: "gemini-3-flash-preview", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
+          { model: "gemini-3.8-flash", config: { systemInstruction } },
           { model: "gemini-3.1-pro-preview", config: { systemInstruction } }
         );
       }
@@ -747,30 +1029,68 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       let usedModel = candidates[0].model;
       let lastErr: any;
 
-      for (const candidate of candidates) {
-        console.log(
-          `[Abya AI Server] Dispatching request with model="${candidate.model}", mode="${mode}", hasImage=${!!image}...`
-        );
-        try {
-          response = await ai.models.generateContent({
-            model: candidate.model,
-            contents: contents,
-            config: candidate.config,
+      const fallbackText = `Here is a focused study breakdown for ${safeStudentName} (${safeClassLevel} • ${safeStream} • ${safeBoard}):\n\n• **Core Concept**: Break the topic into its fundamental definition, governing principle/formula, and one real-world application.\n• **High-Yield Revision Step**: Write down the key formula or rule from memory and solve 2 previous-year board questions.\n• **Practice Check**: Review "${safeCurrTopic !== "N/A" ? safeCurrTopic : (prompt || "current topic").slice(0, 80)}" with active recall before your next study block.`;
+
+      const routeSafetyTimer = setTimeout(() => {
+        if (!res.writableEnded && !res.destroyed) {
+          res.json({
+            text: fallbackText,
+            durationMs: Date.now() - startTime,
+            modelUsed: "abya-study-mentor-engine",
+            modeUsed: mode,
           });
-          if (response) {
-            usedModel = candidate.model;
-            break;
-          }
-        } catch (err: any) {
-          lastErr = err;
-          console.warn(
-            `[Abya AI Server] Candidate ${candidate.model} failed (status: ${err?.status || err?.code || "UNAVAILABLE"}). Trying next candidate...`
-          );
         }
+      }, 5500);
+
+      try {
+        for (const candidate of candidates) {
+          if (res.writableEnded || res.destroyed) break;
+          if (Date.now() - startTime > 4500) break;
+          console.log(
+            `[Abya AI Server] Dispatching request with model="${candidate.model}", mode="${mode}", hasImage=${!!image}...`
+          );
+          try {
+            response = await withUpstreamTimeout(
+              ai.models.generateContent({
+                model: candidate.model,
+                contents: contents,
+                config: candidate.config,
+              }),
+              3500,
+              `Abya AI (${candidate.model})`
+            );
+            if (response) {
+              usedModel = candidate.model;
+              break;
+            }
+          } catch (err: any) {
+            lastErr = err;
+            console.warn(
+              `[Abya AI Server] Candidate ${candidate.model} failed (status: ${err?.status || err?.code || "UNAVAILABLE"}). Trying next candidate...`
+            );
+            if (
+              err?.code === "UPSTREAM_TIMEOUT" ||
+              err?.message?.includes("fetch failed")
+            ) {
+              upstreamNetworkCooldownUntil = Date.now() + 60000;
+              break;
+            }
+          }
+        }
+      } finally {
+        clearTimeout(routeSafetyTimer);
       }
 
+      if (res.writableEnded || res.destroyed) return;
+
       if (!response) {
-        throw lastErr || new Error("All candidate AI models were unavailable or rate-limited.");
+        const duration = Date.now() - startTime;
+        return res.json({
+          text: fallbackText,
+          durationMs: duration,
+          modelUsed: "abya-study-mentor-engine",
+          modeUsed: mode,
+        });
       }
 
       const replyText =
@@ -921,11 +1241,12 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       }
 
       const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
-      const studentName = url.searchParams.get("studentName") || "Student";
-      const classLevel = url.searchParams.get("classLevel") || "Class 12";
-      const stream = url.searchParams.get("stream") || "Science";
-      const board = url.searchParams.get("board") || "CBSE";
-      const mode = url.searchParams.get("mode") || "tutor";
+      const studentName = sanitizeMetadataField(url.searchParams.get("studentName"), 80, "Student");
+      const classLevel = sanitizeMetadataField(url.searchParams.get("classLevel"), 40, "Class 12");
+      const stream = sanitizeMetadataField(url.searchParams.get("stream"), 40, "Science");
+      const board = sanitizeMetadataField(url.searchParams.get("board"), 40, "CBSE");
+      const rawMode = sanitizeMetadataField(url.searchParams.get("mode"), 24, "tutor");
+      const mode = ["tutor", "viva", "rapid_quiz"].includes(rawMode) ? rawMode : "tutor";
 
       const apiKey = process.env.GEMINI_API_KEY;
       const ai = apiKey

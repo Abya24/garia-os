@@ -22,7 +22,13 @@ import { StudentProfile, StreamType, ExamBoard } from "../types";
 import { StreamSelector } from "./StreamSelector";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "./ProductionVersionBadge";
-import { AppLanguage, translations, saveStoredLanguage } from "../utils/i18n";
+import {
+  AppLanguage,
+  translations,
+  saveStoredLanguage,
+  SUPPORTED_UI_LANGUAGES,
+  resolveEffectiveLanguage,
+} from "../utils/i18n";
 import {
   getStudentAvatarInitials,
   formatStudentDisplayName,
@@ -79,6 +85,17 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     }
   }, [isOpen, activeTab]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const resetStudentProfileForm = () => {
@@ -102,7 +119,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setClassLevel(p.classLevel);
     setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
-    setLanguage((p.language as AppLanguage) || "en");
+    setLanguage(resolveEffectiveLanguage(p));
     setAvatarColor(p.avatarColor || AVATAR_GRADIENT_OPTIONS[0].value);
     setActiveTab("edit");
   };
@@ -127,6 +144,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       stream: finalStream,
       board,
       language,
+      uiLanguage: language,
       avatarColor,
     });
     saveStoredLanguage(language);
@@ -146,6 +164,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       stream: finalStream,
       board,
       language,
+      uiLanguage: language,
       avatarColor,
     });
     saveStoredLanguage(language);
@@ -178,6 +197,9 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     >
       <div
         id="student-profile-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="student-profile-modal-title"
         className="relative w-full max-w-2xl glass-card rounded-3xl border border-emerald-500/30 p-4 sm:p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
@@ -192,7 +214,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white font-heading flex items-center gap-2">
+              <h3
+                id="student-profile-modal-title"
+                className="text-xl font-bold text-white font-heading flex items-center gap-2"
+              >
                 Student Profiles
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
                   v{APP_VERSION}
@@ -204,6 +229,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Student Profiles"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
           >
@@ -331,16 +358,20 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       )}
 
                       <button
+                        type="button"
                         onClick={() => handleStartEdit(p)}
                         title="Edit Profile"
+                        aria-label={`Edit profile ${p.name}`}
                         className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all text-xs flex items-center gap-1"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => onExportProfile(p.id)}
                         title="Export JSON Backup"
+                        aria-label={`Export profile ${p.name}`}
                         className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 hover:text-cyan-300 border border-white/10 transition-all text-xs flex items-center gap-1"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -437,6 +468,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       <option value="CBSE">CBSE Board</option>
                       <option value="ICSE">ICSE / ISC Board</option>
                       <option value="BSEB">BSEB (Bihar Board)</option>
+                      <option value="UP Board">UP Board (UPMSP)</option>
+                      <option value="NCERT">NCERT Core</option>
                       <option value="State Board">Other State Board</option>
                     </select>
                   </div>
@@ -452,8 +485,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       onChange={(e) => setLanguage(e.target.value as AppLanguage)}
                       className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-500"
                     >
-                      <option value="en">English (English UI)</option>
-                      <option value="hi">हिन्दी (Hindi UI)</option>
+                      {SUPPORTED_UI_LANGUAGES.map((langOpt) => (
+                        <option key={langOpt.code} value={langOpt.code}>
+                          {langOpt.nativeLabel} ({langOpt.label} UI)
+                        </option>
+                      ))}
                     </select>
                   </div>
 

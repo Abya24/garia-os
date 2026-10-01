@@ -1,16 +1,85 @@
 // =======================================================================
 // GARIA OS V3.1 MASTER CURRICULUM DATASET
-// Complete NCERT / CBSE Academic Hierarchy for:
+// Multi-Board Academic Hierarchy (Board -> Class -> Stream -> Subject -> Chapter -> Topic)
+// Supports Boards: CBSE, BSEB, ICSE, UP Board, State Board, NCERT, Other
 // - Class 10 (Math, Science, Social Science, English, Hindi, Sanskrit)
 // - Class 11 Science (Physics, Chem, Math, Bio, English)
 // - Class 11 Commerce (Accountancy, Business Studies, Economics, English)
 // - Class 11 Arts (History, Political Science, Geography, Economics, English)
-// - Class 12 Science (Physics, Chem, Math, Bio, English)
-// - Class 12 Commerce (Accountancy, Business Studies, Economics, English)
-// - Class 12 Arts (History, Political Science, Geography, Sociology, English)
+// - Class 12 / Dropper Science (Physics, Chem, Math, Bio, English)
+// - Class 12 / Dropper Commerce (Accountancy, Business Studies, Economics, English)
+// - Class 12 / Dropper Arts (History, Political Science, Geography, Sociology, English)
 // =======================================================================
 
-import { StreamType } from "../types";
+import { StreamType, BoardType } from "../types";
+
+export interface BoardCurriculumMetadata {
+  board: BoardType;
+  fullName: string;
+  examPatternSummary: string;
+  objectiveWeightagePct: number;
+  descriptiveWeightagePct: number;
+  syllabusFramework: string;
+}
+
+export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetadata> = {
+  CBSE: {
+    board: "CBSE",
+    fullName: "Central Board of Secondary Education (CBSE)",
+    examPatternSummary: "Competency-based (50%), Case-Study/Source-based (20%), Short & Long Descriptive (30%)",
+    objectiveWeightagePct: 25,
+    descriptiveWeightagePct: 75,
+    syllabusFramework: "NCERT Core Rationalised Framework",
+  },
+  BSEB: {
+    board: "BSEB",
+    fullName: "Bihar School Examination Board (BSEB)",
+    examPatternSummary: "50% OMR Objective MCQs (with 2x option choice) + 50% Short & Long Answer Descriptive",
+    objectiveWeightagePct: 50,
+    descriptiveWeightagePct: 50,
+    syllabusFramework: "SCERT Bihar / NCERT Aligned Syllabus",
+  },
+  ICSE: {
+    board: "ICSE",
+    fullName: "CISCE (ICSE Class 10 / ISC Class 11-12)",
+    examPatternSummary: "Section A Compulsory Analytical/Conceptual + Section B Application & Structured Long Answers",
+    objectiveWeightagePct: 20,
+    descriptiveWeightagePct: 80,
+    syllabusFramework: "CISCE Prescriptive Syllabus",
+  },
+  "UP Board": {
+    board: "UP Board",
+    fullName: "Uttar Pradesh Madhyamik Shiksha Parishad (UPMSP)",
+    examPatternSummary: "OMR Multiple Choice Section (30%) + Step-marked Descriptive & Numericals (70%)",
+    objectiveWeightagePct: 30,
+    descriptiveWeightagePct: 70,
+    syllabusFramework: "UPMSP NCERT-Aligned Curriculum",
+  },
+  "State Board": {
+    board: "State Board",
+    fullName: "State Board of Secondary & Higher Secondary Education",
+    examPatternSummary: "Objective + Very Short + Short + Long Descriptive State Board Pattern",
+    objectiveWeightagePct: 30,
+    descriptiveWeightagePct: 70,
+    syllabusFramework: "State SCERT / NCERT Core Alignment",
+  },
+  NCERT: {
+    board: "NCERT",
+    fullName: "National Council of Educational Research and Training (NCERT)",
+    examPatternSummary: "Conceptual In-Text + Exemplar + Competitive Foundation (JEE/NEET/CUET/CA)",
+    objectiveWeightagePct: 35,
+    descriptiveWeightagePct: 65,
+    syllabusFramework: "National Curriculum Framework (NCF)",
+  },
+  Other: {
+    board: "Other",
+    fullName: "General National & International Board Curriculum",
+    examPatternSummary: "Balanced Conceptual, Analytical & Structured Problem-Solving Assessment",
+    objectiveWeightagePct: 30,
+    descriptiveWeightagePct: 70,
+    syllabusFramework: "Universal Secondary & Senior Secondary Framework",
+  },
+};
 
 export interface CurriculumTopic {
   id: string;
@@ -39,9 +108,19 @@ export interface CurriculumSubject {
   code: string;
   stream: StreamType;
   classLevel: "Class 10" | "Class 11" | "Class 12";
+  board?: BoardType | string;
+  boardExamPattern?: string;
   color: string;
   iconName: string;
   chapters: CurriculumChapter[];
+}
+
+export interface BoardCurriculumHierarchy {
+  board: BoardType;
+  boardMetadata: BoardCurriculumMetadata;
+  classLevel: "Class 10" | "Class 11" | "Class 12";
+  stream: StreamType;
+  subjects: CurriculumSubject[];
 }
 
 
@@ -2818,26 +2897,95 @@ export const CLASS12_ARTS_CURRICULUM: CurriculumSubject[] = [
 // MASTER CURRICULUM LOOKUP FUNCTIONS
 // =======================================================================
 
+export function normalizeCurriculumBoard(board?: string): BoardType {
+  if (!board) return "CBSE";
+  const b = board.trim().toUpperCase();
+  if (b === "BSEB" || b.includes("BIHAR")) return "BSEB";
+  if (b === "CBSE" || b.includes("CENTRAL")) return "CBSE";
+  if (b === "ICSE" || b === "ISC" || b.includes("CISCE")) return "ICSE";
+  if (b === "UP BOARD" || b === "UPMSP" || b.includes("UTTAR PRADESH")) return "UP Board";
+  if (b === "STATE BOARD" || b.includes("STATE")) return "State Board";
+  if (b === "NCERT") return "NCERT";
+  return "Other";
+}
+
+export function normalizeCurriculumClassLevel(
+  classLevel: string = "Class 10"
+): "Class 10" | "Class 11" | "Class 12" {
+  const c = (classLevel || "").trim().toLowerCase();
+  if (c.includes("11")) return "Class 11";
+  if (c.includes("12") || c.includes("dropper") || c.includes("gap")) return "Class 12";
+  return "Class 10";
+}
+
+export function normalizeCurriculumStream(
+  stream: StreamType | string = "General",
+  normalizedClass: "Class 10" | "Class 11" | "Class 12" = "Class 10"
+): StreamType {
+  if (normalizedClass === "Class 10") return "General";
+  const s = (stream || "").trim().toLowerCase();
+  if (s.includes("sci") || s === "pcm" || s === "pcb") return "Science";
+  if (s.includes("comm")) return "Commerce";
+  if (s.includes("art") || s.includes("humanities")) return "Arts";
+  return "Science";
+}
+
 export function getCurriculumSubjects(
   classLevel: string = "Class 10",
-  stream: StreamType = "General"
+  stream: StreamType | string = "General",
+  board: BoardType | string = "CBSE"
 ): CurriculumSubject[] {
-  if (classLevel === "Class 10" || stream === "General") {
-    return CLASS10_CURRICULUM;
+  const normalizedBoard = normalizeCurriculumBoard(board);
+  const boardMeta = CURRICULUM_BOARDS_METADATA[normalizedBoard];
+  const normalizedClass = normalizeCurriculumClassLevel(classLevel);
+  const normalizedStream = normalizeCurriculumStream(stream, normalizedClass);
+
+  let baseSubjects: CurriculumSubject[];
+  if (normalizedClass === "Class 10" || normalizedStream === "General") {
+    baseSubjects = CLASS10_CURRICULUM;
+  } else if (normalizedClass === "Class 11") {
+    if (normalizedStream === "Science") baseSubjects = CLASS11_SCIENCE_CURRICULUM;
+    else if (normalizedStream === "Commerce") baseSubjects = CLASS11_COMMERCE_CURRICULUM;
+    else if (normalizedStream === "Arts" || normalizedStream === "Arts / Humanities") {
+      baseSubjects = CLASS11_ARTS_CURRICULUM;
+    } else {
+      baseSubjects = CLASS11_SCIENCE_CURRICULUM;
+    }
+  } else {
+    // Class 12 or Dropper / Gap Year
+    if (normalizedStream === "Science") baseSubjects = CLASS12_SCIENCE_CURRICULUM;
+    else if (normalizedStream === "Commerce") baseSubjects = CLASS12_COMMERCE_CURRICULUM;
+    else if (normalizedStream === "Arts" || normalizedStream === "Arts / Humanities") {
+      baseSubjects = CLASS12_ARTS_CURRICULUM;
+    } else {
+      baseSubjects = CLASS12_SCIENCE_CURRICULUM;
+    }
   }
 
-  if (classLevel === "Class 11") {
-    if (stream === "Science") return CLASS11_SCIENCE_CURRICULUM;
-    if (stream === "Commerce") return CLASS11_COMMERCE_CURRICULUM;
-    if (stream === "Arts" || stream === "Arts / Humanities") return CLASS11_ARTS_CURRICULUM;
-    return CLASS11_SCIENCE_CURRICULUM;
-  }
+  return baseSubjects.map((sub) => ({
+    ...sub,
+    board: normalizedBoard,
+    boardExamPattern: boardMeta.examPatternSummary,
+  }));
+}
 
-  // Class 12
-  if (stream === "Science") return CLASS12_SCIENCE_CURRICULUM;
-  if (stream === "Commerce") return CLASS12_COMMERCE_CURRICULUM;
-  if (stream === "Arts" || stream === "Arts / Humanities") return CLASS12_ARTS_CURRICULUM;
-  return CLASS12_SCIENCE_CURRICULUM;
+export function getBoardCurriculumHierarchy(
+  board: BoardType | string = "CBSE",
+  classLevel: string = "Class 12",
+  stream: StreamType | string = "Science"
+): BoardCurriculumHierarchy {
+  const normalizedBoard = normalizeCurriculumBoard(board);
+  const normalizedClass = normalizeCurriculumClassLevel(classLevel);
+  const normalizedStream = normalizeCurriculumStream(stream, normalizedClass);
+  const subjects = getCurriculumSubjects(normalizedClass, normalizedStream, normalizedBoard);
+
+  return {
+    board: normalizedBoard,
+    boardMetadata: CURRICULUM_BOARDS_METADATA[normalizedBoard],
+    classLevel: normalizedClass,
+    stream: normalizedStream,
+    subjects,
+  };
 }
 
 export function getAllCurriculumSubjects(): CurriculumSubject[] {
@@ -2877,11 +3025,13 @@ export function findCurriculumTopicById(topicId: string): { topic: CurriculumTop
 export function searchCurriculum(
   query: string,
   classLevel?: string,
-  stream?: StreamType
+  stream?: StreamType,
+  board?: BoardType | string
 ): { subject: CurriculumSubject; chapter: CurriculumChapter; topic?: CurriculumTopic }[] {
   if (!query || query.trim().length < 2) return [];
   const q = query.toLowerCase().trim();
-  const subjects = classLevel || stream ? getCurriculumSubjects(classLevel, stream) : getAllCurriculumSubjects();
+  const subjects =
+    classLevel || stream ? getCurriculumSubjects(classLevel, stream, board) : getAllCurriculumSubjects();
   const results: { subject: CurriculumSubject; chapter: CurriculumChapter; topic?: CurriculumTopic }[] = [];
 
   for (const sub of subjects) {

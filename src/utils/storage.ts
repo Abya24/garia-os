@@ -44,6 +44,7 @@ import {
   DEFAULT_ARTS_SUBJECTS,
   DEFAULT_INITIAL_CHAPTERS,
   getDefaultSubjectsForStream,
+  getDefaultChaptersForStream,
 } from "./academicEngine";
 import { CAREER_CATALOG, generateDefaultRoadmap } from "./careerEngine";
 import { AVATAR_GRADIENT_VALUES } from "./studentNameUtils";
@@ -921,13 +922,12 @@ function seedNewProfileData(profile: StudentProfile): void {
   const academicSubs = getDefaultSubjectsForStream(profile.stream, profile.classLevel);
   saveAcademicSubjects(academicSubs, profId);
 
-  const academicChaps = DEFAULT_INITIAL_CHAPTERS.filter((c) =>
-    academicSubs.some((s) => s.id === c.subjectId)
+  const academicChaps = getDefaultChaptersForStream(
+    profile.stream,
+    profile.classLevel,
+    profile.board
   );
-  saveAcademicChapters(
-    academicChaps.length > 0 ? academicChaps : DEFAULT_INITIAL_CHAPTERS,
-    profId
-  );
+  saveAcademicChapters(academicChaps, profId);
 
   // Exam Profile & Milestones
   const examCycle = getUpcomingExamCycle();
@@ -1603,7 +1603,11 @@ export const saveAcademicSubjects = (subs: AcademicSubject[], profileId?: string
 
 export const loadAcademicChapters = (profileId?: string): AcademicChapter[] => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_CHAPTERS), DEFAULT_INITIAL_CHAPTERS);
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const fallback = activeProf
+    ? getDefaultChaptersForStream(activeProf.stream, activeProf.classLevel, activeProf.board)
+    : DEFAULT_INITIAL_CHAPTERS;
+  return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_CHAPTERS), fallback);
 };
 export const saveAcademicChapters = (chaps: AcademicChapter[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();

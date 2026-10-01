@@ -9,16 +9,54 @@ export type OfflineActionType =
   | "CREATE_NOTE"
   | "UPDATE_NOTE"
   | "DELETE_NOTE"
+  | "CREATE_HABIT"
   | "UPDATE_HABIT"
+  | "DELETE_HABIT"
+  | "CREATE_GOAL"
+  | "UPDATE_GOAL"
+  | "DELETE_GOAL"
+  | "CREATE_SUBJECT"
+  | "UPDATE_SUBJECT"
+  | "DELETE_SUBJECT"
+  | "CREATE_STUDY_SESSION"
+  | "UPDATE_STUDY_SESSION"
+  | "DELETE_STUDY_SESSION"
+  | "CREATE_EVENT"
+  | "UPDATE_EVENT"
+  | "DELETE_EVENT"
   | "UPDATE_WATER"
   | "LOG_FOCUS"
-  | "UPDATE_GOAL"
-  | "UPDATE_EVENT"
   | "UPDATE_PROFILE"
   | "UPDATE_ACADEMIC"
   | "SAVE_EXAM_RECORD"
   | "UPDATE_SETTINGS"
   | "WORKSPACE_SNAPSHOT";
+
+export const SUPPORTED_OFFLINE_ENTITIES: ReadonlySet<string> = new Set([
+  "tasks",
+  "notes",
+  "habits",
+  "goals",
+  "subjects",
+  "study_sessions",
+  "calendar",
+  "calendar_events",
+  "profiles",
+  "water",
+  "settings",
+  "focus",
+  "focus_logs",
+  "academic",
+  "exam_records",
+  "examTestRecords",
+  "workspace",
+]);
+
+export function isSupportedOfflineEntity(entityName: string): boolean {
+  return Boolean(entityName && SUPPORTED_OFFLINE_ENTITIES.has(String(entityName)));
+}
+
+export const MAX_OFFLINE_RETRY_COUNT = 5;
 
 export interface PendingOfflineAction {
   id: string;
@@ -52,7 +90,8 @@ export interface OfflineQueueState {
   isOnline: boolean;
 }
 
-const OFFLINE_QUEUE_KEY = "garia_offline_pending_queue_v1";
+export const OFFLINE_QUEUE_KEY = "garia_offline_pending_queue_v1";
+export const OFFLINE_QUEUE_STORAGE_KEY = OFFLINE_QUEUE_KEY;
 const LAST_RECONCILED_KEY = "garia_last_reconciled_time_v1";
 
 type QueueListener = (state: OfflineQueueState) => void;
@@ -77,7 +116,32 @@ function saveStoredQueue(queue: PendingOfflineAction[]): void {
   try {
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
   } catch (e) {
-    console.error("[OfflineQueue] Error saving pending queue to localStorage", e);
+    console.warn("[OfflineQueue] Quota pressure while saving pending queue; attempting recovery...", e);
+    try {
+      // 1. Evict non-essential or oldest failed snapshot entries first
+      const compacted = queue
+        .filter((item) => item.retryCount < MAX_OFFLINE_RETRY_COUNT)
+        .slice(-50)
+        .map((item) => {
+          if (item.payload && typeof item.payload === "object") {
+            const nextPayload = { ...item.payload };
+            if (Array.isArray(nextPayload.versions)) {
+              nextPayload.versions = [];
+            }
+            if (typeof nextPayload.content === "string" && nextPayload.content.length > 10000) {
+              nextPayload.content = nextPayload.content.slice(0, 10000);
+            }
+            return {
+              ...item,
+              payload: nextPayload,
+            };
+          }
+          return item;
+        });
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(compacted));
+    } catch (retryErr) {
+      console.error("[OfflineQueue] Error saving pending queue to localStorage after recovery attempt", retryErr);
+    }
   }
 }
 
@@ -158,12 +222,21 @@ export function getPendingQueueCount(): number {
   return currentState.pendingActions.length;
 }
 
+export function getPendingCount(profileId?: string): number {
+  if (!profileId) return currentState.pendingActions.length;
+  return currentState.pendingActions.filter((a) => a.profileId === profileId).length;
+}
+
 /**
  * Enqueue a new mutation or action performed while offline (or for optimistic sync).
  */
 export function enqueueOfflineAction(
   action: Omit<PendingOfflineAction, "id" | "timestamp" | "retryCount" | "status">
 ): PendingOfflineAction {
+  if (!action || !action.entityName || !SUPPORTED_OFFLINE_ENTITIES.has(String(action.entityName))) {
+    throw new Error(`Unsupported offline entity: ${String(action?.entityName)}`);
+  }
+
   const newAction: PendingOfflineAction = {
     ...action,
     id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -174,31 +247,60 @@ export function enqueueOfflineAction(
 
   // Deduplicate against existing pending actions for the same entity and document
   let updatedQueue = [...currentState.pendingActions];
-  const targetDocId = (action.payload as any)?.id;
+  const resolveDedupeKey = (act: {
+    entityName?: string;
+    action: string;
+    payload: any;
+  }): string | undefined => {
+    const explicitId = act.payload?.id || (typeof act.payload === "string" ? act.payload : undefined);
+    if (explicitId) return String(explicitId);
+    if (act.entityName === "water") {
+      return `water_${act.payload?.date || "singleton"}`;
+    }
+    if (act.entityName === "settings" || act.entityName === "workspace") {
+      return `${act.entityName}_singleton`;
+    }
+    return undefined;
+  };
+
+  const targetDocId = resolveDedupeKey(action);
   if (targetDocId && action.entityName) {
     const existingIndex = updatedQueue.findIndex(
       (a) =>
         a.profileId === action.profileId &&
         a.entityName === action.entityName &&
-        (a.payload as any)?.id === targetDocId
+        resolveDedupeKey(a) === targetDocId
     );
 
     if (existingIndex >= 0) {
       const existing = updatedQueue[existingIndex];
-      if (existing.action === "create" && action.action === "update") {
+      if (
+        (existing.action === "create" || existing.action === "update") &&
+        (action.action === "create" || action.action === "update")
+      ) {
+        const mergedPayload =
+          typeof existing.payload === "object" &&
+          existing.payload !== null &&
+          typeof action.payload === "object" &&
+          action.payload !== null
+            ? {
+                ...existing.payload,
+                ...action.payload,
+                ...(existing.payload.createdAt !== undefined
+                  ? { createdAt: existing.payload.createdAt }
+                  : {}),
+              }
+            : action.payload;
         updatedQueue[existingIndex] = {
           ...existing,
-          payload: { ...existing.payload, ...action.payload },
+          action: existing.action === "create" ? "create" : action.action,
+          payload: mergedPayload,
           timestamp: Date.now(),
+          status: "pending",
         };
         newAction.id = existing.id;
-      } else if (existing.action === "update" && action.action === "update") {
-        updatedQueue[existingIndex] = {
-          ...existing,
-          payload: { ...existing.payload, ...action.payload },
-          timestamp: Date.now(),
-        };
-        newAction.id = existing.id;
+        newAction.action = updatedQueue[existingIndex].action;
+        newAction.payload = mergedPayload;
       } else if (existing.action === "create" && action.action === "delete") {
         // Created while offline then deleted while offline: eliminate both
         updatedQueue.splice(existingIndex, 1);
@@ -292,6 +394,61 @@ export function clearPendingQueue(): void {
 }
 
 /**
+ * Remove all pending offline actions for a specific student profile without affecting other profiles.
+ */
+export function clearPendingQueueForProfile(profileId: string): number {
+  if (!profileId) return 0;
+  const beforeLen = currentState.pendingActions.length;
+  const updatedQueue = currentState.pendingActions.filter((a) => a.profileId !== profileId);
+  const removed = beforeLen - updatedQueue.length;
+  saveStoredQueue(updatedQueue);
+  currentState = {
+    ...currentState,
+    pendingActions: updatedQueue,
+    pendingCount: updatedQueue.length,
+    syncProgress: {
+      ...currentState.syncProgress,
+      total: updatedQueue.length,
+    },
+  };
+  notifyListeners();
+  return removed;
+}
+
+/**
+ * Reloads the in-memory queue from localStorage (simulates page reload / boot hydration).
+ */
+export function reloadOfflineQueueFromStorage(): PendingOfflineAction[] {
+  const stored = loadStoredQueue();
+  currentState = {
+    ...currentState,
+    pendingActions: stored,
+    pendingCount: stored.length,
+    syncProgress: {
+      ...currentState.syncProgress,
+      total: stored.length,
+    },
+  };
+  notifyListeners();
+  return [...stored];
+}
+
+let customTestPersistExecutor:
+  | ((userId: string, action: PendingOfflineAction) => Promise<void>)
+  | null = null;
+let simulatedOnlineStateForTesting: boolean | null = null;
+
+export function setOfflineSyncExecutorForTesting(
+  executor: ((userId: string, action: PendingOfflineAction) => Promise<void>) | null
+): void {
+  customTestPersistExecutor = executor;
+}
+
+export function setSimulatedOnlineStateForTesting(online: boolean | null): void {
+  simulatedOnlineStateForTesting = online;
+}
+
+/**
  * Persist an individual offline action to the remote Firestore database.
  * Throws an error if remote persistence is rejected or fails.
  */
@@ -299,6 +456,19 @@ async function persistActionToFirestore(
   userId: string,
   action: PendingOfflineAction
 ): Promise<void> {
+  if (!action || !action.entityName || !SUPPORTED_OFFLINE_ENTITIES.has(String(action.entityName))) {
+    const unsupportedErr: any = new Error(
+      `Unsupported offline entity: ${String(action?.entityName)}`
+    );
+    unsupportedErr.permanent = true;
+    throw unsupportedErr;
+  }
+
+  if (customTestPersistExecutor) {
+    await customTestPersistExecutor(userId, action);
+    return;
+  }
+
   const p = action.payload || {};
   const isDelete = action.action === "delete";
   const rawId = p.id || (typeof p === "string" ? p : action.id);
@@ -330,7 +500,7 @@ async function persistActionToFirestore(
   }
 
   // 5. Calendar Events
-  if (type.includes("EVENT") || entity === "calendar_events") {
+  if (type.includes("EVENT") || entity === "calendar" || entity === "calendar_events") {
     await persistEntityToFirestore(userId, "calendar_events", rawId, p, isDelete);
     return;
   }
@@ -341,14 +511,41 @@ async function persistActionToFirestore(
     return;
   }
 
-  // 7. Any other actions (UPDATE_SETTINGS, UPDATE_WATER, LOG_FOCUS, SAVE_EXAM_RECORD, WORKSPACE_SNAPSHOT, etc.)
-  // Persist directly into the user's Firestore cloud backup workspace snapshot!
-  const snapshot = getWorkspaceSnapshot();
-  await uploadWorkspaceToCloud(userId, {
-    activeProfileId: snapshot.activeProfileId,
-    profiles: snapshot.profiles,
-    fullStorageDump: snapshot.fullStorageDump,
-  });
+  // 7. Subjects
+  if (type.includes("SUBJECT") || entity === "subjects") {
+    await persistEntityToFirestore(userId, "subjects", rawId, p, isDelete);
+    return;
+  }
+
+  // 8. Study Sessions
+  if (type.includes("STUDY_SESSION") || entity === "study_sessions") {
+    await persistEntityToFirestore(userId, "study_sessions", rawId, p, isDelete);
+    return;
+  }
+
+  // 9. Explicit Workspace Snapshot-backed entities (water, settings, focus_logs, academic, exam_records, workspace)
+  if (
+    entity === "water" ||
+    entity === "settings" ||
+    entity === "focus" ||
+    entity === "focus_logs" ||
+    entity === "academic" ||
+    entity === "exam_records" ||
+    entity === "examTestRecords" ||
+    entity === "workspace"
+  ) {
+    const snapshot = getWorkspaceSnapshot();
+    await uploadWorkspaceToCloud(userId, {
+      activeProfileId: snapshot.activeProfileId,
+      profiles: snapshot.profiles,
+      fullStorageDump: snapshot.fullStorageDump,
+    });
+    return;
+  }
+
+  const fallbackErr: any = new Error(`Unsupported offline entity: ${String(entity)}`);
+  fallbackErr.permanent = true;
+  throw fallbackErr;
 }
 
 /**
@@ -364,7 +561,11 @@ export async function reconcilePendingQueueWithFirestore(
   remaining: number;
   error?: string;
 }> {
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
+  const isDeviceOffline =
+    simulatedOnlineStateForTesting !== null
+      ? !simulatedOnlineStateForTesting
+      : typeof navigator !== "undefined" && navigator.onLine === false;
+  if (isDeviceOffline) {
     currentState = {
       ...currentState,
       isOnline: false,
@@ -455,6 +656,7 @@ export async function reconcilePendingQueueWithFirestore(
 
       let actionPersisted = false;
       let actionErr: string | undefined;
+      let isPermanentFailure = false;
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -463,6 +665,10 @@ export async function reconcilePendingQueueWithFirestore(
           break;
         } catch (err: any) {
           actionErr = err?.message || String(err);
+          if (err?.permanent === true || String(actionErr).includes("Unsupported offline entity")) {
+            isPermanentFailure = true;
+            break;
+          }
           if (attempt < maxRetries) {
             await new Promise((res) => setTimeout(res, 250 * attempt));
           }
@@ -473,12 +679,17 @@ export async function reconcilePendingQueueWithFirestore(
         persistedIds.add(action.id);
       } else {
         lastErrorMsg = actionErr;
-        failedActionErrors.set(action.id, actionErr || "Persistence failed");
+        if (isPermanentFailure || (action.retryCount || 0) + 1 >= MAX_OFFLINE_RETRY_COUNT) {
+          // Drop permanently unrecoverable action so it cannot block the queue indefinitely
+          persistedIds.add(action.id);
+        } else {
+          failedActionErrors.set(action.id, actionErr || "Persistence failed");
+        }
       }
     }
 
     // Auxiliary cloud backup snapshot sync for confirmed batch
-    if (persistedIds.size > 0) {
+    if (persistedIds.size > 0 && !customTestPersistExecutor) {
       currentState.syncProgress = {
         total: totalActions,
         current: totalActions,

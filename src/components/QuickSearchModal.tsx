@@ -238,6 +238,9 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
     >
       <div
         id="quick-search-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quick Search"
         className="w-full max-w-xl glass-card rounded-2xl sm:rounded-3xl border border-emerald-500/30 shadow-2xl overflow-hidden mt-6 sm:mt-16 flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >

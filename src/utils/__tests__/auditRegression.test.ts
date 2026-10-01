@@ -1134,8 +1134,796 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(dailyExecSource.includes("execution-focus-study-card")).toBe(false);
     expect(serverSource.includes("gemini-3.8-flash")).toBe(true);
     expect(serverSource.includes("gemini-3.8-live")).toBe(true);
-    expect(serverSource.includes("/api/auth/student-session")).toBe(true);
     expect(liveVoiceModalSource.includes("getValidClientAuthToken")).toBe(true);
-    expect(liveVoiceModalSource.includes("Authentication required. Please sign in")).toBe(false);
+  });
+
+  it("18. Enforces P0 security remediation: no local profileId token minting, authenticated Smart Tags, dual UID+IP rate limits, security headers, and Firestore ownership rules", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { verifyFirebaseIdToken, generateDevTestToken } = await import(
+      "../../../server/firebaseAuth"
+    );
+
+    const serverSource = fs.readFileSync(
+      path.resolve(process.cwd(), "server.ts"),
+      "utf-8"
+    );
+    const firebaseClientSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/utils/firebase.ts"),
+      "utf-8"
+    );
+    const firestoreRulesSource = fs.readFileSync(
+      path.resolve(process.cwd(), "firestore.rules"),
+      "utf-8"
+    );
+
+    // 1. Unauthenticated users cannot obtain privileged server tokens & arbitrary profileId cannot become a privileged UID
+    expect(serverSource.includes("generateDevTestToken")).toBe(false);
+    expect(firebaseClientSource.includes("/api/auth/student-session")).toBe(false);
+    expect(firebaseClientSource.includes("cachedLocalSession")).toBe(false);
+
+    const missingAuth = await verifyFirebaseIdToken(undefined);
+    expect(missingAuth.valid).toBe(false);
+    expect(missingAuth.code).toBe("UNAUTHENTICATED");
+
+    const arbitraryProfileHeader = await verifyFirebaseIdToken("Bearer student_arbitrary_profile_123");
+    expect(arbitraryProfileHeader.valid).toBe(false);
+    expect(arbitraryProfileHeader.code).toBe("INVALID_TOKEN");
+
+    // Production guard on dev test tokens
+    const prevEnv = process.env.NODE_ENV;
+    try {
+      const devToken = generateDevTestToken("test_uid_alpha");
+      const devVerified = await verifyFirebaseIdToken(`Bearer ${devToken}`);
+      expect(devVerified.valid).toBe(true);
+      expect(devVerified.user?.uid).toBe("test_uid_alpha");
+
+      process.env.NODE_ENV = "production";
+      let prodMintThrew = false;
+      try {
+        generateDevTestToken("prod_bypass_attempt");
+      } catch {
+        prodMintThrew = true;
+      }
+      expect(prodMintThrew).toBe(true);
+
+      // In production, dev test key is not accepted as a valid Google cert
+      const prodVerifyAttempt = await verifyFirebaseIdToken(`Bearer ${devToken}`);
+      expect(prodVerifyAttempt.valid).toBe(false);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+
+    // 2. Smart Tags authentication, input validation, and UID + IP rate limiting in server.ts and client
+    expect(serverSource.includes("smartTagsUidLimiter")).toBe(true);
+    expect(serverSource.includes("smartTagsIpLimiter")).toBe(true);
+    expect(serverSource.includes("INVALID_EXISTING_LABELS")).toBe(true);
+    expect(serverSource.includes("TITLE_TOO_LARGE")).toBe(true);
+    expect(serverSource.includes("CONTENT_TOO_LARGE")).toBe(true);
+
+    // Verify client requestAbyaSmartTags attaches Bearer token when provided
+    const { requestAbyaSmartTags } = await import("../noteFeatures");
+    const originalFetch = globalThis.fetch;
+    let capturedAuthHeader: string | undefined;
+    try {
+      globalThis.fetch = (async (_url: any, init?: any) => {
+        capturedAuthHeader = init?.headers?.Authorization;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "ok",
+            tags: ["Electrostatics", "Physics"],
+            provider: "online_ai",
+          }),
+        } as any;
+      }) as any;
+
+      const tagged = await requestAbyaSmartTags(
+        "Gauss law and electric flux through closed surface",
+        "Electrostatics Lecture",
+        [],
+        "mock_firebase_id_token_xyz"
+      );
+      expect(capturedAuthHeader).toBe("Bearer mock_firebase_id_token_xyz");
+      expect(tagged.tags.includes("Electrostatics")).toBe(true);
+      expect(tagged.source).toBe("online_ai");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    // 3. AI Chat and Live Voice Ticket dual UID + IP rate limiters
+    expect(serverSource.includes("aiChatLimiter")).toBe(true);
+    expect(serverSource.includes("aiChatIpLimiter")).toBe(true);
+    expect(serverSource.includes("liveVoiceTicketLimiter")).toBe(true);
+    expect(serverSource.includes("liveVoiceTicketIpLimiter")).toBe(true);
+    expect(serverSource.includes('res.setHeader("Retry-After"')).toBe(true);
+
+    // 4. Security Headers configured in server.ts
+    expect(serverSource.includes('"X-Content-Type-Options", "nosniff"')).toBe(true);
+    expect(serverSource.includes('"Referrer-Policy", "strict-origin-when-cross-origin"')).toBe(true);
+    expect(serverSource.includes('"X-Frame-Options", "SAMEORIGIN"')).toBe(true);
+    expect(serverSource.includes('"Strict-Transport-Security"')).toBe(true);
+    expect(serverSource.includes('"Permissions-Policy"')).toBe(true);
+
+    // 5. Firestore ownership & cross-user isolation rules remain strictly enforced
+    expect(firestoreRulesSource.includes("match /{document=**}")).toBe(true);
+    expect(firestoreRulesSource.includes("allow read, write: if false;")).toBe(true);
+    expect(firestoreRulesSource.includes("function isOwner(userId)")).toBe(true);
+    expect(firestoreRulesSource.includes("return request.auth != null;")).toBe(true);
+    expect(firestoreRulesSource.includes("return isSignedIn() && request.auth.uid == userId;")).toBe(true);
+    expect(firestoreRulesSource.includes("match /users/{userId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /profiles/{profileId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /tasks/{taskId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /notes/{noteId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /goals/{goalId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /subjects/{subjectId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /calendar_events/{eventId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /collaboration_notifications/{notifId}")).toBe(true);
+    expect(firestoreRulesSource.includes("match /shared_workspaces/{workspaceId}")).toBe(true);
+  });
+
+  it("19. Enforces P1 engineering audit: consolidated framer-motion dependency, dead file removal, board-aware curriculum hierarchy (BSEB/CBSE/ICSE), Class 11 & Dropper chapter resolution, singleton offline queue deduplication, and route-level code splitting", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    // 1. Dependency audit: motion removed from package.json, @types/* in devDependencies
+    const pkgJson = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf-8")
+    );
+    expect(pkgJson.dependencies["motion"]).toBe(undefined);
+    expect(pkgJson.dependencies["framer-motion"]).toBeDefined();
+    expect(pkgJson.dependencies["@types/ws"]).toBe(undefined);
+    expect(pkgJson.dependencies["@types/canvas-confetti"]).toBe(undefined);
+    expect(pkgJson.devDependencies["@types/ws"]).toBeDefined();
+    expect(pkgJson.devDependencies["@types/canvas-confetti"]).toBeDefined();
+
+    // Verify dead/duplicate files are removed
+    const deadPaths = [
+      "src/i18n.ts",
+      "src/components/LanguageSwitcher.tsx",
+      "src/components/DesktopSidebar.tsx",
+      "src/components/BottomNav.tsx",
+      "src/components/home/widgets/DailyAcademicInsightCard.tsx",
+      "src/components/home/widgets/DailyMotivationWidget.tsx",
+      "src/components/home/widgets/FocusSessionSummaryWidget.tsx",
+      "src/components/home/widgets/QuickActionsWidget.tsx",
+      "src/components/home/widgets/StudyStreakSummaryWidget.tsx",
+    ];
+    for (const deadRel of deadPaths) {
+      expect(fs.existsSync(path.resolve(process.cwd(), deadRel))).toBe(false);
+    }
+
+    // 2. Board-aware curriculum hierarchy (Board -> Class -> Stream -> Subject -> Chapter -> Topic)
+    const {
+      getBoardCurriculumHierarchy,
+      getCurriculumSubjects,
+      normalizeCurriculumBoard,
+      normalizeCurriculumClassLevel,
+    } = await import("../../data/masterCurriculum");
+
+    expect(normalizeCurriculumBoard("Bihar Board (BSEB)")).toBe("BSEB");
+    expect(normalizeCurriculumBoard("ISC")).toBe("ICSE");
+    expect(normalizeCurriculumClassLevel("Dropper / Gap Year")).toBe("Class 12");
+
+    const bsebSci12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Science");
+    expect(bsebSci12.board).toBe("BSEB");
+    expect(bsebSci12.boardMetadata.objectiveWeightagePct).toBe(50);
+    expect(bsebSci12.subjects.length > 0).toBe(true);
+    expect(bsebSci12.subjects[0].board).toBe("BSEB");
+    expect(Boolean(bsebSci12.subjects[0].boardExamPattern?.includes("50% OMR"))).toBe(true);
+
+    // Verify Dropper / Gap Year resolves Class 12 stream subjects instead of falling back to Class 10
+    const dropperSubs = getCurriculumSubjects("Dropper / Gap Year", "Science", "CBSE");
+    expect(dropperSubs.every((s) => s.classLevel === "Class 12")).toBe(true);
+    expect(dropperSubs.some((s) => s.name === "Physics")).toBe(true);
+
+    // 3. Class 11 & Dropper chapter initialization and decision engine topic resolution
+    const { getDefaultChaptersForStream } = await import("../academicEngine");
+    const class11SciChaps = getDefaultChaptersForStream("Science", "Class 11", "BSEB");
+    expect(class11SciChaps.length > 0).toBe(true);
+    expect(class11SciChaps.some((c) => c.title.includes("Units") || c.title.includes("Sets"))).toBe(
+      true
+    );
+
+    const { generateAcademicDecisionReport } = await import("../academicDecisionEngine");
+    const c11Report = generateAcademicDecisionReport({
+      student: {
+        id: "stu-c11",
+        name: "Aarav",
+        classLevel: "Class 11",
+        stream: "Science",
+        board: "BSEB",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+    expect(c11Report.classLevel).toBe("Class 11");
+    expect(
+      c11Report.highPriorityFocus.chapterTitle.includes("Structure of Atom") ||
+        c11Report.highPriorityFocus.chapterTitle.includes("Units and Measurements")
+    ).toBe(true);
+
+    // 4. Singleton/date-scoped offline queue deduplication (water & settings)
+    const {
+      enqueueOfflineAction,
+      clearPendingQueue,
+      getPendingQueue,
+    } = await import("../offlineQueue");
+    clearPendingQueue();
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: "prof_test_1",
+      payload: { date: "2026-10-01", glasses: 3, goal: 8 },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: "prof_test_1",
+      payload: { date: "2026-10-01", glasses: 4, goal: 8 },
+    });
+    const pendingWater = getPendingQueue().filter(
+      (a) => a.profileId === "prof_test_1" && a.entityName === "water"
+    );
+    expect(pendingWater).toHaveLength(1);
+    expect(pendingWater[0].payload.glasses).toBe(4);
+    clearPendingQueue();
+
+    // 5. Route-level React.lazy code splitting in App.tsx
+    const appSource = fs.readFileSync(path.resolve(process.cwd(), "src/App.tsx"), "utf-8");
+    expect(appSource.includes('import("./pages/AbyaAIPage")')).toBe(true);
+    expect(appSource.includes('import("./pages/ExamCenterPage")')).toBe(true);
+    expect(appSource.includes('import("./pages/SettingsPage")')).toBe(true);
+  });
+
+  it("20. Offline Queue & Sync Deep Runtime Audit (all 20 scenarios + entity allowlist protection)", async () => {
+    const {
+      enqueueOfflineAction,
+      clearPendingQueue,
+      clearPendingQueueForProfile,
+      getPendingQueue,
+      getPendingCount,
+      reconcilePendingQueueWithFirestore,
+      setOfflineSyncExecutorForTesting,
+      setSimulatedOnlineStateForTesting,
+      isSupportedOfflineEntity,
+      OFFLINE_QUEUE_STORAGE_KEY,
+    } = await import("../offlineQueue");
+
+    clearPendingQueue();
+    setOfflineSyncExecutorForTesting(null);
+    setSimulatedOnlineStateForTesting(null);
+
+    // 1. Offline create (tasks, notes, subjects, study_sessions, goals, habits, calendar_events)
+    const createdTask = enqueueOfflineAction({
+      type: "CREATE_TASK",
+      entityName: "tasks",
+      action: "create",
+      profileId: "prof_A",
+      payload: { id: "t-1", title: "Physics Ch 1", completed: false, createdAt: 1000 },
+    });
+    expect(createdTask.id.startsWith("act-")).toBe(true);
+    expect(getPendingCount("prof_A")).toBe(1);
+
+    // 2. Offline update on same entity ID merges payload & preserves original createdAt
+    enqueueOfflineAction({
+      type: "UPDATE_TASK",
+      entityName: "tasks",
+      action: "update",
+      profileId: "prof_A",
+      payload: { id: "t-1", title: "Physics Ch 1 Updated", completed: true, createdAt: 9999 },
+    });
+    expect(getPendingCount("prof_A")).toBe(1);
+    const mergedTask = getPendingQueue().find((q) => q.payload?.id === "t-1");
+    expect(mergedTask?.payload.title).toBe("Physics Ch 1 Updated");
+    expect(mergedTask?.payload.completed).toBe(true);
+    expect(mergedTask?.payload.createdAt).toBe(1000);
+    // Because it started as a "create" in the offline queue, updating before flush preserves "create" action
+    expect(mergedTask?.action).toBe("create");
+
+    // 3. Offline delete removes prior queued create for same entity ID (created then deleted offline cancels out)
+    enqueueOfflineAction({
+      type: "DELETE_TASK",
+      entityName: "tasks",
+      action: "delete",
+      profileId: "prof_A",
+      payload: { id: "t-1" },
+    });
+    const afterDeleteOfOfflineCreate = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "tasks"
+    );
+    expect(afterDeleteOfOfflineCreate).toHaveLength(0);
+
+    // Offline update followed by offline delete replaces update with delete
+    enqueueOfflineAction({
+      type: "UPDATE_TASK",
+      entityName: "tasks",
+      action: "update",
+      profileId: "prof_A",
+      payload: { id: "t-existing", title: "Existing Task", completed: true },
+    });
+    enqueueOfflineAction({
+      type: "DELETE_TASK",
+      entityName: "tasks",
+      action: "delete",
+      profileId: "prof_A",
+      payload: { id: "t-existing" },
+    });
+    const afterDeleteExisting = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "tasks"
+    );
+    expect(afterDeleteExisting).toHaveLength(1);
+    expect(afterDeleteExisting[0].action).toBe("delete");
+
+    // 4. Duplicate mutation deduplication (notes, subjects, goals, habits, calendar, study_sessions)
+    enqueueOfflineAction({
+      type: "CREATE_SUBJECT",
+      entityName: "subjects",
+      action: "create",
+      profileId: "prof_A",
+      payload: { id: "sub-101", name: "Mathematics", completedMinutes: 10 },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_SUBJECT",
+      entityName: "subjects",
+      action: "update",
+      profileId: "prof_A",
+      payload: { id: "sub-101", name: "Applied Mathematics", completedMinutes: 45 },
+    });
+    const subQueue = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "subjects"
+    );
+    expect(subQueue).toHaveLength(1);
+    expect(subQueue[0].payload.name).toBe("Applied Mathematics");
+    expect(subQueue[0].payload.completedMinutes).toBe(45);
+
+    enqueueOfflineAction({
+      type: "CREATE_STUDY_SESSION",
+      entityName: "study_sessions",
+      action: "create",
+      profileId: "prof_A",
+      payload: { id: "sess-1", subjectId: "sub-101", durationSeconds: 1800, date: "2026-10-01" },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_STUDY_SESSION",
+      entityName: "study_sessions",
+      action: "update",
+      profileId: "prof_A",
+      payload: { id: "sess-1", durationSeconds: 3600 },
+    });
+    const sessQueue = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "study_sessions"
+    );
+    expect(sessQueue).toHaveLength(1);
+    expect(sessQueue[0].payload.durationSeconds).toBe(3600);
+
+    // 5. Singleton mutation deduplication (settings)
+    enqueueOfflineAction({
+      type: "UPDATE_SETTINGS",
+      entityName: "settings",
+      action: "update",
+      profileId: "prof_A",
+      payload: { theme: "dark", focusDuration: 25 },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_SETTINGS",
+      entityName: "settings",
+      action: "update",
+      profileId: "prof_A",
+      payload: { theme: "amoled", focusDuration: 50 },
+    });
+    const settingsQueue = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "settings"
+    );
+    expect(settingsQueue).toHaveLength(1);
+    expect(settingsQueue[0].payload.theme).toBe("amoled");
+    expect(settingsQueue[0].payload.focusDuration).toBe(50);
+
+    // 6. Date-scoped mutation deduplication (water)
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: "prof_A",
+      payload: { date: "2026-10-01", glasses: 2, goal: 8 },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: "prof_A",
+      payload: { date: "2026-10-01", glasses: 5, goal: 8 },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_WATER",
+      entityName: "water",
+      action: "update",
+      profileId: "prof_A",
+      payload: { date: "2026-10-02", glasses: 1, goal: 8 },
+    });
+    const waterQueue = getPendingQueue().filter(
+      (q) => q.profileId === "prof_A" && q.entityName === "water"
+    );
+    expect(waterQueue).toHaveLength(2);
+    expect(waterQueue.find((w) => w.payload.date === "2026-10-01")?.payload.glasses).toBe(5);
+    expect(waterQueue.find((w) => w.payload.date === "2026-10-02")?.payload.glasses).toBe(1);
+
+    // Prove unsupported entities are strictly rejected and NEVER silently become tasks or another entity
+    expect(isSupportedOfflineEntity("tasks")).toBe(true);
+    expect(isSupportedOfflineEntity("study_sessions")).toBe(true);
+    expect(isSupportedOfflineEntity("arbitrary_unknown_collection")).toBe(false);
+    let threwUnsupported = false;
+    try {
+      enqueueOfflineAction({
+        type: "CREATE_TASK",
+        entityName: "arbitrary_unknown_collection",
+        action: "create",
+        profileId: "prof_A",
+        payload: { id: "bad-1" },
+      });
+    } catch (err: any) {
+      threwUnsupported = String(err?.message || "").includes("Unsupported offline entity");
+    }
+    expect(threwUnsupported).toBe(true);
+
+    // 10. Refresh with pending queue (persisted in localStorage across reload)
+    const rawSaved = localStorage.getItem(OFFLINE_QUEUE_STORAGE_KEY);
+    expect(Boolean(rawSaved)).toBe(true);
+    const parsedSaved = JSON.parse(rawSaved!);
+    expect(parsedSaved.length).toBe(getPendingQueue().length);
+
+    // 12 & 13. Two profiles on same device + profile switch with pending queue
+    enqueueOfflineAction({
+      type: "CREATE_NOTE",
+      entityName: "notes",
+      action: "create",
+      profileId: "prof_B",
+      payload: { id: "note-b1", title: "Profile B Note", content: "Isolated" },
+    });
+    expect(getPendingCount("prof_B")).toBe(1);
+    expect(getPendingCount("prof_A")).toBe(6);
+
+    // 7, 8, 15, 16, 17, 18, 19. Reconnect, retry after temporary failure, partial sync, lock release, idempotency, Firestore reconciliation
+    const executedIds: string[] = [];
+    let shouldFailNoteOnce = true;
+    setOfflineSyncExecutorForTesting(async (_userId, action) => {
+      if (action.entityName === "notes" && shouldFailNoteOnce) {
+        shouldFailNoteOnce = false;
+        throw new Error("Temporary network timeout");
+      }
+      executedIds.push(`${action.profileId}:${action.entityName}:${action.action}`);
+    });
+
+    // While offline, reconciliation is safely deferred
+    setSimulatedOnlineStateForTesting(false);
+    const whileOfflineSync = await reconcilePendingQueueWithFirestore("user_uid_1", 1);
+    expect(whileOfflineSync.processed).toBe(0);
+    expect(whileOfflineSync.remaining).toBe(7);
+
+    // Reconnect:
+    // First sync pass (maxRetries=1 so temporary failure leaves item for next sync): prof_A actions succeed (6), prof_B note fails once (partial sync = 6 processed, 1 remaining)
+    setSimulatedOnlineStateForTesting(true);
+    const firstSync = await reconcilePendingQueueWithFirestore("user_uid_1", 1);
+    expect(firstSync.processed).toBe(6);
+    expect(firstSync.remaining).toBe(1);
+    expect(getPendingCount("prof_A")).toBe(0);
+    expect(getPendingCount("prof_B")).toBe(1);
+    expect(getPendingQueue()[0].retryCount).toBe(1);
+
+    // Second sync pass (retry after temporary failure): prof_B note now succeeds!
+    const secondSync = await reconcilePendingQueueWithFirestore("user_uid_1", 1);
+    expect(secondSync.processed).toBe(1);
+    expect(secondSync.remaining).toBe(0);
+    expect(getPendingQueue()).toHaveLength(0);
+
+    // 9 & 14. Permanent failure / max retry eviction (stale/unrecoverable mutation does not block queue forever)
+    setOfflineSyncExecutorForTesting(async () => {
+      const err: any = new Error("Unsupported offline entity: corrupted_entity");
+      err.permanent = true;
+      throw err;
+    });
+    enqueueOfflineAction({
+      type: "CREATE_GOAL",
+      entityName: "goals",
+      action: "create",
+      profileId: "prof_A",
+      payload: { id: "g-perm-fail", title: "Goal" },
+    });
+    const permFailSync = await reconcilePendingQueueWithFirestore("user_uid_1", 1);
+    expect(permFailSync.remaining).toBe(0);
+
+    // 11. Profile deletion / workspace cleanup clears only that profile's pending queue
+    setOfflineSyncExecutorForTesting(null);
+    enqueueOfflineAction({
+      type: "CREATE_HABIT",
+      entityName: "habits",
+      action: "create",
+      profileId: "prof_A",
+      payload: { id: "h-a", title: "Habit A" },
+    });
+    enqueueOfflineAction({
+      type: "UPDATE_EVENT",
+      entityName: "calendar_events",
+      action: "create",
+      profileId: "prof_B",
+      payload: { id: "cal-b", title: "Event B", date: "2026-10-05" },
+    });
+    const removedCount = clearPendingQueueForProfile("prof_A");
+    expect(removedCount).toBe(1);
+    expect(getPendingCount("prof_A")).toBe(0);
+    expect(getPendingCount("prof_B")).toBe(1);
+
+    // 20. localStorage quota recovery (compacts large payloads when QuotaExceededError occurs)
+    const origSetItem = localStorage.setItem.bind(localStorage);
+    let quotaThrownOnce = false;
+    localStorage.setItem = (key: string, val: string) => {
+      if (key === OFFLINE_QUEUE_STORAGE_KEY && !quotaThrownOnce && val.length > 500) {
+        quotaThrownOnce = true;
+        const err = new Error("QuotaExceededError");
+        err.name = "QuotaExceededError";
+        throw err;
+      }
+      return origSetItem(key, val);
+    };
+    try {
+      enqueueOfflineAction({
+        type: "CREATE_NOTE",
+        entityName: "notes",
+        action: "create",
+        profileId: "prof_B",
+        payload: {
+          id: "note-large",
+          title: "Large Note",
+          content: "Largebody".repeat(200),
+          versions: [{ id: "v1", content: "OldVersion".repeat(200) }],
+        },
+      });
+      expect(quotaThrownOnce).toBe(true);
+      const savedRawAfterQuota = localStorage.getItem(OFFLINE_QUEUE_STORAGE_KEY);
+      const savedParsedAfterQuota = JSON.parse(savedRawAfterQuota || "[]");
+      const compactedNote = savedParsedAfterQuota.find((q: any) => q.payload?.id === "note-large");
+      expect(Boolean(compactedNote)).toBe(true);
+      expect(Array.isArray(compactedNote?.payload.versions)).toBe(true);
+      expect(compactedNote?.payload.versions.length).toBe(0);
+    } finally {
+      localStorage.setItem = origSetItem;
+      setSimulatedOnlineStateForTesting(null);
+      setOfflineSyncExecutorForTesting(null);
+      clearPendingQueue();
+    }
+  });
+
+  it("21. PWA / Service Worker Deep Runtime Verification (sw.js execution & install detection)", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const swSource = fs.readFileSync(path.resolve(process.cwd(), "public/sw.js"), "utf-8");
+
+    // Execute public/sw.js inside a simulated ServiceWorkerGlobalScope to test runtime handlers
+    const listeners: Record<string, Function> = {};
+    const cacheStore = new Map<string, Map<string, any>>();
+
+    const mockCaches = {
+      open: async (name: string) => {
+        if (!cacheStore.has(name)) cacheStore.set(name, new Map());
+        const bucket = cacheStore.get(name)!;
+        return {
+          addAll: async (urls: string[]) => {
+            urls.forEach((u) =>
+              bucket.set(u, {
+                status: 200,
+                type: "basic",
+                headers: { get: () => "text/html" },
+                body: "cached-shell",
+              })
+            );
+          },
+          put: async (req: any, res: any) => {
+            const urlKey = typeof req === "string" ? req : req.url;
+            bucket.set(urlKey, res);
+          },
+        };
+      },
+      keys: async () => Array.from(cacheStore.keys()),
+      delete: async (name: string) => cacheStore.delete(name),
+      match: async (req: any) => {
+        const key = typeof req === "string" ? req : req.url;
+        for (const bucket of cacheStore.values()) {
+          if (bucket.has(key)) return bucket.get(key);
+        }
+        return undefined;
+      },
+    };
+
+    let mockFetchImpl: (req: any) => Promise<any> = async () => ({
+      status: 200,
+      type: "basic",
+      headers: { get: () => "application/javascript" },
+      clone: function () {
+        return this;
+      },
+    });
+
+    class MockResponse {
+      body: string;
+      status: number;
+      headers: { get: (k: string) => string | null };
+      constructor(body: string, init?: { status?: number; headers?: Record<string, string> }) {
+        this.body = body;
+        this.status = init?.status || 200;
+        const h = init?.headers || {};
+        this.headers = {
+          get: (k: string) => h[k] || h[k.toLowerCase()] || null,
+        };
+      }
+    }
+
+    const selfMock = {
+      addEventListener: (type: string, handler: Function) => {
+        listeners[type] = handler;
+      },
+      skipWaiting: () => {},
+      clients: { claim: () => {} },
+    };
+
+    const runSw = new Function("self", "caches", "fetch", "URL", "Response", swSource);
+    runSw(
+      selfMock,
+      mockCaches,
+      (req: any) => mockFetchImpl(req),
+      URL,
+      MockResponse
+    );
+
+    // 1. Install & Activate lifecycle + stale cache cleanup
+    cacheStore.set("garia-os-old-stale-cache-v1", new Map());
+    let installPromise: Promise<any> = Promise.resolve();
+    listeners.install({
+      waitUntil: (p: Promise<any>) => {
+        installPromise = p;
+      },
+    });
+    await installPromise;
+    expect(cacheStore.has("garia-os-v3.2.0-cache-v4")).toBe(true);
+
+    let activatePromise: Promise<any> = Promise.resolve();
+    listeners.activate({
+      waitUntil: (p: Promise<any>) => {
+        activatePromise = p;
+      },
+    });
+    await activatePromise;
+    expect(cacheStore.has("garia-os-old-stale-cache-v1")).toBe(false);
+    expect(cacheStore.has("garia-os-v3.2.0-cache-v4")).toBe(true);
+
+    // Helper to dispatch fetch event to sw.js
+    const dispatchSwFetch = async (url: string, method = "GET", mode = "cors") => {
+      let respondedPromise: Promise<any> | null = null;
+      listeners.fetch({
+        request: { url, method, mode },
+        respondWith: (p: Promise<any>) => {
+          respondedPromise = p;
+        },
+      });
+      return respondedPromise ? await respondedPromise : "BYPASSED";
+    };
+
+    // 2. /api/* and Vite dev resource bypass
+    expect(await dispatchSwFetch("https://example.com/api/ai/chat", "POST")).toBe("BYPASSED");
+    expect(await dispatchSwFetch("https://example.com/api/health", "GET")).toBe("BYPASSED");
+    expect(await dispatchSwFetch("https://example.com/@vite/client", "GET")).toBe("BYPASSED");
+    expect(await dispatchSwFetch("https://example.com/src/main.tsx", "GET")).toBe("BYPASSED");
+    expect(await dispatchSwFetch("https://example.com/node_modules/react/index.js", "GET")).toBe(
+      "BYPASSED"
+    );
+
+    // 3. JS/CSS never receive HTML fallback when server returns text/html for missing chunk
+    mockFetchImpl = async () => ({
+      status: 200,
+      type: "basic",
+      headers: { get: () => "text/html; charset=utf-8" },
+      clone: function () {
+        return this;
+      },
+    });
+    const badChunkRes = await dispatchSwFetch("https://example.com/assets/chunk-abc.js", "GET");
+    expect(badChunkRes.status).toBe(404);
+    expect(badChunkRes.body).toBe("Asset not found");
+
+    // 4. Offline navigation request receives cached /index.html SPA shell, while offline JS asset gets 408/404 (not HTML)
+    mockFetchImpl = async () => {
+      throw new Error("Offline network failure");
+    };
+    const navRes = await dispatchSwFetch("https://example.com/tasks", "GET", "navigate");
+    expect(navRes.status).toBe(200);
+    expect(navRes.body).toBe("cached-shell");
+
+    const offlineAssetRes = await dispatchSwFetch(
+      "https://example.com/assets/missing-offline.js",
+      "GET",
+      "cors"
+    );
+    expect(offlineAssetRes.status).toBe(408);
+
+    // 5. Verify pwaInstall.ts standalone / iOS / Android detection helpers
+    const pwaMod = await import("../pwaInstall");
+    expect(typeof pwaMod.checkIsAppInstalled()).toBe("boolean");
+    expect(typeof pwaMod.detectDevicePlatform()).toBe("string");
+    expect(typeof pwaMod.isInstallPromptDismissed()).toBe("boolean");
+  });
+
+  it("22. Storage Architecture Runtime Verification (profile isolation, switching, cleanup & corrupted JSON recovery)", async () => {
+    const {
+      addStudentProfile,
+      saveTasks,
+      loadTasks,
+      saveNotes,
+      loadNotes,
+      saveWater,
+      loadWater,
+      saveSettings,
+      loadSettings,
+      clearStudentWorkspaceData,
+    } = await import("../storage");
+
+    const p1 = addStudentProfile({
+      name: "Student One",
+      classLevel: "Class 12",
+      stream: "Science",
+      board: "CBSE",
+    });
+    const p2 = addStudentProfile({
+      name: "Student Two",
+      classLevel: "Class 11",
+      stream: "Commerce",
+      board: "BSEB",
+    });
+
+    saveTasks(
+      [
+        {
+          id: "t-p1",
+          title: "P1 Physics Task",
+          description: "",
+          date: "2026-10-01",
+          priority: "high",
+          category: "study",
+          completed: false,
+          createdAt: 1000,
+        },
+      ],
+      p1.id
+    );
+    saveTasks(
+      [
+        {
+          id: "t-p2",
+          title: "P2 Accountancy Task",
+          description: "",
+          date: "2026-10-01",
+          priority: "medium",
+          category: "study",
+          completed: true,
+          createdAt: 2000,
+        },
+      ],
+      p2.id
+    );
+
+    expect(loadTasks(p1.id)).toHaveLength(1);
+    expect(loadTasks(p1.id)[0].title).toBe("P1 Physics Task");
+    expect(loadTasks(p2.id)).toHaveLength(1);
+    expect(loadTasks(p2.id)[0].title).toBe("P2 Accountancy Task");
+
+    // Corrupted JSON resilience: writing malformed JSON to a profile key never crashes load*
+    localStorage.setItem(`garia_p_${p1.id}_notes`, "{corrupted_json_payload");
+    const recoveredNotes = loadNotes(p1.id);
+    expect(Array.isArray(recoveredNotes)).toBe(true);
+
+    // Clearing P1 workspace does not affect P2 data
+    clearStudentWorkspaceData(p1.id);
+    expect(loadTasks(p2.id)[0].title).toBe("P2 Accountancy Task");
   });
 });

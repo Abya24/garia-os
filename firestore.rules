@@ -360,6 +360,60 @@ service cloud.firestore {
         allow delete: if isOwner(userId) && isValidId(eventId);
       }
 
+      // Study Sessions Subcollection
+      match /study_sessions/{sessionId} {
+        allow get: if isOwner(userId) && isValidId(sessionId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(sessionId) &&
+          incoming().userId == userId &&
+          incoming().id is string && incoming().id.size() > 0 && incoming().id.size() <= 128;
+        allow update: if isOwner(userId) && isValidId(sessionId) &&
+          incoming().userId == userId &&
+          incoming().userId == existing().userId &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt);
+        allow delete: if isOwner(userId) && isValidId(sessionId);
+      }
+
+      // Exam Results Subcollection
+      match /exam_results/{resultId} {
+        allow get: if isOwner(userId) && isValidId(resultId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(resultId) &&
+          incoming().userId == userId &&
+          incoming().id is string && incoming().id.size() > 0 && incoming().id.size() <= 128;
+        allow update: if isOwner(userId) && isValidId(resultId) &&
+          incoming().userId == userId &&
+          incoming().userId == existing().userId &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt);
+        allow delete: if isOwner(userId) && isValidId(resultId);
+      }
+
+      // Career Plans Subcollection
+      match /career_plans/{planId} {
+        allow get: if isOwner(userId) && isValidId(planId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(planId) &&
+          incoming().userId == userId;
+        allow update: if isOwner(userId) && isValidId(planId) &&
+          incoming().userId == userId &&
+          incoming().userId == existing().userId &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt);
+        allow delete: if isOwner(userId) && isValidId(planId);
+      }
+
+      // Offline Mutations Subcollection
+      match /offline_mutations/{mutationId} {
+        allow get: if isOwner(userId) && isValidId(mutationId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(mutationId) &&
+          incoming().userId == userId;
+        allow update: if isOwner(userId) && isValidId(mutationId) &&
+          incoming().userId == userId &&
+          incoming().userId == existing().userId &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt);
+        allow delete: if isOwner(userId) && isValidId(mutationId);
+      }
+
       // Cloud Sync Document
       match /sync/{syncDocId} {
         allow get: if isOwner(userId);

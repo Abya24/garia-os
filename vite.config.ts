@@ -35,9 +35,21 @@ export default defineConfig(() => {
               if (id.includes('motion') || id.includes('framer-motion')) {
                 return 'vendor-motion';
               }
+              if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
+                return 'vendor-react';
+              }
             }
             if (id.includes('masterCurriculum')) {
               return 'data-master-curriculum';
+            }
+            if (id.includes('careerDatabase') || id.includes('careerEngine')) {
+              return 'data-career-engine';
+            }
+            if (id.includes('questionBankEngine') || id.includes('examIntelligenceEngine') || id.includes('examEngine')) {
+              return 'data-exam-engine';
+            }
+            if (id.includes('academicEngine') || id.includes('academicDecisionEngine') || id.includes('abyaFallbackEngine')) {
+              return 'data-academic-engine';
             }
             if (id.includes('quotes')) {
               return 'data-quotes';
