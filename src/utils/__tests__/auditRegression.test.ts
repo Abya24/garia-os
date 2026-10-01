@@ -1107,5 +1107,35 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(indexCssSource.includes(".classic-select")).toBe(true);
     expect(indexCssSource.includes(".classic-slider")).toBe(true);
     expect(indexCssSource.includes(".classic-paper-header")).toBe(true);
+
+    // Verify ChatGPT-referenced Abya AI Studio and deduplicated DailyExecutionSection
+    const abyaSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/pages/AbyaAIPage.tsx"),
+      "utf-8"
+    );
+    const dailyExecSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/home/sections/DailyExecutionSection.tsx"),
+      "utf-8"
+    );
+    const serverSource = fs.readFileSync(
+      path.resolve(process.cwd(), "server.ts"),
+      "utf-8"
+    );
+
+    const liveVoiceModalSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/AbyaLiveVoiceModal.tsx"),
+      "utf-8"
+    );
+
+    expect(abyaSource.includes('id="abya-chatgpt-studio"')).toBe(true);
+    expect(abyaSource.includes('id="abya-mode-dropdown"')).toBe(true);
+    expect(abyaSource.includes('id="abya-response-depth-slider"')).toBe(true);
+    expect(abyaSource.includes('id="abya-language-dropdown"')).toBe(true);
+    expect(dailyExecSource.includes("execution-focus-study-card")).toBe(false);
+    expect(serverSource.includes("gemini-3.8-flash")).toBe(true);
+    expect(serverSource.includes("gemini-3.8-live")).toBe(true);
+    expect(serverSource.includes("/api/auth/student-session")).toBe(true);
+    expect(liveVoiceModalSource.includes("getValidClientAuthToken")).toBe(true);
+    expect(liveVoiceModalSource.includes("Authentication required. Please sign in")).toBe(false);
   });
 });

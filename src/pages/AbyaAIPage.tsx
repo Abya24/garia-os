@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Sparkles,
   Send,
@@ -7,17 +7,11 @@ import {
   Trash2,
   Copy,
   Check,
-  Key,
   BookOpen,
   Calendar,
-  Lightbulb,
-  Compass,
   GraduationCap,
   RefreshCw,
-  AlertTriangle,
-  Flame,
   Target,
-  Trophy,
   BarChart3,
   ArrowRight,
   Zap,
@@ -25,40 +19,25 @@ import {
   Globe,
   X,
   MessageCircle,
-  Brain,
   Search,
   Mic,
   Image as ImageIcon,
   ExternalLink,
-  Upload,
   Clock,
   CheckCircle2,
-  ChevronDown,
-  Layers,
   FileText,
   HelpCircle,
-  Award,
   Activity,
   Wifi,
-  WifiOff,
-  Server,
   Cpu,
-  ShieldCheck,
   Radio,
-  ArrowLeft,
-  MoreHorizontal,
-  ChevronUp,
   Camera,
   Sliders,
-  Paperclip,
   CheckSquare,
-  TrendingUp,
-  Bookmark,
-  Hash,
-  PlusCircle,
-  CornerDownRight,
-  Eye,
   Plus,
+  PanelLeft,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   AbyaMessage,
@@ -82,7 +61,6 @@ import {
   FocusSessionLog,
 } from "../types";
 import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
-import { AcademicDecisionEngineSection } from "../components/home/sections/AcademicDecisionEngineSection";
 import {
   getCurriculumSubjects,
   CurriculumSubject,
@@ -93,10 +71,8 @@ import {
   loadAbyaChatSessions,
   saveAbyaChatSessions,
   deleteAbyaChatSession,
-  getTodayString,
 } from "../utils/storage";
 import { getStudentDisplayName } from "../utils/studentNameUtils";
-import { getTimeOfDayGreeting } from "../utils/dateTimeUtils";
 
 interface AbyaAIPageProps {
   messages: AbyaMessage[];
@@ -130,7 +106,6 @@ interface AbyaAIPageProps {
   diagnostics?: AbyaDiagnosticsInfo;
   onTestDiagnostics?: () => Promise<void>;
   onBack?: () => void;
-  // Context props
   tasks?: Task[];
   academicSubjects?: AcademicSubject[];
   academicChapters?: AcademicChapter[];
@@ -146,53 +121,36 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   messages,
   settings,
   activeStudent,
-  insightCards = [],
   abyaLanguage = "WhatsApp Language",
   onUpdateAbyaLanguage,
   onSendMessage,
   onClearChat,
-  onUpdateSettings,
   attachedContextNote,
   onClearAttachedContext,
   onNavigate,
-  onTriggerFallbackAction,
   onRetryLastMessage,
-  diagnostics,
-  onTestDiagnostics,
-  onBack,
-  tasks = [],
   academicSubjects = [],
   academicChapters = [],
-  academicRevisions = [],
-  academicPractice = [],
   examProfile,
-  habits = [],
-  studySessions = [],
-  focusLogs = [],
 }) => {
-  // Navigation between Home Dashboard and Active Conversation Thread
-  const [viewMode, setViewMode] = useState<"home" | "chat">(
-    messages.length > 0 ? "chat" : "home"
-  );
+  // ChatGPT-style Collapsible Left Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
+  // Composer & AI Controls
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedMode, setSelectedMode] = useState<AbyaAIMode>("standard");
+  const [responseDepthLevel, setResponseDepthLevel] = useState<number>(3);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [isDictating, setIsDictating] = useState<boolean>(false);
   const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
-  const [isPingingDiagnostics, setIsPingingDiagnostics] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // Recent chat sessions state
   const [chatSessions, setChatSessions] = useState<AbyaChatSession[]>(() =>
     loadAbyaChatSessions(activeStudent?.id || "")
   );
-
-  // Drawers
-  const [isContextDrawerOpen, setIsContextDrawerOpen] = useState(false);
-  const [isIntelligenceDrawerOpen, setIsIntelligenceDrawerOpen] = useState(false);
 
   // Image input
   const [selectedImage, setSelectedImage] = useState<{
@@ -206,6 +164,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   // Responsive Virtual Keyboard Handling for mobile viewports
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -237,7 +196,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     };
   }, []);
 
-  // Sync sessions when student changes or messages change
+  // Sync sessions when student changes
   useEffect(() => {
     const loaded = loadAbyaChatSessions(activeStudent?.id || "");
     setChatSessions(loaded);
@@ -246,9 +205,11 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   // Save current active session whenever messages update
   useEffect(() => {
     if (messages.length > 0) {
-      const firstUserMsg = messages.find((m) => m.role === "user")?.content || "Academic Session";
+      const firstUserMsg =
+        messages.find((m) => m.role === "user")?.content || "Academic Session";
       const lastMsg = messages[messages.length - 1]?.content || "";
-      const title = firstUserMsg.slice(0, 45).trim() + (firstUserMsg.length > 45 ? "..." : "");
+      const title =
+        firstUserMsg.slice(0, 45).trim() + (firstUserMsg.length > 45 ? "..." : "");
 
       const currentSessions = loadAbyaChatSessions(activeStudent?.id || "");
       const existingIdx = currentSessions.findIndex((s) => s.id === "active_session");
@@ -276,7 +237,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     }
   }, [messages, activeStudent?.id, selectedMode]);
 
-  // Master Curriculum State (for contextual drilldown)
+  // Master Curriculum State (for contextual drilldown in sidebar)
   const [selectedSubId, setSelectedSubId] = useState<string>("");
   const [selectedChapId, setSelectedChapId] = useState<string>("");
   const [selectedTopId, setSelectedTopId] = useState<string>("");
@@ -285,7 +246,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     return getCurriculumSubjects(activeStudent?.classLevel, activeStudent?.stream);
   }, [activeStudent?.classLevel, activeStudent?.stream]);
 
-  // Initialize selected subject if empty
   useEffect(() => {
     if (curriculumSubjects.length > 0 && !selectedSubId) {
       setSelectedSubId(curriculumSubjects[0].id);
@@ -314,12 +274,10 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     );
   }, [currentChapter, selectedTopId]);
 
-  // Scroll to bottom of chat
+  // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
-    if (viewMode === "chat") {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isLoading, viewMode]);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   // Image Upload Handlers
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,8 +299,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         previewUrl: result,
         fileName: file.name,
       });
-      // Switch to chat view to prepare asking
-      setViewMode("chat");
     };
     reader.readAsDataURL(file);
   };
@@ -351,6 +307,50 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     setSelectedImage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  // Voice Dictation (Web Speech API)
+  const handleToggleDictation = () => {
+    if (isDictating) {
+      recognitionRef.current?.stop();
+      setIsDictating(false);
+      return;
+    }
+    const SpeechRec =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    const rec = new SpeechRec();
+    rec.lang = abyaLanguage === "Hindi" ? "hi-IN" : "en-IN";
+    rec.interimResults = false;
+    rec.onresult = (event: any) => {
+      const transcript = event?.results?.[0]?.[0]?.transcript || "";
+      if (transcript) {
+        setInputPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    rec.onend = () => setIsDictating(false);
+    rec.onerror = () => setIsDictating(false);
+    recognitionRef.current = rec;
+    setIsDictating(true);
+    rec.start();
+  };
+
+  // Read Aloud (SpeechSynthesis TTS)
+  const handleToggleSpeak = (id: string, text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.02;
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+    setSpeakingId(id);
+    window.speechSynthesis.speak(utterance);
   };
 
   // Primary Message Sender
@@ -367,8 +367,18 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
       modeType?: string;
     }
   ) => {
-    const prompt = (textToSend || inputPrompt).trim();
-    if ((!prompt && !selectedImage) || isLoading) return;
+    const rawPrompt = (textToSend || inputPrompt).trim();
+    if ((!rawPrompt && !selectedImage) || isLoading) return;
+
+    const depthHint =
+      responseDepthLevel <= 2
+        ? " (Keep response concise and bulleted)"
+        : responseDepthLevel >= 4
+        ? " (Provide a comprehensive, detailed step-by-step explanation with examples)"
+        : "";
+
+    const prompt =
+      rawPrompt ? `${rawPrompt}${depthHint && !textToSend ? depthHint : ""}` : "";
 
     const modeToUse = overrideMode || selectedMode;
     const imagePayload = selectedImage
@@ -380,7 +390,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     setIsLoading(true);
-    setViewMode("chat");
 
     try {
       await onSendMessage(
@@ -405,107 +414,32 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Student Intelligence & Briefing Calculations
-  const pendingTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
-  const completedTasks = useMemo(() => tasks.filter((t) => t.completed), [tasks]);
-  const highPriorityTasksCount = useMemo(
-    () => pendingTasks.filter((t) => t.priority === "high").length,
-    [pendingTasks]
-  );
-
-  // Study Time Calculation (combines logged study sessions and focus timer logs for today)
-  const studyTimeMinutesToday = useMemo(() => {
-    const todayStr = getTodayString();
-    const sessionMins = Math.round(
-      studySessions
-        .filter((s) => s.date === todayStr)
-        .reduce((acc, s) => acc + (s.durationSeconds || 0), 0) / 60
-    );
-    const focusMins = focusLogs
-      .filter((l) => l.date === todayStr && l.type === "focus")
-      .reduce((acc, l) => acc + (l.durationMinutes || 0), 0);
-    if (sessionMins + focusMins > 0) {
-      return sessionMins + focusMins;
-    }
-    return habits
-      .filter((h) => h.completedDates.includes(todayStr))
-      .reduce((acc, h) => acc + (h.durationMinutes || 0), 0);
-  }, [studySessions, focusLogs, habits]);
-
-  const targetStudyHours = examProfile?.dailyStudyHours || 4;
-  const studyTimeHours = Math.floor(studyTimeMinutesToday / 60);
-  const studyTimeMinutes = studyTimeMinutesToday % 60;
-  const studyProgressPct = Math.min(
-    100,
-    Math.round((studyTimeMinutesToday / (targetStudyHours * 60)) * 100)
-  );
-
-  // Weak Subject & Topic Extraction
-  const weakSubjectInfo = useMemo(() => {
+  // Weak Subject & Topic Extraction for smart starter prompts
+  const weakSubjectTitle = useMemo(() => {
     const weakChap = academicChapters.find(
-      (c) => (c.status as string) === "needs_revision" || (c.masteryLevel && c.masteryLevel < 50) || c.isWeak
+      (c) =>
+        (c.status as string) === "needs_revision" ||
+        (c.masteryLevel && c.masteryLevel < 50) ||
+        c.isWeak
     );
-    if (weakChap) {
-      return {
-        title: weakChap.title,
-        detail: `Needs revision (${weakChap.masteryLevel || 42}% mastery)`,
-      };
-    }
-    const defaultSub = academicSubjects[0]?.name || activeStudent?.stream || "Core Subject";
-    return {
-      title: defaultSub,
-      detail: "Steady mastery • Keep practicing PYQs",
-    };
+    if (weakChap) return weakChap.title;
+    return academicSubjects[0]?.name || activeStudent?.stream || "Core Subject";
   }, [academicChapters, academicSubjects, activeStudent?.stream]);
 
-  // Suggested Study Duration based on pending tasks and countdown
-  const daysRemaining = useMemo(() => {
-    if (!examProfile?.targetDate) return 179;
-    const target = new Date(examProfile.targetDate).getTime();
-    const now = new Date().getTime();
-    const diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : 0;
-  }, [examProfile]);
-
-  const suggestedDurationText = useMemo(() => {
-    if (pendingTasks.length > 4) return "3h 30m recommended";
-    if (pendingTasks.length > 0) return "2h 15m recommended";
-    return "1h 45m (Light Recall)";
-  }, [pendingTasks.length]);
-
-  const calculatedReadiness = useMemo(() => {
-    const completedChapters = academicChapters.filter((c) => c.status === "Completed").length;
-    const total = academicChapters.length || 1;
-    const base = Math.round((completedChapters / total) * 100);
-    return Math.max(35, Math.min(95, base || 74));
-  }, [academicChapters]);
-
-  const streakCount = useMemo(() => {
-    return habits.reduce((max, h) => Math.max(max, h.streak || 1), 5);
-  }, [habits]);
-
-  // Contextual AI Tip
-  const aiRecommendationTip = useMemo(() => {
-    if (weakSubjectInfo.title) {
-      return `Dedicate your next 45-minute focus session to "${weakSubjectInfo.title}" to boost your readiness score by +4% today!`;
-    }
-    return `Review high-yield PYQs and summary definitions today to reinforce long-term memory retention!`;
-  }, [weakSubjectInfo.title]);
-
-  // Suggested Prompts List (dynamically tailored to student context)
+  // Suggested Prompts List
   const suggestedPromptsList = useMemo(() => {
-    const stream = activeStudent?.stream || "General";
-    const careerTarget = activeStudent?.stream === "Commerce" ? "CA Foundation & B.Com" : "JEE / NEET / Board";
+    const careerTarget =
+      activeStudent?.stream === "Commerce"
+        ? "CA Foundation & B.Com"
+        : "JEE / NEET / Board";
     return [
       "What should I study today?",
       "Create a revision timetable for my upcoming exams.",
-      "Analyze my weak subjects and tell me where to start.",
-      "Help me prepare for boards with scoring tips.",
-      `Build a ${careerTarget} roadmap.`,
+      `Explain the hardest concept in ${weakSubjectTitle}.`,
       "Give me 5 high-yield MCQs for quick practice.",
-      `Explain the hardest concept in ${weakSubjectInfo.title}.`,
+      `Build a ${careerTarget} roadmap.`,
     ];
-  }, [activeStudent?.stream, weakSubjectInfo.title]);
+  }, [activeStudent?.stream, weakSubjectTitle]);
 
   // Quick Action Handler
   const handleQuickActionClick = (actionType: AbyaQuickActionType) => {
@@ -527,30 +461,14 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         promptToSend = `Please create a balanced 7-Day Weekly Timetable covering all my subjects (${activeStudent?.classLevel || "Class 12"} ${activeStudent?.stream || "Commerce"}). Allocate dedicated slots for theory, solved numericals/cases, mock test day, and Sunday backlog clearance.`;
         break;
       case "ask_doubt":
-        // Switch to chat and focus input
-        setViewMode("chat");
         setInputPrompt("Explain step-by-step: ");
-        setTimeout(() => inputRef.current?.focus(), 150);
+        setTimeout(() => inputRef.current?.focus(), 100);
         return;
       default:
         promptToSend = `Help me with ${actionType} for my studies.`;
     }
 
     handleSend(promptToSend, actionType);
-  };
-
-  const handleSendSuggestedPrompt = (promptText: string) => {
-    handleSend(promptText);
-  };
-
-  const handleStartNewChat = () => {
-    onClearChat();
-    setViewMode("chat");
-  };
-
-  const handleReopenSession = (session: AbyaChatSession) => {
-    // If messages are available, view them
-    setViewMode("chat");
   };
 
   const handleDeleteRecentSession = (sessionId: string) => {
@@ -562,13 +480,18 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     const now = Date.now();
     const diffHours = Math.floor((now - ts) / (1000 * 60 * 60));
     if (diffHours < 1) return "Just now";
-    if (diffHours < 24) return `Today, ${new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffHours < 24)
+      return `Today, ${new Date(ts).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`;
     if (diffHours < 48) return "Yesterday";
     return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  // Helper for curriculum action
-  const handleCurriculumTopicAction = (action: "explanation" | "notes" | "mcq" | "pyq" | "revision") => {
+  const handleCurriculumTopicAction = (
+    action: "explanation" | "notes" | "mcq" | "pyq" | "revision"
+  ) => {
     if (!currentTopic || !currentSubject) return;
 
     let prompt = "";
@@ -590,6 +513,7 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         break;
     }
 
+    setIsSidebarOpen(false);
     handleSend(prompt, undefined, undefined, {
       classLevel: activeStudent?.classLevel,
       stream: activeStudent?.stream,
@@ -600,939 +524,896 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     });
   };
 
+  const studentDisplayName = getStudentDisplayName(activeStudent, settings, "Student");
+  const hasUserMessages = messages.some((m) => m.role === "user");
+
   return (
     <div
-      className={`flex flex-col w-full max-w-4xl mx-auto animate-in fade-in duration-300 relative ${
-        isKeyboardOpen ? "pb-1" : "pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] md:pb-2"
+      id="abya-chatgpt-studio"
+      className={`flex w-full max-w-6xl mx-auto animate-in fade-in duration-300 relative rounded-3xl overflow-hidden border border-amber-500/25 bg-slate-950/95 shadow-2xl ${
+        isKeyboardOpen ? "pb-1" : "pb-2"
       }`}
       style={{
         height: viewportHeight
-          ? `${Math.max(300, viewportHeight - (isKeyboardOpen ? 8 : 84))}px`
-          : "calc(var(--visual-viewport-height, 100dvh) - 84px)",
-        maxHeight: viewportHeight ? `${viewportHeight}px` : "calc(100dvh - 74px)",
+          ? `${Math.max(340, viewportHeight - (isKeyboardOpen ? 8 : 88))}px`
+          : "calc(var(--visual-viewport-height, 100dvh) - 88px)",
+        maxHeight: viewportHeight ? `${viewportHeight}px` : "calc(100dvh - 80px)",
       }}
     >
       {/* ========================================================================= */}
-      {/* 1. TOP ABYA HEADER                                                        */}
+      {/* 1. COLLAPSIBLE CHATGPT LEFT SIDEBAR (Threads + Syllabus Context)          */}
       {/* ========================================================================= */}
-      <div className="glass-card rounded-2xl p-2.5 sm:px-3.5 sm:py-2.5 border border-emerald-500/30 flex items-center justify-between gap-3 mb-2 shrink-0 relative z-40 bg-slate-950/80 backdrop-blur-xl shadow-lg shadow-black/20">
-        {/* Left: Avatar & View Toggle */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative shrink-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 p-0.5 flex items-center justify-center font-bold text-slate-900 shadow-md shadow-emerald-500/20">
-              <Sparkles className="w-4 h-4 text-slate-900" />
+      {isSidebarOpen && (
+        <aside
+          id="abya-chatgpt-sidebar"
+          className="w-72 sm:w-80 shrink-0 border-r border-amber-500/20 bg-slate-900/95 flex flex-col justify-between p-3.5 z-30 animate-in slide-in-from-left-4 duration-200"
+        >
+          <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+            {/* New Thread Button */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                id="abya-new-chat-btn"
+                onClick={() => {
+                  onClearChat();
+                  setIsSidebarOpen(false);
+                }}
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs inline-flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>New Study Thread</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title="Close Sidebar"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse" />
-          </div>
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h2 className="font-bold text-xs sm:text-sm text-white font-heading truncate">
-                Abya AI
-              </h2>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold truncate">
-                Study Mentor
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5 flex items-center gap-1">
-              <span className="text-emerald-300 font-medium truncate">{activeStudent?.name || "Student"}</span>
-              <span className="text-slate-600">•</span>
-              <span className="truncate">{activeStudent?.classLevel || "Class 12"}</span>
-              {activeStudent?.stream && (
-                <>
-                  <span className="text-slate-600">•</span>
-                  <span className="truncate hidden xs:inline">{activeStudent.stream}</span>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
+            {/* Canonical Curriculum Drilldown Dropdowns */}
+            <div className="p-3 rounded-2xl bg-slate-950/90 border border-amber-500/25 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 uppercase tracking-wider font-classic">
+                <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                <span>Syllabus Topic Drilldown</span>
+              </div>
 
-        {/* Center / Navigation Pill */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => setViewMode("home")}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-              viewMode === "home"
-                ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20"
-                : "bg-white/5 hover:bg-white/10 text-slate-300"
-            }`}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => setViewMode("chat")}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-              viewMode === "chat"
-                ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20"
-                : "bg-white/5 hover:bg-white/10 text-slate-300"
-            }`}
-          >
-            <MessageCircle className="w-3 h-3" />
-            <span>Chat ({messages.length})</span>
-          </button>
-        </div>
-
-        {/* Right Actions: Voice, Language, More */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Live Voice Button */}
-          <button
-            onClick={() => setShowLiveVoiceModal(true)}
-            className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-gradient-to-r from-emerald-500/15 to-cyan-500/15 hover:from-emerald-500/25 hover:to-cyan-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
-            title="Live Voice Mentor"
-            aria-label="Live Voice Mentor"
-          >
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="hidden sm:inline">Voice</span>
-          </button>
-
-          {/* Language Switcher (Icon-Only Control) */}
-          <button
-            onClick={() => setShowLanguageModal(true)}
-            id="abya-language-switcher-btn"
-            className="p-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 border border-purple-500/30 text-purple-200 transition-all flex items-center justify-center shrink-0 shadow-sm"
-            title={`Language: ${abyaLanguage} (Click to switch)`}
-            aria-label={`Switch Abya AI Language (Current: ${abyaLanguage})`}
-          >
-            <Globe className="w-4 h-4 text-purple-400 shrink-0" />
-          </button>
-
-          {/* More Options */}
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setShowMoreMenu(!showMoreMenu)}
-              id="abya-more-options-btn"
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white transition-all border border-white/10 text-xs"
-              title="More Options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-
-            {showMoreMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowMoreMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card border border-white/15 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1 bg-slate-900/95 backdrop-blur-xl">
-                  {/* New Chat */}
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      handleStartNewChat();
+              <div className="space-y-2">
+                <div>
+                  <label
+                    htmlFor="abya-curriculum-subject-select"
+                    className="block text-[10px] font-semibold text-slate-400 mb-0.5"
+                  >
+                    Subject:
+                  </label>
+                  <select
+                    id="abya-curriculum-subject-select"
+                    value={currentSubject?.id || ""}
+                    onChange={(e) => {
+                      setSelectedSubId(e.target.value);
+                      setSelectedChapId("");
+                      setSelectedTopId("");
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-emerald-300 hover:text-emerald-200 transition-colors text-left"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold text-white focus:outline-none"
                   >
-                    <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Start New Chat</span>
-                  </button>
-
-                  {/* Curriculum & AI Context */}
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      setIsContextDrawerOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-purple-300 transition-colors text-left"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                    <div>
-                      <div className="text-white">Curriculum Context</div>
-                      <div className="text-[10px] text-slate-400 font-normal">
-                        {currentSubject?.name || "Subject"} • {currentTopic?.name || "Topic"}
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Academic Intelligence Dashboard */}
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      setIsIntelligenceDrawerOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-indigo-300 transition-colors text-left"
-                  >
-                    <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
-                    <div>
-                      <div className="text-white">Academic Intelligence</div>
-                      <div className="text-[10px] text-slate-400 font-normal">
-                        Student insights & recommendations
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Diagnostics */}
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      setShowDiagnosticsModal(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold text-slate-200 hover:text-emerald-300 transition-colors text-left"
-                  >
-                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Diagnostics & Health</span>
-                  </button>
-
-                  <div className="border-t border-white/10 my-1" />
-
-                  {/* Clear Chat */}
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      onClearChat();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-500/20 text-xs font-semibold text-rose-300 transition-colors text-left"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Clear Chat History</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Context Note Attachment Banner */}
-      {attachedContextNote && (
-        <div className="glass-pill p-1.5 px-2.5 rounded-xl border border-cyan-500/30 mb-2 flex items-center justify-between text-xs text-cyan-300 shrink-0 bg-cyan-950/40">
-          <div className="flex items-center gap-1.5 truncate">
-            <BookOpen className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span className="truncate text-[11px]">Context: "{attachedContextNote}"</span>
-          </div>
-          <button
-            onClick={onClearAttachedContext}
-            className="text-slate-400 hover:text-white ml-2 text-[11px] font-bold"
-          >
-            Remove
-          </button>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 2. MAIN VIEW CONTAINER                                                    */}
-      {/* ========================================================================= */}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 scrollbar-thin flex flex-col">
-        {viewMode === "home" ? (
-          /* ===================================================================== */
-          /* HOME SCREEN (Intelligent Assistant Dashboard)                         */
-          /* ===================================================================== */
-          <div className="space-y-4 animate-in fade-in duration-300 max-w-3xl mx-auto w-full pb-4">
-            {/* ------------------------------------------------------------------- */}
-            {/* SECTION 1: Greeting Card                                            */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-slate-900/95 via-slate-950/90 to-emerald-950/30 shadow-xl relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 w-44 h-44 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-400 to-cyan-500 p-0.5 flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
-                      <Sparkles className="w-4 h-4 text-slate-950 font-bold" />
-                    </div>
-                    <h1 className="text-lg sm:text-xl font-black text-white font-heading tracking-tight">
-                      {getTimeOfDayGreeting()}, <span className="inline-block" dir="ltr">{getStudentDisplayName(activeStudent, settings, "Student")}</span> 👋
-                    </h1>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                    <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
-                      {activeStudent?.classLevel || "Class 12"}
-                    </span>
-                    {activeStudent?.stream && (
-                      <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold">
-                        {activeStudent.stream}
-                      </span>
-                    )}
-                    <span className="px-2 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold">
-                      {activeStudent?.board || "CBSE"} Board
-                    </span>
-                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
-                      <Flame className="w-3 h-3 text-amber-400" />
-                      {streakCount} Day Streak
-                    </span>
-                  </div>
+                    {curriculumSubjects.map((sub) => (
+                      <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Countdown & Readiness Badge */}
-                <div className="flex items-center gap-2.5 bg-slate-900/80 border border-white/10 rounded-xl p-2.5 px-3 shrink-0">
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                      {examProfile?.examName || "Target Exam"}
-                    </div>
-                    <div className="text-xs sm:text-sm font-extrabold text-emerald-400 flex items-center justify-end gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{daysRemaining} Days Left</span>
-                    </div>
-                  </div>
-                  <div className="h-7 w-px bg-white/10 mx-1" />
-                  <div className="text-center">
-                    <div className="text-[10px] text-slate-400 font-medium">Readiness</div>
-                    <div className="text-xs sm:text-sm font-extrabold text-cyan-300">
-                      {calculatedReadiness}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ------------------------------------------------------------------- */}
-            {/* SECTION 2: Today's AI Briefing                                      */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
-                  <Brain className="w-4 h-4 text-emerald-400" />
-                  Today's AI Briefing
-                </div>
-                <span className="text-[11px] text-slate-400">Contextual Overview</span>
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {/* 1. Pending Tasks */}
-                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-emerald-500/30 transition-all bg-slate-900/60">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[11px] font-semibold text-slate-300">Pending Tasks</span>
-                    <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  </div>
-                  <div className="text-base sm:text-lg font-black text-white font-heading">
-                    {pendingTasks.length === 0 ? "All Done! 🎉" : `${pendingTasks.length} Left`}
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                    {highPriorityTasksCount > 0
-                      ? `${highPriorityTasksCount} high priority • Today`
-                      : "Daily tasks queue"}
-                  </p>
-                </div>
-
-                {/* 2. Study Time Completed */}
-                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-cyan-500/30 transition-all bg-slate-900/60">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[11px] font-semibold text-slate-300">Study Completed</span>
-                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                  </div>
-                  <div className="text-base sm:text-lg font-black text-cyan-300 font-heading">
-                    {studyTimeHours}h {studyTimeMinutes}m
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                    Target: {targetStudyHours}h • {studyProgressPct}% done
-                  </p>
-                </div>
-
-                {/* 3. Weak Subject */}
-                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-amber-500/30 transition-all bg-slate-900/60">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[11px] font-semibold text-slate-300">Weak Subject</span>
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  </div>
-                  <div className="text-base sm:text-lg font-black text-amber-300 font-heading truncate">
-                    {weakSubjectInfo.title}
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                    {weakSubjectInfo.detail}
-                  </p>
-                </div>
-
-                {/* 4. Suggested Duration */}
-                <div className="glass-card p-3 rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all bg-slate-900/60">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[11px] font-semibold text-slate-300">Suggested Duration</span>
-                    <Lightbulb className="w-3.5 h-3.5 text-purple-400" />
-                  </div>
-                  <div className="text-base sm:text-lg font-black text-purple-300 font-heading truncate">
-                    {suggestedDurationText}
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                    Optimized for {daysRemaining}d countdown
-                  </p>
-                </div>
-              </div>
-
-              {/* Smart AI Recommendation Tip */}
-              <div className="glass-card p-3 rounded-2xl border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent flex items-center justify-between gap-3">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 shrink-0 mt-0.5">
-                    <Zap className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                      Abya AI Mentor Tip
-                    </span>
-                    <p className="text-xs text-slate-200 font-medium line-clamp-2">
-                      {aiRecommendationTip}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleQuickActionClick("study_plan")}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-sm shadow-emerald-500/20 flex items-center gap-1"
-                >
-                  <span>Apply Plan</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* ------------------------------------------------------------------- */}
-            {/* SECTION 3: Quick Actions Grid (6 Action Cards)                      */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  Quick Actions
-                </div>
-                <span className="text-[11px] text-slate-400">Instant AI generation</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {/* 1. Study Plan */}
-                <button
-                  onClick={() => handleQuickActionClick("study_plan")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
+                {currentSubject && currentSubject.chapters.length > 0 && (
                   <div>
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center justify-between">
-                      <span>📚 Study Plan</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      Today's customized timetable & priorities
-                    </div>
+                    <label
+                      htmlFor="abya-curriculum-chapter-select"
+                      className="block text-[10px] font-semibold text-slate-400 mb-0.5"
+                    >
+                      Chapter:
+                    </label>
+                    <select
+                      id="abya-curriculum-chapter-select"
+                      value={currentChapter?.id || ""}
+                      onChange={(e) => {
+                        setSelectedChapId(e.target.value);
+                        setSelectedTopId("");
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs font-semibold text-cyan-200 focus:outline-none"
+                    >
+                      {currentSubject.chapters.map((ch) => (
+                        <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                          {ch.title}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </button>
+                )}
 
-                {/* 2. Revision Plan */}
-                <button
-                  onClick={() => handleQuickActionClick("revision_plan")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
+                {currentChapter && currentChapter.topics.length > 0 && (
                   <div>
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <RotateCw className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-cyan-300 flex items-center justify-between">
-                      <span>📝 Revision Plan</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      Spaced recall for weak & due topics
-                    </div>
+                    <label
+                      htmlFor="abya-curriculum-topic-select"
+                      className="block text-[10px] font-semibold text-slate-400 mb-0.5"
+                    >
+                      Topic:
+                    </label>
+                    <select
+                      id="abya-curriculum-topic-select"
+                      value={currentTopic?.id || ""}
+                      onChange={(e) => setSelectedTopId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs font-semibold text-emerald-200 focus:outline-none"
+                    >
+                      {currentChapter.topics.map((tp) => (
+                        <option key={tp.id} value={tp.id} className="bg-slate-900 text-white">
+                          {tp.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </button>
-
-                {/* 3. Exam Strategy */}
-                <button
-                  onClick={() => handleQuickActionClick("exam_strategy")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <Target className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-purple-300 flex items-center justify-between">
-                      <span>🎯 Exam Strategy</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      High weightage, scoring rubrics & tricks
-                    </div>
-                  </div>
-                </button>
-
-                {/* 4. Progress Analysis */}
-                <button
-                  onClick={() => handleQuickActionClick("progress_analysis")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <BarChart3 className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-blue-300 flex items-center justify-between">
-                      <span>📊 Progress Analysis</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      Mastery breakdown & test accuracy
-                    </div>
-                  </div>
-                </button>
-
-                {/* 5. Weekly Schedule */}
-                <button
-                  onClick={() => handleQuickActionClick("weekly_schedule")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <Calendar className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-amber-300 flex items-center justify-between">
-                      <span>📅 Weekly Schedule</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      7-day timetable balancing all subjects
-                    </div>
-                  </div>
-                </button>
-
-                {/* 6. Ask a Doubt */}
-                <button
-                  onClick={() => handleQuickActionClick("ask_doubt")}
-                  className="p-3.5 rounded-2xl glass-card border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all group text-left active:scale-[0.98] flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
-                      <HelpCircle className="w-4 h-4" />
-                    </div>
-                    <div className="text-xs font-bold text-white group-hover:text-rose-300 flex items-center justify-between">
-                      <span>❓ Ask a Doubt</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="text-[11px] text-slate-400 line-clamp-2 mt-1">
-                      Step-by-step solutions & camera upload
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* ------------------------------------------------------------------- */}
-            {/* SECTION 4: Suggested Prompts                                        */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
-                  <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  Suggested Prompts
-                </div>
-                <span className="text-[11px] text-slate-400">One-tap ask</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {suggestedPromptsList.map((promptText, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendSuggestedPrompt(promptText)}
-                    className="px-3 py-2 rounded-xl glass-card border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-medium text-slate-200 hover:text-white transition-all text-left flex items-center gap-2 group active:scale-95 shadow-sm"
-                  >
-                    <Sparkles className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
-                    <span>{promptText}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ------------------------------------------------------------------- */}
-            {/* SECTION 5: Recent Conversations                                     */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-emerald-400" />
-                  Recent Conversations
-                </div>
-                {chatSessions.length > 0 && (
-                  <button
-                    onClick={handleStartNewChat}
-                    className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>New Chat</span>
-                  </button>
                 )}
               </div>
 
-              {chatSessions.length === 0 && messages.length === 0 ? (
-                <div className="p-4 rounded-2xl glass-card border border-dashed border-white/15 text-center text-slate-400 text-xs py-5">
-                  <p className="font-medium text-slate-300">No previous conversations yet</p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Tap any quick action or ask a question below to start your first session with Abya AI!
-                  </p>
+              {/* 1-Tap Topic Actions */}
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleCurriculumTopicAction("explanation")}
+                  className="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold transition-colors cursor-pointer"
+                >
+                  Explain Concept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCurriculumTopicAction("notes")}
+                  className="px-2 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold transition-colors cursor-pointer"
+                >
+                  Formula Notes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCurriculumTopicAction("mcq")}
+                  className="px-2 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-bold transition-colors cursor-pointer"
+                >
+                  5 Practice MCQs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCurriculumTopicAction("pyq")}
+                  className="px-2 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-bold transition-colors cursor-pointer"
+                >
+                  Board PYQs
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Conversation Threads */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                Recent Threads ({chatSessions.length})
+              </div>
+              {chatSessions.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 text-[11px] text-slate-400">
+                  Your saved study threads will appear here automatically.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {chatSessions.slice(0, 4).map((session) => (
+                <div className="space-y-1.5">
+                  {chatSessions.slice(0, 6).map((session) => (
                     <div
                       key={session.id}
-                      className="p-3 rounded-2xl glass-card border border-white/10 hover:border-emerald-500/30 hover:bg-white/5 transition-all flex items-center justify-between gap-3 group"
+                      className="p-2.5 rounded-xl bg-slate-950/75 hover:bg-slate-950 border border-white/10 flex items-center justify-between gap-2 group"
                     >
                       <button
-                        onClick={() => handleReopenSession(session)}
-                        className="flex-1 min-w-0 text-left"
+                        type="button"
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="min-w-0 flex-1 text-left cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-bold text-xs text-white group-hover:text-emerald-300 truncate">
-                            {session.title || "Academic Study Session"}
-                          </span>
-                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/10 text-slate-300 font-mono shrink-0">
-                            {session.messagesCount || session.messages?.length || 1} msg
-                          </span>
+                        <div className="text-xs font-bold text-white truncate">
+                          {session.title || "Academic Session"}
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate">
-                          {session.previewMessage || "Click to reopen this conversation..."}
-                        </p>
-                        <span className="text-[9px] text-slate-500 mt-1 block">
-                          {formatSessionTimestamp(session.updatedAt || session.createdAt)}
-                        </span>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {formatSessionTimestamp(session.updatedAt || session.createdAt)} ·{" "}
+                          {session.messagesCount || 1} msgs
+                        </div>
                       </button>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleReopenSession(session)}
-                          className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all active:scale-95"
-                        >
-                          Open
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRecentSession(session.id)}
-                          className="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors"
-                          title="Delete conversation"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecentSession(session.id)}
+                        className="p-1 rounded-lg text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                        title="Delete Thread"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
-        ) : (
-          /* ===================================================================== */
-          /* ACTIVE CONVERSATION THREAD (ChatGPT / Gemini Style AI Messages)       */
-          /* ===================================================================== */
-          <div className="space-y-4 max-w-3xl mx-auto w-full flex-1 flex flex-col justify-start">
-            {messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                <Sparkles className="w-8 h-8 text-emerald-400 mb-2" />
-                <h3 className="text-sm font-bold text-white">Ask anything to Abya AI</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Type your study doubt or choose a quick action to get step-by-step guidance.
-                </p>
-              </div>
-            ) : (
-              messages.map((m) => {
-                const isUser = m.role === "user";
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex gap-2.5 sm:gap-3 text-left animate-in fade-in duration-200 ${
-                      isUser ? "flex-row-reverse" : "flex-row"
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div
-                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${
-                        isUser
-                          ? "bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-md"
-                          : m.isFallback
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-gradient-to-tr from-emerald-400 via-cyan-400 to-indigo-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                      }`}
-                    >
-                      {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                    </div>
 
-                    {/* Content Container */}
-                    <div
-                      className={`flex flex-col max-w-[85%] sm:max-w-[80%] ${
-                        isUser ? "items-end" : "items-start"
-                      }`}
-                    >
-                      {/* Attached Image in Message */}
-                      {m.imageUrl && (
-                        <div className="mb-2 rounded-2xl overflow-hidden border border-white/10 max-w-xs shadow-md">
-                          <img
-                            src={m.imageUrl}
-                            alt="Study Question"
-                            className="w-full h-auto max-h-56 object-contain bg-slate-950"
-                          />
-                        </div>
-                      )}
+          {/* Sidebar Footer: AI Diagnostics Status */}
+          <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDiagnosticsModal(true)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950/90 hover:bg-slate-900 border border-white/10 text-xs font-semibold text-slate-300 flex items-center justify-between transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                <span>AI Engine Status</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                Online
+              </span>
+            </button>
+          </div>
+        </aside>
+      )}
 
-                      {/* Text Bubble */}
-                      <div
-                        className={`rounded-2xl p-3 sm:p-4 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
-                          isUser
-                            ? "bg-emerald-500 text-slate-950 font-medium rounded-tr-none shadow-md shadow-emerald-500/10"
-                            : "glass-card border border-white/10 text-slate-100 rounded-tl-none bg-slate-900/80 backdrop-blur-md shadow-lg"
-                        }`}
-                      >
-                        {m.content}
-                      </div>
+      {/* ========================================================================= */}
+      {/* 2. MAIN CHATGPT WORKSPACE COLUMN                                          */}
+      {/* ========================================================================= */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* TOP CLASSIC CHATGPT CONTROL BAR */}
+        <header className="px-3 sm:px-5 py-2.5 border-b border-amber-500/20 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+          {/* Left: Sidebar Toggle + Model/Persona Selector Dropdown */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              id="abya-sidebar-toggle-btn"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              title="Toggle Syllabus & Threads Sidebar"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-950/90 hover:bg-slate-800 border border-amber-500/25 text-amber-200 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <PanelLeft className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Threads & Syllabus</span>
+            </button>
 
-                      {/* Executed Action Card */}
-                      {m.executedAction && (
-                        <div className="mt-2 w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                              {m.executedAction.module === "tasks" && <CheckSquare className="w-4 h-4" />}
-                              {m.executedAction.module === "notes" && <FileText className="w-4 h-4" />}
-                              {m.executedAction.module === "wellness" && <Zap className="w-4 h-4" />}
-                              {m.executedAction.module === "goals" && <Target className="w-4 h-4" />}
-                              {m.executedAction.module === "exam" && <BookOpen className="w-4 h-4" />}
-                              {m.executedAction.module === "study" && <GraduationCap className="w-4 h-4" />}
-                              {!["tasks", "notes", "wellness", "goals", "exam", "study"].includes(m.executedAction.module) && (
-                                <CheckCircle2 className="w-4 h-4" />
-                              )}
-                            </div>
-                            <div className="truncate text-left">
-                              <p className="font-semibold text-emerald-300 truncate">
-                                {m.executedAction.summary}
-                              </p>
-                              <p className="text-[10px] text-slate-400">
-                                Module: <span className="capitalize">{m.executedAction.module}</span> • Saved in Garia OS
-                              </p>
-                            </div>
-                          </div>
-                          {m.executedAction.targetTab && onNavigate && (
-                            <button
-                              type="button"
-                              onClick={() => onNavigate(m.executedAction!.targetTab as ActiveTab)}
-                              className="shrink-0 px-2.5 py-1 text-[11px] font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg transition-colors flex items-center gap-1 border border-emerald-500/30"
-                            >
-                              <span>Open</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+            {/* Canonical AI Model & Persona Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <label htmlFor="abya-mode-dropdown" className="sr-only">
+                Select AI Model & Mode
+              </label>
+              <select
+                id="abya-mode-dropdown"
+                aria-label="Select Abya AI Mode"
+                value={selectedMode}
+                onChange={(e) => setSelectedMode(e.target.value as AbyaAIMode)}
+                className="bg-transparent text-xs font-extrabold text-white focus:outline-none cursor-pointer"
+              >
+                <option value="standard" className="bg-slate-900 text-white">
+                  Abya 3.8 Flash · Study Mentor
+                </option>
+                <option value="high_thinking" className="bg-slate-900 text-white">
+                  Abya 3.1 Pro · Deep Thinking
+                </option>
+                <option value="fast_lite" className="bg-slate-900 text-white">
+                  Abya 3.1 Lite · Fast Recall
+                </option>
+                <option value="search_grounded" className="bg-slate-900 text-white">
+                  Abya Search · Live Web Grounding
+                </option>
+                <option value="exam_coach" className="bg-slate-900 text-white">
+                  Exam Strategy & Marking Coach
+                </option>
+                <option value="career_coach" className="bg-slate-900 text-white">
+                  Career & Stream Advisor
+                </option>
+                <option value="mentor" className="bg-slate-900 text-white">
+                  Focus & Discipline Mentor
+                </option>
+              </select>
+            </div>
+          </div>
 
-                      {/* Assistant Metadata Badges */}
-                      {!isUser && (
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px] text-slate-400">
-                          {m.isFallback ? (
-                            <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                              <Cpu className="w-2.5 h-2.5" />
-                              Local Study Mentor
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              {m.modelUsed || "Gemini Online AI"}
-                            </span>
-                          )}
+          {/* Right: Depth Slider + Language Dropdown + Live Voice + Clear Chat */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Response Depth Slider */}
+            <div className="hidden lg:flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-white/10">
+              <Sliders className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <label
+                htmlFor="abya-response-depth-slider"
+                className="text-[11px] font-semibold text-slate-300 whitespace-nowrap"
+              >
+                Depth: {responseDepthLevel}/5
+              </label>
+              <input
+                id="abya-response-depth-slider"
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={responseDepthLevel}
+                onChange={(e) => setResponseDepthLevel(Number(e.target.value))}
+                aria-label="AI Response Depth Slider"
+                className="w-20 accent-emerald-400 cursor-pointer"
+              />
+            </div>
 
-                          {m.thinkingDurationMs && (
-                            <span className="text-slate-500 flex items-center gap-0.5">
-                              <Clock className="w-2.5 h-2.5" />
-                              {Math.round(m.thinkingDurationMs / 100) / 10}s
-                            </span>
-                          )}
+            {/* Canonical AI Language Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-white/10">
+              <Globe className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <label htmlFor="abya-language-dropdown" className="sr-only">
+                Select AI Response Language
+              </label>
+              <select
+                id="abya-language-dropdown"
+                aria-label="Select Abya AI Language"
+                value={abyaLanguage}
+                onChange={(e) =>
+                  onUpdateAbyaLanguage &&
+                  onUpdateAbyaLanguage(e.target.value as AbyaLanguageSetting)
+                }
+                className="bg-transparent text-xs font-bold text-purple-200 focus:outline-none cursor-pointer"
+              >
+                <option value="WhatsApp Language" className="bg-slate-900 text-white">
+                  Hinglish (Mentor Mix)
+                </option>
+                <option value="English" className="bg-slate-900 text-white">
+                  Academic English
+                </option>
+                <option value="Hindi" className="bg-slate-900 text-white">
+                  Hindi (हिंदी)
+                </option>
+                <option value="Hinglish" className="bg-slate-900 text-white">
+                  Roman Hinglish
+                </option>
+              </select>
+            </div>
 
-                          {/* Copy Button */}
-                          <button
-                            onClick={() => handleCopy(m.id, m.content)}
-                            className="hover:text-white flex items-center gap-0.5 transition-colors ml-1"
-                            title="Copy response"
-                          >
-                            {copiedId === m.id ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
-                          </button>
-                        </div>
-                      )}
+            {/* Live Voice Mentor Button */}
+            <button
+              type="button"
+              id="abya-live-voice-btn"
+              onClick={() => setShowLiveVoiceModal(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Launch Real-Time Live Voice Tutor"
+            >
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline">Live Voice</span>
+            </button>
+
+            {/* Clear Thread Button */}
+            <button
+              type="button"
+              id="abya-clear-chat-btn"
+              onClick={onClearChat}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+              title="Reset Conversation Thread"
+              aria-label="Clear Chat History"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Attached Note Context Banner */}
+        {attachedContextNote && (
+          <div className="mx-4 mt-2.5 px-3.5 py-2 rounded-xl border border-cyan-500/35 bg-cyan-950/40 flex items-center justify-between text-xs text-cyan-200 shrink-0">
+            <div className="flex items-center gap-2 truncate">
+              <BookOpen className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="truncate">Attached Study Context: "{attachedContextNote}"</span>
+            </div>
+            <button
+              type="button"
+              onClick={onClearAttachedContext}
+              className="text-slate-300 hover:text-white ml-3 text-xs font-bold cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        {/* ===================================================================== */}
+        {/* CENTERED CHATGPT CONVERSATION STREAM                                  */}
+        {/* ===================================================================== */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-5 custom-scrollbar">
+          <div className="max-w-3xl mx-auto w-full space-y-6">
+            {/* ChatGPT-Style Classic Welcome Hero & Starter Cards when thread is fresh */}
+            {!hasUserMessages && (
+              <div className="space-y-6 py-4 text-center animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-400 to-cyan-500 p-0.5 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-amber-300" />
                     </div>
                   </div>
-                );
-              })
+                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full classic-badge text-[10px] font-bold">
+                    <span>
+                      {activeStudent?.classLevel || "Class 12"} ·{" "}
+                      {activeStudent?.stream || "Science"} ·{" "}
+                      {activeStudent?.board || "CBSE"}
+                    </span>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white font-classic tracking-tight">
+                    What shall we study or solve today,{" "}
+                    <span className="text-amber-200" dir="ltr">
+                      {studentDisplayName}
+                    </span>
+                    ?
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
+                    Ask any concept doubt, upload a photo of a question paper, or launch a structured study blueprint below.
+                  </p>
+                </div>
+
+                {/* 2x3 ChatGPT-Style Starter Action Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-left">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("study_plan")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-emerald-500/45 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 font-classic">
+                        Today's Study Plan
+                      </span>
+                      <BookOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Custom time-blocked schedule for today's pending tasks & weak topics
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("revision_plan")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-cyan-500/45 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-cyan-300 font-classic">
+                        Spaced Revision Plan
+                      </span>
+                      <RotateCw className="w-4 h-4 text-cyan-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Active recall intervals & high-yield formula sheets for due chapters
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("exam_strategy")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-purple-500/45 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-purple-300 font-classic">
+                        Exam Scoring Strategy
+                      </span>
+                      <Target className="w-4 h-4 text-purple-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Board weightage breakdown, marking rubrics & exam-hall time pacing
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("progress_analysis")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-amber-500/50 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-amber-300 font-classic">
+                        Syllabus Mastery Audit
+                      </span>
+                      <BarChart3 className="w-4 h-4 text-amber-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Identify weak chapters and next actions to reach 95%+ readiness
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("weekly_schedule")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-emerald-500/45 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 font-classic">
+                        7-Day Timetable
+                      </span>
+                      <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Balanced weekly study routine with theory, numericals & mock tests
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickActionClick("ask_doubt")}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/25 hover:border-rose-500/45 transition-all group cursor-pointer flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-rose-300 font-classic">
+                        Step-by-Step Doubt Solver
+                      </span>
+                      <HelpCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                      Instant conceptual breakdown, analogies & solved practice questions
+                    </p>
+                  </button>
+                </div>
+
+                {/* One-Tap Suggested Prompts Strip */}
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  {suggestedPromptsList.map((promptText, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSend(promptText)}
+                      className="px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-white/10 hover:border-amber-500/35 text-xs text-slate-300 hover:text-white inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <MessageCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>{promptText}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
+
+            {/* Conversation Messages */}
+            {messages.map((m) => {
+              const isUser = m.role === "user";
+              return (
+                <div
+                  key={m.id}
+                  className={`flex gap-3 text-left animate-in fade-in duration-200 ${
+                    isUser ? "flex-row-reverse" : "flex-row"
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${
+                      isUser
+                        ? "bg-amber-500/20 border border-amber-500/40 text-amber-200"
+                        : m.isFallback
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-gradient-to-tr from-emerald-400 via-teal-400 to-cyan-500 text-slate-950 shadow-sm"
+                    }`}
+                  >
+                    {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                  </div>
+
+                  {/* Message Content Column */}
+                  <div
+                    className={`flex flex-col max-w-[88%] sm:max-w-[84%] ${
+                      isUser ? "items-end" : "items-start"
+                    }`}
+                  >
+                    {m.imageUrl && (
+                      <div className="mb-2 rounded-2xl overflow-hidden border border-white/10 max-w-xs shadow-md">
+                        <img
+                          src={m.imageUrl}
+                          alt="Uploaded Study Problem"
+                          className="w-full h-auto max-h-56 object-contain bg-slate-950"
+                        />
+                      </div>
+                    )}
+
+                    <div
+                      className={`rounded-3xl px-4 py-3.5 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
+                        isUser
+                          ? "bg-slate-800/95 border border-amber-500/30 text-white font-medium rounded-tr-sm shadow-sm"
+                          : "bg-slate-900/90 border border-white/10 text-slate-100 rounded-tl-sm shadow-md"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
+
+                    {/* Search Grounding Citations */}
+                    {!isUser && m.groundingSources && m.groundingSources.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-cyan-400 flex items-center gap-1">
+                          <Search className="w-3 h-3" /> Sources:
+                        </span>
+                        {m.groundingSources.map((src, sIdx) => (
+                          <a
+                            key={sIdx}
+                            href={src.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 hover:text-white inline-flex items-center gap-1 transition-colors"
+                          >
+                            <span className="truncate max-w-[160px]">{src.title}</span>
+                            <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Executed OS Action Card */}
+                    {m.executedAction && (
+                      <div className="mt-2.5 w-full bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                            {m.executedAction.module === "tasks" && (
+                              <CheckSquare className="w-4 h-4" />
+                            )}
+                            {m.executedAction.module === "notes" && (
+                              <FileText className="w-4 h-4" />
+                            )}
+                            {m.executedAction.module === "wellness" && (
+                              <Zap className="w-4 h-4" />
+                            )}
+                            {m.executedAction.module === "goals" && (
+                              <Target className="w-4 h-4" />
+                            )}
+                            {m.executedAction.module === "exam" && (
+                              <BookOpen className="w-4 h-4" />
+                            )}
+                            {m.executedAction.module === "study" && (
+                              <GraduationCap className="w-4 h-4" />
+                            )}
+                            {![
+                              "tasks",
+                              "notes",
+                              "wellness",
+                              "goals",
+                              "exam",
+                              "study",
+                            ].includes(m.executedAction.module) && (
+                              <CheckCircle2 className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="truncate text-left">
+                            <p className="font-bold text-emerald-300 truncate">
+                              {m.executedAction.summary}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              Saved in{" "}
+                              <span className="capitalize">{m.executedAction.module}</span>
+                            </p>
+                          </div>
+                        </div>
+                        {m.executedAction.targetTab && onNavigate && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onNavigate(m.executedAction!.targetTab as ActiveTab)
+                            }
+                            className="shrink-0 px-3 py-1.5 text-xs font-bold bg-emerald-500 text-slate-950 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Assistant Response Action Bar (ChatGPT Style) */}
+                    {!isUser && (
+                      <div className="flex items-center gap-3 mt-1.5 px-1 flex-wrap text-[11px] text-slate-400">
+                        {m.isFallback ? (
+                          <span className="inline-flex items-center gap-1 text-amber-300 font-mono">
+                            <Cpu className="w-3 h-3" />
+                            <span>Scholar Mentor Engine</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-emerald-400 font-mono">
+                            <Sparkles className="w-3 h-3" />
+                            <span>{m.modelUsed || "gemini-3.8-flash"}</span>
+                          </span>
+                        )}
+
+                        {m.thinkingDurationMs && (
+                          <span className="text-slate-500 font-mono flex items-center gap-0.5">
+                            <Clock className="w-3 h-3" />
+                            {Math.round(m.thinkingDurationMs / 100) / 10}s
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(m.id, m.content)}
+                          className="hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Copy response"
+                        >
+                          {copiedId === m.id ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                          <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSpeak(m.id, m.content)}
+                          className="hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Read Aloud"
+                        >
+                          {speakingId === m.id ? (
+                            <>
+                              <VolumeX className="w-3 h-3 text-amber-400" />
+                              <span className="text-amber-300">Stop</span>
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="w-3 h-3" />
+                              <span>Listen</span>
+                            </>
+                          )}
+                        </button>
+
+                        {onRetryLastMessage && m.id === messages[messages.length - 1]?.id && (
+                          <button
+                            type="button"
+                            onClick={onRetryLastMessage}
+                            className="hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Regenerate response"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Regenerate</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
 
             {/* Typing Indicator */}
             {isLoading && (
-              <div className="flex gap-2.5 sm:gap-3 text-left animate-in fade-in duration-200">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-400 to-cyan-500 text-slate-950 flex items-center justify-center shrink-0">
+              <div className="flex gap-3 text-left animate-in fade-in duration-200">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-400 to-cyan-500 text-slate-950 flex items-center justify-center shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
-                <div className="glass-card rounded-2xl rounded-tl-none p-3.5 border border-white/10 flex items-center gap-2 text-xs text-emerald-300">
+                <div className="bg-slate-900/90 rounded-3xl rounded-tl-sm px-4 py-3 border border-white/10 flex items-center gap-2 text-xs text-emerald-300">
                   <div className="flex gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.4s]" />
                   </div>
-                  <span className="text-[11px] text-slate-400 ml-1">
-                    Abya AI is crafting your explanation...
+                  <span className="text-xs text-slate-300 ml-1">
+                    Abya AI is composing a scholarly response...
                   </span>
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
-        )}
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. STICKY COMPOSER BAR (Always Accessible & Responsive)                    */}
-      {/* ========================================================================= */}
-      <div className="mt-2 shrink-0 relative z-30">
-        {/* Active Image Attachment Pill */}
-        {selectedImage && (
-          <div className="mb-2 p-2 rounded-2xl glass-card border border-emerald-500/30 flex items-center justify-between gap-2 bg-slate-900/90 backdrop-blur-md">
-            <div className="flex items-center gap-2 min-w-0">
-              <img
-                src={selectedImage.previewUrl}
-                alt="Selected"
-                className="w-10 h-10 object-cover rounded-xl border border-white/10"
-              />
-              <div className="min-w-0 text-left">
-                <div className="text-xs font-bold text-white truncate">
-                  {selectedImage.fileName}
-                </div>
-                <div className="text-[10px] text-emerald-400">Photo Attached • Ready to analyze</div>
-              </div>
-            </div>
-            <button
-              onClick={handleClearSelectedImage}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Input Bar */}
-        <div className="glass-card rounded-2xl p-1.5 sm:p-2 border border-white/15 bg-slate-950/90 backdrop-blur-xl shadow-2xl flex items-center gap-1.5">
-          {/* Camera / Upload Action */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageFileChange}
-            accept="image/*"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={cameraInputRef}
-            onChange={handleImageFileChange}
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-          />
-
-          <button
-            onClick={() => cameraInputRef.current?.click()}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors active:scale-95 shrink-0"
-            title="Take Photo of Question"
-          >
-            <Camera className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors active:scale-95 shrink-0 hidden xs:block"
-            title="Upload Image"
-          >
-            <ImageIcon className="w-4 h-4" />
-          </button>
-
-          {/* Text Input */}
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder={`Ask Abya AI in ${abyaLanguage}...`}
-            className="flex-1 min-w-0 bg-transparent border-0 text-white placeholder:text-slate-500 text-xs sm:text-sm focus:outline-none focus:ring-0 px-2 py-1.5"
-          />
-
-          {/* Send Button */}
-          <button
-            onClick={() => handleSend()}
-            disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
-            className={`p-2 sm:px-3.5 sm:py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 active:scale-95 ${
-              (inputPrompt.trim() || selectedImage) && !isLoading
-                ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/25"
-                : "bg-white/5 text-slate-600 cursor-not-allowed"
-            }`}
-          >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Send</span>
-          </button>
         </div>
-      </div>
 
-      {/* ========================================================================= */}
-      {/* 4. MODALS & DRAWERS                                                       */}
-      {/* ========================================================================= */}
-
-      {/* Language Switcher Modal */}
-      {showLanguageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="glass-card max-w-sm w-full rounded-2xl p-4 border border-purple-500/30 bg-slate-900/95 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-purple-400" />
-                <h3 className="font-bold text-sm text-white">Select Abya Language</h3>
+        {/* ===================================================================== */}
+        {/* CENTERED CHATGPT COMPOSER DOCK                                        */}
+        {/* ===================================================================== */}
+        <div className="px-3 sm:px-6 pb-3 pt-1 shrink-0">
+          <div className="max-w-3xl mx-auto w-full space-y-2">
+            {/* Selected Image Preview Pill */}
+            {selectedImage && (
+              <div className="p-2.5 rounded-2xl bg-slate-900/95 border border-emerald-500/35 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src={selectedImage.previewUrl}
+                    alt="Selected problem"
+                    className="w-10 h-10 object-cover rounded-xl border border-white/10"
+                  />
+                  <div className="min-w-0 text-left">
+                    <div className="text-xs font-bold text-white truncate">
+                      {selectedImage.fileName}
+                    </div>
+                    <div className="text-[10px] text-emerald-400">
+                      Image attached · Ready for step-by-step multimodal analysis
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearSelectedImage}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+            )}
+
+            {/* Floating ChatGPT Input Bar */}
+            <div className="rounded-3xl p-2 border border-amber-500/30 bg-slate-900/95 shadow-xl flex items-center gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={cameraInputRef}
+                onChange={handleImageFileChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
+
               <button
-                onClick={() => setShowLanguageModal(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400"
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="p-2.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-white/10 transition-colors shrink-0 cursor-pointer"
+                title="Capture Photo of Question"
               >
-                <X className="w-4 h-4" />
+                <Camera className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-white/10 transition-colors shrink-0 hidden sm:flex cursor-pointer"
+                title="Upload Question Image"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleToggleDictation}
+                className={`p-2.5 rounded-2xl border transition-colors shrink-0 cursor-pointer ${
+                  isDictating
+                    ? "bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse"
+                    : "bg-slate-950/80 hover:bg-slate-800 border-white/10 text-slate-300 hover:text-emerald-300"
+                }`}
+                title="Voice Dictation"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+
+              <input
+                ref={inputRef}
+                id="abya-chat-input"
+                type="text"
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={`Message Abya AI (${abyaLanguage})... Ask a doubt, create a task, or plan revision`}
+                className="flex-1 min-w-0 bg-transparent border-0 text-white placeholder:text-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-0 px-2 py-2"
+              />
+
+              <button
+                type="button"
+                id="abya-send-btn"
+                onClick={() => handleSend()}
+                disabled={(!inputPrompt.trim() && !selectedImage) || isLoading}
+                className={`px-4 py-2.5 rounded-2xl font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                  (inputPrompt.trim() || selectedImage) && !isLoading
+                    ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md"
+                    : "bg-white/5 text-slate-600 cursor-not-allowed"
+                }`}
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">Send</span>
               </button>
             </div>
-
-            <p className="text-xs text-slate-400">
-              Abya AI will respond naturally in your chosen study tone.
-            </p>
-
-            <div className="space-y-2">
-              {(
-                [
-                  { id: "WhatsApp Language", label: "WhatsApp Language (Hinglish)", desc: "Natural chat language, friendly study tone" },
-                  { id: "Hinglish", label: "Hinglish", desc: "Hindi in Roman script with English terms" },
-                  { id: "English", label: "English", desc: "Clear, standard academic English" },
-                  { id: "Hindi", label: "Hindi (हिंदी)", desc: "Devanagari script with exam vocabulary" },
-                ] as const
-              ).map((lang) => (
-                <button
-                  key={lang.id}
-                  onClick={() => {
-                    if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(lang.id);
-                    setShowLanguageModal(false);
-                  }}
-                  className={`w-full p-2.5 rounded-xl border text-left transition-all ${
-                    abyaLanguage === lang.id
-                      ? "bg-purple-500/20 border-purple-500/50 text-white"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
-                  }`}
-                >
-                  <div className="text-xs font-bold">{lang.label}</div>
-                  <div className="text-[10px] text-slate-400">{lang.desc}</div>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Diagnostics Modal */}
+      {/* ========================================================================= */}
+      {/* 3. MODALS (Diagnostics & Live Voice)                                      */}
+      {/* ========================================================================= */}
       {showDiagnosticsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="glass-card max-w-md w-full rounded-2xl p-4 border border-emerald-500/30 bg-slate-900/95 space-y-3 text-left">
+          <div className="glass-card max-w-md w-full rounded-2xl p-5 border border-emerald-500/30 bg-slate-900/95 space-y-3 text-left">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-400" />
-                <h3 className="font-bold text-sm text-white">Abya AI Diagnostics</h3>
+                <h3 className="font-bold text-sm text-white font-classic">
+                  Abya AI Diagnostics
+                </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowDiagnosticsModal(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400"
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1546,19 +1427,28 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
-                <span className="text-slate-400">Active Model:</span>
-                <span className="font-bold text-white">Gemini 2.5 Flash / Pro</span>
+                <span className="text-slate-400">Primary Models:</span>
+                <span className="font-bold text-white font-mono">
+                  gemini-3.8-flash / 3.1-pro
+                </span>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
-                <span className="text-slate-400">Local Intelligence Fallback:</span>
-                <span className="font-bold text-cyan-400">Available (Zero Downtime)</span>
+                <span className="text-slate-400">Live Voice Engine:</span>
+                <span className="font-bold text-amber-300 font-mono">
+                  gemini-3.8-live
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-between">
+                <span className="text-slate-400">Local Mentor Fallback:</span>
+                <span className="font-bold text-cyan-400">Active (Zero Downtime)</span>
               </div>
             </div>
 
             <div className="pt-2 flex justify-end">
               <button
+                type="button"
                 onClick={() => setShowDiagnosticsModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold"
+                className="px-4 py-1.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold cursor-pointer"
               >
                 Done
               </button>
@@ -1567,7 +1457,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
         </div>
       )}
 
-      {/* Live Voice Modal */}
       {showLiveVoiceModal && (
         <AbyaLiveVoiceModal
           isOpen={showLiveVoiceModal}
@@ -1577,60 +1466,6 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
           stream={activeStudent?.stream || "Commerce"}
           board={activeStudent?.board || "CBSE"}
         />
-      )}
-
-      {/* Academic Intelligence Decision Engine Drawer / Modal */}
-      {isIntelligenceDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-          <div className="relative w-full max-w-5xl my-auto rounded-3xl bg-slate-950/95 border border-indigo-500/30 p-4 sm:p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-slide-up">
-            <div className="flex items-center justify-between sticky top-0 bg-slate-950/95 py-2 z-10 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
-                  <Brain className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white font-heading">
-                    Academic Decision Engine
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Real-time study prioritization, revision tracking, exam readiness, and career alignment
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsIntelligenceDrawerOpen(false)}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <AcademicDecisionEngineSection
-              subjects={academicSubjects?.map(s => ({
-                id: s.id,
-                name: s.name,
-                color: s.color,
-                totalChapters: s.totalChapters || 10,
-                completedChapters: s.completedChapters || 0,
-                targetHoursPerWeek: s.targetHoursPerWeek || 5,
-                targetMinutesPerWeek: (s.targetHoursPerWeek || 5) * 60,
-                completedMinutes: 0,
-                totalSessions: 0,
-                gradeLevel: s.classLevel
-              })) || []}
-              activeStudent={activeStudent || undefined}
-              examProfile={examProfile}
-              academicSubjects={academicSubjects}
-              academicChapters={academicChapters}
-              revisions={academicRevisions}
-              practiceSessions={academicPractice}
-              onNavigate={(tab) => {
-                setIsIntelligenceDrawerOpen(false);
-                if (onNavigate) onNavigate(tab);
-              }}
-            />
-          </div>
-        </div>
       )}
     </div>
   );

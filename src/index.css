@@ -2,12 +2,12 @@
 
 @layer base {
   :root {
-    --bg-main: #0b0f19;
-    --card-bg: rgba(15, 23, 42, 0.8);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent-glow: rgba(16, 185, 129, 0.12);
+    --bg-main: #0a0e17;
+    --card-bg: rgba(16, 22, 34, 0.92);
+    --card-border: rgba(212, 175, 55, 0.22);
+    --text-primary: #fdfbf7;
+    --text-secondary: #c7bda9;
+    --accent-glow: rgba(217, 119, 6, 0.16);
   }
 
   /* 1. AMOLED Black */
@@ -353,7 +353,8 @@ input, textarea, select {
 }
 
 h1, h2, h3, h4, .font-heading {
-  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Playfair Display', 'Cinzel', Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.01em;
 }
 
 /* Glassmorphism Cards & Premium Surfaces */

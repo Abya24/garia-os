@@ -135,7 +135,7 @@ import {
 } from "./utils/abyaModuleActions";
 
 import { hashPassword } from "./utils/auth";
-import { auth } from "./utils/firebase";
+import { auth, getValidClientAuthToken } from "./utils/firebase";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
 import { enqueueOfflineAction, reconcilePendingQueueWithFirestore } from "./utils/offlineQueue";
@@ -1523,14 +1523,7 @@ export default function App() {
         try {
           console.log(`[Abya AI Client] Calling Online AI (attempt ${attempt}/${maxAttempts}, mode=${mode})...`);
 
-          let idToken: string | null = null;
-          if (auth.currentUser) {
-            try {
-              idToken = await auth.currentUser.getIdToken();
-            } catch (tokErr) {
-              console.warn("[Abya AI Client] Error obtaining ID token:", tokErr);
-            }
-          }
+          const idToken = await getValidClientAuthToken(requestProfileId);
 
           const reqHeaders: Record<string, string> = {
             "Content-Type": "application/json",
@@ -1636,7 +1629,7 @@ export default function App() {
           timestamp: Date.now(),
           mode: responseData?.modeUsed || mode,
           provider: "online_ai",
-          modelUsed: responseData?.modelUsed || "gemini-3.7-flash",
+          modelUsed: responseData?.modelUsed || "gemini-3.8-flash",
           groundingSources: responseData?.groundingSources,
           thinkingDurationMs: responseData?.durationMs,
           isFallback: false,
@@ -1657,7 +1650,7 @@ export default function App() {
         setAbyaDiagnostics((prev) => ({
           ...prev,
           provider: "online_ai",
-          activeModel: responseData?.modelUsed || "gemini-3.7-flash",
+          activeModel: responseData?.modelUsed || "gemini-3.8-flash",
           latencyMs: responseData?.durationMs || 0,
           lastStatus: "online",
           lastFallbackReason: "none",

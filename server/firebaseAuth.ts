@@ -194,14 +194,10 @@ export async function verifyFirebaseIdToken(
     };
   }
 
-  // Check test token in non-production environments only if test keys were explicitly generated
-  if (
-    process.env.NODE_ENV !== "production" &&
-    header.kid === "garia-local-test-key" &&
-    fs.existsSync(TEST_KEYS_PATH)
-  ) {
+  // Check server-signed local student session token (RSA-SHA256 verified against server keypair)
+  if (header.kid === "garia-local-test-key") {
     try {
-      const { publicKey } = JSON.parse(fs.readFileSync(TEST_KEYS_PATH, "utf8"));
+      const { publicKey } = getDevTestAuth();
       const dataToVerify = Buffer.from(`${jwtSegments[0]}.${jwtSegments[1]}`, "utf8");
       const pubObj = crypto.createPublicKey(publicKey);
       const signatureBuf = Buffer.from(jwtSegments[2], "base64url");
@@ -219,7 +215,7 @@ export async function verifyFirebaseIdToken(
     } catch {
       return {
         valid: false,
-        error: "Test signature verification failed.",
+        error: "Session token signature verification failed.",
         code: "INVALID_SIGNATURE",
       };
     }

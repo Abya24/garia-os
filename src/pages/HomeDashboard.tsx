@@ -2569,43 +2569,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               </select>
             </div>
 
-            {/* Interactive Filter Tabs */}
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950/80 border border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => setMilestoneFilter("all")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
-                  milestoneFilter === "all"
-                    ? "bg-cyan-500 text-slate-950 font-bold"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                All ({upcomingMilestonesData.allMilestones.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setMilestoneFilter("exam")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
-                  milestoneFilter === "exam"
-                    ? "bg-cyan-500 text-slate-950 font-bold"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Exams ({upcomingMilestonesData.examCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setMilestoneFilter("goal")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
-                  milestoneFilter === "goal"
-                    ? "bg-cyan-500 text-slate-950 font-bold"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Goals ({upcomingMilestonesData.goalCount})
-              </button>
-            </div>
-
             <button
               type="button"
               onClick={() => onNavigate("calendar")}

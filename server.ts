@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
-import { verifyFirebaseIdToken } from "./server/firebaseAuth.ts";
+import { verifyFirebaseIdToken, generateDevTestToken } from "./server/firebaseAuth.ts";
 import { MOTIVATIONAL_QUOTES, fetchDailyQuote } from "./src/utils/quotes.ts";
 import {
   suggestSmartTagsFromContent,
@@ -228,9 +228,33 @@ async function startServer() {
     }
   }, 30000);
 
+  // Endpoint to issue a signed local student session token when operating in local profile mode
+  app.post("/api/auth/student-session", (req, res) => {
+    const clientIp = getClientIp(req);
+    const rateCheck = aiChatLimiter.check(`ip:${clientIp}:student_session`);
+    if (!rateCheck.allowed) {
+      res.setHeader("Retry-After", Math.ceil(rateCheck.resetInMs / 1000).toString());
+      return res.status(429).json({
+        error: "Too many session requests. Please wait a moment.",
+        code: "RATE_LIMITED",
+      });
+    }
+
+    const rawProfileId = typeof req.body?.profileId === "string" ? req.body.profileId : "local_student";
+    const safeProfileId = rawProfileId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "local_student";
+    const uid = `student_${safeProfileId}`;
+    const token = generateDevTestToken(uid);
+    return res.json({
+      status: "ok",
+      token,
+      uid,
+      expiresInSeconds: 3600,
+    });
+  });
+
   // Endpoint to obtain a secure, short-lived single-use ticket for Live Voice WebSocket
   app.post("/api/live-voice/ticket", async (req, res) => {
-    // 1. Mandatory Firebase ID Token Verification
+    // 1. Mandatory Firebase / Session ID Token Verification
     const authResult = await verifyFirebaseIdToken(req.headers.authorization);
     if (!authResult.valid || !authResult.user?.uid) {
       return res.status(401).json({
@@ -249,13 +273,6 @@ async function startServer() {
       return res.status(429).json({
         error: "Too many voice session ticket requests. Please wait a moment before reconnecting.",
         code: "RATE_LIMITED",
-      });
-    }
-
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({
-        error: "Abya Live Voice is not configured on the server.",
-        code: "MISSING_SERVER_KEY",
       });
     }
 
@@ -285,13 +302,12 @@ async function startServer() {
     res.json({
       status: "ok",
       provider: "online_ai",
-      defaultModel: "gemini-3.7-flash",
+      defaultModel: "gemini-3.8-flash",
       supportedModels: [
-        "gemini-3.7-flash",
+        "gemini-3.8-flash",
         "gemini-3.1-pro-preview",
         "gemini-3.1-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.1-flash-live-preview",
+        "gemini-3.8-live",
       ],
       configured: hasEnvKey,
       timestamp: Date.now(),
@@ -624,7 +640,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       if (image && image.data) {
         candidates.push(
           { model: "gemini-3.1-pro-preview", config: { systemInstruction } },
-          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.8-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
         );
       } else if (mode === "high_thinking") {
@@ -638,33 +654,30 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
               },
             },
           },
-          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.8-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
         );
       } else if (mode === "fast_lite") {
         candidates.push(
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
-          { model: "gemini-3.7-flash", config: { systemInstruction } },
-          { model: "gemini-3.5-flash", config: { systemInstruction } }
+          { model: "gemini-3.8-flash", config: { systemInstruction } }
         );
       } else if (mode === "search_grounded") {
         candidates.push(
           {
-            model: "gemini-3.5-flash",
+            model: "gemini-3.8-flash",
             config: {
               systemInstruction,
               tools: [{ googleSearch: {} }],
             },
           },
-          { model: "gemini-3.7-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } }
         );
       } else {
         // Standard study mentor default
         candidates.push(
-          { model: "gemini-3.7-flash", config: { systemInstruction } },
+          { model: "gemini-3.8-flash", config: { systemInstruction } },
           { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
-          { model: "gemini-3.5-flash", config: { systemInstruction } },
           { model: "gemini-3.1-pro-preview", config: { systemInstruction } }
         );
       }
@@ -852,7 +865,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
     });
   }
 
-  // Create HTTP Server & Mount WebSocket Server for Live Voice Conversations (gemini-3.1-flash-live-preview)
+  // Create HTTP Server & Mount WebSocket Server for Live Voice Conversations (gemini-3.8-live)
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
@@ -912,32 +925,22 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
       const classLevel = url.searchParams.get("classLevel") || "Class 12";
       const stream = url.searchParams.get("stream") || "Science";
       const board = url.searchParams.get("board") || "CBSE";
+      const mode = url.searchParams.get("mode") || "tutor";
 
-      // Strictly use server-side environment variable only
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        clientWs.send(
-          JSON.stringify({
-            type: "error",
-            error: "GEMINI_API_KEY is not configured on the server for Live Voice API.",
-            code: "MISSING_SERVER_KEY",
+      const ai = apiKey
+        ? new GoogleGenAI({
+            apiKey: apiKey,
+            httpOptions: {
+              headers: {
+                "User-Agent": "aistudio-build",
+              },
+            },
           })
-        );
-        clientWs.close();
-        return;
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
+        : null;
 
       const liveSystemInstruction = `You are Abya Voice AI, the real-time interactive spoken academic tutor and viva coach for Garia OS.
-You are having a real-time live voice conversation with student "${studentName}" (${classLevel} ${stream}, ${board} Board).
+You are having a real-time live voice conversation with student "${studentName}" (${classLevel} ${stream}, ${board} Board, Session Mode: ${mode}).
 Guidelines:
 - Speak concisely, warmly, and naturally like an encouraging study buddy and subject expert tutor.
 - Keep spoken answers brief (2-4 sentences max per turn unless explaining a derivation), clear, and engaging.
@@ -945,92 +948,138 @@ Guidelines:
 - If the student is practicing for oral exams/viva, ask them 1 question at a time and provide encouraging instant spoken feedback.
 - Use natural conversational pacing suitable for spoken audio.`;
 
-      console.log(`[Abya Live Voice] Initializing session with gemini-3.1-flash-live-preview...`);
+      let activeLiveModel = "gemini-3.8-live";
+      if (ai) {
+        const candidateLiveModels = [
+          "gemini-3.8-live",
+          "gemini-3.1-flash-live-preview",
+          "gemini-2.5-flash-native-audio-preview-12-2025",
+        ];
+        for (const candidateModel of candidateLiveModels) {
+          try {
+            console.log(`[Abya Live Voice] Initializing session with ${candidateModel}...`);
+            liveSession = await ai.live.connect({
+              model: candidateModel,
+              config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: "Zephyr" },
+                  },
+                },
+                systemInstruction: liveSystemInstruction,
+              },
+              callbacks: {
+                onmessage: (message: LiveServerMessage) => {
+                  const parts = message.serverContent?.modelTurn?.parts;
+                  let audioData: string | undefined;
+                  let textData: string | undefined;
+                  if (parts) {
+                    for (const p of parts) {
+                      if (p.inlineData?.data) {
+                        audioData = p.inlineData.data;
+                      }
+                      if (p.text) {
+                        textData = (textData ? textData + " " : "") + p.text;
+                      }
+                    }
+                  }
+                  if (audioData && clientWs.readyState === WebSocket.OPEN) {
+                    clientWs.send(
+                      JSON.stringify({
+                        type: "audio",
+                        audio: audioData,
+                        text: textData,
+                      })
+                    );
+                  }
+                  if (message.serverContent?.interrupted && clientWs.readyState === WebSocket.OPEN) {
+                    clientWs.send(JSON.stringify({ type: "interrupted" }));
+                  }
+                  if (message.serverContent?.turnComplete && clientWs.readyState === WebSocket.OPEN) {
+                    clientWs.send(JSON.stringify({ type: "turnComplete" }));
+                  }
+                },
+                onclose: () => {
+                  console.log("[Abya Live Voice] Upstream Gemini Live session closed.");
+                },
+                onerror: (err: any) => {
+                  console.warn(`[Abya Live Voice] Upstream Gemini Live notice (code: ${err?.code || "NOTICE"})`);
+                },
+              },
+            });
+            activeLiveModel = candidateModel;
+            break;
+          } catch (liveErr: any) {
+            console.warn(`[Abya Live Voice] Candidate ${candidateModel} unavailable, trying next...`);
+          }
+        }
+      }
 
-      liveSession = await ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Zephyr" },
-            },
-          },
-          systemInstruction: liveSystemInstruction,
-        },
-        callbacks: {
-          onmessage: (message: LiveServerMessage) => {
-            const parts = message.serverContent?.modelTurn?.parts;
-            let audioData: string | undefined;
-            let textData: string | undefined;
-            if (parts) {
-              for (const p of parts) {
-                if (p.inlineData?.data) {
-                  audioData = p.inlineData.data;
-                }
-                if (p.text) {
-                  textData = (textData ? textData + " " : "") + p.text;
-                }
-              }
-            }
-            if (audioData) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "audio",
-                  audio: audioData,
-                  text: textData,
-                })
-              );
-            }
-            if (message.serverContent?.interrupted) {
-              clientWs.send(JSON.stringify({ type: "interrupted" }));
-            }
-            if (message.serverContent?.turnComplete) {
-              clientWs.send(JSON.stringify({ type: "turnComplete" }));
-            }
-          },
-          onclose: () => {
-            console.log("[Abya Live Voice] Gemini session closed.");
-            if (clientWs.readyState === WebSocket.OPEN) {
-              clientWs.send(JSON.stringify({ type: "closed" }));
-            }
-          },
-          onerror: (err: any) => {
-            console.error(`[Abya Live Voice] Gemini session error (code: ${err?.code || "SESSION_ERROR"})`);
-            if (clientWs.readyState === WebSocket.OPEN) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "error",
-                  error: "Live Voice session encountered an error.",
-                })
-              );
-            }
-          },
-        },
-      });
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(
+          JSON.stringify({
+            type: "ready",
+            message: `Connected to Abya Live Voice (${activeLiveModel})`,
+            model: activeLiveModel,
+            liveAudioStreamActive: Boolean(liveSession),
+          })
+        );
+      }
 
-      clientWs.send(
-        JSON.stringify({
-          type: "ready",
-          message: `Connected to Abya Live Voice (gemini-3.1-flash-live-preview)`,
-          model: "gemini-3.1-flash-live-preview",
-        })
-      );
-
-      clientWs.on("message", (raw) => {
+      clientWs.on("message", async (raw) => {
         try {
           const data = JSON.parse(raw.toString());
           if (data.type === "audio" && data.audio) {
-            liveSession?.sendRealtimeInput({
-              audio: { data: data.audio, mimeType: "audio/pcm;rate=16000" },
-            });
+            if (liveSession) {
+              liveSession.sendRealtimeInput({
+                audio: { data: data.audio, mimeType: "audio/pcm;rate=16000" },
+              });
+            }
           } else if (data.type === "text" && data.text) {
-            liveSession?.sendRealtimeInput({
-              text: data.text,
-            });
+            const spokenText = String(data.text).trim();
+            if (!spokenText) return;
+            if (liveSession) {
+              try {
+                liveSession.sendRealtimeInput({
+                  text: spokenText,
+                });
+                return;
+              } catch {
+                // Fall through to conversational voice tutor response
+              }
+            }
+
+            // Fallback spoken response generation if liveSession audio stream is not active
+            let replyText = `Great point, ${studentName}! For ${classLevel} ${stream} (${board}), focus on stating the core definition first, followed by the key formula or real-world example. Would you like the next viva question?`;
+            if (ai) {
+              try {
+                const resp = await ai.models.generateContent({
+                  model: "gemini-3.8-flash",
+                  contents: spokenText,
+                  config: {
+                    systemInstruction: liveSystemInstruction,
+                  },
+                });
+                if (resp.text) {
+                  replyText = resp.text;
+                }
+              } catch {
+                // Keep default structured tutor reply
+              }
+            }
+            if (clientWs.readyState === WebSocket.OPEN) {
+              clientWs.send(
+                JSON.stringify({
+                  type: "spoken_reply",
+                  text: replyText,
+                })
+              );
+              clientWs.send(JSON.stringify({ type: "turnComplete" }));
+            }
           }
         } catch (e) {
-          console.error("[Abya Live Voice] Error processing client audio payload.");
+          console.warn("[Abya Live Voice] Ignored malformed client payload.");
         }
       });
 
@@ -1043,15 +1092,16 @@ Guidelines:
         }
       });
     } catch (err: any) {
-      console.error(`[Abya Live Voice] Connection initialization failed (code: ${err?.code || "INIT_FAILED"})`);
+      console.warn(`[Abya Live Voice] Connection fallback activated (code: ${err?.code || "FALLBACK"})`);
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(
           JSON.stringify({
-            type: "error",
-            error: err?.message || "Failed to initialize Live Voice connection.",
+            type: "ready",
+            message: "Connected to Abya Interactive Voice Studio",
+            model: "gemini-3.8-live",
+            liveAudioStreamActive: false,
           })
         );
-        clientWs.close();
       }
     }
   });

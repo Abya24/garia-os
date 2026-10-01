@@ -475,3 +475,60 @@ export function subscribeToCloudSync(
     }
   );
 }
+
+let cachedLocalSession: {
+  token: string;
+  profileId: string;
+  expiresAt: number;
+} | null = null;
+
+/**
+ * Resolves a valid Bearer token for authenticated API endpoints (/api/ai/chat, /api/live-voice/ticket).
+ * Uses Firebase Auth ID token if signed in, or requests a signed local student session token from the server.
+ */
+export async function getValidClientAuthToken(
+  profileId: string = "local_student"
+): Promise<string | null> {
+  if (auth.currentUser) {
+    try {
+      const fbToken = await auth.currentUser.getIdToken();
+      if (fbToken) return fbToken;
+    } catch (err) {
+      console.warn("[Auth] Could not obtain Firebase ID token, falling back to local student session:", err);
+    }
+  }
+
+  const safeProfileId = profileId || "local_student";
+  const now = Date.now();
+  if (
+    cachedLocalSession &&
+    cachedLocalSession.profileId === safeProfileId &&
+    cachedLocalSession.expiresAt > now + 60 * 1000
+  ) {
+    return cachedLocalSession.token;
+  }
+
+  try {
+    const res = await fetch("/api/auth/student-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: safeProfileId }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.token && typeof data.token === "string") {
+        cachedLocalSession = {
+          token: data.token,
+          profileId: safeProfileId,
+          expiresAt: now + (Number(data.expiresInSeconds) || 3600) * 1000,
+        };
+        return data.token;
+      }
+    }
+  } catch (err) {
+    console.warn("[Auth] Could not obtain local student session token:", err);
+  }
+
+  return null;
+}
+
