@@ -1,1162 +1,998 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Play,
   Pause,
   RotateCcw,
-  SkipForward,
-  Timer,
-  Coffee,
-  CheckCircle,
-  Bell,
-  Sparkles,
-  ArrowLeft,
-  Flame,
+  Zap,
   Volume2,
   VolumeX,
-  Volume1,
-  CloudRain,
-  Wind,
-  Activity,
-  Radio,
-  Droplets,
-  Waves,
+  Plus,
+  Minus,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Flame,
+  Sparkles,
+  CheckSquare,
+  Target,
   Headphones,
   Sliders,
-  Trophy,
-  PartyPopper,
-  X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import confetti from "canvas-confetti";
-import { FocusSessionLog, UserSettings } from "../types";
+import { UserSettings, FocusSessionLog, Task, Priority } from "../types";
+import { getTodayString, loadTasks, saveTasks } from "../utils/storage";
 import { sendNotification } from "../utils/notifications";
-import { getTodayString } from "../utils/storage";
 import { formatSecondsToMSS } from "../utils/dateTimeUtils";
-import {
-  ambientAudio,
-  AMBIENT_SOUND_OPTIONS,
-  AmbientSoundType,
-} from "../utils/ambientAudio";
+
+export const QUICK_FOCUS_SESSION_KEY = "garia_quick_focus_pomodoro_state";
+
+export interface QuickFocusSessionState {
+  isRunning: boolean;
+  mode: "focus" | "break";
+  durationMinutes: number;
+  remainingSeconds: number;
+  updatedAt: number;
+  activeTaskId?: string;
+  activeTaskTitle?: string;
+}
+
+export function playFocusTimerChime(
+  _modeOrEnabled: string | boolean = true,
+  soundEnabledOrVol: boolean | number = true
+) {
+  if (_modeOrEnabled === false || soundEnabledOrVol === false) return;
+  try {
+    const AudioCtx =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(528, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.35);
+    const vol = typeof soundEnabledOrVol === "number" ? soundEnabledOrVol : 0.2;
+    gain.gain.setValueAtTime(Math.max(0.01, Math.min(1, vol)), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.9);
+  } catch {
+    // Ignore audio context errors on restricted browsers
+  }
+}
+
+export function saveQuickFocusSessionState(state: QuickFocusSessionState | null) {
+  try {
+    if (!state) {
+      sessionStorage.removeItem(QUICK_FOCUS_SESSION_KEY);
+      return;
+    }
+    sessionStorage.setItem(QUICK_FOCUS_SESSION_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function loadQuickFocusSessionState(): QuickFocusSessionState | null {
+  try {
+    const raw = sessionStorage.getItem(QUICK_FOCUS_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as QuickFocusSessionState;
+    if (
+      !parsed ||
+      typeof parsed.remainingSeconds !== "number" ||
+      typeof parsed.durationMinutes !== "number"
+    ) {
+      return null;
+    }
+    if (parsed.isRunning && parsed.updatedAt) {
+      const elapsed = Math.max(0, Math.floor((Date.now() - parsed.updatedAt) / 1000));
+      const adjusted = Math.max(1, parsed.remainingSeconds - elapsed);
+      return {
+        ...parsed,
+        remainingSeconds: adjusted,
+        updatedAt: Date.now(),
+      };
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+type AmbientSoundMode = "off" | "rain" | "brown" | "drone";
 
 interface FocusTimerProps {
   settings: UserSettings;
   focusLogs: FocusSessionLog[];
   onLogFocusSession: (log: Omit<FocusSessionLog, "id">) => void;
   onBack?: () => void;
+  tasks?: Task[];
+  onToggleTask?: (task: Task) => void;
+  onAddTask?: (task: Omit<Task, "id" | "createdAt">) => void;
 }
+
+const FOCUS_PRESETS = [
+  { id: "pomodoro", label: "Pomodoro", minutes: 25, mode: "focus" as const, desc: "Classic 25m sprint" },
+  { id: "deep", label: "Deep Work", minutes: 50, mode: "focus" as const, desc: "50m chapter mastery" },
+  { id: "exam", label: "Exam Sprint", minutes: 90, mode: "focus" as const, desc: "90m mock paper block" },
+  { id: "break", label: "Short Break", minutes: 5, mode: "break" as const, desc: "5m recharge & stretch" },
+];
 
 export const FocusTimer: React.FC<FocusTimerProps> = ({
   settings,
   focusLogs,
   onLogFocusSession,
-  onBack,
+  tasks,
+  onToggleTask,
+  onAddTask,
 }) => {
-  const [mode, setMode] = useState<"focus" | "break">("focus");
-  const [focusDurationMinutes, setFocusDurationMinutes] = useState<number>(
-    settings.defaultFocusDuration || 25
+  const initialQuickSession = loadQuickFocusSessionState();
+
+  const [mode, setMode] = useState<"focus" | "break">(
+    initialQuickSession ? initialQuickSession.mode : "focus"
   );
-  const [breakDurationMinutes, setBreakDurationMinutes] = useState<number>(
-    settings.defaultBreakDuration || 5
+  const [focusDuration, setFocusDuration] = useState<number>(
+    initialQuickSession && initialQuickSession.mode === "focus"
+      ? initialQuickSession.durationMinutes
+      : settings.defaultFocusDuration || 25
+  );
+  const [breakDuration, setBreakDuration] = useState<number>(
+    initialQuickSession && initialQuickSession.mode === "break"
+      ? initialQuickSession.durationMinutes
+      : settings.defaultBreakDuration || 5
   );
 
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(
-    focusDurationMinutes * 60
+  const [secondsLeft, setSecondsLeft] = useState<number>(
+    initialQuickSession
+      ? initialQuickSession.remainingSeconds
+      : (settings.defaultFocusDuration || 25) * 60
   );
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [sessionsCompletedToday, setSessionsCompletedToday] = useState<number>(0);
-  const [soundMuted, setSoundMuted] = useState<boolean>(false);
+  const [isRunning, setIsRunning] = useState<boolean>(
+    initialQuickSession ? initialQuickSession.isRunning : false
+  );
+  const [statusToast, setStatusToast] = useState<string | null>(null);
 
-  // Ambient Sound Engine State
-  const [selectedAmbientSound, setSelectedAmbientSound] = useState<AmbientSoundType>("rain");
-  const [isAmbientPlaying, setIsAmbientPlaying] = useState<boolean>(false);
-  const [ambientVolume, setAmbientVolume] = useState<number>(0.5);
-  const [autoPlayAmbient, setAutoPlayAmbient] = useState<boolean>(true);
+  // Task integration state
+  const [localTasks, setLocalTasks] = useState<Task[]>(() => loadTasks());
+  const allTasks = useMemo(() => {
+    if (tasks && tasks.length > 0) return tasks;
+    return localTasks;
+  }, [tasks, localTasks]);
 
-  // Celebratory Confetti Overlay State when a study session reaches its planned duration
-  const [showConfettiOverlay, setShowConfettiOverlay] = useState<boolean>(false);
-  const [completedSessionSummary, setCompletedSessionSummary] = useState<{
-    durationMinutes: number;
-    mode: "focus" | "break";
-    sessionsCount: number;
-  } | null>(null);
-
-  const CONFETTI_PARTICLES = React.useMemo(
+  const pendingTasks = useMemo(
     () =>
-      Array.from({ length: 28 }).map((_, idx) => ({
-        id: idx,
-        left: `${(idx * 37) % 96 + 2}%`,
-        delay: (idx % 7) * 0.08,
-        duration: 2.2 + (idx % 5) * 0.35,
-        color: [
-          "#fbbf24",
-          "#10b981",
-          "#06b6d4",
-          "#f43f5e",
-          "#a855f7",
-          "#3b82f6",
-        ][idx % 6],
-        rotate: (idx % 2 === 0 ? 1 : -1) * (180 + (idx % 4) * 60),
-      })),
-    []
+      allTasks
+        .filter((t) => !t.completed)
+        .sort((a, b) => {
+          const pWeight = { high: 0, medium: 1, low: 2 };
+          return (pWeight[a.priority] ?? 1) - (pWeight[b.priority] ?? 1);
+        }),
+    [allTasks]
   );
 
-  const fireConfettiBurst = React.useCallback(() => {
-    try {
-      confetti({
-        particleCount: 85,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ["#fbbf24", "#10b981", "#06b6d4", "#f43f5e", "#a855f7"],
-      });
-    } catch {
-      // Safe fallback in headless environments
+  const [selectedTaskId, setSelectedTaskId] = useState<string>(
+    initialQuickSession?.activeTaskId || ""
+  );
+  const [quickTaskInput, setQuickTaskInput] = useState<string>("");
+  const [quickTaskPriority, setQuickTaskPriority] = useState<Priority>("high");
+
+  const activeTask = useMemo(() => {
+    if (selectedTaskId) {
+      const found = allTasks.find((t) => t.id === selectedTaskId);
+      if (found) return found;
     }
-  }, []);
+    return pendingTasks[0] || null;
+  }, [selectedTaskId, allTasks, pendingTasks]);
 
-  const todayStr = getTodayString();
+  // Ambient Web Audio generator
+  const [ambientMode, setAmbientMode] = useState<AmbientSoundMode>("off");
+  const [ambientVolume, setAmbientVolume] = useState<number>(0.25);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
-  // Keep ambient audio engine volume in sync
+  const stopAmbientAudio = () => {
+    if (audioCtxRef.current) {
+      try {
+        audioCtxRef.current.close();
+      } catch {
+        // Ignore
+      }
+      audioCtxRef.current = null;
+      gainNodeRef.current = null;
+    }
+  };
+
+  const startAmbientAudio = (sound: AmbientSoundMode, vol: number) => {
+    stopAmbientAudio();
+    if (sound === "off") return;
+
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = vol;
+      masterGain.connect(ctx.destination);
+
+      if (sound === "drone") {
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = "sine";
+        osc2.type = "sine";
+        osc1.frequency.value = 174;
+        osc2.frequency.value = 261;
+        osc1.connect(masterGain);
+        osc2.connect(masterGain);
+        osc1.start();
+        osc2.start();
+      } else {
+        // Noise buffer for Rain or Brown noise
+        const bufferSize = 2 * ctx.sampleRate;
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          if (sound === "brown") {
+            output[i] = (lastOut + 0.02 * white) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.2;
+          } else {
+            // Soft Rain pink-ish filtered noise
+            output[i] = white * 0.35;
+          }
+        }
+        const whiteNoise = ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = sound === "rain" ? 950 : 420;
+
+        whiteNoise.connect(filter);
+        filter.connect(masterGain);
+        whiteNoise.start();
+      }
+
+      audioCtxRef.current = ctx;
+      gainNodeRef.current = masterGain;
+    } catch {
+      // Ignore audio restrictions
+    }
+  };
+
   useEffect(() => {
-    ambientAudio.setVolume(ambientVolume);
+    if (isRunning && ambientMode !== "off") {
+      startAmbientAudio(ambientMode, ambientVolume);
+    } else {
+      stopAmbientAudio();
+    }
+    return () => {
+      stopAmbientAudio();
+    };
+  }, [isRunning, ambientMode]);
+
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = ambientVolume;
+    }
   }, [ambientVolume]);
 
-  // Clean up ambient audio on unmount
+  // Keep session state synchronized with QuickFocusWidget
   useEffect(() => {
-    return () => {
-      ambientAudio.stop();
-    };
-  }, []);
+    const durationMinutes = mode === "focus" ? focusDuration : breakDuration;
+    saveQuickFocusSessionState({
+      isRunning,
+      mode,
+      durationMinutes,
+      remainingSeconds: secondsLeft,
+      updatedAt: Date.now(),
+      activeTaskId: activeTask?.id,
+      activeTaskTitle: activeTask?.title,
+    });
+  }, [isRunning, mode, focusDuration, breakDuration, secondsLeft, activeTask?.id, activeTask?.title]);
 
-  const handleToggleAmbientPlay = (forceType?: AmbientSoundType) => {
-    const target = forceType || selectedAmbientSound;
-    if (target === "none") {
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
-      return;
-    }
-
-    if (isAmbientPlaying && !forceType) {
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
-    } else {
-      ambientAudio.setVolume(ambientVolume);
-      ambientAudio.play(target);
-      setIsAmbientPlaying(true);
-    }
-  };
-
-  const handleSelectAmbientSound = (soundType: AmbientSoundType) => {
-    if (soundType === "none") {
-      setSelectedAmbientSound("none");
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
-      return;
-    }
-
-    // If clicking the currently playing soundscape, toggle pause; otherwise switch & play immediately
-    if (selectedAmbientSound === soundType && isAmbientPlaying) {
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
-    } else {
-      setSelectedAmbientSound(soundType);
-      ambientAudio.setVolume(ambientVolume);
-      ambientAudio.play(soundType);
-      setIsAmbientPlaying(true);
-    }
-  };
-
+  // Countdown tick
   useEffect(() => {
-    const countToday = (Array.isArray(focusLogs) ? focusLogs : []).filter(
-      (l) => l.date === todayStr && l.type === "focus"
-    ).length;
-    setSessionsCompletedToday(countToday);
-  }, [focusLogs, todayStr]);
-
-  // Mode or Duration Change Reset
-  useEffect(() => {
-    if (!isRunning) {
-      if (settings.defaultFocusDuration && settings.defaultFocusDuration !== focusDurationMinutes) {
-        setFocusDurationMinutes(settings.defaultFocusDuration);
-      }
-      if (settings.defaultBreakDuration && settings.defaultBreakDuration !== breakDurationMinutes) {
-        setBreakDurationMinutes(settings.defaultBreakDuration);
-      }
-    }
-  }, [settings.defaultFocusDuration, settings.defaultBreakDuration]);
-
-  useEffect(() => {
-    if (!isRunning) {
-      const targetMins =
-        mode === "focus" ? focusDurationMinutes : breakDurationMinutes;
-      setTimeLeftSeconds(targetMins * 60);
-    }
-  }, [mode, focusDurationMinutes, breakDurationMinutes]);
-
-  // Audio chime generator using standard Web Audio API
-  const playChime = (isEnd: boolean = true) => {
-    if (soundMuted || typeof window === "undefined") return;
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
-      const ctx = new AudioContextClass();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      const now = ctx.currentTime;
-
-      osc.onended = () => {
-        try {
-          osc.disconnect();
-          gain.disconnect();
-          if (ctx.state !== "closed") {
-            ctx.close().catch(() => {});
-          }
-        } catch (e) {}
-      };
-
-      if (isEnd) {
-        // High soft chime for session end
-        osc.frequency.setValueAtTime(523.25, now); // C5
-        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15); // E5
-        osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.3); // G5
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.8);
-      } else {
-        // Soft click for timer start
-        osc.frequency.setValueAtTime(440, now);
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.12);
-      }
-    } catch (e) {
-      // Audio context may be restricted by browser policy
-    }
-  };
-
-  const completePlannedSession = React.useCallback(
-    (sessionMode: "focus" | "break", plannedMins: number) => {
-      setIsRunning(false);
-      playChime(true);
-      if (isAmbientPlaying) {
-        ambientAudio.stop();
-        setIsAmbientPlaying(false);
-      }
-
-      if (sessionMode === "focus") {
-        const nextCount = sessionsCompletedToday + 1;
-        setSessionsCompletedToday(nextCount);
-        onLogFocusSession({
-          type: "focus",
-          durationMinutes: plannedMins,
-          completedAt: Date.now(),
-          date: todayStr,
-        });
-
-        fireConfettiBurst();
-        setCompletedSessionSummary({
-          durationMinutes: plannedMins,
-          mode: "focus",
-          sessionsCount: nextCount,
-        });
-        setShowConfettiOverlay(true);
-
-        sendNotification("🎉 Focus Session Finished!", {
-          body: `Great job! You stayed focused for ${plannedMins} minutes. Time for a ${breakDurationMinutes}-minute break.`,
-        });
-
-        setMode("break");
-      } else {
-        onLogFocusSession({
-          type: "break",
-          durationMinutes: plannedMins,
-          completedAt: Date.now(),
-          date: todayStr,
-        });
-
-        sendNotification("☕ Break Finished!", {
-          body: "Ready to get back in the zone? Start your next focus session.",
-        });
-
-        setMode("focus");
-      }
-    },
-    [
-      isAmbientPlaying,
-      sessionsCompletedToday,
-      onLogFocusSession,
-      todayStr,
-      fireConfettiBurst,
-      breakDurationMinutes,
-    ]
-  );
-
-  // Timer Tick
-  useEffect(() => {
-    let interval: any = null;
-    if (isRunning && timeLeftSeconds > 0) {
-      interval = setInterval(() => {
-        setTimeLeftSeconds((prev) => prev - 1);
-      }, 1000);
-    } else if (isRunning && timeLeftSeconds === 0) {
-      // Session Reached Planned Duration -> Trigger Confetti Overlay & Log Session
-      const plannedMins =
-        mode === "focus" ? focusDurationMinutes : breakDurationMinutes;
-      completePlannedSession(mode, plannedMins);
-    }
-
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleSessionComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(interval);
-  }, [
-    isRunning,
-    timeLeftSeconds,
-    mode,
-    focusDurationMinutes,
-    breakDurationMinutes,
-    completePlannedSession,
-  ]);
+  }, [isRunning, mode, focusDuration, breakDuration]);
 
-  const totalModeSeconds =
-    (mode === "focus" ? focusDurationMinutes : breakDurationMinutes) * 60;
-  const progressPercent =
-    totalModeSeconds > 0
-      ? Math.round(((totalModeSeconds - timeLeftSeconds) / totalModeSeconds) * 100)
-      : 0;
-
-  // Remaining Time Fraction & Angle for CSS Conic Gradient Ring
-  const remainingFraction = totalModeSeconds > 0 ? timeLeftSeconds / totalModeSeconds : 0;
-  const remainingDegrees = Math.round(remainingFraction * 360);
-
-  const handleStart = () => {
-    playChime(false);
-    setIsRunning(true);
-    if (autoPlayAmbient && selectedAmbientSound !== "none" && !isAmbientPlaying) {
-      ambientAudio.setVolume(ambientVolume);
-      ambientAudio.play(selectedAmbientSound);
-      setIsAmbientPlaying(true);
-    }
-  };
-  const handlePause = () => {
+  const handleSessionComplete = () => {
     setIsRunning(false);
-    if (autoPlayAmbient && isAmbientPlaying) {
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
+    playFocusTimerChime();
+
+    const completedMinutes = mode === "focus" ? focusDuration : breakDuration;
+    onLogFocusSession({
+      type: mode,
+      durationMinutes: completedMinutes,
+      completedAt: Date.now(),
+      date: getTodayString(),
+    });
+
+    if (mode === "focus") {
+      sendNotification("Focus Session Complete!", {
+        body: `Great job! You completed a ${focusDuration}-minute focus session.`,
+      });
+      setStatusToast(`Completed ${focusDuration}m Focus Session! Switching to Break.`);
+      setMode("break");
+      setSecondsLeft(breakDuration * 60);
+    } else {
+      sendNotification("Break Finished!", {
+        body: "Ready for your next focus sprint?",
+      });
+      setStatusToast("Break finished! Ready for your next Focus Sprint.");
+      setMode("focus");
+      setSecondsLeft(focusDuration * 60);
     }
+    setTimeout(() => setStatusToast(null), 4000);
   };
+
+  const handleSelectPreset = (preset: typeof FOCUS_PRESETS[number]) => {
+    setIsRunning(false);
+    setMode(preset.mode);
+    if (preset.mode === "focus") {
+      setFocusDuration(preset.minutes);
+    } else {
+      setBreakDuration(preset.minutes);
+    }
+    setSecondsLeft(preset.minutes * 60);
+  };
+
   const handleReset = () => {
     setIsRunning(false);
-    setTimeLeftSeconds(totalModeSeconds);
-    if (autoPlayAmbient && isAmbientPlaying) {
-      ambientAudio.stop();
-      setIsAmbientPlaying(false);
+    const mins = mode === "focus" ? focusDuration : breakDuration;
+    setSecondsLeft(mins * 60);
+  };
+
+  const handleAdjustDuration = (deltaMinutes: number) => {
+    if (isRunning) return;
+    if (mode === "focus") {
+      const next = Math.min(180, Math.max(5, focusDuration + deltaMinutes));
+      setFocusDuration(next);
+      setSecondsLeft(next * 60);
+    } else {
+      const next = Math.min(60, Math.max(1, breakDuration + deltaMinutes));
+      setBreakDuration(next);
+      setSecondsLeft(next * 60);
     }
   };
 
-  const handleSkip = () => {
+  const handleCompleteEarly = () => {
+    const totalSeconds = (mode === "focus" ? focusDuration : breakDuration) * 60;
+    const elapsedMinutes = Math.max(1, Math.round((totalSeconds - secondsLeft) / 60));
     setIsRunning(false);
-    setMode(mode === "focus" ? "break" : "focus");
+    playFocusTimerChime();
+    onLogFocusSession({
+      type: mode,
+      durationMinutes: elapsedMinutes,
+      completedAt: Date.now(),
+      date: getTodayString(),
+    });
+    setSecondsLeft(totalSeconds);
+    setStatusToast(`Logged ${elapsedMinutes}m ${mode} session ✓`);
+    setTimeout(() => setStatusToast(null), 3500);
   };
 
-  // SVG Circle Geometry Calculations
-  const radius = 120;
-  const circumference = 2 * Math.PI * radius; // ~753.98
-  const strokeDashoffset = circumference - (circumference * progressPercent) / 100;
+  const handleCompleteActiveTask = (taskItem: Task) => {
+    if (onToggleTask) {
+      onToggleTask(taskItem);
+    } else {
+      const updated = allTasks.map((t) =>
+        t.id === taskItem.id ? { ...t, completed: !t.completed } : t
+      );
+      setLocalTasks(updated);
+      saveTasks(updated);
+    }
+    setStatusToast(`Completed task: "${taskItem.title}" ✓`);
+    setTimeout(() => setStatusToast(null), 3000);
+  };
 
-  // Dynamic Conic Gradient Background representing Remaining Time
-  const conicGradientStyle =
-    mode === "focus"
-      ? {
-          background: `conic-gradient(from -90deg, #fbbf24 0deg, #f59e0b ${
-            remainingDegrees * 0.6
-          }deg, #ea580c ${remainingDegrees}deg, rgba(255, 255, 255, 0.04) ${remainingDegrees}deg 360deg)`,
-        }
-      : {
-          background: `conic-gradient(from -90deg, #38bdf8 0deg, #06b6d4 ${
-            remainingDegrees * 0.6
-          }deg, #2563eb ${remainingDegrees}deg, rgba(255, 255, 255, 0.04) ${remainingDegrees}deg 360deg)`,
-        };
+  const handleCreateQuickFocusTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickTaskInput.trim();
+    if (!trimmed) return;
+    const todayStr = getTodayString();
+
+    if (onAddTask) {
+      onAddTask({
+        title: trimmed,
+        date: todayStr,
+        priority: quickTaskPriority,
+        category: "study",
+        completed: false,
+      });
+    } else {
+      const newTask: Task = {
+        id: `focus_task_${Date.now()}`,
+        title: trimmed,
+        date: todayStr,
+        priority: quickTaskPriority,
+        category: "study",
+        completed: false,
+        createdAt: Date.now(),
+      };
+      const updated = [newTask, ...allTasks];
+      setLocalTasks(updated);
+      saveTasks(updated);
+      setSelectedTaskId(newTask.id);
+    }
+    setQuickTaskInput("");
+    setStatusToast(`Added focus task: "${trimmed}"`);
+    setTimeout(() => setStatusToast(null), 2500);
+  };
+
+  const totalSeconds = (mode === "focus" ? focusDuration : breakDuration) * 60;
+  const progressPercent =
+    totalSeconds > 0
+      ? Math.min(100, Math.max(0, ((totalSeconds - secondsLeft) / totalSeconds) * 100))
+      : 0;
+
+  const todayStr = getTodayString();
+  const todayFocusLogs = useMemo(
+    () => focusLogs.filter((l) => l.date === todayStr && l.type === "focus"),
+    [focusLogs, todayStr]
+  );
+  const todayFocusMinutes = useMemo(
+    () => todayFocusLogs.reduce((acc, l) => acc + l.durationMinutes, 0),
+    [todayFocusLogs]
+  );
+  const totalFocusMinutesAllTime = useMemo(
+    () =>
+      focusLogs
+        .filter((l) => l.type === "focus")
+        .reduce((acc, l) => acc + l.durationMinutes, 0),
+    [focusLogs]
+  );
+
+  // SVG Circle geometry
+  const radius = 112;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
   return (
-    <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 pb-20 max-w-6xl mx-auto">
+      {/* Top Studio Header with Classic Dropdowns */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 glass-card classic-frame p-4 sm:p-5 rounded-3xl border border-amber-500/25">
         <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-400 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5" />
+          </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-                Focus Timer
-              </h1>
-              {isRunning && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Live Session
-                </span>
-              )}
-            </div>
-            <p className="text-slate-400 text-sm mt-0.5">
-              Pomodoro technique for deep work & structured study intervals.
-            </p>
-          </div>
-        </div>
-
-        {/* Mode Selector */}
-        <div className="flex items-center p-1 rounded-2xl glass-pill border border-white/10 self-start sm:self-center">
-          <button
-            onClick={() => {
-              setIsRunning(false);
-              setMode("focus");
-            }}
-            id="focus-mode-toggle"
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              mode === "focus"
-                ? "bg-amber-500 text-slate-900 shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Timer className="w-3.5 h-3.5" />
-            <span>Focus Mode</span>
-          </button>
-          <button
-            onClick={() => {
-              setIsRunning(false);
-              setMode("break");
-            }}
-            id="break-mode-toggle"
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              mode === "break"
-                ? "bg-cyan-500 text-slate-900 shadow-md shadow-cyan-500/20"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Coffee className="w-3.5 h-3.5" />
-            <span>Break Mode</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Timer Display */}
-      <div className="glass-card rounded-3xl p-8 border border-white/10 text-center flex flex-col items-center justify-center relative overflow-hidden max-w-xl mx-auto shadow-2xl">
-        {/* Celebratory Confetti Animation Overlay when a study session reaches its planned duration */}
-        <AnimatePresence>
-          {showConfettiOverlay && completedSessionSummary && (
-            <motion.div
-              id="focus-confetti-celebration-overlay"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Focus Session Completed Celebration Overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center overflow-hidden"
-            >
-              {/* Animated Falling Confetti Particles Layer */}
-              <div
-                id="focus-confetti-particles-layer"
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-              >
-                {CONFETTI_PARTICLES.map((p) => (
-                  <motion.span
-                    key={p.id}
-                    data-testid="confetti-particle"
-                    initial={{ y: -24, opacity: 1, rotate: 0, scale: 0.9 }}
-                    animate={{
-                      y: ["0%", "420%"],
-                      opacity: [1, 1, 0],
-                      rotate: p.rotate,
-                      scale: [1, 1.15, 0.85],
-                    }}
-                    transition={{
-                      duration: p.duration,
-                      delay: p.delay,
-                      repeat: Infinity,
-                      ease: "easeOut",
-                    }}
-                    style={{
-                      left: p.left,
-                      backgroundColor: p.color,
-                    }}
-                    className="absolute top-0 w-2.5 h-4 rounded-sm shadow-sm"
-                  />
-                ))}
-              </div>
-
-              {/* Celebration Card Content */}
-              <motion.div
-                initial={{ scale: 0.85, y: 16, opacity: 0 }}
-                animate={{ scale: 1, y: 0, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                className="relative z-10 max-w-md w-full p-6 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-amber-950/30 border border-amber-500/40 shadow-2xl space-y-4"
-              >
-                <button
-                  type="button"
-                  id="confetti-overlay-close-btn"
-                  onClick={() => setShowConfettiOverlay(false)}
-                  aria-label="Close celebration overlay"
-                  className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                <motion.div
-                  animate={{ scale: [1, 1.12, 1], rotate: [0, 6, -6, 0] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-300 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20"
-                >
-                  <Trophy className="w-8 h-8 text-amber-400" />
-                </motion.div>
-
-                <div className="space-y-1.5">
-                  <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">
-                    <PartyPopper className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Planned Duration Reached!</span>
-                  </div>
-                  <h2
-                    id="confetti-overlay-title"
-                    className="text-xl sm:text-2xl font-extrabold text-white font-heading"
-                  >
-                    Focus Session Complete!
-                  </h2>
-                  <p
-                    id="confetti-overlay-message"
-                    className="text-xs sm:text-sm text-slate-300 leading-relaxed"
-                  >
-                    Congratulations! You completed your planned{" "}
-                    <strong className="text-amber-300 font-mono">
-                      {completedSessionSummary.durationMinutes}-minute
-                    </strong>{" "}
-                    deep study session.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5 p-3 rounded-2xl bg-slate-950/80 border border-white/10 text-xs font-mono tabular-nums">
-                  <div className="p-2 rounded-xl bg-white/5">
-                    <div className="text-slate-400 text-[10px] uppercase">
-                      Session Logged
-                    </div>
-                    <div className="text-base font-extrabold text-amber-300 mt-0.5">
-                      +{completedSessionSummary.durationMinutes} mins
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-white/5">
-                    <div className="text-slate-400 text-[10px] uppercase">
-                      Completed Today
-                    </div>
-                    <div className="text-base font-extrabold text-emerald-300 mt-0.5">
-                      {completedSessionSummary.sessionsCount}{" "}
-                      {completedSessionSummary.sessionsCount === 1
-                        ? "Session"
-                        : "Sessions"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    id="confetti-overlay-start-break-btn"
-                    onClick={() => {
-                      setShowConfettiOverlay(false);
-                      setMode("break");
-                      setTimeLeftSeconds(breakDurationMinutes * 60);
-                    }}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Coffee className="w-4 h-4" />
-                    <span>Take {breakDurationMinutes}m Break</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="confetti-overlay-new-focus-btn"
-                    onClick={() => {
-                      setShowConfettiOverlay(false);
-                      setMode("focus");
-                      setTimeLeftSeconds(focusDurationMinutes * 60);
-                    }}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 fill-slate-950" />
-                    <span>New Focus Session</span>
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {/* Subtle Ambient Glow Blobs */}
-        <div
-          className={`absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-1000 ${
-            mode === "focus"
-              ? isRunning
-                ? "bg-amber-500/20 scale-125"
-                : "bg-amber-500/10"
-              : isRunning
-              ? "bg-cyan-500/20 scale-125"
-              : "bg-cyan-500/10"
-          }`}
-        />
-        <div
-          className={`absolute bottom-0 left-0 -mb-16 -ml-16 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-1000 ${
-            mode === "focus"
-              ? isRunning
-                ? "bg-orange-500/15 scale-125"
-                : "bg-orange-500/5"
-              : isRunning
-              ? "bg-blue-500/15 scale-125"
-              : "bg-blue-500/5"
-          }`}
-        />
-
-        {/* Circular Ring Timer Container with CSS Conic Gradient Ring & Pulse Aura */}
-        <div className="relative w-64 h-64 sm:w-76 sm:h-76 my-4 sm:my-6 flex items-center justify-center">
-          {/* Concentric Animated Pulse Aura when Active */}
-          <AnimatePresence>
-            {isRunning && (
-              <>
-                {/* Outer Breathing Wave */}
-                <motion.div
-                  key="pulse-outer"
-                  initial={{ scale: 0.95, opacity: 0.2 }}
-                  animate={{
-                    scale: [1, 1.14, 1],
-                    opacity: [0.15, 0.45, 0.15],
-                  }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 3.6,
-                    ease: "easeInOut",
-                  }}
-                  className={`absolute inset-0 rounded-full blur-md pointer-events-none border ${
-                    mode === "focus"
-                      ? "border-amber-400/40 bg-amber-500/10"
-                      : "border-cyan-400/40 bg-cyan-500/10"
-                  }`}
-                />
-
-                {/* Inner Breathing Ripple */}
-                <motion.div
-                  key="pulse-inner"
-                  initial={{ scale: 0.98, opacity: 0.3 }}
-                  animate={{
-                    scale: [1, 1.07, 1],
-                    opacity: [0.3, 0.7, 0.3],
-                  }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 3.6,
-                    delay: 0.4,
-                    ease: "easeInOut",
-                  }}
-                  className={`absolute inset-2 rounded-full blur-sm pointer-events-none ${
-                    mode === "focus"
-                      ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10"
-                      : "bg-gradient-to-br from-cyan-500/20 to-blue-500/10"
-                  }`}
-                />
-              </>
-            )}
-          </AnimatePresence>
-
-          {/* CSS Conic Gradient Ring Layer: Shrinks & Rotates Smoothly representing Time Remaining */}
-          <motion.div
-            style={conicGradientStyle}
-            animate={
-              isRunning
-                ? {
-                    scale: [1, 1.015, 1],
-                  }
-                : {}
-            }
-            transition={{ repeat: Infinity, duration: 3.6, ease: "easeInOut" }}
-            className="absolute inset-1.5 sm:inset-1 rounded-full p-2.5 sm:p-3 transition-all duration-1000 ease-linear shadow-xl flex items-center justify-center"
-          >
-            {/* Inner Mask Container for Conic Gradient Ring */}
-            <div className="w-full h-full rounded-full bg-slate-950/95 border border-white/10 flex items-center justify-center relative backdrop-blur-md overflow-hidden">
-              {/* Rotating Light Shimmer when Active */}
-              {isRunning && (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-                  className="absolute inset-0 rounded-full opacity-25 pointer-events-none"
-                  style={{
-                    background:
-                      mode === "focus"
-                        ? "radial-gradient(circle at top, rgba(245, 158, 11, 0.35) 0%, transparent 60%)"
-                        : "radial-gradient(circle at top, rgba(6, 182, 212, 0.35) 0%, transparent 60%)",
-                  }}
-                />
-              )}
-            </div>
-          </motion.div>
-
-          {/* SVG Countdown Ring */}
-          <svg className="w-full h-full transform -rotate-90 z-10 drop-shadow-lg pointer-events-none">
-            <defs>
-              <linearGradient id="focusGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fbbf24" />
-                <stop offset="50%" stopColor="#f59e0b" />
-                <stop offset="100%" stopColor="#ea580c" />
-              </linearGradient>
-              <linearGradient id="breakGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" />
-                <stop offset="50%" stopColor="#06b6d4" />
-                <stop offset="100%" stopColor="#2563eb" />
-              </linearGradient>
-              <filter id="ringGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow
-                  dx="0"
-                  dy="0"
-                  stdDeviation="3"
-                  floodColor={mode === "focus" ? "#f59e0b" : "#06b6d4"}
-                  floodOpacity={isRunning ? "0.6" : "0.3"}
-                />
-              </filter>
-            </defs>
-
-            {/* Background Track */}
-            <circle
-              cx="144"
-              cy="144"
-              r={radius}
-              stroke="currentColor"
-              strokeWidth="11"
-              className="text-slate-800/80"
-              fill="transparent"
-            />
-
-            {/* Dynamic Smooth Animated Countdown Progress Circle */}
-            <circle
-              cx="144"
-              cy="144"
-              r={radius}
-              stroke={mode === "focus" ? "url(#focusGradient)" : "url(#breakGradient)"}
-              strokeWidth="12"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              filter="url(#ringGlow)"
-              className="transition-all duration-1000 ease-linear"
-              fill="transparent"
-            />
-          </svg>
-
-          {/* Timer Display Centerpiece */}
-          <div className="absolute z-20 flex flex-col items-center justify-center select-none">
-            {/* Subtle Active Icon or Sparkle */}
-            <motion.div
-              animate={isRunning ? { scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] } : {}}
-              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-              className="mb-1"
-            >
-              {mode === "focus" ? (
-                <Flame
-                  className={`w-5 h-5 transition-colors ${
-                    isRunning ? "text-amber-400" : "text-slate-500"
-                  }`}
-                />
-              ) : (
-                <Coffee
-                  className={`w-5 h-5 transition-colors ${
-                    isRunning ? "text-cyan-400" : "text-slate-500"
-                  }`}
-                />
-              )}
-            </motion.div>
-
-            {/* Countdown Digits */}
-            <span className="text-4xl sm:text-6xl font-black font-mono tracking-wider text-white tabular-nums drop-shadow-sm">
-              {formatSecondsToMSS(timeLeftSeconds)}
-            </span>
-
-            {/* Mode & State Badge */}
-            <motion.span
-              animate={isRunning ? { opacity: [0.8, 1, 0.8] } : {}}
-              transition={{ repeat: Infinity, duration: 2.5 }}
-              className={`text-[11px] font-bold uppercase tracking-widest mt-2 px-3 py-0.5 rounded-full transition-all shadow-sm ${
-                mode === "focus"
-                  ? isRunning
-                    ? "bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-amber-500/10"
-                    : "bg-amber-500/15 text-amber-400 border border-amber-500/25"
-                  : isRunning
-                  ? "bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 shadow-cyan-500/10"
-                  : "bg-cyan-500/15 text-cyan-400 border border-cyan-500/25"
-              }`}
-            >
-              {isRunning
-                ? mode === "focus"
-                  ? "Deep Focus Active"
-                  : "Recharging..."
-                : mode === "focus"
-                ? "Deep Focus"
-                : "Rest & Recharge"}
-            </motion.span>
-
-            {/* Calming Breathing Cue when Running */}
-            {isRunning && (
-              <motion.span
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: [0.4, 0.8, 0.4] }}
-                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                className="text-[10px] text-slate-400 font-medium mt-1"
-              >
-                Inhale • Focus • Exhale
-              </motion.span>
-            )}
-          </div>
-        </div>
-
-        {/* Duration Quick Preset Chips & Dropdown Selector */}
-        <div className="flex flex-col items-center gap-2 mb-6 w-full max-w-sm">
-          <div className="flex items-center justify-between w-full text-xs text-slate-400 px-1">
-            <span className="font-mono">Select Duration:</span>
-            <button
-              onClick={() => setSoundMuted((prev) => !prev)}
-              aria-label={soundMuted ? "Unmute Chime" : "Mute Chime"}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
-            >
-              {soundMuted ? (
-                <>
-                  <VolumeX className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Muted</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Sound On</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-4 gap-1.5 w-full">
-            {(mode === "focus" ? [15, 25, 45, 60] : [5, 10, 15, 20]).map((mins) => {
-              const currentVal = mode === "focus" ? focusDurationMinutes : breakDurationMinutes;
-              const isSelected = currentVal === mins;
-              return (
-                <button
-                  key={mins}
-                  disabled={isRunning}
-                  onClick={() => {
-                    if (mode === "focus") setFocusDurationMinutes(mins);
-                    else setBreakDurationMinutes(mins);
-                  }}
-                  className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all text-center border ${
-                    isSelected
-                      ? mode === "focus"
-                        ? "bg-amber-500/20 border-amber-400/50 text-amber-300 shadow-sm"
-                        : "bg-cyan-500/20 border-cyan-400/50 text-cyan-300 shadow-sm"
-                      : "bg-white/5 border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/10"
-                  } ${isRunning ? "opacity-50 cursor-not-allowed" : "card-press"}`}
-                >
-                  {mins}m
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Action Control Buttons */}
-        <div className="flex items-center gap-4">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            whileHover={{ scale: 1.05 }}
-            onClick={handleReset}
-            id="focus-reset-btn"
-            className="p-3.5 rounded-2xl glass-pill text-slate-400 hover:text-white hover:bg-white/10 border border-white/10 transition-colors shadow-md"
-            title="Reset Timer"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </motion.button>
-
-          {!isRunning ? (
-            <motion.button
-              whileTap={{ scale: 0.94 }}
-              whileHover={{ scale: 1.04 }}
-              onClick={handleStart}
-              id="focus-start-btn"
-              className={`px-8 py-4 rounded-2xl text-slate-900 font-extrabold text-base flex items-center gap-2 shadow-xl transition-all ${
-                mode === "focus"
-                  ? "bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 shadow-amber-500/30"
-                  : "bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-500 shadow-cyan-500/30"
-              }`}
-            >
-              <Play className="w-6 h-6 fill-slate-900" />
-              <span>Start Session</span>
-            </motion.button>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.94 }}
-              whileHover={{ scale: 1.04 }}
-              onClick={handlePause}
-              id="focus-pause-btn"
-              className="px-8 py-4 rounded-2xl bg-amber-500 text-slate-900 font-extrabold text-base flex items-center gap-2 shadow-xl shadow-amber-500/30 transition-all"
-            >
-              <Pause className="w-6 h-6 fill-slate-900" />
-              <span>Pause</span>
-            </motion.button>
-          )}
-
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            whileHover={{ scale: 1.05 }}
-            onClick={handleSkip}
-            id="focus-skip-btn"
-            className="p-3.5 rounded-2xl glass-pill text-slate-400 hover:text-white hover:bg-white/10 border border-white/10 transition-colors shadow-md"
-            title="Skip Mode"
-          >
-            <SkipForward className="w-5 h-5" />
-          </motion.button>
-        </div>
-
-        {/* Complete Planned Session Action (Triggers session completion & celebratory confetti overlay) */}
-        <div className="mt-3">
-          <button
-            type="button"
-            id="focus-complete-session-btn"
-            onClick={() =>
-              completePlannedSession(
-                "focus",
-                mode === "focus" ? focusDurationMinutes : breakDurationMinutes
-              )
-            }
-            className="px-4 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Complete planned study session duration now and log focus session"
-          >
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Complete Planned Session ({focusDurationMinutes}m)</span>
-          </button>
-        </div>
-
-        {/* Quick Focus Music Soundscape Bar inside Main Timer Card */}
-        <div
-          id="focus-music-quick-bar"
-          className="mt-6 pt-4 border-t border-white/10 w-full space-y-2.5 text-left"
-        >
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-200 flex items-center gap-1.5">
-              <Headphones className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Focus Music Soundscapes</span>
-            </span>
-            <span className="text-[11px] font-mono text-slate-400">
-              {isAmbientPlaying
-                ? `Playing: ${
-                    AMBIENT_SOUND_OPTIONS.find((o) => o.id === selectedAmbientSound)?.name ||
-                    selectedAmbientSound
-                  }`
-                : "Tap to toggle audio"}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            {(
-              [
-                { id: "rain" as AmbientSoundType, label: "Rain" },
-                { id: "cafe" as AmbientSoundType, label: "Cafe" },
-                { id: "white_noise" as AmbientSoundType, label: "White Noise" },
-                { id: "none" as AmbientSoundType, label: "Off" },
-              ] as const
-            ).map((item) => {
-              const isActive =
-                item.id === "none"
-                  ? !isAmbientPlaying || selectedAmbientSound === "none"
-                  : selectedAmbientSound === item.id && isAmbientPlaying;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  id={`focus-music-toggle-${item.id}`}
-                  onClick={() => handleSelectAmbientSound(item.id)}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    isActive && item.id !== "none"
-                      ? "bg-indigo-500/25 border-indigo-400 text-indigo-200 shadow-sm"
-                      : isActive && item.id === "none"
-                      ? "bg-slate-900 border-white/20 text-slate-300"
-                      : "bg-slate-950/70 border-white/10 text-slate-400 hover:text-white hover:border-white/20"
-                  }`}
-                >
-                  {item.id === "rain" && <CloudRain className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                  {item.id === "cafe" && <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                  {item.id === "white_noise" && <Wind className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
-                  {item.id === "none" && <VolumeX className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Daily Session Counter & Status */}
-        <div className="mt-4 pt-4 border-t border-white/10 w-full flex items-center justify-between text-xs text-slate-400">
-          <span className="flex items-center gap-1.5 font-medium">
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
-            Sessions Completed Today
-          </span>
-          <span className="font-bold font-mono text-emerald-400 text-sm">
-            {sessionsCompletedToday} sessions
-          </span>
-        </div>
-      </div>
-
-      {/* Focus Music & Ambient Background Soundscapes Card */}
-      <div
-        id="focus-music-player"
-        className="glass-card rounded-3xl p-6 border border-white/10 shadow-lg space-y-4"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
-              <Headphones className="w-5 h-5 text-indigo-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white font-heading">
-                  Focus Music & Ambient Soundscapes
-                </h3>
-                {isAmbientPlaying && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    Playing
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400">
-                Toggle calming background soundscapes (Rain, Cafe, White Noise, Binaural Beats) to mask distractions and deepen focus.
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Play/Stop Preview Button */}
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            <button
-              id="ambient-play-toggle-btn"
-              onClick={() => handleToggleAmbientPlay()}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border card-press ${
-                isAmbientPlaying
-                  ? "bg-amber-500/20 border-amber-400/50 text-amber-300 shadow-sm"
-                  : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
-              }`}
-            >
-              {isAmbientPlaying ? (
-                <>
-                  <Pause className="w-3.5 h-3.5 fill-amber-300" />
-                  <span>Pause Sound</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-slate-300" />
-                  <span>Play Sound</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Sound Selection Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-          {AMBIENT_SOUND_OPTIONS.map((option) => {
-            const isSelected = selectedAmbientSound === option.id;
-            const isPlayingThis = isSelected && isAmbientPlaying;
-
-            const renderIcon = () => {
-              switch (option.id) {
-                case "rain":
-                  return <CloudRain className="w-4 h-4 text-cyan-400" />;
-                case "cafe":
-                  return <Coffee className="w-4 h-4 text-amber-400" />;
-                case "white_noise":
-                  return <Wind className="w-4 h-4 text-sky-400" />;
-                case "pink_noise":
-                  return <Activity className="w-4 h-4 text-pink-400" />;
-                case "brown_noise":
-                  return <Radio className="w-4 h-4 text-amber-400" />;
-                case "forest_stream":
-                  return <Droplets className="w-4 h-4 text-teal-400" />;
-                case "waves":
-                  return <Waves className="w-4 h-4 text-blue-400" />;
-                case "binaural_focus":
-                  return <Sparkles className="w-4 h-4 text-purple-400" />;
-                default:
-                  return <VolumeX className="w-4 h-4 text-slate-500" />;
-              }
-            };
-
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleSelectAmbientSound(option.id)}
-                className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between gap-1.5 ${
-                  isSelected
-                    ? "bg-gradient-to-br from-indigo-950/40 to-slate-900 border-indigo-400/50 shadow-md shadow-indigo-500/10 text-white"
-                    : "bg-white/5 border-white/5 hover:border-white/15 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="p-1.5 rounded-xl bg-white/5 border border-white/10">
-                    {renderIcon()}
-                  </div>
-                  {isPlayingThis && (
-                    <div className="flex items-end gap-0.5 h-3">
-                      <span className="w-0.5 h-2 bg-emerald-400 animate-pulse" />
-                      <span className="w-0.5 h-3 bg-emerald-400 animate-pulse delay-75" />
-                      <span className="w-0.5 h-1.5 bg-emerald-400 animate-pulse delay-150" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white font-heading truncate">
-                    {option.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 line-clamp-1">
-                    {option.description}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Volume & Auto-Play Controls */}
-        <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
-          {/* Volume Slider */}
-          <div className="flex items-center gap-3 w-full sm:w-64">
-            <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
-            <div className="flex-1 flex items-center gap-2">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={ambientVolume}
-                onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-400"
-                title="Ambient Sound Volume"
-              />
-              <span className="font-mono text-slate-400 text-[11px] w-8 text-right">
-                {Math.round(ambientVolume * 100)}%
+            <div className="flex items-center gap-2 text-xs text-amber-300 font-medium">
+              <span>Classic Focus Studio</span>
+              <span>·</span>
+              <span className="font-mono tabular-nums text-emerald-300">
+                {todayFocusLogs.length} sessions ({todayFocusMinutes}m) today
               </span>
             </div>
+            <h1 className="text-lg sm:text-xl font-bold font-classic text-white tracking-tight">
+              Distraction-Free Pomodoro & Task Execution
+            </h1>
+          </div>
+        </div>
+
+        {/* Classic Dropdowns & Ambient Soundscape Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Dropdown 1: Preset Mode Selector */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-950/90 border border-white/10">
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-[11px] text-slate-400 font-semibold">Preset:</span>
+            <select
+              id="focus-preset-select"
+              aria-label="Select Focus Preset"
+              value={
+                FOCUS_PRESETS.find(
+                  (p) =>
+                    p.mode === mode &&
+                    (p.mode === "focus"
+                      ? focusDuration === p.minutes
+                      : breakDuration === p.minutes)
+                )?.id || "custom"
+              }
+              onChange={(e) => {
+                const found = FOCUS_PRESETS.find((p) => p.id === e.target.value);
+                if (found) handleSelectPreset(found);
+              }}
+              className="bg-transparent text-xs font-bold text-amber-200 focus:outline-none cursor-pointer"
+            >
+              {FOCUS_PRESETS.map((p) => (
+                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                  {p.label} ({p.minutes}m)
+                </option>
+              ))}
+              <option value="custom" className="bg-slate-900 text-slate-300">
+                Custom ({mode === "focus" ? focusDuration : breakDuration}m)
+              </option>
+            </select>
           </div>
 
-          {/* Auto-play with timer toggle */}
-          <label className="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+          {/* Dropdown 2: Ambient Soundscape Dropdown */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-950/90 border border-white/10">
+            <Headphones className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-[11px] text-slate-400 font-semibold">Audio:</span>
+            <select
+              id="focus-ambient-select"
+              aria-label="Select Ambient Sound"
+              value={ambientMode}
+              onChange={(e) => setAmbientMode(e.target.value as AmbientSoundMode)}
+              className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer"
+            >
+              <option value="off" className="bg-slate-900 text-white">Silent Mode</option>
+              <option value="rain" className="bg-slate-900 text-white">Soft Rain</option>
+              <option value="brown" className="bg-slate-900 text-white">Brown Noise</option>
+              <option value="drone" className="bg-slate-900 text-white">Focus Drone</option>
+            </select>
+          </div>
+
+          {/* Volume Slider (Always visible for quick adjustment) */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-950/90 border border-white/10">
+            {ambientVolume === 0 || ambientMode === "off" ? (
+              <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+            )}
+            <span className="text-[11px] font-mono text-slate-400">
+              {Math.round((ambientVolume / 0.6) * 100)}%
+            </span>
             <input
-              type="checkbox"
-              checked={autoPlayAmbient}
-              onChange={(e) => setAutoPlayAmbient(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
+              type="range"
+              min={0}
+              max={0.6}
+              step={0.05}
+              value={ambientVolume}
+              onChange={(e) => setAmbientVolume(Number(e.target.value))}
+              aria-label="Ambient Sound Volume"
+              className="w-20 accent-cyan-400 cursor-pointer"
             />
-            <span>Auto-play sound when focus timer starts</span>
-          </label>
+          </div>
+        </div>
+      </div>
+
+      {statusToast && (
+        <div
+          role="status"
+          className="px-4 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-200 text-xs font-semibold flex items-center gap-2"
+        >
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{statusToast}</span>
+        </div>
+      )}
+
+      {/* Main Two-Column Focus Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left 7 Cols: Timer Ring, Presets & Primary Controls */}
+        <div className="lg:col-span-7 glass-card rounded-3xl p-5 sm:p-7 border border-white/10 space-y-6">
+          {/* Session Mode Presets */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {FOCUS_PRESETS.map((preset) => {
+              const isSelected =
+                mode === preset.mode &&
+                (preset.mode === "focus"
+                  ? focusDuration === preset.minutes
+                  : breakDuration === preset.minutes);
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(preset)}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? preset.mode === "focus"
+                        ? "bg-amber-500/15 border-amber-400 text-white"
+                        : "bg-cyan-500/15 border-cyan-400 text-white"
+                      : "bg-slate-950/70 border-white/10 text-slate-300 hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold">{preset.label}</span>
+                    <span className="text-xs font-mono font-bold text-amber-300">
+                      {preset.minutes}m
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    {preset.desc}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Center Circular Progress Ring */}
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="relative w-64 h-64 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 256 256">
+                <circle
+                  cx="128"
+                  cy="128"
+                  r={radius}
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="10"
+                  fill="transparent"
+                />
+                <circle
+                  cx="128"
+                  cy="128"
+                  r={radius}
+                  stroke={mode === "focus" ? "#f59e0b" : "#06b6d4"}
+                  strokeWidth="10"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className="transition-all duration-500"
+                />
+              </svg>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                <span
+                  className={`text-xs font-semibold tracking-wide ${
+                    mode === "focus" ? "text-amber-300" : "text-cyan-300"
+                  }`}
+                >
+                  {isRunning
+                    ? mode === "focus"
+                      ? "Focusing Now"
+                      : "Break Active"
+                    : mode === "focus"
+                    ? "Ready to Focus"
+                    : "Break Ready"}
+                </span>
+
+                <div
+                  id="focus-timer-display"
+                  className="text-5xl sm:text-6xl font-extrabold font-mono tabular-nums text-white tracking-tight my-1"
+                >
+                  {formatSecondsToMSS(secondsLeft)}
+                </div>
+
+                {/* Duration Fine-Tuning (-5m / +5m) */}
+                {!isRunning && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustDuration(-5)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs cursor-pointer"
+                      title="Decrease 5 minutes"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs font-mono text-slate-400">
+                      {mode === "focus" ? focusDuration : breakDuration} min
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustDuration(5)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs cursor-pointer"
+                      title="Increase 5 minutes"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Active Task Pill below Ring */}
+            {activeTask && (
+              <div className="mt-3 px-4 py-2 rounded-2xl bg-slate-950/85 border border-emerald-500/30 flex items-center gap-2.5 max-w-md w-full justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Target className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs font-semibold text-white truncate">
+                    Focusing on: {activeTask.title}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteActiveTask(activeTask)}
+                  className="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 text-[11px] font-bold transition-colors shrink-0 cursor-pointer"
+                >
+                  Mark Done ✓
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Focus & Break Duration Sliders + Active Task Dropdown */}
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-200 font-classic uppercase tracking-wider">
+                <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                <span>Session Duration Sliders & Target Task Dropdown</span>
+              </div>
+              {pendingTasks.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-1 rounded-xl border border-white/10">
+                  <Target className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <select
+                    id="focus-active-task-select"
+                    aria-label="Select Active Focus Task"
+                    value={activeTask?.id || ""}
+                    onChange={(e) => setSelectedTaskId(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer max-w-[200px] truncate"
+                  >
+                    {pendingTasks.map((tItem) => (
+                      <option key={tItem.id} value={tItem.id} className="bg-slate-900 text-white">
+                        Task: {tItem.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-semibold">Focus Duration:</span>
+                  <span className="font-mono font-bold text-amber-300">{focusDuration} min</span>
+                </div>
+                <input
+                  id="focus-duration-slider"
+                  type="range"
+                  min={5}
+                  max={180}
+                  step={5}
+                  disabled={isRunning}
+                  value={focusDuration}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setFocusDuration(next);
+                    if (mode === "focus" && !isRunning) {
+                      setSecondsLeft(next * 60);
+                    }
+                  }}
+                  aria-label="Focus Duration Minutes Slider"
+                  className="w-full accent-amber-400 cursor-pointer disabled:opacity-50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-semibold">Break Duration:</span>
+                  <span className="font-mono font-bold text-cyan-300">{breakDuration} min</span>
+                </div>
+                <input
+                  id="break-duration-slider"
+                  type="range"
+                  min={1}
+                  max={60}
+                  step={1}
+                  disabled={isRunning}
+                  value={breakDuration}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setBreakDuration(next);
+                    if (mode === "break" && !isRunning) {
+                      setSecondsLeft(next * 60);
+                    }
+                  }}
+                  aria-label="Break Duration Minutes Slider"
+                  className="w-full accent-cyan-400 cursor-pointer disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Primary Timer Action Buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              id="focus-timer-start-pause-btn"
+              onClick={() => setIsRunning((prev) => !prev)}
+              className={`min-h-[46px] px-7 py-3 rounded-2xl font-extrabold text-sm inline-flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
+                isRunning
+                  ? "bg-amber-500 hover:bg-amber-400 text-slate-950"
+                  : "bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950"
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Pause className="w-4 h-4 fill-slate-950" />
+                  <span>Pause Session</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-slate-950" />
+                  <span>
+                    {secondsLeft < totalSeconds ? "Resume Focus" : `Start ${mode === "focus" ? focusDuration : breakDuration}m Session`}
+                  </span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="focus-timer-reset-btn"
+              onClick={handleReset}
+              className="min-h-[46px] px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white font-semibold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Reset</span>
+            </button>
+
+            {(isRunning || secondsLeft < totalSeconds) && (
+              <button
+                type="button"
+                id="focus-timer-complete-btn"
+                onClick={handleCompleteEarly}
+                className="min-h-[46px] px-4 py-3 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Log Session Now</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Right 5 Cols: Active Task Queue & Today's Focus Summary */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* Card 1: Focus Task Queue */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm sm:text-base font-bold font-heading text-white">
+                  Focus Task Queue
+                </h2>
+              </div>
+              <span className="text-xs font-mono text-slate-400">
+                {pendingTasks.length} pending
+              </span>
+            </div>
+
+            {/* Quick Add Task inside Focus Mode */}
+            <form onSubmit={handleCreateQuickFocusTask} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Add a task to focus on right now..."
+                value={quickTaskInput}
+                onChange={(e) => setQuickTaskInput(e.target.value)}
+                className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+              <select
+                value={quickTaskPriority}
+                onChange={(e) => setQuickTaskPriority(e.target.value as Priority)}
+                aria-label="Quick task priority"
+                className="px-2.5 py-2 rounded-xl bg-slate-950 border border-white/10 text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer"
+              >
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <button
+                type="submit"
+                disabled={!quickTaskInput.trim()}
+                className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-bold text-xs cursor-pointer shrink-0"
+              >
+                + Add
+              </button>
+            </form>
+
+            {/* Pending Tasks Selector */}
+            {pendingTasks.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {pendingTasks.slice(0, 6).map((taskItem) => {
+                  const isFocused = activeTask?.id === taskItem.id;
+                  return (
+                    <div
+                      key={taskItem.id}
+                      onClick={() => setSelectedTaskId(taskItem.id)}
+                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                        isFocused
+                          ? "bg-emerald-500/15 border-emerald-500/40"
+                          : "bg-slate-950/75 border-white/5 hover:border-white/15"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCompleteActiveTask(taskItem);
+                          }}
+                          className="text-slate-400 hover:text-emerald-400 shrink-0 cursor-pointer"
+                          title="Mark task completed"
+                        >
+                          <Circle className="w-4 h-4" />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-white truncate">
+                            {taskItem.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+                            <span className="capitalize">{taskItem.priority}</span>
+                            <span>·</span>
+                            <span>{taskItem.date === todayStr ? "Today" : taskItem.date}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[11px] font-mono font-bold shrink-0 ${
+                          isFocused ? "text-emerald-300" : "text-slate-500"
+                        }`}
+                      >
+                        {isFocused ? "Active Target" : "Select"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 text-center text-xs text-slate-400">
+                All tasks completed! Add a new study task above to set your focus target.
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: Today's Focus Summary & Log */}
+          <div className="glass-card rounded-3xl p-5 border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-400" />
+                <h2 className="text-sm sm:text-base font-bold font-heading text-white">
+                  Focus Session Output
+                </h2>
+              </div>
+              <span className="text-xs font-mono text-emerald-300">
+                {(totalFocusMinutesAllTime / 60).toFixed(1)}h total
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/5">
+                <div className="text-[11px] text-slate-400">Today's Focus</div>
+                <div className="text-xl font-extrabold font-mono tabular-nums text-white mt-0.5">
+                  {todayFocusMinutes}m
+                </div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/5">
+                <div className="text-[11px] text-slate-400">Pomodoros Today</div>
+                <div className="text-xl font-extrabold font-mono tabular-nums text-amber-300 mt-0.5">
+                  {todayFocusLogs.length}
+                </div>
+              </div>
+            </div>
+
+            {todayFocusLogs.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-xs font-semibold text-slate-400">
+                  Recent Sessions Today
+                </div>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {todayFocusLogs.slice(0, 4).map((log) => (
+                    <div
+                      key={log.id}
+                      className="px-3 py-2 rounded-xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs"
+                    >
+                      <span className="flex items-center gap-1.5 text-slate-200 font-medium">
+                        <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Focus Sprint</span>
+                      </span>
+                      <span className="font-mono font-bold text-emerald-300">
+                        {log.durationMinutes} min
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

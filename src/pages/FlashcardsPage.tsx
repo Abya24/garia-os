@@ -699,7 +699,7 @@ export const FlashcardsPage: React.FC<FlashcardsPageProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          {(viewMode !== "decks" || onBack) && (
+          {viewMode !== "decks" && (
             <button
               onClick={() => {
                 if (viewMode === "quiz") {

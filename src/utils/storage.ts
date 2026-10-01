@@ -232,71 +232,7 @@ const defaultSettings: UserSettings = {
   },
 };
 
-const defaultTasks: Task[] = [
-  {
-    id: "task-1",
-    title: "Review Accountancy Chapter 4 - Balance Sheet",
-    description: "Focus on ratio analysis and ledger reconciliations.",
-    date: getTodayString(),
-    time: "14:00",
-    priority: "high",
-    category: "study",
-    completed: false,
-    createdAt: Date.now() - 3600000 * 5,
-    subjectId: "sub-1",
-    subjectName: "Accountancy",
-    subtasks: [
-      { id: "sub-101", title: "Read liquidity & solvency ratio formulas", completed: true },
-      { id: "sub-102", title: "Solve 5 Balance Sheet reconciliation problems", completed: true },
-      { id: "sub-103", title: "Verify working capital notes & adjustments", completed: false },
-    ],
-  },
-  {
-    id: "task-2",
-    title: "Economics Macroeconomics Mind Map",
-    description: "Summarize Fiscal vs Monetary Policy key concepts.",
-    date: getTodayString(),
-    time: "16:30",
-    priority: "medium",
-    category: "study",
-    completed: true,
-    createdAt: Date.now() - 3600000 * 24,
-    subjectId: "sub-2",
-    subjectName: "Economics",
-    subtasks: [
-      { id: "sub-201", title: "Outline RBI monetary policy tools (Repo, CRR, SLR)", completed: true },
-      { id: "sub-202", title: "Compare government fiscal deficit types", completed: true },
-    ],
-  },
-  {
-    id: "task-3",
-    title: "Complete Business Studies Quiz",
-    description: "Chapter 2: Principles of Management",
-    date: getTodayString(),
-    time: "19:00",
-    priority: "high",
-    category: "study",
-    completed: false,
-    createdAt: Date.now() - 3600000 * 2,
-    subjectId: "sub-3",
-    subjectName: "Business Studies",
-    subtasks: [
-      { id: "sub-301", title: "Revise Fayol's 14 principles flashcards", completed: true },
-      { id: "sub-302", title: "Attempt 20 MCQ case-study questions", completed: false },
-    ],
-  },
-  {
-    id: "task-4",
-    title: "Daily 20-minute Workout & Hydration",
-    description: "Stretching and cardio core exercise.",
-    date: getTodayString(),
-    time: "08:00",
-    priority: "low",
-    category: "personal",
-    completed: true,
-    createdAt: Date.now() - 3600000 * 10,
-  },
-];
+const defaultTasks: Task[] = [];
 
 export const DEFAULT_COMMERCE_STUDY_SUBJECTS: Subject[] = [
   {
@@ -455,195 +391,11 @@ export const getDefaultStudySubjectsForStream = (stream?: StreamType, classLevel
   return DEFAULT_COMMERCE_STUDY_SUBJECTS;
 };
 
-const defaultNotes: Note[] = [
-  {
-    id: "note-1",
-    title: "Accountancy Ratio Analysis Cheat Sheet",
-    content: `## Quick Formulas
-- **Current Ratio**: Current Assets / Current Liabilities
-- **Quick Ratio**: (Current Assets - Inventory) / Current Liabilities
-- **Debt-to-Equity**: Total Debt / Total Shareholders Equity
+const defaultNotes: Note[] = [];
 
-*Note for Revision*: Keep track of liquidity vs profitability ratios!`,
-    pinned: true,
-    createdAt: Date.now() - 86400000 * 2,
-    updatedAt: Date.now() - 86400000 * 2,
-  },
-  {
-    id: "note-2",
-    title: "Principles of Management Notes",
-    content: `### Fayol's 14 Principles
-1. Division of Work
-2. Authority and Responsibility
-3. Discipline
-4. Unity of Command
-5. Unity of Direction
-6. Subordination of Individual Interest
-7. Remuneration`,
-    pinned: false,
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 86400000,
-  },
-];
+const defaultHabits: Habit[] = [];
 
-const defaultHabits: Habit[] = [
-  {
-    id: "habit-1",
-    title: "Study 2 Hours",
-    category: "study",
-    iconName: "book-open",
-    streak: 5,
-    completedDates: [
-      getOffsetLocalDateString(0),
-      getOffsetLocalDateString(-1),
-      getOffsetLocalDateString(-2),
-      getOffsetLocalDateString(-3),
-      getOffsetLocalDateString(-4),
-      getOffsetLocalDateString(-6),
-      getOffsetLocalDateString(-8),
-      getOffsetLocalDateString(-9),
-      getOffsetLocalDateString(-11),
-      getOffsetLocalDateString(-12),
-      getOffsetLocalDateString(-13),
-      getOffsetLocalDateString(-15),
-      getOffsetLocalDateString(-17),
-      getOffsetLocalDateString(-19),
-      getOffsetLocalDateString(-20),
-      getOffsetLocalDateString(-22),
-      getOffsetLocalDateString(-25),
-      getOffsetLocalDateString(-27),
-    ],
-    createdAt: Date.now() - 86400000 * 30,
-  },
-  {
-    id: "habit-2",
-    title: "Daily Exercise",
-    category: "health",
-    iconName: "activity",
-    streak: 3,
-    completedDates: [
-      getOffsetLocalDateString(0),
-      getOffsetLocalDateString(-1),
-      getOffsetLocalDateString(-2),
-      getOffsetLocalDateString(-5),
-      getOffsetLocalDateString(-7),
-      getOffsetLocalDateString(-9),
-      getOffsetLocalDateString(-10),
-      getOffsetLocalDateString(-12),
-      getOffsetLocalDateString(-15),
-      getOffsetLocalDateString(-16),
-      getOffsetLocalDateString(-18),
-      getOffsetLocalDateString(-21),
-      getOffsetLocalDateString(-24),
-      getOffsetLocalDateString(-26),
-    ],
-    createdAt: Date.now() - 86400000 * 30,
-  },
-  {
-    id: "habit-3",
-    title: "Reading 20 Mins",
-    category: "mindset",
-    iconName: "book",
-    streak: 4,
-    completedDates: [
-      getOffsetLocalDateString(0),
-      getOffsetLocalDateString(-1),
-      getOffsetLocalDateString(-2),
-      getOffsetLocalDateString(-3),
-      getOffsetLocalDateString(-6),
-      getOffsetLocalDateString(-8),
-      getOffsetLocalDateString(-10),
-      getOffsetLocalDateString(-11),
-      getOffsetLocalDateString(-14),
-      getOffsetLocalDateString(-16),
-      getOffsetLocalDateString(-19),
-      getOffsetLocalDateString(-23),
-      getOffsetLocalDateString(-26),
-    ],
-    createdAt: Date.now() - 86400000 * 30,
-  },
-  {
-    id: "habit-4",
-    title: "Sleep Before 11 PM",
-    category: "health",
-    iconName: "moon",
-    streak: 2,
-    completedDates: [
-      getOffsetLocalDateString(-1),
-      getOffsetLocalDateString(-2),
-      getOffsetLocalDateString(-4),
-      getOffsetLocalDateString(-8),
-      getOffsetLocalDateString(-11),
-      getOffsetLocalDateString(-14),
-      getOffsetLocalDateString(-18),
-      getOffsetLocalDateString(-22),
-      getOffsetLocalDateString(-25),
-    ],
-    createdAt: Date.now() - 86400000 * 30,
-  },
-  {
-    id: "habit-5",
-    title: "Daily Revision",
-    category: "study",
-    iconName: "rotate-cw",
-    streak: 6,
-    completedDates: [
-      getOffsetLocalDateString(0),
-      getOffsetLocalDateString(-1),
-      getOffsetLocalDateString(-2),
-      getOffsetLocalDateString(-3),
-      getOffsetLocalDateString(-4),
-      getOffsetLocalDateString(-5),
-      getOffsetLocalDateString(-7),
-      getOffsetLocalDateString(-8),
-      getOffsetLocalDateString(-10),
-      getOffsetLocalDateString(-12),
-      getOffsetLocalDateString(-13),
-      getOffsetLocalDateString(-15),
-      getOffsetLocalDateString(-17),
-      getOffsetLocalDateString(-20),
-      getOffsetLocalDateString(-21),
-      getOffsetLocalDateString(-24),
-      getOffsetLocalDateString(-27),
-    ],
-    createdAt: Date.now() - 86400000 * 30,
-  },
-];
-
-const defaultGoals: Goal[] = [
-  {
-    id: "goal-1",
-    title: "Master Accountancy Chapter 4 & 5",
-    description: "Complete all practice problems, ratio formulas, and ledger reconciliations.",
-    category: "Academic",
-    subjectId: "sub-1",
-    targetDate: getTodayString(),
-    progress: 80,
-    completed: false,
-    createdAt: Date.now() - 86400000 * 5,
-  },
-  {
-    id: "goal-2",
-    title: "Maintain 100% Hydration Streak",
-    description: "Drink at least 8 glasses of water every day for 14 consecutive days.",
-    category: "Health",
-    targetDate: getTodayString(),
-    progress: 65,
-    completed: false,
-    createdAt: Date.now() - 86400000 * 8,
-  },
-  {
-    id: "goal-3",
-    title: "Economics Macroeconomics Mock Paper",
-    description: "Score 90%+ in the practice exam before Friday.",
-    category: "Academic",
-    subjectId: "sub-2",
-    targetDate: getTodayString(),
-    progress: 40,
-    completed: false,
-    createdAt: Date.now() - 86400000 * 3,
-  },
-];
+const defaultGoals: Goal[] = [];
 
 const defaultCalendarEvents: CalendarEvent[] = [
   {
@@ -1093,74 +845,27 @@ function seedNewProfileData(profile: StudentProfile): void {
   };
   saveSettings(settings, profId);
 
-  // Tasks
-  const tasks: Task[] = [
-    {
-      id: `task-${Date.now()}-1`,
-      title: `Welcome ${profile.name}! Plan your weekly study goals`,
-      description: "Review your active subjects and syllabus roadmap.",
-      date: getTodayString(),
-      time: "10:00",
-      priority: "high",
-      category: "study",
-      completed: false,
-      createdAt: Date.now(),
-    },
-    {
-      id: `task-${Date.now()}-2`,
-      title: "Explore Career Center Matches",
-      description: "Take career assessment or select a target career path.",
-      date: getTodayString(),
-      time: "15:00",
-      priority: "medium",
-      category: "study",
-      completed: false,
-      createdAt: Date.now(),
-    },
-  ];
-  saveTasks(tasks, profId);
+  // Tasks: start empty for new students so empty state & onboarding guide cards appear
+  saveTasks([], profId);
+
+  // Study Sessions & Focus Sessions: start empty for new students
+  saveStudySessions([], profId);
+  saveFocusSessions([], profId);
 
   // Subjects
   saveSubjects(getDefaultStudySubjectsForStream(profile.stream, profile.classLevel), profId);
 
-  // Notes
-  const notes: Note[] = [
-    {
-      id: `note-${Date.now()}-1`,
-      title: `${profile.name}'s Quick Study Scratchpad`,
-      content: `Welcome to Garia OS v1.5 Multi-Student Intelligence!
-Stream: ${profile.stream}
-Class: ${profile.classLevel}
-Board: ${profile.board}
-
-Use this space to write formulas, key terms, or daily notes.`,
-      pinned: true,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-  ];
-  saveNotes(notes, profId);
+  // Notes: start empty for new students so empty state & onboarding guide cards appear
+  saveNotes([], profId);
 
   // Habits
   saveHabits(defaultHabits, profId);
 
   // Water
-  saveWater({ date: getTodayString(), glasses: 4, goal: 8 }, profId);
+  saveWater({ date: getTodayString(), glasses: 0, goal: 8 }, profId);
 
-  // Goals
-  const goals: Goal[] = [
-    {
-      id: `goal-${Date.now()}-1`,
-      title: `Complete ${profile.stream} Core Syllabus First Pass`,
-      description: "Aim for 80%+ completion across all subjects.",
-      category: "Academic",
-      targetDate: getTodayString(),
-      progress: 30,
-      completed: false,
-      createdAt: Date.now(),
-    },
-  ];
-  saveGoals(goals, profId);
+  // Goals: start empty for new students so empty state & onboarding guide cards appear
+  saveGoals([], profId);
 
   // Calendar
   const events: CalendarEvent[] = [
@@ -1382,44 +1087,7 @@ export const saveSubjects = (subs: Subject[], profileId?: string): void => {
 
 export const loadStudySessions = (profileId?: string): StudySession[] => {
   const pId = profileId || loadActiveProfileId();
-  const defaultStudySessions: StudySession[] = [
-    {
-      id: "study-seed-1",
-      subjectId: "sub-1",
-      subjectName: "Accountancy",
-      durationSeconds: 3600,
-      date: getOffsetLocalDateString(0),
-      timestamp: Date.now() - 3600000 * 2,
-      notes: "Completed ratio analysis & balance sheet adjustments.",
-    },
-    {
-      id: "study-seed-2",
-      subjectId: "sub-2",
-      subjectName: "Economics",
-      durationSeconds: 5400,
-      date: getOffsetLocalDateString(-1),
-      timestamp: Date.now() - 86400000,
-      notes: "Macroeconomics national income & monetary policy.",
-    },
-    {
-      id: "study-seed-3",
-      subjectId: "sub-3",
-      subjectName: "Business Studies",
-      durationSeconds: 4200,
-      date: getOffsetLocalDateString(-2),
-      timestamp: Date.now() - 86400000 * 2,
-      notes: "Principles of Management & case study practice.",
-    },
-    {
-      id: "study-seed-4",
-      subjectId: "sub-1",
-      subjectName: "Accountancy",
-      durationSeconds: 4800,
-      date: getOffsetLocalDateString(-3),
-      timestamp: Date.now() - 86400000 * 3,
-      notes: "Partnership accounts reconstitution practice.",
-    },
-  ];
+  const defaultStudySessions: StudySession[] = [];
   return getItem(getProfileKey(pId, STORAGE_KEYS.STUDY_SESSIONS), defaultStudySessions);
 };
 export const saveStudySessions = (sessions: StudySession[], profileId?: string): void => {
@@ -1428,14 +1096,179 @@ export const saveStudySessions = (sessions: StudySession[], profileId?: string):
   setItem(getProfileKey(pId, STORAGE_KEYS.STUDY_SESSIONS), sessions);
 };
 
+export const normalizeNote = (
+  note: Partial<Note> & { id: string; title: string; content: string }
+): Note => {
+  const rawLabels: any[] = Array.isArray(note.labels)
+    ? note.labels
+    : Array.isArray(note.colorLabels)
+    ? note.colorLabels
+    : Array.isArray(note.tags)
+    ? note.tags
+    : [];
+
+  const mergedColors: Record<string, string> = {
+    ...(note.labelColors && typeof note.labelColors === "object"
+      ? note.labelColors
+      : {}),
+  };
+
+  if (Array.isArray(note.colorLabels)) {
+    for (const cl of note.colorLabels) {
+      if (cl && typeof cl.name === "string" && cl.name.trim() && cl.color) {
+        mergedColors[cl.name.trim()] = cl.color;
+      }
+    }
+  }
+
+  const seenLower = new Set<string>();
+  const cleanLabels: string[] = [];
+  const cleanLabelColors: Record<string, string> = {};
+
+  for (const item of rawLabels) {
+    let name = "";
+    let explicitColor = "";
+    if (typeof item === "string") {
+      name = item.trim();
+    } else if (item && typeof item === "object" && typeof item.name === "string") {
+      name = item.name.trim();
+      if (typeof item.color === "string" && item.color.trim()) {
+        explicitColor = item.color.trim();
+      }
+    }
+    if (!name) continue;
+    const lower = name.toLowerCase();
+    if (seenLower.has(lower)) continue;
+    seenLower.add(lower);
+    cleanLabels.push(name);
+    const matchedKey = Object.keys(mergedColors).find(
+      (k) => k.toLowerCase() === lower
+    );
+    const resolvedColor =
+      explicitColor || (matchedKey ? mergedColors[matchedKey] : "cyan");
+    cleanLabelColors[name] = resolvedColor;
+  }
+
+  const cleanColorLabels = cleanLabels.map((lbl) => ({
+    id: `lbl-${lbl.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name: lbl,
+    color: cleanLabelColors[lbl] || "cyan",
+  }));
+
+  const cleanFolder =
+    typeof note.folder === "string" && note.folder.trim()
+      ? note.folder.trim()
+      : "General";
+  const cleanReminderDate =
+    typeof note.reminderDate === "string" && note.reminderDate.trim()
+      ? note.reminderDate.trim()
+      : undefined;
+  const isEncrypted =
+    Boolean(note.isEncrypted) ||
+    (typeof note.content === "string" && note.content.startsWith("ENCv1:"));
+
+  const cleanVersions = Array.isArray(note.versions)
+    ? note.versions
+        .filter((v) => v && (typeof v === "object" || typeof v === "string"))
+        .map((v: any, idx: number) => {
+          if (typeof v === "string") {
+            const ts = Date.now() - idx * 1000;
+            return {
+              id: `ver-${ts}-${idx}`,
+              title: note.title || "Snapshot",
+              content: v,
+              timestamp: ts,
+              createdAt: ts,
+            };
+          }
+          const ts =
+            typeof v.timestamp === "number"
+              ? v.timestamp
+              : typeof v.createdAt === "number"
+              ? v.createdAt
+              : Date.now();
+          return {
+            id:
+              typeof v.id === "string" && v.id.trim()
+                ? v.id.trim()
+                : `ver-${ts}-${idx}`,
+            title:
+              typeof v.title === "string" && v.title.trim()
+                ? v.title.trim()
+                : note.title || "Snapshot",
+            content: typeof v.content === "string" ? v.content : "",
+            timestamp: ts,
+            createdAt: ts,
+            ...(typeof v.summary === "string" && v.summary.trim()
+              ? { summary: v.summary.trim() }
+              : {}),
+          };
+        })
+    : [];
+
+  const seenEmails = new Set<string>();
+  const cleanSharedWith: string[] = [];
+  if (Array.isArray(note.sharedWith)) {
+    for (const rawEmail of note.sharedWith) {
+      const email =
+        typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+      if (email && !seenEmails.has(email)) {
+        seenEmails.add(email);
+        cleanSharedWith.push(email);
+      }
+    }
+  }
+
+  return {
+    id: note.id,
+    title: note.title,
+    content: note.content ?? "",
+    pinned: Boolean(note.pinned),
+    archived: Boolean(note.archived),
+    labels: cleanLabels,
+    labelColors: cleanLabelColors,
+    colorLabels: cleanColorLabels,
+    folder: cleanFolder,
+    ...(cleanReminderDate ? { reminderDate: cleanReminderDate } : {}),
+    ...(isEncrypted ? { isEncrypted: true } : {}),
+    ...(note.encryptedContent ? { encryptedContent: note.encryptedContent } : {}),
+    versions: cleanVersions,
+    sharedWith: cleanSharedWith,
+    ...(note.sharedPermissions && typeof note.sharedPermissions === "object"
+      ? { sharedPermissions: note.sharedPermissions }
+      : {}),
+    createdAt: typeof note.createdAt === "number" ? note.createdAt : Date.now(),
+    updatedAt:
+      typeof note.updatedAt === "number"
+        ? note.updatedAt
+        : typeof note.createdAt === "number"
+        ? note.createdAt
+        : Date.now(),
+    tags: cleanLabels,
+  };
+};
+
+export const sortNotesPinnedFirst = (notesList: Note[]): Note[] => {
+  if (!Array.isArray(notesList)) return [];
+  return [...notesList]
+    .map((n) => normalizeNote(n))
+    .sort((a, b) => {
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) {
+        return a.pinned ? -1 : 1;
+      }
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    });
+};
+
 export const loadNotes = (profileId?: string): Note[] => {
   const pId = profileId || loadActiveProfileId();
-  return getItem(getProfileKey(pId, STORAGE_KEYS.NOTES), defaultNotes);
+  const raw = getItem(getProfileKey(pId, STORAGE_KEYS.NOTES), defaultNotes);
+  return sortNotesPinnedFirst(raw);
 };
 export const saveNotes = (notes: Note[], profileId?: string): void => {
   const pId = profileId || loadActiveProfileId();
   if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.NOTES), notes);
+  setItem(getProfileKey(pId, STORAGE_KEYS.NOTES), sortNotesPinnedFirst(notes));
 };
 
 export const loadHabits = (profileId?: string): Habit[] => {
@@ -1472,36 +1305,7 @@ export const saveWater = (water: WaterLog, profileId?: string): void => {
 
 export const loadFocusSessions = (profileId?: string): FocusSessionLog[] => {
   const pId = profileId || loadActiveProfileId();
-  const defaultFocusLogs: FocusSessionLog[] = [
-    {
-      id: "focus-seed-1",
-      type: "focus",
-      durationMinutes: 25,
-      completedAt: Date.now() - 3600000 * 4,
-      date: getOffsetLocalDateString(0),
-    },
-    {
-      id: "focus-seed-2",
-      type: "focus",
-      durationMinutes: 25,
-      completedAt: Date.now() - 3600000 * 1.5,
-      date: getOffsetLocalDateString(0),
-    },
-    {
-      id: "focus-seed-3",
-      type: "focus",
-      durationMinutes: 50,
-      completedAt: Date.now() - 86400000,
-      date: getOffsetLocalDateString(-1),
-    },
-    {
-      id: "focus-seed-4",
-      type: "focus",
-      durationMinutes: 25,
-      completedAt: Date.now() - 86400000 * 2,
-      date: getOffsetLocalDateString(-2),
-    },
-  ];
+  const defaultFocusLogs: FocusSessionLog[] = [];
   return getItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), defaultFocusLogs);
 };
 export const saveFocusSessions = (focus: FocusSessionLog[], profileId?: string): void => {
@@ -2578,6 +2382,40 @@ export const restoreWorkspaceSnapshot = (snapshot: {
   }
 };
 
+export const clearStudentWorkspaceData = (profileId?: string): void => {
+  const pId = profileId || loadActiveProfileId();
+  if (!pId) return;
+
+  const activeProf = loadProfiles().find((p) => p.id === pId);
+  const studentName = activeProf?.name || "Student";
+
+  saveTasks([], pId);
+  saveStudySessions([], pId);
+  saveNotes([], pId);
+  saveFlashcardDecks([], pId);
+  saveHabits([], pId);
+  saveWater({ date: getTodayString(), glasses: 0, goal: 8 }, pId);
+  saveFocusSessions([], pId);
+  saveGoals([], pId);
+  saveCalendarEvents([], pId);
+  saveAcademicTests([], pId);
+  saveAcademicPractice([], pId);
+  saveExamMockTests([], pId);
+  saveExamTestRecords([], pId);
+  saveAbyaChat(createDefaultAbyaMessages(studentName), pId);
+  saveAbyaChatSessions([], pId);
+
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(`garia_timer_state_${pId}`);
+    localStorage.removeItem(`garia_mock_test_history_${pId}`);
+    localStorage.removeItem(`garia_question_progress_${pId}`);
+    localStorage.removeItem(`garia_abya_chat_sessions_${pId}`);
+    localStorage.removeItem(`garia_home_interacted_modules_${pId}`);
+    localStorage.removeItem(`garia_home_guide_dismissed_${pId}`);
+    localStorage.removeItem(`garia_morning_motivation_v1_${pId}`);
+  }
+};
+
 export const clearAllData = () => {
   const profiles = loadProfiles();
   profiles.forEach((p) => {
@@ -2588,6 +2426,12 @@ export const clearAllData = () => {
     localStorage.removeItem(`garia_p_${p.id}_dashboard_widgets_v1`);
     localStorage.removeItem(`garia_p_${p.id}_abya_sessions_v1`);
     localStorage.removeItem(`garia_p_${p.id}_abya_language_v1`);
+    localStorage.removeItem(`garia_timer_state_${p.id}`);
+    localStorage.removeItem(`garia_mock_test_history_${p.id}`);
+    localStorage.removeItem(`garia_question_progress_${p.id}`);
+    localStorage.removeItem(`garia_abya_chat_sessions_${p.id}`);
+    localStorage.removeItem(`garia_home_interacted_modules_${p.id}`);
+    localStorage.removeItem(`garia_home_guide_dismissed_${p.id}`);
   });
   Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem("garia_dashboard_widgets_v2");
@@ -2596,6 +2440,32 @@ export const clearAllData = () => {
   localStorage.removeItem(ACTIVE_PROFILE_KEY);
   localStorage.removeItem(getProfilesKey());
   localStorage.removeItem(getActiveProfileKey());
+
+  if (typeof localStorage !== "undefined") {
+    const keysToPurge: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (
+        k &&
+        (k.startsWith("garia_") ||
+          k.startsWith("smart_") ||
+          k.startsWith("vvi_") ||
+          k.startsWith("revisions_") ||
+          k.startsWith("practice_") ||
+          k.startsWith("academic_") ||
+          k.startsWith("career_") ||
+          k.startsWith("exam_"))
+      ) {
+        keysToPurge.push(k);
+      }
+    }
+    keysToPurge.forEach((k) => localStorage.removeItem(k));
+  }
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      sessionStorage.clear();
+    } catch {}
+  }
 };
 
 export const clearOfflineCache = async (): Promise<{ cachesCleared: number; storageFreedKb: number }> => {

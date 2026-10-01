@@ -276,6 +276,8 @@ export function executeAbyaModuleAction(
           title,
           content,
           pinned: false,
+          archived: false,
+          labels: noteTags,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           tags: noteTags,

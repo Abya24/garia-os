@@ -8,6 +8,10 @@ import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from "@google
 import dotenv from "dotenv";
 import { verifyFirebaseIdToken } from "./server/firebaseAuth.ts";
 import { MOTIVATIONAL_QUOTES, fetchDailyQuote } from "./src/utils/quotes.ts";
+import {
+  suggestSmartTagsFromContent,
+  parseSmartTagsResponse,
+} from "./src/utils/noteFeatures.ts";
 
 dotenv.config();
 
@@ -292,6 +296,68 @@ async function startServer() {
       configured: hasEnvKey,
       timestamp: Date.now(),
     });
+  });
+
+  // Abya AI Note Smart Tagging Endpoint
+  app.post("/api/ai/smart-tags", async (req, res) => {
+    try {
+      const { title = "", content = "", existingLabels = [] } = req.body || {};
+      const safeTitle = typeof title === "string" ? title.slice(0, 500) : "";
+      const safeContent = typeof content === "string" ? content.slice(0, 10000) : "";
+      const safeExisting = Array.isArray(existingLabels)
+        ? existingLabels.filter((l) => typeof l === "string").slice(0, 20)
+        : [];
+
+      const fallbackTags = suggestSmartTagsFromContent(
+        safeContent,
+        safeTitle,
+        safeExisting
+      );
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey && (safeTitle.trim() || safeContent.trim())) {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: {
+              headers: {
+                "User-Agent": "aistudio-build",
+              },
+            },
+          });
+          const prompt = `You are Abya AI, a student study assistant. Analyze the following study note and suggest 3 to 5 concise, relevant academic tags or labels (1-2 words each, Title Case). Return ONLY a JSON array of strings, e.g. ["Physics", "Thermodynamics", "Formula"].\n\nTitle: ${safeTitle}\nContent: ${safeContent}`;
+          const response = await ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: prompt,
+          });
+          const parsedAiTags = parseSmartTagsResponse(response.text || "");
+          if (parsedAiTags.length > 0) {
+            const combined = Array.from(
+              new Set([...parsedAiTags, ...fallbackTags])
+            ).slice(0, 6);
+            return res.json({
+              status: "ok",
+              tags: combined,
+              provider: "online_ai",
+            });
+          }
+        } catch {
+          // Fall back gracefully to deterministic Abya AI curriculum tagger
+        }
+      }
+
+      return res.json({
+        status: "ok",
+        tags: fallbackTags,
+        provider: "abya_engine",
+      });
+    } catch {
+      return res.json({
+        status: "ok",
+        tags: ["Study Note", "Revision"],
+        provider: "abya_engine",
+      });
+    }
   });
 
   // Abya AI Multimodal & Advanced Mode Endpoint
@@ -740,9 +806,7 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
   const indexPath = path.join(distPath, "index.html");
   const isProduction =
     process.env.NODE_ENV === "production" ||
-    Boolean(process.env.K_SERVICE) ||
-    Boolean(process.env.K_REVISION) ||
-    (process.env.npm_lifecycle_event === "start" && fs.existsSync(indexPath));
+    process.env.npm_lifecycle_event === "start";
 
   // Cache & PWA Headers Middleware
   app.use((req, res, next) => {
@@ -772,11 +836,18 @@ ${examContext ? `- Target Exam: "${examContext.examName}", ${examContext.daysRem
 
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      // Never serve index.html fallback for missing static assets/chunks
+      if (
+        req.path.startsWith("/assets/") ||
+        /\.(js|mjs|css|map|json|png|jpg|jpeg|svg|ico|woff|woff2)$/i.test(req.path)
+      ) {
+        return res.status(404).end();
+      }
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
-        res.status(200).send("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Garia OS</title></head><body><div id='root'></div></body></html>");
+        res.status(503).send("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Garia OS</title></head><body><div id='root'></div></body></html>");
       }
     });
   }

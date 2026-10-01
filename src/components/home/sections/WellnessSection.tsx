@@ -15,6 +15,7 @@ import { Habit, WaterLog, ActiveTab } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
 import { getTodayString } from "../../../utils/storage";
 import { HabitWeeklySparkline } from "../../HabitWeeklySparkline";
+import { ModuleEmptyState } from "../../ModuleEmptyState";
 
 interface WellnessSectionProps {
   habits: Habit[];
@@ -169,18 +170,29 @@ export const WellnessSection: React.FC<WellnessSectionProps> = ({
                 })}
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 text-center space-y-1.5">
-                <p className="text-xs text-slate-400">
-                  Track habits like Morning Revision, NCERT Practice, and Exercise.
-                </p>
-                <button
-                  onClick={() => onNavigate("habits")}
-                  className="text-xs text-amber-300 font-bold hover:underline inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Add First Habit</span>
-                </button>
-              </div>
+              <ModuleEmptyState
+                id="home-habits-empty-state"
+                testId="habits-empty-state"
+                actionButtonId="habits-empty-get-started-btn"
+                title={
+                  currentLanguage === "hi"
+                    ? "अभी तक कोई दैनिक आदत नहीं जोड़ी गई"
+                    : "No Daily Study Habits Tracked Yet"
+                }
+                description={
+                  currentLanguage === "hi"
+                    ? "सुबह का रिवीजन, NCERT अभ्यास और व्यायाम जैसी आदतें ट्रैक करें।"
+                    : "Build daily consistency with habits like Morning Formula Revision, NCERT Practice, and Exercise."
+                }
+                illustration={Flame}
+                accentColor="amber"
+                actionLabel={
+                  currentLanguage === "hi"
+                    ? "शुरू करें — पहली आदत जोड़ें"
+                    : "Get Started — Add First Habit"
+                }
+                onAction={() => onNavigate("habits")}
+              />
             )}
           </div>
 

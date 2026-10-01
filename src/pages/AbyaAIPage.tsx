@@ -78,6 +78,8 @@ import {
   ExamProfile,
   Task,
   Habit,
+  StudySession,
+  FocusSessionLog,
 } from "../types";
 import { AbyaLiveVoiceModal } from "../components/AbyaLiveVoiceModal";
 import { AcademicDecisionEngineSection } from "../components/home/sections/AcademicDecisionEngineSection";
@@ -136,6 +138,8 @@ interface AbyaAIPageProps {
   academicPractice?: AcademicPracticeSession[];
   examProfile?: ExamProfile;
   habits?: Habit[];
+  studySessions?: StudySession[];
+  focusLogs?: FocusSessionLog[];
 }
 
 export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
@@ -163,6 +167,8 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
   academicPractice = [],
   examProfile,
   habits = [],
+  studySessions = [],
+  focusLogs = [],
 }) => {
   // Navigation between Home Dashboard and Active Conversation Thread
   const [viewMode, setViewMode] = useState<"home" | "chat">(
@@ -407,13 +413,24 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
     [pendingTasks]
   );
 
-  // Study Time Calculation
+  // Study Time Calculation (combines logged study sessions and focus timer logs for today)
   const studyTimeMinutesToday = useMemo(() => {
     const todayStr = getTodayString();
+    const sessionMins = Math.round(
+      studySessions
+        .filter((s) => s.date === todayStr)
+        .reduce((acc, s) => acc + (s.durationSeconds || 0), 0) / 60
+    );
+    const focusMins = focusLogs
+      .filter((l) => l.date === todayStr && l.type === "focus")
+      .reduce((acc, l) => acc + (l.durationMinutes || 0), 0);
+    if (sessionMins + focusMins > 0) {
+      return sessionMins + focusMins;
+    }
     return habits
       .filter((h) => h.completedDates.includes(todayStr))
-      .reduce((acc, h) => acc + (h.durationMinutes || 30), 0);
-  }, [habits]);
+      .reduce((acc, h) => acc + (h.durationMinutes || 0), 0);
+  }, [studySessions, focusLogs, habits]);
 
   const targetStudyHours = examProfile?.dailyStudyHours || 4;
   const studyTimeHours = Math.floor(studyTimeMinutesToday / 60);
@@ -669,16 +686,15 @@ export const AbyaAIPage: React.FC<AbyaAIPageProps> = ({
             <span className="hidden sm:inline">Voice</span>
           </button>
 
-          {/* Language Switcher */}
+          {/* Language Switcher (Icon-Only Control) */}
           <button
             onClick={() => setShowLanguageModal(true)}
             id="abya-language-switcher-btn"
-            className="px-2.5 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 border border-purple-500/30 text-purple-200 transition-all text-xs flex items-center gap-1 font-semibold shrink-0 shadow-sm"
-            title="Switch Language"
+            className="p-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-95 border border-purple-500/30 text-purple-200 transition-all flex items-center justify-center shrink-0 shadow-sm"
+            title={`Language: ${abyaLanguage} (Click to switch)`}
+            aria-label={`Switch Abya AI Language (Current: ${abyaLanguage})`}
           >
-            <Globe className="w-3 h-3 text-purple-400 shrink-0" />
-            <span className="hidden xs:inline text-xs">{abyaLanguage}</span>
-            <ChevronDown className="w-2.5 h-2.5 text-purple-300 opacity-70 shrink-0" />
+            <Globe className="w-4 h-4 text-purple-400 shrink-0" />
           </button>
 
           {/* More Options */}

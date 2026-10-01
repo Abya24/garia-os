@@ -46,14 +46,50 @@ export interface StudySession {
   notes?: string;
 }
 
+export interface NoteColorLabel {
+  id?: string;
+  name: string;
+  color: string;
+}
+
+export interface NoteVersion {
+  id: string;
+  title: string;
+  content: string;
+  timestamp: number;
+  createdAt?: number;
+  summary?: string;
+}
+
 export interface Note {
   id: string;
   title: string;
   content: string;
   pinned: boolean;
+  archived?: boolean;
+  labels?: string[];
+  labelColors?: Record<string, string>;
+  colorLabels?: NoteColorLabel[];
+  folder?: string;
+  reminderDate?: string;
+  isEncrypted?: boolean;
+  encryptedContent?: string;
+  versions?: NoteVersion[];
+  sharedWith?: string[];
+  sharedPermissions?: Record<string, "view" | "edit">;
   createdAt: number;
   updatedAt: number;
   tags?: string[];
+}
+
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  content: string;
+  folder?: string;
+  labels?: string[];
+  isCustom?: boolean;
 }
 
 export interface Habit {
@@ -307,6 +343,8 @@ export interface UserSettings {
   waterGoal: number;
   defaultFocusDuration: number;
   defaultBreakDuration: number;
+  dailyStudyGoalMinutes?: number;
+  pomodoroFocusMinutes?: number;
   language?: AbyaLanguageSetting;
   dashboardWidgets?: DashboardWidgetConfig[];
   customTheme?: CustomThemeConfig;

@@ -13,10 +13,12 @@ import {
   Timer,
   Sparkles,
   BookOpen,
+  ClipboardList,
 } from "lucide-react";
 import { Task, StudySession, FocusSessionLog, ActiveTab, Priority } from "../../../types";
 import { AppLanguage } from "../../../utils/i18n";
 import { getTodayString } from "../../../utils/storage";
+import { ModuleEmptyState } from "../../ModuleEmptyState";
 
 interface DailyExecutionSectionProps {
   tasks: Task[];
@@ -28,6 +30,7 @@ interface DailyExecutionSectionProps {
   onQuickAddTask?: () => void;
   onAddTask?: (task: Omit<Task, "id" | "createdAt">) => void;
   onToggleTask?: (task: Task) => void;
+  tasksEmptyState?: React.ReactNode;
 }
 
 export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
@@ -40,6 +43,7 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
   onQuickAddTask,
   onAddTask,
   onToggleTask,
+  tasksEmptyState,
 }) => {
   const todayStr = getTodayString();
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all");
@@ -313,25 +317,52 @@ export const DailyExecutionSection: React.FC<DailyExecutionSectionProps> = ({
                   </div>
                 ))}
               </div>
+            ) : taskFilter !== "completed" && tasksEmptyState ? (
+              tasksEmptyState
             ) : (
-              <div className="p-6 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400/60 mx-auto" />
-                <p className="text-xs text-slate-300">
-                  {taskFilter === "completed"
-                    ? "No completed tasks yet today."
-                    : "No pending tasks scheduled for today. You are completely on track!"}
-                </p>
-                <button
-                  onClick={() => {
-                    if (onAddTask) setIsAdding(true);
-                    else if (onQuickAddTask) onQuickAddTask();
-                  }}
-                  className="text-xs text-emerald-400 font-bold hover:underline inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{currentLanguage === "hi" ? "+ नया कार्य जोड़ें" : "+ Schedule a study task"}</span>
-                </button>
-              </div>
+              <ModuleEmptyState
+                id="home-tasks-empty-state"
+                testId="tasks-empty-state"
+                actionButtonId="tasks-empty-get-started-btn"
+                title={
+                  taskFilter === "completed"
+                    ? currentLanguage === "hi"
+                      ? "आज अभी तक कोई कार्य पूरा नहीं हुआ"
+                      : "No Completed Tasks Yet Today"
+                    : currentLanguage === "hi"
+                    ? "आज के लिए कोई अध्ययन कार्य निर्धारित नहीं है"
+                    : "Your Today's Task Schedule is Empty"
+                }
+                description={
+                  taskFilter === "completed"
+                    ? currentLanguage === "hi"
+                      ? "अपनी दैनिक प्रगति शुरू करने के लिए किसी कार्य को पूरा करें या नया कार्य जोड़ें।"
+                      : "Check off a pending study task or add a new topic to start building today's momentum."
+                    : currentLanguage === "hi"
+                    ? "अध्याय रिवीजन, होमवर्क या मॉक टेस्ट अभ्यास जोड़कर अपने अध्ययन दिवस की शुरुआत करें।"
+                    : "Plan your first chapter revision, assignment, or practice session to kickstart your study day."
+                }
+                illustration={ClipboardList}
+                accentColor="emerald"
+                actionLabel={
+                  currentLanguage === "hi"
+                    ? "शुरू करें — टास्क मैनेजर खोलें"
+                    : "Get Started"
+                }
+                onAction={() => onNavigate("tasks")}
+                secondaryActionLabel={
+                  currentLanguage === "hi" ? "+ त्वरित कार्य जोड़ें" : "+ Quick Add Here"
+                }
+                onSecondaryAction={() => {
+                  if (onAddTask) {
+                    setIsAdding(true);
+                  } else if (onQuickAddTask) {
+                    onQuickAddTask();
+                  } else {
+                    onNavigate("tasks");
+                  }
+                }}
+              />
             )}
           </div>
 

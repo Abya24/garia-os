@@ -73,6 +73,11 @@
         "title": { "type": "string", "maxLength": 256 },
         "content": { "type": "string", "maxLength": 50000 },
         "pinned": { "type": "boolean" },
+        "archived": { "type": "boolean" },
+        "labels": { "type": "array" },
+        "labelColors": { "type": "object" },
+        "versions": { "type": "array" },
+        "sharedWith": { "type": "array" },
         "userId": { "type": "string", "maxLength": 128 },
         "createdAt": { "type": "number" },
         "updatedAt": { "type": "number" }

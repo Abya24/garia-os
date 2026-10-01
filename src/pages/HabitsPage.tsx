@@ -5,17 +5,15 @@ import {
   CheckCircle2,
   Circle,
   Calendar,
-  Award,
   Trash2,
   X,
   Sparkles,
-  ArrowLeft,
   Target,
   Trophy,
   Gift,
-  Zap,
   TrendingUp,
   BarChart3,
+  Sliders,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -29,7 +27,6 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-  Legend,
 } from "recharts";
 import { Habit } from "../types";
 import { getTodayString, formatLocalDate } from "../utils/storage";
@@ -305,7 +302,6 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
   onUpdateHabit,
   onToggleHabitDate,
   onDeleteHabit,
-  onBack,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -317,6 +313,8 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
   // Trend Visualization Filters & Mode
   const [trendCategoryFilter, setTrendCategoryFilter] = useState<string>("all");
   const [trendChartMode, setTrendChartMode] = useState<"area" | "bar">("area");
+  const [habitSortBy, setHabitSortBy] = useState<"streak" | "today" | "title">("streak");
+  const [minStreakFilter, setMinStreakFilter] = useState<number>(0);
 
   // Streak Goal Modal State
   const [goalModalHabit, setGoalModalHabit] = useState<Habit | null>(null);
@@ -381,10 +379,29 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
     });
   };
 
+  const displayedHabits = useMemo(() => {
+    const filtered = habits.filter((h) => {
+      if (trendCategoryFilter !== "all" && h.category !== trendCategoryFilter) return false;
+      if (h.streak < minStreakFilter) return false;
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      if (habitSortBy === "today") {
+        const aDone = a.completedDates.includes(todayStr) ? 1 : 0;
+        const bDone = b.completedDates.includes(todayStr) ? 1 : 0;
+        if (bDone !== aDone) return bDone - aDone;
+      }
+      if (habitSortBy === "title") {
+        return a.title.localeCompare(b.title);
+      }
+      return b.streak - a.streak;
+    });
+  }, [habits, trendCategoryFilter, minStreakFilter, habitSortBy, todayStr]);
+
   return (
     <div className="space-y-6 pb-4 md:pb-0 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Classic Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 classic-paper-header p-4 sm:p-5 rounded-2xl">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
@@ -396,13 +413,94 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold hover:shadow-lg hover:shadow-rose-500/25 transition-all transform active:scale-95 text-xs sm:text-sm"
-        >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span>New Habit</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Classic Category Dropdown */}
+          <select
+            id="habits-category-dropdown"
+            aria-label="Filter Habits by Category"
+            value={trendCategoryFilter}
+            onChange={(e) =>
+              setTrendCategoryFilter(
+                e.target.value as "all" | "study" | "health" | "mindset"
+              )
+            }
+            className="classic-select text-xs font-semibold rounded-lg px-2.5 py-2 cursor-pointer"
+          >
+            <option value="all">Category: All Habits</option>
+            <option value="study">Category: Study</option>
+            <option value="health">Category: Health</option>
+            <option value="mindset">Category: Mindset</option>
+          </select>
+
+          {/* Classic Sort Dropdown */}
+          <select
+            id="habits-sort-dropdown"
+            aria-label="Sort Habits"
+            value={habitSortBy}
+            onChange={(e) =>
+              setHabitSortBy(e.target.value as "streak" | "today" | "title")
+            }
+            className="classic-select text-xs font-semibold rounded-lg px-2.5 py-2 cursor-pointer"
+          >
+            <option value="streak">Sort: Highest Streak</option>
+            <option value="today">Sort: Completed Today</option>
+            <option value="title">Sort: Alphabetical (A–Z)</option>
+          </select>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold hover:shadow-lg hover:shadow-rose-500/25 transition-all transform active:scale-95 text-xs sm:text-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>New Habit</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Classic Streak Filter & Default Goal Slider Bar */}
+      <div className="glass-card rounded-2xl p-4 border border-amber-500/20 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+        <div className="flex items-center gap-3">
+          <Sliders className="w-4 h-4 text-amber-400 shrink-0" />
+          <label
+            htmlFor="habits-min-streak-slider"
+            className="text-xs font-bold text-slate-300 whitespace-nowrap"
+          >
+            Min Streak Filter:
+          </label>
+          <input
+            id="habits-min-streak-slider"
+            type="range"
+            min={0}
+            max={30}
+            step={1}
+            value={minStreakFilter}
+            onChange={(e) => setMinStreakFilter(Number(e.target.value))}
+            aria-label="Filter Habits by Minimum Streak"
+            className="classic-slider flex-1"
+          />
+          <span className="text-xs font-mono font-bold text-amber-300 min-w-[4rem] text-right">
+            {minStreakFilter}+ days
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor="habits-chart-style-dropdown"
+            className="text-xs font-bold text-slate-300 whitespace-nowrap"
+          >
+            Trend Chart Style:
+          </label>
+          <select
+            id="habits-chart-style-dropdown"
+            aria-label="Select Habit Trend Chart Style"
+            value={trendChartMode}
+            onChange={(e) => setTrendChartMode(e.target.value as "area" | "bar")}
+            className="classic-select text-xs font-semibold rounded-lg px-3 py-1.5 cursor-pointer"
+          >
+            <option value="area">Area Trend Curve</option>
+            <option value="bar">Weekly Completion Bars</option>
+          </select>
+        </div>
       </div>
 
       {/* Monthly Habit Completion Trend Visualization Chart (Recharts) */}
@@ -694,7 +792,7 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
 
       {/* Habit List */}
       <div className="space-y-4">
-        {habits.length === 0 ? (
+        {displayedHabits.length === 0 ? (
           <div className="glass-card rounded-3xl p-12 text-center border border-white/10 space-y-3">
             <Flame className="w-12 h-12 text-rose-500 mx-auto mb-1" />
             <h3 className="font-bold text-white font-heading text-lg">
@@ -711,7 +809,7 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
             </button>
           </div>
         ) : (
-          habits.map((habit) => {
+          displayedHabits.map((habit) => {
             const isDoneToday = habit.completedDates.includes(todayStr);
             const hasGoal = habit.streakGoal && habit.streakGoal > 0;
             const targetGoal = habit.streakGoal || 0;
@@ -804,6 +902,35 @@ export const HabitsPage: React.FC<HabitsPageProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {/* Interactive Streak Goal Target Slider */}
+                  {onUpdateHabit && (
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                        Target Goal Slider:
+                      </span>
+                      <input
+                        type="range"
+                        min={3}
+                        max={90}
+                        step={1}
+                        value={targetGoal || 7}
+                        aria-label={`Streak target slider for ${habit.title}`}
+                        onChange={(e) => {
+                          const nextGoal = Number(e.target.value);
+                          onUpdateHabit({
+                            ...habit,
+                            streakGoal: nextGoal,
+                            streakGoalStartDate: habit.streakGoalStartDate || todayStr,
+                          });
+                        }}
+                        className="classic-slider flex-1"
+                      />
+                      <span className="text-[11px] font-mono font-bold text-amber-300 min-w-[3.5rem] text-right">
+                        {targetGoal || 7}d goal
+                      </span>
+                    </div>
+                  )}
 
                   {/* STREAK GOAL PROGRESS BAR (if set) */}
                   {hasGoal && (

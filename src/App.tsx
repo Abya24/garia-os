@@ -48,6 +48,7 @@ import {
   saveStudySessions,
   loadNotes,
   saveNotes,
+  sortNotesPinnedFirst,
   loadHabits,
   saveHabits,
   loadWater,
@@ -100,6 +101,7 @@ import {
   saveExamTestRecords,
   getTodayString,
   clearAllData,
+  clearStudentWorkspaceData,
   loadProfiles,
   saveProfiles,
   loadActiveProfileId,
@@ -146,94 +148,32 @@ import {
 
 // Components & Pages
 import { StatusBar } from "./components/StatusBar";
-import { BottomNav } from "./components/BottomNav";
-import { DesktopSidebar } from "./components/DesktopSidebar";
-import { SliderMenu } from "./components/SliderMenu";
 import { MoreDrawer } from "./components/MoreDrawer";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { AuthModal } from "./components/AuthModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { QuickSearchModal } from "./components/QuickSearchModal";
-import { NotificationsModal } from "./components/NotificationsModal";
-import { SavedItemsModal } from "./components/SavedItemsModal";
 import { OfflineSyncToast } from "./components/OfflineSyncToast";
 import { PinLockScreen } from "./components/PinLockScreen";
 import { PageSkeletonLoader } from "./components/PageSkeletonLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { shouldAppBeLocked, markSessionUnlocked, lockSession } from "./utils/security";
 
-// Resilient Route-Level Lazy Loader with Automatic Reload on Stale Chunks / Deployments
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  componentImport: () => Promise<{ default: T }>
-) {
-  return lazy(async () => {
-    try {
-      return await componentImport();
-    } catch (error: any) {
-      console.warn("[Garia OS] Dynamic import chunk load error detected:", error?.message || error);
-      const hasReloaded = sessionStorage.getItem("garia_chunk_reload");
-      if (!hasReloaded) {
-        sessionStorage.setItem("garia_chunk_reload", "true");
-        window.location.reload();
-        return { default: (() => null) as unknown as T };
-      }
-      try {
-        sessionStorage.removeItem("garia_chunk_reload");
-        return await componentImport();
-      } catch (retryErr) {
-        console.error("[Garia OS] Critical lazy import failure after retry:", retryErr);
-        throw retryErr;
-      }
-    }
-  });
-}
-
-// Route-Level Lazy Loaded Pages
-const HomeDashboard = lazyWithRetry(() =>
-  import("./pages/HomeDashboard").then((m) => ({ default: m.HomeDashboard }))
-);
-const TaskManager = lazyWithRetry(() =>
-  import("./pages/TaskManager").then((m) => ({ default: m.TaskManager }))
-);
-const StudyTracker = lazyWithRetry(() =>
-  import("./pages/StudyTracker").then((m) => ({ default: m.StudyTracker }))
-);
-const FocusTimer = lazyWithRetry(() =>
-  import("./pages/FocusTimer").then((m) => ({ default: m.FocusTimer }))
-);
-const NotesPage = lazyWithRetry(() =>
-  import("./pages/NotesPage").then((m) => ({ default: m.NotesPage }))
-);
-const WaterTracker = lazyWithRetry(() =>
-  import("./pages/WaterTracker").then((m) => ({ default: m.WaterTracker }))
-);
-const HabitsPage = lazyWithRetry(() =>
-  import("./pages/HabitsPage").then((m) => ({ default: m.HabitsPage }))
-);
-const GoalsPage = lazyWithRetry(() =>
-  import("./pages/GoalsPage").then((m) => ({ default: m.GoalsPage }))
-);
-const CalendarPage = lazyWithRetry(() =>
-  import("./pages/CalendarPage").then((m) => ({ default: m.CalendarPage }))
-);
-const AbyaAIPage = lazyWithRetry(() =>
-  import("./pages/AbyaAIPage").then((m) => ({ default: m.AbyaAIPage }))
-);
-const StatisticsPage = lazyWithRetry(() =>
-  import("./pages/StatisticsPage").then((m) => ({ default: m.StatisticsPage }))
-);
-const SettingsPage = lazyWithRetry(() =>
-  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
-);
-const CareerCenterPage = lazyWithRetry(() =>
-  import("./pages/CareerCenterPage").then((m) => ({ default: m.CareerCenterPage }))
-);
-const ExamCenterPage = lazyWithRetry(() =>
-  import("./pages/ExamCenterPage").then((m) => ({ default: m.ExamCenterPage }))
-);
-const FlashcardsPage = lazyWithRetry(() =>
-  import("./pages/FlashcardsPage").then((m) => ({ default: m.FlashcardsPage }))
-);
+import { HomeDashboard } from "./pages/HomeDashboard";
+import { TaskManager } from "./pages/TaskManager";
+import { StudyTracker } from "./pages/StudyTracker";
+import { FocusTimer } from "./pages/FocusTimer";
+import { NotesPage } from "./pages/NotesPage";
+import { WaterTracker } from "./pages/WaterTracker";
+import { HabitsPage } from "./pages/HabitsPage";
+import { GoalsPage } from "./pages/GoalsPage";
+import { CalendarPage } from "./pages/CalendarPage";
+import { AbyaAIPage } from "./pages/AbyaAIPage";
+import { StatisticsPage } from "./pages/StatisticsPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { CareerCenterPage } from "./pages/CareerCenterPage";
+import { ExamCenterPage } from "./pages/ExamCenterPage";
+import { FlashcardsPage } from "./pages/FlashcardsPage";
 import {
   calculateExamCountdown,
   calculateExamReadiness,
@@ -265,13 +205,11 @@ export default function App() {
     }
     return ["home"];
   });
-  const [isSliderMenuOpen, setIsSliderMenuOpen] = useState<boolean>(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
-  const [isSavedItemsOpen, setIsSavedItemsOpen] = useState<boolean>(false);
+  const [isNoteFocusMode, setIsNoteFocusMode] = useState<boolean>(false);
 
   // Global search shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -311,9 +249,7 @@ export default function App() {
       isMoreMenuOpen ||
       isStudentModalOpen ||
       isAuthModalOpen ||
-      isSearchOpen ||
-      isNotificationsOpen ||
-      isSavedItemsOpen
+      isSearchOpen
     ) {
       touchStartPos.current = null;
       return;
@@ -471,7 +407,20 @@ export default function App() {
   }, []);
 
   // Multi-Student Profiles State (v1.5)
-  const [profiles, setProfiles] = useState<StudentProfile[]>(loadProfiles);
+  const [profiles, setProfiles] = useState<StudentProfile[]>(() => {
+    const existing = loadProfiles();
+    if (existing.length > 0) return existing;
+    if (typeof document !== "undefined") {
+      const starter = addStudentProfile({
+        name: "Student",
+        stream: "Science",
+        classLevel: "Class 12",
+        board: "CBSE",
+      });
+      return [starter];
+    }
+    return [];
+  });
   const [activeProfileId, setActiveProfileId] = useState<string>(loadActiveProfileId);
   const activeProfileIdRef = useRef<string>(activeProfileId);
   activeProfileIdRef.current = activeProfileId;
@@ -1055,47 +1004,162 @@ export default function App() {
   const handleAddNote = (
     newNote: Omit<Note, "id" | "createdAt" | "updatedAt">
   ) => {
-    const created: Note = {
-      ...newNote,
-      id: "note-" + Date.now(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    const updated = [created, ...notes];
-    setNotes(updated);
-    saveNotes(updated, activeProfileId);
-    enqueueOfflineAction({
-      type: "CREATE_NOTE",
-      entityName: "notes",
-      action: "create",
-      profileId: activeProfileId,
-      payload: created,
+    setNotes((prevNotes) => {
+      const maxExistingTs = prevNotes.reduce(
+        (max, n) => Math.max(max, n.createdAt || 0, n.updatedAt || 0),
+        0
+      );
+      const now = Math.max(Date.now(), maxExistingTs + 1);
+      const resolvedLabels = Array.isArray(newNote.labels)
+        ? newNote.labels
+        : Array.isArray(newNote.tags)
+        ? newNote.tags
+        : [];
+      const resolvedFolder =
+        typeof newNote.folder === "string" && newNote.folder.trim()
+          ? newNote.folder.trim()
+          : "General";
+      const created: Note = {
+        ...newNote,
+        pinned: Boolean(newNote.pinned),
+        archived: Boolean(newNote.archived),
+        labels: resolvedLabels,
+        labelColors: newNote.labelColors || {},
+        colorLabels: newNote.colorLabels || [],
+        folder: resolvedFolder,
+        reminderDate:
+          typeof newNote.reminderDate === "string" && newNote.reminderDate.trim()
+            ? newNote.reminderDate.trim()
+            : undefined,
+        isEncrypted:
+          Boolean(newNote.isEncrypted) ||
+          (typeof newNote.content === "string" && newNote.content.startsWith("ENCv1:")),
+        versions: Array.isArray(newNote.versions) ? newNote.versions : [],
+        sharedWith: Array.isArray(newNote.sharedWith) ? newNote.sharedWith : [],
+        sharedPermissions: newNote.sharedPermissions || {},
+        tags: resolvedLabels,
+        id: "note-" + now + "-" + Math.random().toString(36).slice(2, 6),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const updated = sortNotesPinnedFirst([created, ...prevNotes]);
+      saveNotes(updated, activeProfileId);
+      enqueueOfflineAction({
+        type: "CREATE_NOTE",
+        entityName: "notes",
+        action: "create",
+        profileId: activeProfileId,
+        payload: created,
+      });
+      return updated;
     });
   };
 
   const handleUpdateNote = (updatedNote: Note) => {
-    const updated = notes.map((n) => (n.id === updatedNote.id ? updatedNote : n));
-    setNotes(updated);
-    saveNotes(updated, activeProfileId);
-    enqueueOfflineAction({
-      type: "UPDATE_NOTE",
-      entityName: "notes",
-      action: "update",
-      profileId: activeProfileId,
-      payload: updatedNote,
+    setNotes((prevNotes) => {
+      const maxExistingTs = prevNotes.reduce(
+        (max, n) => Math.max(max, n.createdAt || 0, n.updatedAt || 0),
+        0
+      );
+      const nextUpdatedAt = Math.max(
+        updatedNote.updatedAt || 0,
+        Date.now(),
+        maxExistingTs + 1
+      );
+      const resolvedLabels = Array.isArray(updatedNote.labels)
+        ? updatedNote.labels
+        : Array.isArray(updatedNote.tags)
+        ? updatedNote.tags
+        : [];
+      const resolvedFolder =
+        typeof updatedNote.folder === "string" && updatedNote.folder.trim()
+          ? updatedNote.folder.trim()
+          : "General";
+      const existingTarget = prevNotes.find((n) => n.id === updatedNote.id);
+      let resolvedVersions = Array.isArray(updatedNote.versions)
+        ? updatedNote.versions
+        : Array.isArray(existingTarget?.versions)
+        ? existingTarget!.versions!
+        : [];
+      if (
+        existingTarget &&
+        existingTarget.content &&
+        existingTarget.content.trim() !== (updatedNote.content || "").trim()
+      ) {
+        const alreadyRecorded =
+          resolvedVersions.length > 0 &&
+          resolvedVersions[0]?.content === existingTarget.content;
+        if (!alreadyRecorded) {
+          resolvedVersions = [
+            {
+              id: `ver-${existingTarget.updatedAt || Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 6)}`,
+              title: existingTarget.title || "Snapshot",
+              content: existingTarget.content,
+              timestamp: existingTarget.updatedAt || existingTarget.createdAt || Date.now(),
+              createdAt: existingTarget.updatedAt || existingTarget.createdAt || Date.now(),
+            },
+            ...resolvedVersions,
+          ].slice(0, 30);
+        }
+      }
+
+      const normalizedNote: Note = {
+        ...updatedNote,
+        pinned: Boolean(updatedNote.pinned),
+        archived: Boolean(updatedNote.archived),
+        labels: resolvedLabels,
+        labelColors: updatedNote.labelColors || {},
+        colorLabels: updatedNote.colorLabels || [],
+        folder: resolvedFolder,
+        reminderDate:
+          typeof updatedNote.reminderDate === "string" &&
+          updatedNote.reminderDate.trim()
+            ? updatedNote.reminderDate.trim()
+            : undefined,
+        isEncrypted:
+          Boolean(updatedNote.isEncrypted) ||
+          (typeof updatedNote.content === "string" &&
+            updatedNote.content.startsWith("ENCv1:")),
+        versions: resolvedVersions,
+        sharedWith: Array.isArray(updatedNote.sharedWith)
+          ? updatedNote.sharedWith
+          : Array.isArray(existingTarget?.sharedWith)
+          ? existingTarget!.sharedWith
+          : [],
+        sharedPermissions:
+          updatedNote.sharedPermissions || existingTarget?.sharedPermissions || {},
+        tags: resolvedLabels,
+        updatedAt: nextUpdatedAt,
+      };
+      const updated = sortNotesPinnedFirst(
+        prevNotes.map((n) => (n.id === normalizedNote.id ? normalizedNote : n))
+      );
+      saveNotes(updated, activeProfileId);
+      enqueueOfflineAction({
+        type: "UPDATE_NOTE",
+        entityName: "notes",
+        action: "update",
+        profileId: activeProfileId,
+        payload: normalizedNote,
+      });
+      return updated;
     });
   };
 
   const handleDeleteNote = (id: string) => {
-    const updated = notes.filter((n) => n.id !== id);
-    setNotes(updated);
-    saveNotes(updated, activeProfileId);
-    enqueueOfflineAction({
-      type: "DELETE_NOTE",
-      entityName: "notes",
-      action: "delete",
-      profileId: activeProfileId,
-      payload: { id },
+    setNotes((prevNotes) => {
+      const updated = prevNotes.filter((n) => n.id !== id);
+      saveNotes(updated, activeProfileId);
+      enqueueOfflineAction({
+        type: "DELETE_NOTE",
+        entityName: "notes",
+        action: "delete",
+        profileId: activeProfileId,
+        payload: { id },
+      });
+      return updated;
     });
   };
 
@@ -1603,10 +1667,11 @@ export default function App() {
         }));
       } else {
         // Graceful Local Intelligence Fallback
-        console.log(`[Abya AI Client] Activating Local Intelligence fallback (Reason: ${fallbackReason}).`);
         const activeStudentData = {
-          profile: activeStudent,
-          tasks,
+          profile: isStillSameProfile
+            ? activeStudent
+            : profiles.find((p) => p.id === requestProfileId) || activeStudent,
+          tasks: actionContext.tasks,
           subjects: academicSubjects,
           chapters: academicChapters,
           tests: academicTests,
@@ -1834,7 +1899,7 @@ export default function App() {
     saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
-      entityName: "calendarEvents",
+      entityName: "calendar_events",
       action: "create",
       profileId: activeProfileId,
       payload: created,
@@ -1847,7 +1912,7 @@ export default function App() {
     saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
-      entityName: "calendarEvents",
+      entityName: "calendar_events",
       action: "update",
       profileId: activeProfileId,
       payload: updatedEvent,
@@ -1860,7 +1925,7 @@ export default function App() {
     saveCalendarEvents(updated, activeProfileId);
     enqueueOfflineAction({
       type: "UPDATE_EVENT",
-      entityName: "calendarEvents",
+      entityName: "calendar_events",
       action: "delete",
       profileId: activeProfileId,
       payload: { id },
@@ -1882,6 +1947,13 @@ export default function App() {
     setGoals([]);
     setCalendarEvents([]);
     setAbyaChat([]);
+  };
+
+  const handleClearStudentWorkspace = () => {
+    const targetProfId = loadActiveProfileId() || activeProfileId;
+    if (!targetProfId) return;
+    clearStudentWorkspaceData(targetProfId);
+    reloadAllDataForProfile(targetProfId);
   };
 
   const handleReloadData = () => {
@@ -2003,58 +2075,43 @@ export default function App() {
           <span className="capitalize">{swipeFeedback.targetTab}</span>
         </div>
       )}
-      {/* Top OS Bar */}
-      <StatusBar
-        settings={settings}
-        activeStudent={activeStudent}
-        profiles={profiles}
-        onSwitchProfile={handleSwitchProfile}
-        onLogout={() => setIsStudentModalOpen(true)}
-        tasks={tasks}
-        goals={goals}
-        habits={habits}
-        currentLanguage={currentLanguage}
-        onUpdateLanguage={handleUpdateLanguage}
-        onOpenProfile={() => {
-          handleNavigate("settings");
-          setIsMoreMenuOpen(false);
-        }}
-        onOpenStudentModal={() => setIsStudentModalOpen(true)}
-        onOpenMoreMenu={() => setIsMoreMenuOpen(true)}
-        onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
-        onOpenSavedItems={() => setIsSavedItemsOpen(true)}
-        onGoBack={handleGoBack}
-        onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
-        onUpdateSettings={handleUpdateSettings}
-        onNavigate={(tab) => {
-          handleNavigate(tab);
-          setIsMoreMenuOpen(false);
-        }}
-        activeTab={activeTab}
-      />
-
-      <div className="flex-1 flex max-w-7xl w-full mx-auto min-h-0">
-        {/* Desktop Sidebar Navigation */}
-        <DesktopSidebar
-          activeTab={activeTab}
+      {/* Top OS Bar (Hidden during Note Editor Focus Mode) */}
+      {!(isNoteFocusMode && activeTab === "notes") && (
+        <StatusBar
+          settings={settings}
           activeStudent={activeStudent}
+          profiles={profiles}
+          onSwitchProfile={handleSwitchProfile}
+          onLogout={() => setIsStudentModalOpen(true)}
+          tasks={tasks}
+          goals={goals}
+          habits={habits}
           currentLanguage={currentLanguage}
+          onUpdateLanguage={handleUpdateLanguage}
+          onOpenProfile={() => {
+            handleNavigate("settings");
+            setIsMoreMenuOpen(false);
+          }}
           onOpenStudentModal={() => setIsStudentModalOpen(true)}
-          onOpenMoreDrawer={() => setIsMoreMenuOpen(true)}
+          onOpenMoreMenu={() => setIsMoreMenuOpen(true)}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onGoBack={handleGoBack}
+          onUpdateSettings={handleUpdateSettings}
           onNavigate={(tab) => {
             handleNavigate(tab);
             setIsMoreMenuOpen(false);
           }}
-          settings={settings}
+          activeTab={activeTab}
         />
+      )}
 
+      <div className="flex-1 flex max-w-7xl w-full mx-auto min-h-0">
         {/* Main Content Stage */}
         <main
           className={`flex-1 min-w-0 ${
             activeTab === "abya"
-              ? "p-2 sm:p-4 lg:p-6 pb-20 md:pb-6 flex flex-col min-h-0"
-              : "p-3 sm:p-6 lg:p-8 pb-28 md:pb-8"
+              ? "p-2 sm:p-4 lg:p-6 pb-8 flex flex-col min-h-0"
+              : "p-3 sm:p-6 lg:p-8 pb-12"
           }`}
         >
           <ErrorBoundary>
@@ -2083,7 +2140,11 @@ export default function App() {
                 }}
                 onQuickAddTask={() => handleNavigate("tasks")}
                 onAddTask={handleAddTask}
+                onUpdateTask={handleUpdateTask}
                 onAddNote={handleAddNote}
+                onAddHabit={handleAddHabit}
+                onAddGoal={handleAddGoal}
+                onLogFocusSession={handleLogFocusSession}
                 onUpdateSettings={handleUpdateSettings}
                 onAddWaterGlass={() =>
                   handleUpdateWater({ ...water, glasses: water.glasses + 1 })
@@ -2097,7 +2158,8 @@ export default function App() {
                 onToggleHabit={(habitId, dateStr) =>
                   handleToggleHabitDate(habitId, dateStr)
                 }
-                onOpenSliderMenu={() => setIsSliderMenuOpen(true)}
+                onOpenMoreMenu={() => setIsMoreMenuOpen(true)}
+                onOpenSearch={() => setIsSearchOpen(true)}
               />
             )}
 
@@ -2108,6 +2170,7 @@ export default function App() {
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onBulkDeleteTasks={handleBulkDeleteTasks}
+                onStartFocusForTask={() => handleNavigate("focus")}
                 onBack={handleGoBack}
                 currentUserId={activeStudent?.id || "guest"}
                 currentUserName={activeStudent?.name || "Student"}
@@ -2211,6 +2274,11 @@ export default function App() {
                 settings={settings}
                 focusLogs={focusLogs}
                 onLogFocusSession={handleLogFocusSession}
+                tasks={tasks}
+                onToggleTask={(task) =>
+                  handleUpdateTask({ ...task, completed: !task.completed })
+                }
+                onAddTask={handleAddTask}
                 onBack={handleGoBack}
               />
             )}
@@ -2223,6 +2291,7 @@ export default function App() {
                 onDeleteNote={handleDeleteNote}
                 onAskAbyaWithContext={handleAskAbyaWithContext}
                 onBack={handleGoBack}
+                onFocusModeChange={setIsNoteFocusMode}
                 currentUserId={activeStudent?.id || "guest"}
                 currentUserName={activeStudent?.name || "Student"}
                 currentUserEmail={auth.currentUser?.email || undefined}
@@ -2304,6 +2373,8 @@ export default function App() {
                 academicPractice={academicPractice}
                 examProfile={examProfile}
                 habits={habits}
+                studySessions={studySessions}
+                focusLogs={focusLogs}
               />
             )}
 
@@ -2349,6 +2420,7 @@ export default function App() {
                 onNavigate={(tab) => handleNavigate(tab)}
                 onUpdateSettings={handleUpdateSettings}
                 onClearChatHistory={handleClearChatHistory}
+                onClearStudentData={handleClearStudentWorkspace}
                 onClearAllOSData={handleClearAllOSData}
                 onReloadData={handleReloadData}
                 onBack={handleGoBack}
@@ -2362,54 +2434,6 @@ export default function App() {
         </ErrorBoundary>
       </main>
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav
-        activeTab={activeTab}
-        currentLanguage={currentLanguage}
-        onNavigate={(tab) => {
-          handleNavigate(tab);
-          setIsMoreMenuOpen(false);
-        }}
-        onOpenMore={() => setIsMoreMenuOpen((prev) => !prev)}
-        isMoreOpen={isMoreMenuOpen}
-        onOpenProfile={() => {
-          handleNavigate("settings");
-          setIsMoreMenuOpen(false);
-        }}
-        activeStudent={activeStudent}
-        isHidden={isKeyboardOpen && activeTab === "abya"}
-      />
-
-      {/* Slide-Over Panel (SliderMenu for Abya AI & System Settings) */}
-      <SliderMenu
-        isOpen={isSliderMenuOpen}
-        onClose={() => setIsSliderMenuOpen(false)}
-        activeStudent={activeStudent}
-        profiles={profiles}
-        onSwitchProfile={handleSwitchProfile}
-        onOpenStudentModal={() => {
-          setIsSliderMenuOpen(false);
-          setIsStudentModalOpen(true);
-        }}
-        currentLanguage={currentLanguage}
-        onUpdateLanguage={handleUpdateLanguage}
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        onNavigate={(tab) => {
-          handleNavigate(tab);
-          setIsSliderMenuOpen(false);
-        }}
-        onClearAllData={handleClearAllOSData}
-        onLogout={() => {
-          setIsSliderMenuOpen(false);
-          setIsStudentModalOpen(true);
-        }}
-        onLockApp={() => {
-          lockSession(activeProfileId);
-          setIsAppLocked(true);
-        }}
-      />
 
       {/* More Apps & Modules Slide Drawer (V3) */}
       <MoreDrawer
@@ -2438,31 +2462,6 @@ export default function App() {
           setIsSearchOpen(false);
         }}
         activeStudent={activeStudent}
-      />
-
-      {/* Notifications Center Overlay */}
-      <NotificationsModal
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-        onNavigate={(tab) => {
-          handleNavigate(tab);
-          setIsNotificationsOpen(false);
-        }}
-        revisions={academicRevisions}
-        goals={goals}
-        habits={habits}
-        tasks={tasks}
-      />
-
-      {/* Saved Items & Bookmarks Overlay */}
-      <SavedItemsModal
-        isOpen={isSavedItemsOpen}
-        onClose={() => setIsSavedItemsOpen(false)}
-        onNavigate={(tab) => {
-          handleNavigate(tab);
-          setIsSavedItemsOpen(false);
-        }}
-        notes={notes}
       />
 
       {/* Multi-Student Profile Management Modal (v1.5) */}

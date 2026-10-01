@@ -178,11 +178,11 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
       {/* Header & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          {onBack && (
+          {selectedSubjectId !== "all" && (
             <button
               onClick={handleBack}
               className="p-2 rounded-2xl bg-slate-900/80 border border-white/10 hover:bg-slate-800 text-slate-300 transition-colors"
-              aria-label="Back"
+              aria-label="Back to All Subjects"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>

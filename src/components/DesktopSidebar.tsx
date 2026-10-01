@@ -268,10 +268,17 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         ))}
       </div>
 
-      {/* Footer Student profile pill */}
-      {!isIconsOnly && activeStudent && (
+      {/* Footer Student profile switcher */}
+      {activeStudent && (
         <div className="pt-3 border-t border-white/10 mt-auto w-full">
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/80 border border-white/5">
+          <button
+            type="button"
+            onClick={onOpenStudentModal}
+            title={`Switch Student Profile (${studentName})`}
+            className={`w-full flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/5 hover:border-emerald-500/30 transition-all text-left cursor-pointer ${
+              isIconsOnly ? "justify-center px-0" : ""
+            }`}
+          >
             <div
               className={`w-7 h-7 rounded-xl bg-gradient-to-tr ${
                 activeStudent.avatarColor || "from-emerald-400 to-cyan-400"
@@ -279,13 +286,15 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             >
               {getStudentAvatarInitials(studentName)}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-bold text-white truncate">{studentName}</div>
-              <div className="text-[10px] text-slate-400 truncate">
-                {activeStudent.classLevel || "Student"} • {activeStudent.stream || "General"}
+            {!isIconsOnly && (
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-white truncate">{studentName}</div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  {activeStudent.classLevel || "Student"} · {activeStudent.stream || "General"}
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </button>
         </div>
       )}
     </aside>

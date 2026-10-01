@@ -1,166 +1,179 @@
 import React, { useState } from "react";
-import { ShieldCheck, Copy, Check, Terminal, Cpu } from "lucide-react";
 import {
-  APP_VERSION_STRING,
-  APP_BUILD_DATE,
-  getAppEnvironment,
-  SYSTEM_VERSION_DETAILS,
+  ShieldCheck,
+  Copy,
+  Check,
+  Cpu,
+  Timer,
+  CheckSquare,
+  LayoutGrid,
+  Sparkles,
+  Lock,
+  Cloud,
+} from "lucide-react";
+import {
+  APP_VERSION_LABEL,
+  APP_RELEASE_DATE,
+  APP_BUILD_CHANNEL,
+  APP_CODENAME,
+  getFullBuildString,
 } from "../constants/version";
 
 interface ProductionVersionBadgeProps {
-  variant?: "card" | "compact" | "minimal" | "footer" | "banner";
-  className?: string;
+  variant?: "pill" | "card" | "footer" | "minimal";
   showCopy?: boolean;
+  className?: string;
 }
 
 export const ProductionVersionBadge: React.FC<ProductionVersionBadgeProps> = ({
-  variant = "card",
+  variant = "pill",
+  showCopy = false,
   className = "",
-  showCopy = true,
 }) => {
   const [copied, setCopied] = useState(false);
-  const environment = getAppEnvironment();
 
-  const getEnvBadgeStyles = () => {
-    switch (environment) {
-      case "Production":
-        return {
-          dot: "bg-emerald-400 animate-pulse",
-          pill: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-        };
-      case "Staging":
-        return {
-          dot: "bg-amber-400 animate-pulse",
-          pill: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-        };
-      default:
-        return {
-          dot: "bg-cyan-400",
-          pill: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
-        };
+  const handleCopyBuildInfo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = getFullBuildString();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
     }
-  };
-
-  const envStyles = getEnvBadgeStyles();
-
-  const handleCopyDiagnostics = () => {
-    const text = `${APP_VERSION_STRING}\nBuild: ${APP_BUILD_DATE}\nEnvironment: ${environment}`;
-    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Compact / Footer layout
-  if (variant === "footer" || variant === "compact") {
+  if (variant === "card") {
     return (
       <div
-        className={`p-3 rounded-2xl bg-slate-900/80 border border-white/10 text-left font-mono space-y-1 ${className}`}
+        id="about-garia-os-card"
+        className={`p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-emerald-500/25 space-y-4 ${className}`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-white tracking-wide">
-            {APP_VERSION_STRING}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${envStyles.pill}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${envStyles.dot}`} />
-            <span>{environment}</span>
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-slate-400">
-          <span>Build: {APP_BUILD_DATE}</span>
-          {showCopy && (
-            <button
-              onClick={handleCopyDiagnostics}
-              title="Copy Version Details"
-              className="text-[10px] text-slate-500 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
-            >
-              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              <span>{copied ? "Copied" : "Copy"}</span>
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Minimal inline pill
-  if (variant === "minimal") {
-    return (
-      <div
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] font-mono ${className}`}
-      >
-        <span className="font-bold text-white">{APP_VERSION_STRING}</span>
-        <span className="text-slate-500">•</span>
-        <span className="text-slate-400">Build: {APP_BUILD_DATE}</span>
-        <span className="text-slate-500">•</span>
-        <span className={`inline-flex items-center gap-1 font-bold ${envStyles.pill} px-1.5 py-0.2 rounded-md`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${envStyles.dot}`} />
-          {environment}
-        </span>
-      </div>
-    );
-  }
-
-  // Standard Card layout (for Settings, Profile System Info, About Modal, More Menu)
-  return (
-    <div
-      className={`p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-white/15 shadow-lg space-y-3 font-mono ${className}`}
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
-            <Cpu className="w-4 h-4" />
+        {/* Top Identity & Version Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center text-emerald-400 shrink-0">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm sm:text-base font-bold text-white font-heading">
+                  Garia OS {APP_VERSION_LABEL}
+                </span>
+                <span className="text-xs font-mono text-emerald-300 font-semibold">
+                  · {APP_BUILD_CHANNEL}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {APP_CODENAME} · Released {APP_RELEASE_DATE}
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
-              <span>{APP_VERSION_STRING}</span>
-            </h4>
-            <span className="text-[10px] text-slate-400 font-sans block">
-              Official Production Release
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${envStyles.pill}`}
-          >
-            <span className={`w-2 h-2 rounded-full ${envStyles.dot}`} />
-            <span>{environment}</span>
-          </span>
 
           {showCopy && (
             <button
-              onClick={handleCopyDiagnostics}
-              title="Copy Version Information"
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-colors"
+              type="button"
+              onClick={handleCopyBuildInfo}
+              title="Copy build version string"
+              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-center"
             >
               {copied ? (
-                <Check className="w-4 h-4 text-emerald-400" />
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">Copied</span>
+                </>
               ) : (
-                <Copy className="w-4 h-4" />
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Copy Build ID</span>
+                </>
               )}
             </button>
           )}
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-        <div className="p-2.5 rounded-xl bg-slate-950/50 border border-white/5 space-y-0.5">
-          <span className="text-[10px] text-slate-500 uppercase font-semibold">
-            Build Identifier
-          </span>
-          <p className="font-bold text-slate-200">{APP_BUILD_DATE}</p>
+        {/* About App Description */}
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+          Garia OS is a distraction-free student study operating system engineered for board exam preparation, deep-work Pomodoro execution, structured task & subtask tracking, and intelligent revision planning.
+        </p>
+
+        {/* What's New in v3.0 Highlights Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="p-3 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+              <Timer className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Now Focus Mode Studio</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Synchronized 25-min Pomodoro & Deep Work timer linked directly to your active tasks with ambient study soundscapes.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
+              <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span>Streamlined Task Manager</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Instant quick-add task bar, 1-click task focus launcher, subtask checklists, and automatic overdue rescheduling.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+              <LayoutGrid className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <span>Decluttered Bento Dashboard</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Clean execution workspace with Urgent Attention alerts, Study Streak, Weekly Study Hours comparison, and Academic Milestones.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+              <Cloud className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Offline-First + Cloud Sync</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Zero-latency local storage with optional Firebase Firestore cloud backup, multi-student profiles, and PIN lock security.
+            </p>
+          </div>
         </div>
 
-        <div className="p-2.5 rounded-xl bg-slate-950/50 border border-white/5 space-y-0.5">
-          <span className="text-[10px] text-slate-500 uppercase font-semibold">
-            Deployment Environment
+        {/* System Architecture Footer */}
+        <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
+          <span className="inline-flex items-center gap-1.5 text-emerald-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Verified Production Build ({APP_VERSION_LABEL})</span>
           </span>
-          <p className="font-bold text-emerald-400">{environment}</p>
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="w-3 h-3 text-slate-500" />
+            <span>Local-First Privacy · Zero Telemetry</span>
+          </span>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  if (variant === "footer") {
+    return (
+      <div
+        className={`inline-flex items-center gap-2 text-[11px] font-mono text-slate-400 ${className}`}
+      >
+        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+        <span className="text-slate-300 font-bold">Garia OS {APP_VERSION_LABEL}</span>
+        <span>·</span>
+        <span>{APP_CODENAME}</span>
+      </div>
+    );
+  }
+
+  return (
+    <span
+      title={getFullBuildString()}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 select-none ${className}`}
+    >
+      <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+      <span>{APP_VERSION_LABEL}</span>
+    </span>
   );
 };

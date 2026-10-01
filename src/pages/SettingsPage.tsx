@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Settings,
   Sun,
   Moon,
-  Key,
   Trash2,
   Download,
   Upload,
@@ -11,40 +9,29 @@ import {
   Sparkles,
   AlertTriangle,
   CheckCircle2,
-  X,
   Users,
-  UserPlus,
-  Check,
   Globe,
   Calendar as CalendarIcon,
-  ExternalLink,
   RefreshCw,
-  Sliders,
   CheckSquare,
   BookOpen,
   Target,
   Bell,
-  LogOut,
   Flame,
   CloudUpload,
   CloudDownload,
-  Database,
-  Cloud,
-  ArrowLeft,
   HardDrive,
   Sunrise,
   Sunset,
   MapPin,
-  Compass,
   Lock,
-  Unlock,
   Shield,
-  ShieldCheck,
   KeyRound,
-  ShieldAlert,
   Palette,
   Pipette,
   RotateCcw,
+  Eraser,
+  Sliders,
 } from "lucide-react";
 import {
   UserSettings,
@@ -59,7 +46,6 @@ import {
 import {
   getSolarInfo,
   requestDeviceLocation,
-  getCachedSolarCoordinates,
   SolarInfo,
   DARK_THEME_OPTIONS,
   resolvePreferredNightTheme,
@@ -71,32 +57,43 @@ import {
   getWorkspaceSnapshot,
   restoreWorkspaceSnapshot,
   clearOfflineCache,
+  clearStudentWorkspaceData,
 } from "../utils/storage";
 import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "../components/ProductionVersionBadge";
 import { PWAInstallOption } from "../components/PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
-import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
+import {
+  getStudentDisplayName,
+  getStudentAvatarInitials,
+} from "../utils/studentNameUtils";
 import { useTransientToast } from "../utils/uiUtils";
 import { GoogleCalendarSyncModal } from "../components/GoogleCalendarSyncModal";
-import { PinManagementModal, PinModalMode } from "../components/PinManagementModal";
+import {
+  PinManagementModal,
+  PinModalMode,
+} from "../components/PinManagementModal";
 import { lockSession } from "../utils/security";
 import {
   loadCalendarSyncSettings,
   saveCalendarSyncSettings,
   GoogleCalendarSyncSettings,
-  signInWithGoogle,
-  signOutGoogle,
   initGoogleAuth,
 } from "../utils/googleCalendar";
 import {
   auth,
   uploadWorkspaceToCloud,
   downloadWorkspaceFromCloud,
-  signInWithGoogle as fbSignInWithGoogle,
-  signOutFromFirebase,
 } from "../utils/firebase";
 import { User, onAuthStateChanged } from "firebase/auth";
+
+export type SettingsCategoryFilter =
+  | "all"
+  | "profile_security"
+  | "global_config"
+  | "appearance"
+  | "sync_notifications"
+  | "data_clear";
 
 interface SettingsPageProps {
   settings: UserSettings;
@@ -115,6 +112,7 @@ interface SettingsPageProps {
   onNavigate?: (tab: any) => void;
   onUpdateSettings: (s: UserSettings) => void;
   onClearChatHistory: () => void;
+  onClearStudentData?: () => void;
   onClearAllOSData: () => void;
   onReloadData: () => void;
   onBack?: () => void;
@@ -135,34 +133,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onUpdateAbyaLanguage,
   onOpenStudentModal,
   onOpenAuthModal,
-  onNavigate,
   onUpdateSettings,
   onClearChatHistory,
+  onClearStudentData,
   onClearAllOSData,
   onReloadData,
-  onBack,
   onLockApp,
 }) => {
   const t = translations[currentLanguage] || translations.en;
-  const initialStudentName = getStudentDisplayName(activeStudent, settings, "Student");
-  const [userName, setUserName] = useState(initialStudentName);
+  const [activeCategory, setActiveCategory] =
+    useState<SettingsCategoryFilter>("all");
+  const [showConfirmClearStudent, setShowConfirmClearStudent] = useState(false);
   const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
-  const [importStatusMessage, setImportStatusMessage] = useState<string | null>(null);
+  const [importStatusMessage, setImportStatusMessage] = useState<string | null>(
+    null
+  );
   const [pinModalMode, setPinModalMode] = useState<PinModalMode | null>(null);
 
   // Google Calendar Integration State
-  const [gcalUser, setGcalUser] = useState<User | null>(null);
-  const [gcalToken, setGcalToken] = useState<string | null>(null);
+  const [, setGcalUser] = useState<User | null>(null);
   const [isGCalModalOpen, setIsGCalModalOpen] = useState(false);
-  const [gcalSettings, setGcalSettings] = useState<GoogleCalendarSyncSettings>(() =>
-    loadCalendarSyncSettings(activeStudent?.id)
+  const [gcalSettings, setGcalSettings] = useState<GoogleCalendarSyncSettings>(
+    () => loadCalendarSyncSettings(activeStudent?.id)
   );
 
-  // Sync local form states when active student profile switches
   useEffect(() => {
-    setUserName(getStudentDisplayName(activeStudent, settings, "Student"));
     setGcalSettings(loadCalendarSyncSettings(activeStudent?.id));
-  }, [activeStudent?.id, activeStudent?.name, settings.userName]);
+  }, [activeStudent?.id]);
 
   // Firebase Firestore Cloud Sync State
   const [fbUser, setFbUser] = useState<User | null>(auth.currentUser);
@@ -175,6 +172,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     });
     return () => unsubAuth();
   }, []);
+
+  useEffect(() => {
+    const unsub = initGoogleAuth(
+      (u) => {
+        setGcalUser(u);
+      },
+      () => {
+        setGcalUser(null);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const { toastMessage, showToast } = useTransientToast(3500);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFbBackup = async () => {
     if (!fbUser) {
@@ -228,27 +241,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  useEffect(() => {
-    const unsub = initGoogleAuth(
-      (u, token) => {
-        setGcalUser(u);
-        setGcalToken(token);
-      },
-      () => {
-        setGcalUser(null);
-        setGcalToken(null);
-      }
-    );
-    return () => unsub();
-  }, []);
-
-  const handleUpdateGCalSettings = (updates: Partial<GoogleCalendarSyncSettings>) => {
+  const handleUpdateGCalSettings = (
+    updates: Partial<GoogleCalendarSyncSettings>
+  ) => {
     const updated = { ...gcalSettings, ...updates };
     setGcalSettings(updated);
     saveCalendarSyncSettings(updated, activeStudent?.id);
   };
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notifs = settings.notifications || {
     master: true,
@@ -272,17 +271,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     });
   };
 
-  const { toastMessage, showToast } = useTransientToast(3500);
-  const [isClearingCache, setIsClearingCache] = useState(false);
-
   const handleClearOfflineCache = async () => {
     setIsClearingCache(true);
     try {
       const res = await clearOfflineCache();
       showToast(
         currentLanguage === "hi"
-          ? `ऑफ़लाइन कैश सफलतापूर्वक साफ़ किया गया! (~${res.storageFreedKb} KB मेमोरी मुक्त)`
-          : `Offline cache cleared successfully! (~${res.storageFreedKb} KB freed)`
+          ? `ऑफ़लाइन कैश साफ़ किया गया (~${res.storageFreedKb} KB मुक्त)`
+          : `Offline cache cleared (~${res.storageFreedKb} KB freed)`
       );
     } catch (e) {
       console.error(e);
@@ -296,35 +292,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedSettings = {
-      ...settings,
-      userName: userName.trim() || activeStudent?.name || "Student",
-    };
-    onUpdateSettings(updatedSettings);
-    if (fbUser) {
-      const snap = getWorkspaceSnapshot();
-      uploadWorkspaceToCloud(fbUser.uid, {
-        activeProfileId: snap.activeProfileId,
-        profiles: snap.profiles,
-        fullStorageDump: {
-          ...snap.fullStorageDump,
-          garia_os_settings: JSON.stringify(updatedSettings),
-        },
-      })
-        .then((res) => {
-          setFbLastSynced(new Date(res.timestamp).toLocaleTimeString());
-        })
-        .catch((err) => console.warn("Background cloud sync on settings update:", err));
+  const handleConfirmClearStudentWorkspace = () => {
+    if (onClearStudentData) {
+      onClearStudentData();
+    } else {
+      clearStudentWorkspaceData(activeStudent?.id);
+      onReloadData();
     }
+    setShowConfirmClearStudent(false);
     showToast(
       currentLanguage === "hi"
-        ? "सेटिंग्स सफलतापूर्वक सहेजी गईं!"
-        : "Settings saved successfully!"
+        ? "वर्तमान छात्र का अध्ययन डेटा साफ़ कर दिया गया है।"
+        : "Active student study data cleared (fresh workspace ready)."
     );
   };
 
+  // Custom Theme Hex State
   const defaultCustomPrimary = "#10B981";
   const defaultCustomBg = "#0B0F19";
   const savedPrimary =
@@ -413,7 +396,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleThemeChange = (theme: AppTheme) => {
-    const nextNightTheme = !isLightOrDayTheme(theme) && theme !== "system" ? theme : settings.preferredNightTheme || "dark";
+    const nextNightTheme =
+      !isLightOrDayTheme(theme) && theme !== "system"
+        ? theme
+        : settings.preferredNightTheme || "dark";
     if (theme === "custom") {
       const p =
         settings.customTheme?.primary ||
@@ -452,7 +438,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => {
     setSolarInfo(getSolarInfo(new Date(), undefined, preferredNight, simMode));
     const interval = setInterval(() => {
-      setSolarInfo(getSolarInfo(new Date(), undefined, preferredNight, simMode));
+      setSolarInfo(
+        getSolarInfo(new Date(), undefined, preferredNight, simMode)
+      );
     }, 60000);
     return () => clearInterval(interval);
   }, [preferredNight, simMode]);
@@ -520,15 +508,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (res.success) {
           setImportStatusMessage(
             currentLanguage === "hi"
-              ? `✅ प्रोफाइल "${res.profileName || 'Imported'}" सफलतापूर्वक आयात किया गया!`
-              : `✅ Profile "${res.profileName || 'Imported'}" imported successfully!`
+              ? `प्रोफाइल "${res.profileName || "Imported"}" सफलतापूर्वक आयात किया गया!`
+              : `Profile "${res.profileName || "Imported"}" imported successfully!`
           );
           onReloadData();
         } else {
           setImportStatusMessage(
             currentLanguage === "hi"
-              ? "❌ JSON प्रोफाइल बैकअप पार्स करने में विफल।"
-              : "❌ Failed to parse JSON profile backup."
+              ? "JSON प्रोफाइल बैकअप पार्स करने में विफल।"
+              : "Failed to parse JSON profile backup."
           );
         }
       }
@@ -555,366 +543,727 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     );
   };
 
+  const showProfileSecurity =
+    activeCategory === "all" || activeCategory === "profile_security";
+  const showAppearance =
+    activeCategory === "all" ||
+    activeCategory === "global_config" ||
+    activeCategory === "appearance";
+  const showSyncNotifications =
+    activeCategory === "all" ||
+    activeCategory === "global_config" ||
+    activeCategory === "sync_notifications";
+  const showDataClear =
+    activeCategory === "all" ||
+    activeCategory === "global_config" ||
+    activeCategory === "data_clear";
+
   return (
-    <div className="space-y-6 pb-4 md:pb-0 max-w-4xl mx-auto w-full animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-            {t.settings}
-          </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {currentLanguage === "hi"
-              ? "प्राथमिकताएं, भाषा, पिन सुरक्षा और मल्टी-विद्यार्थी प्रोफाइल कॉन्फ़िगर करें।"
-              : "Configure preferences, language, PIN security, and multi-student profiles."}
-          </p>
+    <div
+      id="settings-page-root"
+      data-testid="settings-page-root"
+      className="space-y-6 pb-8 md:pb-4 max-w-4xl mx-auto w-full animate-in fade-in duration-300"
+    >
+      {/* Header & Profile vs Global Navigation Architecture */}
+      <div id="settings-navigation-bar" data-testid="settings-navigation-bar" className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              {t.settings || "Settings"}
+            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
+              {currentLanguage === "hi"
+                ? "छात्र प्रोफाइल सेटिंग्स और ग्लोबल सिस्टम कॉन्फ़िगरेशन के बीच आसानी से नेविगेट करें।"
+                : "Navigate seamlessly between active student Profile Settings and system-wide Global Configuration."}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Focus Mode Toggle Card (Hides Non-Essential Dashboard Widgets) */}
-      <div
-        id="settings-focus-mode-card"
-        data-testid="settings-focus-mode-card"
-        className={`glass-card p-6 rounded-3xl border transition-all space-y-4 ${
-          isFocusModeEnabled
-            ? "border-indigo-500/50 bg-gradient-to-br from-indigo-950/35 via-slate-900/90 to-emerald-950/20 shadow-lg shadow-indigo-500/10"
-            : "border-white/10 bg-slate-900/80"
-        }`}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div
-              className={`w-10 h-10 rounded-2xl p-2 flex items-center justify-center font-bold shadow-md shrink-0 transition-colors ${
-                isFocusModeEnabled
-                  ? "bg-gradient-to-tr from-indigo-500 to-emerald-400 text-slate-950"
-                  : "bg-slate-800 text-indigo-400 border border-white/10"
-              }`}
-            >
-              <Target className="w-5 h-5" />
-            </div>
+        {/* Toast Feedback Banner */}
+        {toastMessage && (
+          <div className="p-3.5 rounded-2xl bg-emerald-500/15 text-xs font-semibold text-emerald-300 border border-emerald-500/30 flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Primary Scope Switcher: Profile Settings vs Global Configuration */}
+        <div
+          id="settings-scope-switcher"
+          data-testid="settings-scope-switcher"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
+        >
+          <button
+            type="button"
+            id="settings-tab-all"
+            data-testid="settings-tab-all"
+            onClick={() => setActiveCategory("all")}
+            className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+              activeCategory === "all"
+                ? "bg-emerald-500/15 border-emerald-400 text-white shadow-sm"
+                : "bg-slate-900/80 border-white/10 text-slate-300 hover:border-white/25"
+            }`}
+          >
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-bold font-heading text-white">
-                  {currentLanguage === "hi" ? "फोकस मोड (Focus Mode)" : "Focus Mode"}
-                </h3>
-                <span className="text-xs text-slate-500">·</span>
-                <span
-                  id="settings-focus-mode-status"
-                  className={`text-xs font-mono font-semibold ${
-                    isFocusModeEnabled ? "text-emerald-400" : "text-slate-400"
-                  }`}
-                >
-                  {isFocusModeEnabled
-                    ? currentLanguage === "hi"
-                      ? "सक्रिय (Distraction-Free)"
-                      : "Active — Distractions Hidden"
-                    : currentLanguage === "hi"
-                    ? "निष्क्रिय (Standard View)"
-                    : "Off — Full Dashboard"}
-                </span>
+              <div className="text-xs sm:text-sm font-bold text-white">
+                {currentLanguage === "hi" ? "सभी सेटिंग्स (All)" : "All Settings Overview"}
               </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+              <div className="text-[11px] text-slate-400 mt-0.5">
                 {currentLanguage === "hi"
-                  ? "गहन अध्ययन सत्रों के दौरान विकर्षणों को कम करने के लिए गैर-जरूरी डैशबोर्ड विजेट (प्रेरणा कोट्स, त्वरित लिंक, विस्तारित एनालिटिक्स और वेलनेस कार्ड) को छिपाता है।"
-                  : "When enabled, hides non-essential dashboard widgets (Daily Motivation quotes, Quick Action strip, extended Career/Decision cards, and Wellness widgets) to reduce distractions during intensive study sessions."}
-              </p>
+                  ? "प्रोफाइल + ग्लोबल कॉन्फ़िगरेशन"
+                  : "Profile + Global Configuration"}
+              </div>
             </div>
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            id="settings-tab-profile"
+            data-testid="settings-tab-profile"
+            onClick={() => setActiveCategory("profile_security")}
+            className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+              activeCategory === "profile_security"
+                ? "bg-emerald-500/15 border-emerald-400 text-white shadow-sm"
+                : "bg-slate-900/80 border-white/10 text-slate-300 hover:border-white/25"
+            }`}
+          >
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-white">
+                {currentLanguage === "hi" ? "प्रोफाइल सेटिंग्स" : "Profile Settings"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {currentLanguage === "hi"
+                  ? "छात्र पहचान, पिन लॉक व फोकस मोड"
+                  : "Student Identity, PIN Lock & Focus"}
+              </div>
+            </div>
+            <Users className="w-4 h-4 text-cyan-400 shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            id="settings-tab-global"
+            data-testid="settings-tab-global"
+            onClick={() => setActiveCategory("global_config")}
+            className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+              activeCategory === "global_config" ||
+              activeCategory === "appearance" ||
+              activeCategory === "sync_notifications" ||
+              activeCategory === "data_clear"
+                ? "bg-emerald-500/15 border-emerald-400 text-white shadow-sm"
+                : "bg-slate-900/80 border-white/10 text-slate-300 hover:border-white/25"
+            }`}
+          >
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-white">
+                {currentLanguage === "hi" ? "ग्लोबल कॉन्फ़िगरेशन" : "Global Configuration"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {currentLanguage === "hi"
+                  ? "थीम, लेआउट, क्लाउड सिंक व डेटा रीसेट"
+                  : "Theme, Layout, Cloud Sync & Data"}
+              </div>
+            </div>
+            <Globe className="w-4 h-4 text-amber-400 shrink-0" />
+          </button>
+        </div>
+
+        {/* Classic Settings Command Bar with Dropdowns & Sliders */}
+        <div className="classic-paper-header rounded-2xl p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <select
+              id="settings-section-dropdown"
+              aria-label="Select Settings Section"
+              value={activeCategory}
+              onChange={(e) =>
+                setActiveCategory(e.target.value as SettingsCategoryFilter)
+              }
+              className="classic-select text-xs font-semibold rounded-lg px-3 py-2 cursor-pointer"
+            >
+              <option value="all">Section: All Settings</option>
+              <option value="profile_security">
+                Section: 1. Profile & Security
+              </option>
+              <option value="global_config">
+                Section: Global Configuration
+              </option>
+              <option value="appearance">Section: 2. Appearance & Theme</option>
+              <option value="sync_notifications">
+                Section: 3. Cloud Sync & Alerts
+              </option>
+              <option value="data_clear">Section: 4. Data & Reset</option>
+            </select>
+
+            <select
+              id="settings-theme-dropdown"
+              aria-label="Select App Theme Look"
+              value={settings.theme}
+              onChange={(e) => handleThemeChange(e.target.value as AppTheme)}
+              className="classic-select text-xs font-semibold rounded-lg px-3 py-2 cursor-pointer"
+            >
+              <option value="classic">Theme: Classic Scholar</option>
+              <option value="graphite">Theme: Graphite Slate</option>
+              <option value="midnight">Theme: Midnight Navy</option>
+              <option value="emerald">Theme: Emerald Academy</option>
+              <option value="amoled">Theme: AMOLED Pure Black</option>
+              <option value="arctic">Theme: Arctic Light</option>
+              <option value="high-contrast">Theme: High Contrast</option>
+              <option value="purple">Theme: Royal Purple</option>
+              <option value="sunset">Theme: Warm Sunset</option>
+            </select>
           </div>
 
-          <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
-            <button
-              type="button"
-              id="settings-focus-mode-toggle"
-              data-testid="focus-mode-toggle"
-              role="switch"
-              aria-checked={isFocusModeEnabled}
-              aria-label="Focus Mode"
-              onClick={handleToggleFocusMode}
-              className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isFocusModeEnabled ? "bg-emerald-500" : "bg-slate-700"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  isFocusModeEnabled ? "translate-x-6" : "translate-x-0"
-                }`}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 bg-slate-950/70 px-3 py-2 rounded-xl border border-amber-500/20">
+              <Sliders className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <label
+                htmlFor="settings-study-goal-slider"
+                className="text-[11px] font-bold text-slate-300 whitespace-nowrap"
+              >
+                Daily Goal:
+              </label>
+              <input
+                id="settings-study-goal-slider"
+                type="range"
+                min={30}
+                max={480}
+                step={15}
+                value={settings.dailyStudyGoalMinutes || 120}
+                onChange={(e) =>
+                  onUpdateSettings({
+                    ...settings,
+                    dailyStudyGoalMinutes: Number(e.target.value),
+                  })
+                }
+                aria-label="Daily Study Goal Minutes Slider"
+                className="classic-slider flex-1"
               />
-            </button>
+              <span className="text-[11px] font-mono font-bold text-amber-300 min-w-[3rem] text-right">
+                {settings.dailyStudyGoalMinutes || 120}m
+              </span>
+            </div>
 
-            <button
-              type="button"
-              id="settings-focus-mode-action-btn"
-              onClick={handleToggleFocusMode}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                isFocusModeEnabled
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
-                  : "bg-indigo-500 hover:bg-indigo-400 text-white shadow-sm"
-              }`}
-            >
-              {isFocusModeEnabled
-                ? currentLanguage === "hi"
-                  ? "फोकस मोड बंद करें"
-                  : "Disable Focus Mode"
-                : currentLanguage === "hi"
-                ? "फोकस मोड सक्षम करें"
-                : "Enable Focus Mode"}
-            </button>
+            <div className="flex items-center gap-2 bg-slate-950/70 px-3 py-2 rounded-xl border border-amber-500/20">
+              <Target className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <label
+                htmlFor="settings-pomodoro-slider"
+                className="text-[11px] font-bold text-slate-300 whitespace-nowrap"
+              >
+                Pomodoro:
+              </label>
+              <input
+                id="settings-pomodoro-slider"
+                type="range"
+                min={15}
+                max={90}
+                step={5}
+                value={settings.pomodoroFocusMinutes || 25}
+                onChange={(e) =>
+                  onUpdateSettings({
+                    ...settings,
+                    pomodoroFocusMinutes: Number(e.target.value),
+                  })
+                }
+                aria-label="Default Pomodoro Focus Minutes Slider"
+                className="classic-slider flex-1"
+              />
+              <span className="text-[11px] font-mono font-bold text-emerald-300 min-w-[2.5rem] text-right">
+                {settings.pomodoroFocusMinutes || 25}m
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Summary of Visible vs Hidden Widgets in Focus Mode */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10 text-xs">
-          <div className="p-3 rounded-2xl bg-slate-950/70 border border-emerald-500/20 space-y-1">
-            <div className="font-bold text-emerald-300 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Kept Visible (Essential Study Tools)</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Focus Session Timer & Streak, Study Hours Progress, Daily Academic Revision Insight, Quick Task Input & Today's Tasks, Floating Quick-Note Capture.
-            </p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-950/70 border border-indigo-500/20 space-y-1">
-            <div className="font-bold text-indigo-300 flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span>Hidden When Active (Non-Essential Widgets)</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Daily Motivation Quote Banner, Hero Gamification & Level Scoreboard, 1-Tap Quick Actions Bar, Multi-Card Career/Decision Engine, Water & Wellness Section.
-            </p>
-          </div>
+        {/* Sub-Section Quick Filter Bar */}
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-900/90 border border-white/10 overflow-x-auto">
+          {[
+            {
+              id: "all" as SettingsCategoryFilter,
+              label: currentLanguage === "hi" ? "सभी सेटिंग्स" : "All Sections",
+            },
+            {
+              id: "profile_security" as SettingsCategoryFilter,
+              label:
+                currentLanguage === "hi"
+                  ? "प्रोफाइल व सुरक्षा"
+                  : "1. Profile & Security",
+            },
+            {
+              id: "appearance" as SettingsCategoryFilter,
+              label:
+                currentLanguage === "hi" ? "दिखावट व थीम" : "2. Appearance & Layout",
+            },
+            {
+              id: "sync_notifications" as SettingsCategoryFilter,
+              label:
+                currentLanguage === "hi" ? "सिंक व अलर्ट" : "3. Cloud Sync & Alerts",
+            },
+            {
+              id: "data_clear" as SettingsCategoryFilter,
+              label:
+                currentLanguage === "hi"
+                  ? "डेटा व रीसेट (Clear)"
+                  : "4. Data, Backup & Clear",
+            },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveCategory(tab.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                activeCategory === tab.id
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* 0. App Language Selector Card */}
-      <div className="glass-card p-6 rounded-3xl border border-emerald-500/30 space-y-4 bg-gradient-to-br from-emerald-950/20 via-slate-900/80 to-cyan-950/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-400 to-cyan-400 p-2 flex items-center justify-center text-slate-950 font-bold shadow-md">
-              <Globe className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-                {t.language}
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                  OS System
-                </span>
-              </h3>
-              <p className="text-xs text-slate-400">
+      {/* ===================================================================== */}
+      {/* GROUP 1: STUDENT PROFILE SETTINGS (Identity, Focus Mode & Security)   */}
+      {/* ===================================================================== */}
+      {showProfileSecurity && (
+        <section
+          id="settings-group-profile"
+          data-testid="settings-group-profile"
+          aria-label="Student Profile Settings"
+          className="space-y-5"
+        >
+          <div className="flex items-center justify-between px-1 border-b border-white/10 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm sm:text-base font-extrabold font-heading text-white uppercase tracking-wider">
                 {currentLanguage === "hi"
-                  ? "पूरे ऐप की भाषा चुनें: हिंदी या English"
-                  : "Select full system interface language: English or Hindi"}
-              </p>
+                  ? "अनुभाग I · छात्र प्रोफाइल सेटिंग्स"
+                  : "Section I · Student Profile Settings"}
+              </h2>
             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          {[
-            { id: "en" as AppLanguage, label: "English (UK/US)", flag: "🇬🇧", desc: "Full English UI & Terminology" },
-            { id: "hi" as AppLanguage, label: "हिन्दी (Hindi Medium)", flag: "🇮🇳", desc: "सम्पूर्ण इंटरफ़ेस, पाठ्यक्रम व प्रश्न बैंक" },
-          ].map((langItem) => {
-            const isSelected = currentLanguage === langItem.id;
-            return (
+            {activeCategory === "profile_security" && (
               <button
-                key={langItem.id}
-                onClick={() => {
-                  if (onUpdateLanguage) {
-                    onUpdateLanguage(langItem.id);
-                    showToast(
-                      langItem.id === "hi"
-                        ? "भाषा हिन्दी में परिवर्तित की गई!"
-                        : "Language changed to English!"
-                    );
-                  }
-                }}
-                className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-2 transition-all ${
-                  isSelected
-                    ? "bg-emerald-500/20 border-emerald-400 text-white shadow-lg shadow-emerald-500/20 font-bold"
-                    : "glass-pill border-white/10 text-slate-400 hover:text-white hover:border-emerald-500/40"
-                }`}
+                type="button"
+                id="settings-nav-to-global-btn"
+                onClick={() => setActiveCategory("global_config")}
+                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl">{langItem.flag}</span>
-                  {isSelected && (
-                    <span className="w-5 h-5 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-xs font-bold">
-                      ✓
-                    </span>
-                  )}
+                {currentLanguage === "hi"
+                  ? "ग्लोबल कॉन्फ़िगरेशन पर जाएँ →"
+                  : "Go to Global Configuration →"}
+              </button>
+            )}
+          </div>
+          {/* 1.1 Active Student Profile & Multi-Student Switcher */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold font-heading text-white">{langItem.label}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{langItem.desc}</p>
+                  <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                    {t.studentProfiles || "Student Profiles"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {currentLanguage === "hi"
+                      ? "प्रत्येक छात्र के लिए अलग कार्य, अध्ययन, शैक्षणिक और परीक्षा डेटा"
+                      : "Isolated tasks, notes, study sessions, and exam data per student"}
+                  </p>
                 </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              </div>
 
-      {/* 1. Multi-Student Intelligence Card (v1.5) */}
-      <div className="glass-card p-6 rounded-3xl border border-emerald-500/30 space-y-4 bg-gradient-to-br from-emerald-950/20 via-slate-900/80 to-cyan-950/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-400 to-emerald-400 p-2 flex items-center justify-center text-slate-950 font-bold shadow-md">
-              <Users className="w-5 h-5" />
+              {onOpenStudentModal && (
+                <button
+                  type="button"
+                  onClick={onOpenStudentModal}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>
+                    {currentLanguage === "hi"
+                      ? "प्रोफाइल प्रबंधित करें"
+                      : "Switch / Manage Profiles"}
+                  </span>
+                </button>
+              )}
             </div>
-            <div>
-              <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-                {t.studentProfiles}
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                  v1.5
-                </span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                {currentLanguage === "hi"
-                  ? "प्रत्येक छात्र के लिए अलग कार्य, अध्ययन, शैक्षणिक और परीक्षा डेटा"
-                  : "Isolate tasks, career, academic, and exam data for each student"}
-              </p>
+
+            {activeStudent && (
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${
+                      activeStudent.avatarColor || "from-cyan-500 to-emerald-500"
+                    } flex items-center justify-center text-slate-950 font-bold text-sm font-heading shrink-0`}
+                  >
+                    {getStudentAvatarInitials(
+                      getStudentDisplayName(activeStudent, settings, "Student")
+                    )}
+                  </div>
+                  <div>
+                    <h4
+                      className="font-bold text-white text-sm font-heading flex items-center gap-2"
+                      dir="ltr"
+                    >
+                      <span>
+                        {getStudentDisplayName(
+                          activeStudent,
+                          settings,
+                          "Student"
+                        )}
+                      </span>
+                      <span className="text-xs font-mono text-emerald-400">
+                        · Active
+                      </span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {activeStudent.classLevel || "Class 12"} ·{" "}
+                      {activeStudent.stream || "General"} ·{" "}
+                      {activeStudent.board || "CBSE"} Board
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-xs font-mono tabular-nums text-slate-400">
+                  {currentLanguage === "hi" ? "पंजीकृत प्रोफाइल: " : "Profiles: "}
+                  <span className="text-emerald-400 font-bold">
+                    {profiles.length}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 1.2 Focus Mode Toggle Card */}
+          <div
+            id="settings-focus-mode-card"
+            data-testid="settings-focus-mode-card"
+            className={`glass-card p-5 sm:p-6 rounded-3xl border transition-all space-y-4 ${
+              isFocusModeEnabled
+                ? "border-indigo-500/50 bg-gradient-to-br from-indigo-950/35 via-slate-900/90 to-emerald-950/20"
+                : "border-white/10 bg-slate-900/80"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div
+                  className={`w-10 h-10 rounded-2xl p-2 flex items-center justify-center font-bold shrink-0 transition-colors ${
+                    isFocusModeEnabled
+                      ? "bg-emerald-500 text-slate-950"
+                      : "bg-slate-800 text-indigo-400 border border-white/10"
+                  }`}
+                >
+                  <Target className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                      {currentLanguage === "hi"
+                        ? "फोकस मोड (Focus Mode)"
+                        : "Focus Mode"}
+                    </h3>
+                    <span className="text-xs text-slate-500">·</span>
+                    <span
+                      id="settings-focus-mode-status"
+                      className={`text-xs font-mono font-semibold ${
+                        isFocusModeEnabled
+                          ? "text-emerald-400"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {isFocusModeEnabled
+                        ? currentLanguage === "hi"
+                          ? "सक्रिय (Distraction-Free)"
+                          : "Active — Distractions Hidden"
+                        : currentLanguage === "hi"
+                        ? "निष्क्रिय (Standard View)"
+                        : "Off — Full Dashboard"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                    {currentLanguage === "hi"
+                      ? "गहन अध्ययन सत्रों के दौरान गैर-जरूरी डैशबोर्ड विजेट (प्रेरणा कोट्स, त्वरित लिंक, विस्तारित एनालिटिक्स और वेलनेस कार्ड) को छिपाता है।"
+                      : "Hides non-essential dashboard widgets (Motivation Quotes, Quick Actions, extended Career/Decision cards, and Wellness) to keep your workspace distraction-free."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
+                <button
+                  type="button"
+                  id="settings-focus-mode-toggle"
+                  data-testid="focus-mode-toggle"
+                  role="switch"
+                  aria-checked={isFocusModeEnabled}
+                  aria-label="Focus Mode"
+                  onClick={handleToggleFocusMode}
+                  className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isFocusModeEnabled ? "bg-emerald-500" : "bg-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      isFocusModeEnabled ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 
-          {onOpenStudentModal && (
-            <button
-              onClick={onOpenStudentModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs hover:brightness-110 shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5"
-            >
-              <Users className="w-3.5 h-3.5" />
-              {currentLanguage === "hi" ? "प्रोफाइल प्रबंधित करें" : "Manage Profiles"}
-            </button>
-          )}
-        </div>
-
-        {activeStudent && (
-          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex items-center justify-between gap-3">
+          {/* 1.3 Unified Language & Abya AI Language Mode */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-5">
             <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${
-                  activeStudent.avatarColor || "from-cyan-500 to-emerald-500"
-                } flex items-center justify-center text-white font-bold text-sm font-heading shadow-md`}
-              >
-                {getStudentAvatarInitials(getStudentDisplayName(activeStudent, settings, "Student"))}
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                <Globe className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm font-heading flex items-center gap-2" dir="ltr">
-                  {getStudentDisplayName(activeStudent, settings, "Student")}
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                    {currentLanguage === "hi" ? "सक्रिय परिवेश" : "Active Environment"}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {activeStudent.classLevel || "Class 12"} • {activeStudent.stream || "General"} • {activeStudent.board || "CBSE"} Board
+                <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                  {currentLanguage === "hi"
+                    ? "सिस्टम और एआई भाषा प्राथमिकताएं"
+                    : "System & Abya AI Language"}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {currentLanguage === "hi"
+                    ? "ऐप इंटरफ़ेस और अव्या एआई मेंटर की भाषा एक ही स्थान से नियंत्रित करें"
+                    : "Control app interface language and Abya AI mentor response style in one place"}
                 </p>
               </div>
             </div>
 
-            <div className="text-xs font-mono text-slate-400">
-              {currentLanguage === "hi" ? "कुल पंजीकृत: " : "Total Registered: "}
-              <span className="text-emerald-400 font-bold">
-                {profiles.length} {currentLanguage === "hi" ? "विद्यार्थी" : "Students"}
-              </span>
+            {/* App Interface Language */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                {currentLanguage === "hi"
+                  ? "1. ऐप इंटरफ़ेस भाषा:"
+                  : "1. App Interface Language:"}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    id: "en" as AppLanguage,
+                    label: "English",
+                    desc: "Full English interface & academic terminology",
+                  },
+                  {
+                    id: "hi" as AppLanguage,
+                    label: "हिन्दी (Hindi)",
+                    desc: "सम्पूर्ण इंटरफ़ेस, पाठ्यक्रम व प्रश्न बैंक",
+                  },
+                ].map((langItem) => {
+                  const isSelected = currentLanguage === langItem.id;
+                  return (
+                    <button
+                      key={langItem.id}
+                      type="button"
+                      onClick={() => {
+                        if (onUpdateLanguage) {
+                          onUpdateLanguage(langItem.id);
+                          showToast(
+                            langItem.id === "hi"
+                              ? "भाषा हिन्दी में परिवर्तित की गई!"
+                              : "Language changed to English!"
+                          );
+                        }
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-emerald-500/15 border-emerald-400 text-white font-bold"
+                          : "bg-slate-950/60 border-white/10 text-slate-300 hover:border-white/25"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-sm font-bold text-white">
+                          {langItem.label}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {langItem.desc}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 2. Account & Private Mode */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-              <Users className="w-5 h-5 text-emerald-400" />
-              <span>{currentLanguage === "hi" ? "प्रमाणीकरण और निजी मोड" : "Authentication & Private Mode"}</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {isPrivateMode
-                ? (currentLanguage === "hi" ? "निजी मोड सक्रिय — स्थानीय ब्राउज़र अलगाव का उपयोग" : "Private Mode Active — Using local browser isolation")
-                : `${currentLanguage === "hi" ? "लॉग इन:" : "Logged in as"} ${settings.account?.email || settings.userName}`}
-            </p>
-          </div>
-          {onOpenAuthModal && (
-            <button
-              onClick={onOpenAuthModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs shadow-md hover:brightness-110 transition-all"
-            >
-              {isPrivateMode ? (currentLanguage === "hi" ? "लॉग इन / रजिस्टर" : "Log In / Register") : (currentLanguage === "hi" ? "खाता प्रबंधित करें" : "Manage Account")}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 2.1 PIN Lock & Security Settings */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-5 bg-gradient-to-br from-purple-500/5 via-slate-900/40 to-transparent shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/40 flex items-center justify-center shrink-0 shadow-md shadow-purple-500/10">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 font-mono">
-                  Garia Security Engine
+            {/* Abya AI Response Language */}
+            <div className="pt-4 border-t border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">
+                  {currentLanguage === "hi"
+                    ? "2. अव्या एआई भाषा मोड (Abya AI Response Mode):"
+                    : "2. Abya AI Coach Response Language:"}
+                </label>
+                <span className="text-[11px] font-mono text-emerald-400">
+                  Server-Side Gemini Proxy Active
                 </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  {
+                    id: "WhatsApp Language" as AbyaLanguageSetting,
+                    label: "WhatsApp Mix",
+                  },
+                  { id: "English" as AbyaLanguageSetting, label: "English" },
+                  { id: "Hindi" as AbyaLanguageSetting, label: "Hindi" },
+                  { id: "Hinglish" as AbyaLanguageSetting, label: "Hinglish" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(item.id);
+                    }}
+                    className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      abyaLanguage === item.id
+                        ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                        : "bg-slate-950/60 border-white/10 text-slate-300 hover:border-emerald-500/40"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 1.4 Security, PIN Lock & Account Authentication */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                    {currentLanguage === "hi"
+                      ? "खाता प्रमाणीकरण और पिन सुरक्षा"
+                      : "Account & PIN Lock Security"}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {isPrivateMode
+                      ? currentLanguage === "hi"
+                        ? "निजी मोड सक्रिय — स्थानीय ब्राउज़र अलगाव"
+                        : "Private Mode Active — Local browser storage isolation"
+                      : `Signed in as ${
+                          settings.account?.email || settings.userName
+                        }`}
+                  </p>
+                </div>
+              </div>
+
+              {onOpenAuthModal && (
+                <button
+                  type="button"
+                  onClick={onOpenAuthModal}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs transition-all self-start sm:self-auto cursor-pointer"
+                >
+                  {isPrivateMode
+                    ? currentLanguage === "hi"
+                      ? "लॉग इन / रजिस्टर"
+                      : "Account Sign In"
+                    : currentLanguage === "hi"
+                    ? "खाता प्रबंधित करें"
+                    : "Manage Account"}
+                </button>
+              )}
+            </div>
+
+            {/* PIN Lock Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-white">
+                    {currentLanguage === "hi"
+                      ? "पिन लॉक सुरक्षा (4–8 अंक)"
+                      : "Numeric PIN App Lock"}
+                  </h4>
+                  <span className="text-xs font-mono text-slate-400">
+                    ·{" "}
+                    {settings.security?.enabled && settings.security?.pinHash
+                      ? "PIN Active"
+                      : "Disabled"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {currentLanguage === "hi"
+                    ? "अपने अध्ययन सत्र, कार्य और नोट्स को सुरक्षित पिन से लॉक करें।"
+                    : "Protect your study notes, tasks, and profile with a numeric PIN."}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
                 {settings.security?.enabled && settings.security?.pinHash ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    <span>PIN Active</span>
-                  </span>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPinModalMode("change")}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
+                    >
+                      {currentLanguage === "hi" ? "पिन बदलें" : "Change PIN"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        lockSession();
+                        if (onLockApp) onLockApp();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>
+                        {currentLanguage === "hi" ? "अभी लॉक करें" : "Lock Now"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPinModalMode("remove")}
+                      className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      {currentLanguage === "hi" ? "पिन हटाएं" : "Remove PIN"}
+                    </button>
+                  </>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-medium border border-white/10">
-                    Disabled
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPinModalMode("setup")}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>
+                      {currentLanguage === "hi"
+                        ? "पिन लॉक सेट करें"
+                        : "Create PIN Lock"}
+                    </span>
+                  </button>
                 )}
               </div>
-              <h3 className="text-lg font-bold font-heading text-white">
-                {currentLanguage === "hi" ? "पिन लॉक और सुरक्षा सेटिंग्स" : "PIN Lock & Security Settings"}
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {currentLanguage === "hi"
-                  ? "अपने अध्ययन सत्र, कार्य और नोट्स को 4-8 अंकों के सुरक्षित पिन से लॉक करें।"
-                  : "Protect your study sessions, confidential notes, exams, and habits with a secure numeric PIN."}
-              </p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            {settings.security?.enabled && settings.security?.pinHash ? (
-              <button
-                onClick={() => setPinModalMode("remove")}
-                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors"
-              >
-                {currentLanguage === "hi" ? "पिन हटाएं" : "Remove PIN"}
-              </button>
-            ) : (
-              <button
-                onClick={() => setPinModalMode("setup")}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>{currentLanguage === "hi" ? "पिन लॉक सेट करें" : "Create PIN Lock"}</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* PIN Configuration Options when Enabled */}
-        {settings.security?.enabled && settings.security?.pinHash && (
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Launch Lock Toggle */}
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between">
+            {settings.security?.enabled && settings.security?.pinHash && (
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{currentLanguage === "hi" ? "ऐप लॉन्च पर लॉक स्क्रीन" : "Lock Screen on App Launch"}</span>
+                    <span>
+                      {currentLanguage === "hi"
+                        ? "ऐप लॉन्च पर लॉक स्क्रीन"
+                        : "Require PIN on App Launch"}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {currentLanguage === "hi"
                       ? "ब्राउज़र टैब खोलने पर तुरंत पिन मांगें"
-                      : "Require PIN verification when opening Garia OS"}
+                      : "Prompt for PIN verification whenever Garia OS is opened"}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => {
                     if (settings.security) {
                       onUpdateSettings({
@@ -926,1342 +1275,1115 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       });
                     }
                   }}
-                  className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
-                    settings.security.lockOnLaunch ? "bg-emerald-500" : "bg-slate-700"
+                  className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 cursor-pointer ${
+                    settings.security.lockOnLaunch
+                      ? "bg-emerald-500"
+                      : "bg-slate-700"
                   }`}
                 >
                   <span
                     className={`w-4.5 h-4.5 rounded-full bg-white transition-transform transform shadow-sm ${
-                      settings.security.lockOnLaunch ? "translate-x-4.5" : "translate-x-0"
+                      settings.security.lockOnLaunch
+                        ? "translate-x-4.5"
+                        : "translate-x-0"
                     }`}
                   />
                 </button>
               </div>
+            )}
+          </div>
+        </section>
+      )}
 
-              {/* Action Buttons: Change PIN & Lock Now */}
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2">
+      {/* ===================================================================== */}
+      {/* GROUP 2: GLOBAL CONFIGURATION — APPEARANCE, THEMES & LAYOUT           */}
+      {/* ===================================================================== */}
+      {(showAppearance || showSyncNotifications || showDataClear) && (
+        <div
+          id="settings-group-global"
+          data-testid="settings-group-global"
+          className="flex items-center justify-between px-1 border-b border-white/10 pb-2.5 pt-2"
+        >
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-amber-400" />
+            <h2 className="text-sm sm:text-base font-extrabold font-heading text-white uppercase tracking-wider">
+              {currentLanguage === "hi"
+                ? "अनुभाग II · ग्लोबल ओएस कॉन्फ़िगरेशन"
+                : "Section II · Global OS Configuration"}
+            </h2>
+          </div>
+          {activeCategory !== "all" && (
+            <button
+              type="button"
+              id="settings-nav-to-profile-btn"
+              onClick={() => setActiveCategory("profile_security")}
+              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+            >
+              {currentLanguage === "hi"
+                ? "← प्रोफाइल सेटिंग्स पर वापस जाएँ"
+                : "← Back to Profile Settings"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showAppearance && (
+        <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold font-heading text-white flex items-center gap-2">
+                <Sun className="w-5 h-5 text-amber-400" />
+                <span>
+                  {currentLanguage === "hi"
+                    ? "दिखावट व थीम सिस्टम"
+                    : "Appearance & Theme System"}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {currentLanguage === "hi"
+                  ? "अपनी पसंद के अनुसार थीम चुनें या सूर्योदय/सूर्यास्त ऑटो-सिंक सक्रिय करें।"
+                  : "Switch themes manually or enable automatic daylight/night solar transitions."}
+              </p>
+            </div>
+          </div>
+
+          {/* Geolocation-Based Theme Switcher */}
+          <div
+            id="geolocation-theme-switcher-card"
+            data-testid="geolocation-theme-switcher-card"
+            className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-amber-500/30 space-y-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  {solarInfo.isDaytime ? (
+                    <Sunrise className="w-5 h-5 text-amber-400" />
+                  ) : (
+                    <Sunset className="w-5 h-5 text-indigo-400" />
+                  )}
+                </div>
                 <div>
-                  <div className="text-xs font-bold text-white">
-                    {currentLanguage === "hi" ? "सत्र प्रबंधन" : "Session Controls"}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-xs sm:text-sm font-bold text-white font-heading">
+                      {currentLanguage === "hi"
+                        ? "जियोलोकेशन-आधारित थीम स्विचर"
+                        : "Geolocation Solar Theme Switcher"}
+                    </h4>
+                    <span className="text-xs text-slate-500">·</span>
+                    <span className="text-[11px] font-mono text-amber-300 font-semibold">
+                      {settings.autoSolarTheme
+                        ? solarInfo.isDaytime
+                          ? "Active: High Contrast (Daylight)"
+                          : `Active: ${preferredNight} (Night)`
+                        : "Manual Mode"}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    {currentLanguage === "hi" ? "पिन बदलें या अभी लॉक करें" : "Update PIN or lock your screen now"}
+                    {currentLanguage === "hi"
+                      ? "दिन के उजाले में 'हाई कॉन्ट्रास्ट' मोड और रात में आपकी पसंदीदा डार्क थीम में स्वचालित रूप से स्विच करता है।"
+                      : "Automatically transitions to High Contrast during daylight hours and your preferred dark theme at night."}
                   </p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPinModalMode("change")}
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-slate-200 transition-colors"
-                  >
-                    {currentLanguage === "hi" ? "पिन बदलें" : "Change PIN"}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      lockSession();
-                      if (onLockApp) onLockApp();
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-colors flex items-center gap-1"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>{currentLanguage === "hi" ? "अभी लॉक करें" : "Lock Now"}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 2.2 Firebase Firestore Cloud Sync Section */}
-      <div className="glass-card p-6 rounded-3xl border border-orange-500/30 space-y-5 bg-gradient-to-br from-orange-500/5 via-slate-900/40 to-transparent shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/20 text-orange-400 border border-orange-500/40 flex items-center justify-center shrink-0 shadow-md shadow-orange-500/10">
-              <Flame className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400 font-mono">
-                  Firebase Database
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
-                  Cloud Firestore
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Real-Time Sync
-                </span>
-              </div>
-              <h3 className="text-lg font-bold font-heading text-white mt-0.5">
-                Firebase Firestore Cloud Sync
-              </h3>
-              <p className="text-xs text-slate-400">
-                Persistent cross-device synchronization for all student profiles, tasks, notes, habits, and exam data.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleFbBackup}
-              disabled={isFbSyncing}
-              className="px-3.5 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <CloudUpload className="w-3.5 h-3.5" />
-              <span>{isFbSyncing ? "Syncing..." : "Backup to Cloud"}</span>
-            </button>
-            <button
-              onClick={handleFbRestore}
-              disabled={isFbSyncing}
-              className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <CloudDownload className="w-3.5 h-3.5" />
-              <span>Restore</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Firebase Config Meta Bar */}
-        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
-            {fbUser?.photoURL ? (
-              <img
-                src={fbUser.photoURL}
-                alt="Firebase user avatar"
-                referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-full border border-orange-500/40 object-cover"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-orange-400">
-                <Flame className="w-4 h-4" />
-              </div>
-            )}
-            <div>
-              <div className="text-xs font-bold text-white flex items-center gap-2">
-                <span>{fbUser ? (fbUser.displayName || fbUser.email) : "Guest / Local Offline Session"}</span>
-                {fbUser && (
-                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Online
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                {fbUser ? fbUser.email : "Sign in via Auth Modal to enable automatic cloud backup"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-            <div>
-              Region: <span className="text-slate-200">asia-southeast1</span>
-            </div>
-            {fbLastSynced && (
-              <div className="text-emerald-400 font-bold">
-                Synced at: {fbLastSynced}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2.5 Google Calendar API Sync Settings */}
-      <div className="glass-card p-6 rounded-3xl border border-amber-500/30 space-y-5 bg-gradient-to-br from-amber-500/5 via-slate-900/40 to-transparent shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/10">
-              <CalendarIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-mono">
-                  Google Workspace
-                </span>
-                <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Google Calendar API
-                </span>
-                <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                  Gmail API
-                </span>
-              </div>
-              <h3 className="text-lg font-bold font-heading text-white mt-0.5">
-                Google Workspace & Calendar Sync
-              </h3>
-              <p className="text-xs text-slate-400">
-                Sync academic tasks, study sessions, exams, and access your Student Gmail directly in Garia OS
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Master Toggle */}
-            <div className="flex items-center gap-2.5 bg-slate-950/80 px-3 py-1.5 rounded-2xl border border-white/10">
-              <span className="text-xs font-semibold text-slate-300">
-                {gcalSettings.enabled ? "Sync Enabled" : "Sync Disabled"}
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={gcalSettings.enabled}
-                  onChange={(e) => handleUpdateGCalSettings({ enabled: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-              </label>
-            </div>
-
-            <button
-              onClick={() => setIsGCalModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 hover:scale-105 shrink-0"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Open Sync Center</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Account Info Bar */}
-        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {gcalUser?.photoURL ? (
-              <img
-                src={gcalUser.photoURL}
-                alt="Google avatar"
-                referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-full border border-amber-500/40"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-amber-300">
-                {gcalUser?.email ? gcalUser.email[0].toUpperCase() : "G"}
-              </div>
-            )}
-            <div>
-              <div className="text-xs font-bold text-white">
-                {gcalUser ? (gcalUser.displayName || gcalUser.email) : "No Google account connected"}
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                {gcalUser ? gcalUser.email : "Sign in to allow direct API synchronization"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {gcalUser ? (
-              <>
-                <a
-                  href="https://calendar.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <ExternalLink className="w-3 h-3 text-cyan-400" />
-                  <span>Google Calendar</span>
-                </a>
-                <button
-                  onClick={async () => {
-                    await signOutGoogle();
-                    setGcalUser(null);
-                    setGcalToken(null);
-                    showToast("Google account disconnected");
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold flex items-center gap-1"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Disconnect</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await signInWithGoogle();
-                    if (res) {
-                      setGcalUser(res.user);
-                      setGcalToken(res.accessToken);
-                      showToast("Google Account Connected Successfully!");
-                    }
-                  } catch (e: any) {
-                    showToast(e.message || "Failed to sign in with Google");
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-md transition-all flex items-center gap-2"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                </svg>
-                <span>Sign in with Google</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Granular Sync Selection Checkboxes */}
-        {gcalSettings.enabled && (
-          <div className="space-y-3 pt-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-heading block">
-              Choose Items to Sync:
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Tasks */}
-              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-white">Tasks</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={gcalSettings.syncTasks}
-                  onChange={(e) => handleUpdateGCalSettings({ syncTasks: e.target.checked })}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
-                />
-              </label>
-
-              {/* Study Sessions */}
-              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-cyan-400" />
-                  <span className="text-xs font-bold text-white">Study Sessions</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={gcalSettings.syncStudySessions}
-                  onChange={(e) => handleUpdateGCalSettings({ syncStudySessions: e.target.checked })}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
-                />
-              </label>
-
-              {/* Exams */}
-              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-rose-400" />
-                  <span className="text-xs font-bold text-white">Exams & Events</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={gcalSettings.syncExams}
-                  onChange={(e) => handleUpdateGCalSettings({ syncExams: e.target.checked })}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
-                />
-              </label>
-
-              {/* Goals */}
-              <label className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-2">
-                  <Target className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-bold text-white">Goal Targets</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={gcalSettings.syncGoals}
-                  onChange={(e) => handleUpdateGCalSettings({ syncGoals: e.target.checked })}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700"
-                />
-              </label>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 3. Notifications Center */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>{t.notifications}</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {currentLanguage === "hi"
-                ? "प्रोफ़ाइल-पृथक सूचना प्राथमिकताएं और अलर्ट"
-                : "Profile-isolated notification preferences and alert triggers"}
-            </p>
-          </div>
-          <button
-            onClick={() => handleToggleNotifKey("master")}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-              notifs.master
-                ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                : "glass-pill text-slate-400 border border-white/10"
-            }`}
-          >
-            {notifs.master ? "Master ON" : "Master OFF"}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          {[
-            { key: "study", label: currentLanguage === "hi" ? "अध्ययन अनुस्मारक" : "Study Reminders", desc: currentLanguage === "hi" ? "अध्ययन सत्रों के लिए अलर्ट" : "Alerts for study sessions" },
-            { key: "tasks", label: currentLanguage === "hi" ? "कार्य समय-सीमा" : "Task Deadlines", desc: currentLanguage === "hi" ? "लंबित कार्यों के लिए अलर्ट" : "Alerts for pending tasks" },
-            { key: "revision", label: currentLanguage === "hi" ? "रिवीजन शेड्यूल" : "Revision Schedule", desc: currentLanguage === "hi" ? "स्मार्ट स्पेसड रिपीटिशन अलर्ट" : "Spaced repetition alerts" },
-            { key: "habits", label: currentLanguage === "hi" ? "आदत ट्रैकर" : "Habit Tracker", desc: currentLanguage === "hi" ? "दैनिक स्ट्रीक अनुस्मारक" : "Daily streak reminders" },
-            { key: "water", label: currentLanguage === "hi" ? "जल अनुस्मारक" : "Water Reminders", desc: currentLanguage === "hi" ? "हाइड्रेशन लक्ष्य अलर्ट" : "Hydration goal alerts" },
-            { key: "exam", label: currentLanguage === "hi" ? "परीक्षा उलटी गिनती" : "Exam Countdown", desc: currentLanguage === "hi" ? "परीक्षा तत्परता अपडेट" : "Exam readiness updates" },
-            { key: "suggestions", label: currentLanguage === "hi" ? "स्मार्ट सुझाव" : "Smart Suggestions", desc: currentLanguage === "hi" ? "ओएस एआई इनसाइट्स" : "OS intelligence insights" },
-          ].map((item) => {
-            const isChecked = notifs[item.key as keyof typeof notifs];
-            return (
-              <div
-                key={item.key}
-                onClick={() => handleToggleNotifKey(item.key as keyof typeof notifs)}
-                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                  isChecked
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-white"
-                    : "glass-pill border-white/5 text-slate-400 hover:text-white"
-                }`}
-              >
-                <div>
-                  <h4 className="text-xs font-bold font-heading text-white">{item.label}</h4>
-                  <p className="text-[10px] text-slate-400">{item.desc}</p>
-                </div>
-                <div
-                  className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold ${
-                    isChecked
-                      ? "bg-emerald-500 border-emerald-400 text-slate-950"
-                      : "border-slate-600 bg-slate-900"
-                  }`}
-                >
-                  {isChecked && "✓"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 4. Appearance & Multi-Theme System */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-            <Sun className="w-5 h-5 text-amber-400" />
-            <span>{currentLanguage === "hi" ? "दिखावट व थीम सिस्टम" : "Appearance & Theme System"}</span>
-          </h3>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-            8 Premium Themes
-          </span>
-        </div>
-        <p className="text-xs text-slate-400">
-          {currentLanguage === "hi"
-            ? "अपनी पसंद के अनुसार तुरंत थीम स्विच करें। आंखों के तनाव को कम करने और फोकस बढ़ाने के लिए तैयार।"
-            : "Switch instantly between 8 high-contrast student-focused themes designed for focus and low eye strain."}
-        </p>
-
-        {/* Geolocation-Based Theme Switcher (Daylight High Contrast & Night Preferred Dark) */}
-        <div
-          id="geolocation-theme-switcher-card"
-          data-testid="geolocation-theme-switcher-card"
-          className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-amber-500/30 space-y-4"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                {solarInfo.isDaytime ? (
-                  <Sunrise className="w-5 h-5 text-amber-400" />
-                ) : (
-                  <Sunset className="w-5 h-5 text-indigo-400" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-xs sm:text-sm font-bold text-white font-heading">
-                    {currentLanguage === "hi"
-                      ? "जियोलोकेशन-आधारित थीम स्विचर (हाई कॉन्ट्रास्ट दिन / डार्क रात)"
-                      : "Geolocation-Based Theme Switcher (High Contrast Daylight / Night Dark)"}
-                  </h4>
-                  <span className="text-xs text-slate-500">·</span>
-                  <span className="text-[11px] font-mono text-amber-300 font-semibold">
-                    {settings.autoSolarTheme
-                      ? solarInfo.isDaytime
-                        ? "Active: High Contrast (Daylight)"
-                        : `Active: ${preferredNight} (Night)`
-                      : "Manual Mode"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {currentLanguage === "hi"
-                    ? "आपके GPS स्थान के सूर्योदय/सूर्यास्त के आधार पर दिन के उजाले में 'हाई कॉन्ट्रास्ट' मोड और रात में आपकी पसंदीदा डार्क थीम में स्वचालित रूप से स्विच करता है।"
-                    : "Automatically transitions the app to High Contrast mode during daylight hours and your preferred dark theme at night using GPS solar coordinates."}
-                </p>
-              </div>
-            </div>
-
-            {/* Toggle Button */}
-            <button
-              onClick={() => handleToggleAutoSolar(!settings.autoSolarTheme)}
-              id="auto-solar-theme-toggle"
-              data-testid="geolocation-theme-toggle"
-              role="switch"
-              aria-checked={Boolean(settings.autoSolarTheme)}
-              aria-label="Toggle Geolocation-Based Theme Switcher"
-              className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-200 ease-in-out shrink-0 focus:outline-none flex items-center cursor-pointer ${
-                settings.autoSolarTheme ? "bg-amber-500" : "bg-slate-700"
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out flex items-center justify-center text-[10px] text-slate-900 font-bold ${
-                  settings.autoSolarTheme ? "translate-x-5.5" : "translate-x-0"
-                }`}
-              >
-                {settings.autoSolarTheme ? "☀️" : "🌙"}
-              </div>
-            </button>
-          </div>
-
-          {/* Preferred Nighttime Dark Theme & Phase Controls */}
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2">
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                <label
-                  htmlFor="preferred-night-theme-select"
-                  className="text-xs font-semibold text-slate-300"
-                >
-                  Preferred Night Dark Theme:
-                </label>
-                <select
-                  id="preferred-night-theme-select"
-                  data-testid="preferred-night-theme-select"
-                  value={preferredNight}
-                  onChange={(e) => handlePreferredNightThemeChange(e.target.value as AppTheme)}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-white/15 text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer"
-                >
-                  {DARK_THEME_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id} className="bg-slate-900 text-white">
-                      {opt.label} ({opt.desc})
-                    </option>
-                  ))}
-                </select>
               </div>
 
-              {/* Phase Preview / Geolocation Mode Selector */}
-              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
-                <button
-                  type="button"
-                  onClick={() => handleSimulationModeChange("auto")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                    settings.autoSolarTheme && simMode === "auto"
-                      ? "bg-amber-500 text-slate-950 font-bold"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Auto GPS Solar
-                </button>
-                <button
-                  type="button"
-                  data-testid="simulate-daylight-high-contrast-btn"
-                  onClick={() => handleSimulationModeChange("daylight")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                    settings.autoSolarTheme && simMode === "daylight"
-                      ? "bg-amber-400 text-slate-950 font-bold"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Daylight (High Contrast)
-                </button>
-                <button
-                  type="button"
-                  data-testid="simulate-night-dark-btn"
-                  onClick={() => handleSimulationModeChange("night")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                    settings.autoSolarTheme && simMode === "night"
-                      ? "bg-indigo-500 text-white font-bold"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Night ({preferredNight})
-                </button>
-              </div>
-            </div>
-
-            {/* Solar Live Status & GPS Calibration Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                <Sunrise className="w-4 h-4 text-amber-400 shrink-0" />
-                <div>
-                  <div className="text-[10px] text-slate-400">Daylight High-Contrast Start</div>
-                  <div className="font-bold font-mono tabular-nums text-white text-xs">
-                    Sunrise · {solarInfo.sunriseFormatted}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                <Sunset className="w-4 h-4 text-indigo-400 shrink-0" />
-                <div>
-                  <div className="text-[10px] text-slate-400">Night Dark Theme Start</div>
-                  <div className="font-bold font-mono tabular-nums text-white text-xs">
-                    Sunset · {solarInfo.sunsetFormatted}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 truncate">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-[11px] text-slate-300 truncate font-mono tabular-nums">
-                    {solarInfo.isUsingGeolocation && solarInfo.coordinatesUsed
-                      ? `${solarInfo.coordinatesUsed.lat.toFixed(2)}°, ${solarInfo.coordinatesUsed.lng.toFixed(2)}°`
-                      : "Regional Solar"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDetectLocation}
-                  disabled={isLocating}
-                  data-testid="sync-gps-location-btn"
-                  className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition-all shrink-0 cursor-pointer"
-                >
-                  {isLocating ? "Detecting..." : "Sync GPS"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-2">
-          <h4 className="text-xs font-bold text-slate-300 mb-2">
-            {settings.autoSolarTheme
-              ? currentLanguage === "hi"
-                ? "रात के लिए पसंदीदा डार्क थीम चुनें:"
-                : "Select your preferred Dark Theme for nighttime:"
-              : currentLanguage === "hi"
-              ? "मैन्युअल थीम चयन:"
-              : "Manual Theme Palette:"}
-          </h4>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
-          {[
-            { id: "high-contrast", label: "High Contrast", desc: "Daylight Crisp AAA", color: "bg-white border-2 border-slate-950 text-black", dot: "bg-black" },
-            { id: "classic", label: currentLanguage === "hi" ? "क्लासिक स्कॉलर" : "Classic Scholar", desc: "Heritage Ivory & Bronze", color: "bg-[#0c1017] border-amber-500/40 text-amber-200", dot: "bg-amber-400" },
-            { id: "amoled", label: "AMOLED Black", desc: "Pure #000000", color: "bg-black border-zinc-800", dot: "bg-white" },
-            { id: "purple", label: "Royal Purple", desc: "Deep Violet", color: "bg-purple-950 border-purple-800", dot: "bg-purple-400" },
-            { id: "midnight", label: "Midnight Blue", desc: "Navy Horizon", color: "bg-sky-950 border-sky-800", dot: "bg-cyan-400" },
-            { id: "graphite", label: "Graphite Gray", desc: "Slate Minimal", color: "bg-slate-900 border-slate-700", dot: "bg-slate-300" },
-            { id: "arctic", label: "Arctic White", desc: "Crisp & Clean", color: "bg-slate-100 border-slate-300 text-slate-900", dot: "bg-emerald-600" },
-            { id: "frost", label: "Frost Glass", desc: "Translucent Ice", color: "bg-slate-800/60 border-cyan-500/30", dot: "bg-cyan-200" },
-            { id: "emerald", label: "Emerald Green", desc: "Calm Focus", color: "bg-emerald-950 border-emerald-800", dot: "bg-emerald-400" },
-            { id: "sunset", label: "Sunset Orange", desc: "Warm Twilight", color: "bg-orange-950 border-orange-800", dot: "bg-orange-400" },
-            { id: "custom", label: currentLanguage === "hi" ? "कस्टम थीम" : "Custom Theme", desc: currentLanguage === "hi" ? "हेक्स रंग स्टूडियो" : "Custom Hex Studio", color: "", dot: "", isCustom: true },
-          ].map((themeItem) => {
-            const isCustom = themeItem.id === "custom";
-            const isActive =
-              settings.theme === themeItem.id ||
-              (!isCustom && themeItem.id === "arctic" && settings.theme === "light") ||
-              (!isCustom && themeItem.id === "midnight" && settings.theme === "ocean") ||
-              (!isCustom && themeItem.id === "emerald" && settings.theme === "forest") ||
-              (!isCustom && themeItem.id === "graphite" && settings.theme === "dark");
-
-            return (
-              <button
-                key={themeItem.id}
-                onClick={() => handleThemeChange(themeItem.id as AppTheme)}
-                className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2.5 transition-all card-press ${
-                  isActive
-                    ? "bg-emerald-500/20 border-emerald-400 text-white font-bold shadow-lg shadow-emerald-500/20 scale-[1.02]"
-                    : "glass-pill border-white/10 text-slate-300 hover:text-white hover:border-white/20"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  {isCustom ? (
-                    <div
-                      className="w-6 h-6 rounded-lg border border-white/20 flex items-center justify-center shadow-inner relative overflow-hidden shrink-0"
-                      style={{ backgroundColor: customBgHex }}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full ring-1 ring-white/30 shadow-sm"
-                        style={{ backgroundColor: customPrimaryHex }}
-                      />
-                    </div>
-                  ) : (
-                    <div className={`w-6 h-6 rounded-lg ${themeItem.color} border flex items-center justify-center shrink-0`}>
-                      <span className={`w-2 h-2 rounded-full ${themeItem.dot}`} />
-                    </div>
-                  )}
-                  {isActive && (
-                    <span className="w-4 h-4 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-[10px] font-bold">
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold font-heading flex items-center gap-1.5">
-                    {themeItem.label}
-                    {isCustom && <Palette className="w-3 h-3 text-emerald-400 inline" />}
-                  </h4>
-                  <p className="text-[10px] opacity-70 mt-0.5">{themeItem.desc}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* CUSTOM THEME HEX COLOR PICKER STUDIO */}
-        <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white border border-white/15 shadow-sm"
-                style={{ backgroundColor: customPrimaryHex }}
-              >
-                <Palette className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>{currentLanguage === "hi" ? "कस्टम थीम हेक्स कलर पिकर" : "Custom Theme Hex Color Studio"}</span>
-                  {settings.theme === "custom" && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
-                      {currentLanguage === "hi" ? "सक्रिय थीम" : "Active Theme"}
-                    </span>
-                  )}
-                </h4>
-                <p className="text-xs text-slate-400">
-                  {currentLanguage === "hi"
-                    ? "प्राइमरी एक्सेंट और बैकग्राउंड के लिए अपनी पसंद के हेक्स कोड चुनें या टाइप करें"
-                    : "Pick or enter custom hex color codes for primary accent and background canvas"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleResetCustomTheme}
-                className="text-xs px-3 py-1.5 rounded-xl border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1.5 active:scale-95"
-                title={currentLanguage === "hi" ? "डिफ़ॉल्ट हेक्स रीसेट करें" : "Reset to default colors"}
+                onClick={() => handleToggleAutoSolar(!settings.autoSolarTheme)}
+                id="auto-solar-theme-toggle"
+                data-testid="geolocation-theme-toggle"
+                role="switch"
+                aria-checked={Boolean(settings.autoSolarTheme)}
+                aria-label="Toggle Geolocation-Based Theme Switcher"
+                className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-200 ease-in-out shrink-0 focus:outline-none flex items-center cursor-pointer ${
+                  settings.autoSolarTheme ? "bg-amber-500" : "bg-slate-700"
+                }`}
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{currentLanguage === "hi" ? "डिफ़ॉल्ट रीसेट" : "Reset Defaults"}</span>
+                <div
+                  className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out flex items-center justify-center text-[10px] text-slate-900 font-bold ${
+                    settings.autoSolarTheme ? "translate-x-5.5" : "translate-x-0"
+                  }`}
+                >
+                  {settings.autoSolarTheme ? "☀️" : "🌙"}
+                </div>
               </button>
+            </div>
 
-              {settings.theme !== "custom" && (
+            <div className="pt-3 border-t border-white/10 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  <label
+                    htmlFor="preferred-night-theme-select"
+                    className="text-xs font-semibold text-slate-300"
+                  >
+                    Preferred Night Theme:
+                  </label>
+                  <select
+                    id="preferred-night-theme-select"
+                    data-testid="preferred-night-theme-select"
+                    value={preferredNight}
+                    onChange={(e) =>
+                      handlePreferredNightThemeChange(
+                        e.target.value as AppTheme
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer"
+                  >
+                    {DARK_THEME_OPTIONS.map((opt) => (
+                      <option
+                        key={opt.id}
+                        value={opt.id}
+                        className="bg-slate-900 text-white"
+                      >
+                        {opt.label} ({opt.desc})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => handleSimulationModeChange("auto")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                      settings.autoSolarTheme && simMode === "auto"
+                        ? "bg-amber-500 text-slate-950 font-bold"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Auto GPS Solar
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="simulate-daylight-high-contrast-btn"
+                    onClick={() => handleSimulationModeChange("daylight")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                      settings.autoSolarTheme && simMode === "daylight"
+                        ? "bg-amber-400 text-slate-950 font-bold"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Daylight
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="simulate-night-dark-btn"
+                    onClick={() => handleSimulationModeChange("night")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                      settings.autoSolarTheme && simMode === "night"
+                        ? "bg-indigo-500 text-white font-bold"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Night ({preferredNight})
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                  <Sunrise className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-400">Sunrise</div>
+                    <div className="font-bold font-mono tabular-nums text-white text-xs">
+                      {solarInfo.sunriseFormatted}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                  <Sunset className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-400">Sunset</div>
+                    <div className="font-bold font-mono tabular-nums text-white text-xs">
+                      {solarInfo.sunsetFormatted}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-[11px] text-slate-300 truncate font-mono tabular-nums">
+                      {solarInfo.isUsingGeolocation && solarInfo.coordinatesUsed
+                        ? `${solarInfo.coordinatesUsed.lat.toFixed(
+                            2
+                          )}°, ${solarInfo.coordinatesUsed.lng.toFixed(2)}°`
+                        : "Regional Solar"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDetectLocation}
+                    disabled={isLocating}
+                    data-testid="sync-gps-location-btn"
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition-all shrink-0 cursor-pointer"
+                  >
+                    {isLocating ? "Detecting..." : "Sync GPS"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Manual Theme Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+            {[
+              {
+                id: "high-contrast",
+                label: "High Contrast",
+                desc: "Daylight Crisp AAA",
+                color: "bg-white border-2 border-slate-950 text-black",
+                dot: "bg-black",
+              },
+              {
+                id: "classic",
+                label: "Classic Scholar",
+                desc: "Ivory & Bronze",
+                color: "bg-[#0c1017] border-amber-500/40 text-amber-200",
+                dot: "bg-amber-400",
+              },
+              {
+                id: "amoled",
+                label: "AMOLED Black",
+                desc: "Pure #000000",
+                color: "bg-black border-zinc-800",
+                dot: "bg-white",
+              },
+              {
+                id: "purple",
+                label: "Royal Purple",
+                desc: "Deep Violet",
+                color: "bg-purple-950 border-purple-800",
+                dot: "bg-purple-400",
+              },
+              {
+                id: "midnight",
+                label: "Midnight Blue",
+                desc: "Navy Horizon",
+                color: "bg-sky-950 border-sky-800",
+                dot: "bg-cyan-400",
+              },
+              {
+                id: "graphite",
+                label: "Graphite Gray",
+                desc: "Slate Minimal",
+                color: "bg-slate-900 border-slate-700",
+                dot: "bg-slate-300",
+              },
+              {
+                id: "arctic",
+                label: "Arctic White",
+                desc: "Crisp Light",
+                color: "bg-slate-100 border-slate-300 text-slate-900",
+                dot: "bg-emerald-600",
+              },
+              {
+                id: "frost",
+                label: "Frost Glass",
+                desc: "Translucent Ice",
+                color: "bg-slate-800/60 border-cyan-500/30",
+                dot: "bg-cyan-200",
+              },
+              {
+                id: "emerald",
+                label: "Emerald Green",
+                desc: "Calm Focus",
+                color: "bg-emerald-950 border-emerald-800",
+                dot: "bg-emerald-400",
+              },
+              {
+                id: "sunset",
+                label: "Sunset Orange",
+                desc: "Warm Twilight",
+                color: "bg-orange-950 border-orange-800",
+                dot: "bg-orange-400",
+              },
+              {
+                id: "custom",
+                label: "Custom Theme",
+                desc: "Hex Color Studio",
+                color: "",
+                dot: "",
+                isCustom: true,
+              },
+            ].map((themeItem) => {
+              const isCustom = themeItem.id === "custom";
+              const isActive =
+                settings.theme === themeItem.id ||
+                (!isCustom &&
+                  themeItem.id === "arctic" &&
+                  settings.theme === "light") ||
+                (!isCustom &&
+                  themeItem.id === "midnight" &&
+                  settings.theme === "ocean") ||
+                (!isCustom &&
+                  themeItem.id === "emerald" &&
+                  settings.theme === "forest") ||
+                (!isCustom &&
+                  themeItem.id === "graphite" &&
+                  settings.theme === "dark");
+
+              return (
+                <button
+                  key={themeItem.id}
+                  type="button"
+                  onClick={() => handleThemeChange(themeItem.id as AppTheme)}
+                  className={`p-3 rounded-2xl border text-left flex flex-col justify-between gap-2 transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-emerald-500/15 border-emerald-400 text-white font-bold shadow-sm"
+                      : "bg-slate-950/60 border-white/10 text-slate-300 hover:text-white hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    {isCustom ? (
+                      <div
+                        className="w-6 h-6 rounded-lg border border-white/20 flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: customBgHex }}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: customPrimaryHex }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={`w-6 h-6 rounded-lg ${themeItem.color} border flex items-center justify-center shrink-0`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${themeItem.dot}`}
+                        />
+                      </div>
+                    )}
+                    {isActive && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold font-heading">
+                      {themeItem.label}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {themeItem.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Compact Custom Theme Hex Studio */}
+          <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-white">
+                  Custom Hex Color Studio
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleThemeChange("custom")}
-                  className="text-xs px-3.5 py-1.5 rounded-xl font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+                  onClick={handleResetCustomTheme}
+                  className="text-[11px] px-2.5 py-1 rounded-lg border border-white/10 text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer"
                 >
-                  {currentLanguage === "hi" ? "कस्टम थीम लागू करें" : "Apply Custom Theme"}
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
                 </button>
+                {settings.theme !== "custom" && (
+                  <button
+                    type="button"
+                    onClick={() => handleThemeChange("custom")}
+                    className="text-[11px] px-3 py-1 rounded-lg font-bold bg-emerald-500 text-slate-950 cursor-pointer"
+                  >
+                    Apply Custom
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {hexError && (
+              <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{hexError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
+                <Pipette className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-xs text-slate-300 shrink-0">Accent:</span>
+                <input
+                  type="color"
+                  value={
+                    isValidHex(customPrimaryHex)
+                      ? normalizeHex(customPrimaryHex)
+                      : "#10B981"
+                  }
+                  onChange={(e) =>
+                    handleUpdateCustomColors(e.target.value, customBgHex)
+                  }
+                  className="w-7 h-7 rounded cursor-pointer bg-transparent border-0"
+                />
+                <input
+                  type="text"
+                  value={customPrimaryHex}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomPrimaryHex(val);
+                    if (isValidHex(val))
+                      handleUpdateCustomColors(val, customBgHex);
+                  }}
+                  maxLength={7}
+                  className="w-full bg-transparent text-white font-mono text-xs uppercase focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
+                <Moon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="text-xs text-slate-300 shrink-0">
+                  Background:
+                </span>
+                <input
+                  type="color"
+                  value={
+                    isValidHex(customBgHex)
+                      ? normalizeHex(customBgHex)
+                      : "#0B0F19"
+                  }
+                  onChange={(e) =>
+                    handleUpdateCustomColors(customPrimaryHex, e.target.value)
+                  }
+                  className="w-7 h-7 rounded cursor-pointer bg-transparent border-0"
+                />
+                <input
+                  type="text"
+                  value={customBgHex}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomBgHex(val);
+                    if (isValidHex(val))
+                      handleUpdateCustomColors(customPrimaryHex, val);
+                  }}
+                  maxLength={7}
+                  className="w-full bg-transparent text-white font-mono text-xs uppercase focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* GROUP 3: CLOUD SYNC, GOOGLE CALENDAR & NOTIFICATIONS                  */}
+      {/* ===================================================================== */}
+      {showSyncNotifications && (
+        <div className="space-y-5">
+          {/* 3.1 Firebase Cloud Sync */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500/15 text-orange-400 border border-orange-500/30 flex items-center justify-center shrink-0">
+                  <Flame className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                    Firebase Firestore Cloud Sync
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Cross-device backup and synchronization for all student
+                    profiles and modules.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleFbBackup}
+                  disabled={isFbSyncing}
+                  className="px-3.5 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 font-bold text-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <CloudUpload className="w-3.5 h-3.5" />
+                  <span>{isFbSyncing ? "Syncing..." : "Backup to Cloud"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFbRestore}
+                  disabled={isFbSyncing}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <CloudDownload className="w-3.5 h-3.5" />
+                  <span>Restore</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <span className="text-slate-300">
+                {fbUser
+                  ? `Connected: ${fbUser.displayName || fbUser.email}`
+                  : "Local Offline Session — Sign in to enable cloud backup"}
+              </span>
+              {fbLastSynced && (
+                <span className="text-emerald-400 font-mono">
+                  Last synced: {fbLastSynced}
+                </span>
               )}
             </div>
           </div>
 
-          {hexError && (
-            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>{hexError}</span>
-            </div>
-          )}
-
-          {/* TWO PRIMARY COLOR PICKER CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 1. PRIMARY ACCENT COLOR */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
+          {/* 3.2 Google Calendar Sync */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <CalendarIcon className="w-5 h-5" />
+                </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Pipette className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{currentLanguage === "hi" ? "प्राइमरी एक्सेंट रंग (Primary Color)" : "Primary Accent Color"}</span>
-                  </label>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {currentLanguage === "hi"
-                      ? "बटन, बैज, लिंक और हाइलाइट्स के लिए उपयोग किया जाता है"
-                      : "Used for buttons, active tabs, badges, icons & glowing highlights"}
+                  <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                    Google Calendar Sync
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Sync tasks, study sessions, exams, and goal deadlines with
+                    Google Calendar.
                   </p>
                 </div>
-                <div
-                  className="w-5 h-5 rounded-lg border border-white/20 shadow-sm shrink-0"
-                  style={{ backgroundColor: customPrimaryHex }}
-                />
               </div>
 
-              {/* Color input + Hex Text input */}
-              <div className="flex items-center gap-2.5">
-                <div className="relative shrink-0">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                   <input
-                    type="color"
-                    value={isValidHex(customPrimaryHex) ? normalizeHex(customPrimaryHex) : "#10B981"}
-                    onChange={(e) => handleUpdateCustomColors(e.target.value, customBgHex)}
-                    className="w-11 h-10 rounded-xl cursor-pointer bg-transparent border border-white/15 p-0.5 overflow-hidden"
-                    title={currentLanguage === "hi" ? "रंग पैलेट खोलें" : "Open Color Picker"}
+                    type="checkbox"
+                    checked={gcalSettings.enabled}
+                    onChange={(e) =>
+                      handleUpdateGCalSettings({ enabled: e.target.checked })
+                    }
+                    className="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700"
                   />
-                </div>
+                  <span>{gcalSettings.enabled ? "Enabled" : "Disabled"}</span>
+                </label>
 
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={customPrimaryHex}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomPrimaryHex(val);
-                      if (isValidHex(val)) {
-                        handleUpdateCustomColors(val, customBgHex);
-                      }
-                    }}
-                    placeholder="#10B981"
-                    maxLength={7}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-sm tracking-wider uppercase focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Preset Swatches for Primary */}
-              <div>
-                <span className="text-[10px] font-semibold text-slate-400 block mb-1.5">
-                  {currentLanguage === "hi" ? "त्वरित एक्सेंट स्वैचेस:" : "Quick Accent Swatches:"}
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {[
-                    { label: "Emerald", hex: "#10B981" },
-                    { label: "Cyan", hex: "#06B6D4" },
-                    { label: "Indigo", hex: "#6366F1" },
-                    { label: "Purple", hex: "#A855F7" },
-                    { label: "Rose", hex: "#F43F5E" },
-                    { label: "Amber", hex: "#F59E0B" },
-                    { label: "Coral", hex: "#F97316" },
-                    { label: "Sky", hex: "#0EA5E9" },
-                    { label: "Lime", hex: "#84CC16" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.hex}
-                      type="button"
-                      onClick={() => handleUpdateCustomColors(preset.hex, customBgHex)}
-                      className={`h-6 px-2 rounded-lg border text-[10px] font-mono flex items-center gap-1.5 transition-all ${
-                        normalizeHex(customPrimaryHex) === preset.hex
-                          ? "border-white text-white font-bold bg-white/10 scale-105"
-                          : "border-white/10 text-slate-400 hover:text-white hover:border-white/25"
-                      }`}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: preset.hex }}
-                      />
-                      <span>{preset.hex}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 2. BACKGROUND CANVAS COLOR */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Moon className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{currentLanguage === "hi" ? "बैकग्राउंड कैनवास रंग (Background Color)" : "Background Canvas Color"}</span>
-                  </label>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {currentLanguage === "hi"
-                      ? "मुख्य पृष्ठ और कंटेनर पृष्ठभूमि के लिए उपयोग किया जाता है"
-                      : "Used for application backdrop, cards, modals & panel base"}
-                  </p>
-                </div>
-                <div
-                  className="w-5 h-5 rounded-lg border border-white/20 shadow-sm shrink-0"
-                  style={{ backgroundColor: customBgHex }}
-                />
-              </div>
-
-              {/* Color input + Hex Text input */}
-              <div className="flex items-center gap-2.5">
-                <div className="relative shrink-0">
-                  <input
-                    type="color"
-                    value={isValidHex(customBgHex) ? normalizeHex(customBgHex) : "#0B0F19"}
-                    onChange={(e) => handleUpdateCustomColors(customPrimaryHex, e.target.value)}
-                    className="w-11 h-10 rounded-xl cursor-pointer bg-transparent border border-white/15 p-0.5 overflow-hidden"
-                    title={currentLanguage === "hi" ? "रंग पैलेट खोलें" : "Open Color Picker"}
-                  />
-                </div>
-
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={customBgHex}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomBgHex(val);
-                      if (isValidHex(val)) {
-                        handleUpdateCustomColors(customPrimaryHex, val);
-                      }
-                    }}
-                    placeholder="#0B0F19"
-                    maxLength={7}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-sm tracking-wider uppercase focus:outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Preset Swatches for Background */}
-              <div>
-                <span className="text-[10px] font-semibold text-slate-400 block mb-1.5">
-                  {currentLanguage === "hi" ? "त्वरित बैकग्राउंड स्वैचेस:" : "Quick Background Swatches:"}
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {[
-                    { label: "Slate", hex: "#0B0F19" },
-                    { label: "Pure Black", hex: "#000000" },
-                    { label: "Navy", hex: "#040C1A" },
-                    { label: "Twilight", hex: "#0C071A" },
-                    { label: "Charcoal", hex: "#18181B" },
-                    { label: "Espresso", hex: "#18090F" },
-                    { label: "Forest", hex: "#03140D" },
-                    { label: "Paper", hex: "#F8FAFC" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.hex}
-                      type="button"
-                      onClick={() => handleUpdateCustomColors(customPrimaryHex, preset.hex)}
-                      className={`h-6 px-2 rounded-lg border text-[10px] font-mono flex items-center gap-1.5 transition-all ${
-                        normalizeHex(customBgHex) === preset.hex
-                          ? "border-white text-white font-bold bg-white/10 scale-105"
-                          : "border-white/10 text-slate-400 hover:text-white hover:border-white/25"
-                      }`}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20"
-                        style={{ backgroundColor: preset.hex }}
-                      />
-                      <span>{preset.hex}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 1-TAP CURATED COMBOS */}
-          <div className="pt-2 border-t border-white/10">
-            <span className="text-[11px] font-semibold text-slate-300 block mb-2">
-              {currentLanguage === "hi" ? "लोकप्रिय 1-टैप कॉम्बो पैलेट्स:" : "Curated 1-Tap Theme Combos:"}
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {[
-                { name: "Cyberpunk", primary: "#06B6D4", bg: "#000000" },
-                { name: "Neon Matrix", primary: "#00FF66", bg: "#020B05" },
-                { name: "Sunset Glow", primary: "#F97316", bg: "#18090F" },
-                { name: "Royal Violet", primary: "#C084FC", bg: "#0C071A" },
-                { name: "Ocean Deep", primary: "#38BDF8", bg: "#040C1A" },
-                { name: "Emerald Pro", primary: "#10B981", bg: "#0B0F19" },
-                { name: "Clean Ivory", primary: "#059669", bg: "#F8FAFC" },
-              ].map((combo) => (
                 <button
-                  key={combo.name}
                   type="button"
-                  onClick={() => handleUpdateCustomColors(combo.primary, combo.bg)}
-                  className="p-2 rounded-xl border border-white/10 bg-slate-950/50 hover:bg-slate-800/80 transition-all text-left flex flex-col gap-1.5 active:scale-95 group"
+                  onClick={() => setIsGCalModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="w-5 h-5 rounded-md border border-white/20 flex items-center justify-center"
-                      style={{ backgroundColor: combo.bg }}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: combo.primary }}
-                      />
-                    </div>
-                    <span className="text-[9px] text-slate-400 group-hover:text-slate-200">
-                      {combo.primary}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-200 group-hover:text-white truncate">
-                    {combo.name}
-                  </span>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sync Center</span>
                 </button>
-              ))}
+              </div>
             </div>
+
+            {gcalSettings.enabled && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {[
+                  {
+                    key: "syncTasks",
+                    label: "Tasks",
+                    checked: gcalSettings.syncTasks,
+                    icon: CheckSquare,
+                  },
+                  {
+                    key: "syncStudySessions",
+                    label: "Study Sessions",
+                    checked: gcalSettings.syncStudySessions,
+                    icon: BookOpen,
+                  },
+                  {
+                    key: "syncExams",
+                    label: "Exams & Events",
+                    checked: gcalSettings.syncExams,
+                    icon: Bell,
+                  },
+                  {
+                    key: "syncGoals",
+                    label: "Goals",
+                    checked: gcalSettings.syncGoals,
+                    icon: Target,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <label
+                      key={item.key}
+                      className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between cursor-pointer text-xs text-white"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Icon className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{item.label}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) =>
+                          handleUpdateGCalSettings({
+                            [item.key]: e.target.checked,
+                          })
+                        }
+                        className="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* LIVE THEME PREVIEW CARD */}
-          <div className="pt-2 border-t border-white/10">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-2">
-              {currentLanguage === "hi" ? "लाइव थीम पूर्वावलोकन (Live Preview):" : "Live Custom Theme Preview:"}
-            </span>
-            <div
-              className="p-4 rounded-2xl border border-white/15 transition-all shadow-xl"
-              style={{ backgroundColor: customBgHex }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: customPrimaryHex }}
-                  />
-                  <span
-                    className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border"
-                    style={{
-                      color: customPrimaryHex,
-                      borderColor: `${customPrimaryHex}40`,
-                      backgroundColor: `${customPrimaryHex}15`,
-                    }}
-                  >
-                    Custom Preview
-                  </span>
-                </div>
-                <span className="text-[10px] opacity-70 font-mono" style={{ color: customPrimaryHex }}>
-                  Primary: {normalizeHex(customPrimaryHex)} | Bg: {normalizeHex(customBgHex)}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 mb-3">
-                <h5
-                  className="text-base font-bold font-heading"
-                  style={{
-                    color: isValidHex(customBgHex) && (parseInt(normalizeHex(customBgHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
-                      ? "#0F172A"
-                      : "#FFFFFF",
-                  }}
-                >
-                  {currentLanguage === "hi" ? "अकादमिक अध्ययन डैशबोर्ड पूर्वावलोकन" : "Academic Study Dashboard Preview"}
-                </h5>
-                <p
-                  className="text-xs opacity-75"
-                  style={{
-                    color: isValidHex(customBgHex) && (parseInt(normalizeHex(customBgHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customBgHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
-                      ? "#334155"
-                      : "#94A3B8",
-                  }}
-                >
-                  {currentLanguage === "hi"
-                    ? "यह पूर्वावलोकन दर्शाता है कि आपके चुने हुए रंग गारियाओएस के बटनों, कार्डों और बैकग्राउंड पर कैसे दिखाई देंगे।"
-                    : "This live preview demonstrates how your chosen custom primary and background hex colors look across GariaOS."}
+          {/* 3.3 Notification Preferences */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold font-heading text-white flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-emerald-400" />
+                  <span>{t.notifications || "Notifications"}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Configure study reminders, deadline alerts, and habit
+                  notifications.
                 </p>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  type="button"
-                  className="px-3.5 py-1.5 rounded-xl font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
-                  style={{
-                    backgroundColor: customPrimaryHex,
-                    color: isValidHex(customPrimaryHex) && (parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(0, 2), 16) * 299 + parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(2, 4), 16) * 587 + parseInt(normalizeHex(customPrimaryHex).replace("#", "").substring(4, 6), 16) * 114) / 1000 > 155
-                      ? "#0F172A"
-                      : "#FFFFFF",
-                  }}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Primary Accent Action</span>
-                </button>
-
-                <span
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border"
-                  style={{
-                    borderColor: `${customPrimaryHex}40`,
-                    color: customPrimaryHex,
-                    backgroundColor: `${customPrimaryHex}10`,
-                  }}
-                >
-                  Interactive Tag
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. AI Section */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-emerald-400" />
-          <span>{t.abyaAICoach} {currentLanguage === "hi" ? "कॉन्फ़िगरेशन" : "Configuration"}</span>
-        </h3>
-
-        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/20 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-xs">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <div>
-              <div className="font-bold text-white">
-                {currentLanguage === "hi" ? "सर्वर-साइड सुरक्षित एआई प्रॉक्सी" : "Server-Side Secure AI Proxy"}
-              </div>
-              <div className="text-[11px] text-slate-400">
-                {currentLanguage === "hi"
-                  ? "जेमिनी एपीआई कुंजी सर्वर पर सुरक्षित रूप से प्रबंधित है। किसी क्लाइंट कुंजी की आवश्यकता नहीं है।"
-                  : "Gemini API credentials are securely managed server-side. No client-side key storage."}
-              </div>
-            </div>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-            Active
-          </span>
-        </div>
-
-        {/* Language Selection */}
-        <div className="pt-3 border-t border-white/10 space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Globe className="w-4 h-4 text-emerald-400" />
-                <span>{currentLanguage === "hi" ? "अव्या एआई भाषा मोड" : "Abya AI Language Mode"}</span>
-              </h4>
-              <p className="text-xs text-slate-400">
-                {currentLanguage === "hi" ? "छात्र के लिए अलग सेटिंग: " : "Isolated setting for "}
-                <strong className="text-emerald-300">{activeStudent?.name || "Active Student"}</strong>.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-            {[
-              { id: "WhatsApp Language" as AbyaLanguageSetting, label: "WhatsApp Language", icon: "💬" },
-              { id: "English" as AbyaLanguageSetting, label: "English", icon: "🇬🇧" },
-              { id: "Hindi" as AbyaLanguageSetting, label: "Hindi", icon: "🇮🇳" },
-              { id: "Hinglish" as AbyaLanguageSetting, label: "Hinglish", icon: "🗣️" },
-            ].map((item) => (
               <button
-                key={item.id}
-                onClick={() => {
-                  if (onUpdateAbyaLanguage) onUpdateAbyaLanguage(item.id);
-                }}
-                className={`px-3 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                  abyaLanguage === item.id
-                    ? "bg-emerald-500 text-slate-900 border-emerald-400 shadow-md shadow-emerald-500/20"
-                    : "glass-pill border-white/10 text-slate-300 hover:border-emerald-500/40"
+                type="button"
+                onClick={() => handleToggleNotifKey("master")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  notifs.master
+                    ? "bg-emerald-500 text-slate-950"
+                    : "bg-slate-800 text-slate-400 border border-white/10"
                 }`}
               >
-                <span>{item.icon}</span>
-                <span className="truncate">{item.label}</span>
+                {notifs.master ? "Master ON" : "Master OFF"}
               </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-2 flex items-center justify-between border-t border-white/10">
-          <div>
-            <h4 className="text-sm font-semibold text-white">
-              {currentLanguage === "hi" ? "एआई चैट साफ़ करें" : "Clear AI Chat"}
-            </h4>
-            <p className="text-xs text-slate-400">
-              {currentLanguage === "hi" ? "अव्या एआई के सभी चैट संदेश हटाता है।" : "Deletes all chat messages with Abya AI."}
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              onClearChatHistory();
-              showToast(currentLanguage === "hi" ? "चैट इतिहास साफ़ किया गया!" : "Chat history cleared!");
-            }}
-            className="px-4 py-2 rounded-xl glass-pill border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs font-bold"
-          >
-            {currentLanguage === "hi" ? "चैट साफ़ करें" : "Clear Chat"}
-          </button>
-        </div>
-      </div>
-
-      {/* 6. Data Management */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <h3 className="text-lg font-bold font-heading text-white flex items-center gap-2">
-          <Download className="w-5 h-5 text-cyan-400" />
-          <span>{currentLanguage === "hi" ? "डेटा बैकअप और स्टोरेज" : "Data Backup & Storage"}</span>
-        </h3>
-
-        {importStatusMessage && (
-          <div className="p-3 rounded-xl glass-pill text-xs font-semibold text-emerald-300 border border-emerald-500/30">
-            {importStatusMessage}
-          </div>
-        )}
-
-        {toastMessage && (
-          <div className="p-3 rounded-xl bg-emerald-500/20 text-xs font-semibold text-emerald-300 border border-emerald-500/30 flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <Download className="w-4 h-4 text-cyan-400" />
-              <h4 className="text-sm font-bold text-white font-heading">
-                {currentLanguage === "hi" ? "छात्र डेटा बैकअप करें" : "Backup Data"}
-              </h4>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
-                JSON File
-              </span>
             </div>
-            <p className="text-xs text-slate-300">
-              {currentLanguage === "hi"
-                ? "छात्र प्रोफ़ाइल, कार्य, नोट्स, आदतें, अध्ययन सत्र और सभी शैक्षणिक डेटा की एक पूर्ण JSON बैकअप फ़ाइल डाउनलोड करें।"
-                : "Generates a downloadable JSON file of all student profile, tasks, notes, habits, study sessions, and productivity data."}
-            </p>
-          </div>
-          <button
-            id="backup-data-btn"
-            onClick={() => {
-              exportStudentProfileJSON(activeStudent?.id);
-              showToast(
-                currentLanguage === "hi"
-                  ? "बैकअप JSON सफलतापूर्वक डाउनलोड हो गया!"
-                  : "Backup JSON downloaded successfully!"
-              );
-            }}
-            className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-slate-950 text-xs font-extrabold transition-all flex items-center justify-center gap-2 shrink-0 card-press shadow-lg shadow-cyan-500/20"
-          >
-            <Download className="w-4 h-4 text-slate-950" />
-            <span>{currentLanguage === "hi" ? "बैकअप डेटा डाउनलोड करें" : "Backup Data"}</span>
-          </button>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            onClick={() => {
-              exportStudentProfileJSON(activeStudent?.id);
-              showToast(
-                currentLanguage === "hi"
-                  ? "सक्रिय छात्र डेटा निर्यात हो गया!"
-                  : "Student JSON exported successfully!"
-              );
-            }}
-            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl glass-pill border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-300 text-xs font-bold transition-all"
-          >
-            <Download className="w-4 h-4" />
-            <span>{currentLanguage === "hi" ? "सक्रिय छात्र डेटा निर्यात करें" : "Export Student JSON"}</span>
-          </button>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 p-3.5 rounded-2xl glass-pill border border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-300 text-xs font-bold transition-all"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{currentLanguage === "hi" ? "डेटा आयात करें (JSON)" : "Import Data (JSON)"}</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportFileChange}
-            className="hidden"
-          />
-        </div>
-
-        {/* Offline Cache Cleanup Feature */}
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-amber-400" />
-              <h4 className="text-sm font-bold text-white font-heading">
-                {currentLanguage === "hi" ? "ऑफ़लाइन कैश साफ़ करें" : "Clear Offline Cache"}
-              </h4>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-                {currentLanguage === "hi" ? "सुरक्षित सफ़ाई" : "Safe Cleanup"}
-              </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {[
+                {
+                  key: "study",
+                  label: "Study Reminders",
+                  desc: "Alerts for scheduled study sessions",
+                },
+                {
+                  key: "tasks",
+                  label: "Task Deadlines",
+                  desc: "Alerts for due & overdue tasks",
+                },
+                {
+                  key: "revision",
+                  label: "Revision Schedule",
+                  desc: "Spaced repetition review alerts",
+                },
+                {
+                  key: "habits",
+                  label: "Habit Streaks",
+                  desc: "Daily routine check-in reminders",
+                },
+                {
+                  key: "water",
+                  label: "Hydration Alerts",
+                  desc: "Daily water intake reminders",
+                },
+                {
+                  key: "exam",
+                  label: "Exam Countdown",
+                  desc: "Target exam readiness updates",
+                },
+              ].map((item) => {
+                const isChecked = notifs[item.key as keyof typeof notifs];
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() =>
+                      handleToggleNotifKey(item.key as keyof typeof notifs)
+                    }
+                    className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                      isChecked
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-white"
+                        : "bg-slate-950/50 border-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="text-xs font-bold text-white">
+                        {item.label}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {item.desc}
+                      </div>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold shrink-0 ${
+                        isChecked
+                          ? "bg-emerald-500 border-emerald-400 text-slate-950"
+                          : "border-slate-600 bg-slate-900"
+                      }`}
+                    >
+                      {isChecked && "✓"}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            <p className="text-xs text-slate-300">
-              {currentLanguage === "hi"
-                ? "अस्थायी ब्राउज़र कैश, सर्विस वर्कर रिस्पॉन्स और नेटवर्क कैश को साफ़ करके स्टोरेज खाली करता है। आपका छात्र डेटा (नोट्स, टास्क, स्कोर) पूरी तरह सुरक्षित रहता है।"
-                : "Frees up local browser cache, service worker assets, and temporary diagnostic queries without deleting your saved tasks, notes, habits, or student profile data."}
-            </p>
           </div>
-          <button
-            onClick={handleClearOfflineCache}
-            disabled={isClearingCache}
-            className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 card-press"
-          >
-            <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? "animate-spin" : ""}`} />
-            <span>
-              {isClearingCache
-                ? currentLanguage === "hi"
-                  ? "सफ़ाई जारी..."
-                  : "Clearing..."
-                : currentLanguage === "hi"
-                ? "ऑफ़लाइन कैश साफ़ करें"
-                : "Clear Offline Cache"}
-            </span>
-          </button>
         </div>
+      )}
 
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-semibold text-rose-400">
-              {currentLanguage === "hi" ? "सम्पूर्ण गारिया ओएस डेटा रीसेट करें" : "Clear All Garia OS Data"}
-            </h4>
-            <p className="text-xs text-slate-400">
-              {currentLanguage === "hi"
-                ? "सभी कार्य, नोट्स, आदतें, अध्ययन सत्र और सेटिंग्स रीसेट करता है।"
-                : "Resets all tasks, notes, habits, study sessions, and settings."}
-            </p>
+      {/* ===================================================================== */}
+      {/* GROUP 4: DATA BACKUP, CLEAR & RESET CENTER ("Update clear")           */}
+      {/* ===================================================================== */}
+      {showDataClear && (
+        <div className="space-y-5">
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-5">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold font-heading text-white flex items-center gap-2">
+                <Download className="w-5 h-5 text-cyan-400" />
+                <span>
+                  {currentLanguage === "hi"
+                    ? "डेटा बैकअप, सफ़ाई (Clear) और रीसेट केंद्र"
+                    : "Data Backup, Clear & Reset Center"}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {currentLanguage === "hi"
+                  ? "एक ही स्थान से अपना डेटा निर्यात/आयात करें या चैट, कैश व अध्ययन डेटा साफ़ करें।"
+                  : "Export or import JSON backups, or clear specific data without losing your student profile."}
+              </p>
+            </div>
+
+            {importStatusMessage && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 text-xs font-semibold text-emerald-300 border border-emerald-500/30">
+                {importStatusMessage}
+              </div>
+            )}
+
+            {/* 1. Export & Import JSON Backup (Single clean row, no duplicate buttons) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-cyan-500/30 flex flex-col justify-between gap-3">
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-cyan-400" />
+                    <span>
+                      {currentLanguage === "hi"
+                        ? "JSON बैकअप डाउनलोड करें"
+                        : "Export Student Backup (JSON)"}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {currentLanguage === "hi"
+                      ? "सक्रिय छात्र के सभी कार्य, नोट्स, लक्ष्य और अध्ययन सत्रों की बैकअप फ़ाइल डाउनलोड करें।"
+                      : "Download a complete JSON backup of the active student's tasks, notes, goals, and study logs."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  id="backup-data-btn"
+                  onClick={() => {
+                    exportStudentProfileJSON(activeStudent?.id);
+                    showToast(
+                      currentLanguage === "hi"
+                        ? "बैकअप JSON सफलतापूर्वक डाउनलोड हो गया!"
+                        : "Backup JSON downloaded successfully!"
+                    );
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>
+                    {currentLanguage === "hi" ? "बैकअप डाउनलोड करें" : "Backup Data"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-emerald-500/30 flex flex-col justify-between gap-3">
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-emerald-400" />
+                    <span>
+                      {currentLanguage === "hi"
+                        ? "JSON बैकअप आयात करें"
+                        : "Import Student Backup (JSON)"}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {currentLanguage === "hi"
+                      ? "पहले से सहेजी गई JSON बैकअप फ़ाइल से छात्र प्रोफाइल और अध्ययन डेटा बहाल करें।"
+                      : "Restore a previously exported Garia OS JSON backup file into your workspace."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>
+                    {currentLanguage === "hi"
+                      ? "डेटा आयात करें (JSON)"
+                      : "Import Data (JSON)"}
+                  </span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* 2. Unified Clear & Reset Actions Grid */}
+            <div className="pt-3 border-t border-white/10 space-y-3">
+              <div className="text-xs font-bold text-slate-300">
+                {currentLanguage === "hi"
+                  ? "डेटा सफ़ाई और रीसेट विकल्प (Clear Options):"
+                  : "Clear & Reset Options:"}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option A: Clear AI Chat History */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>
+                        {currentLanguage === "hi"
+                          ? "एआई चैट साफ़ करें"
+                          : "Clear Abya AI Chat"}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {currentLanguage === "hi"
+                        ? "अव्या एआई के सभी चैट संदेश हटाता है"
+                        : "Removes all chat messages & sessions with Abya AI"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="settings-clear-chat-btn"
+                    onClick={() => {
+                      onClearChatHistory();
+                      showToast(
+                        currentLanguage === "hi"
+                          ? "चैट इतिहास साफ़ किया गया!"
+                          : "Abya AI chat history cleared!"
+                      );
+                    }}
+                    className="px-3 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-bold shrink-0 cursor-pointer"
+                  >
+                    {currentLanguage === "hi" ? "चैट साफ़ करें" : "Clear Chat"}
+                  </button>
+                </div>
+
+                {/* Option B: Clear Offline Cache */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+                      <span>
+                        {currentLanguage === "hi"
+                          ? "ऑफ़लाइन कैश साफ़ करें"
+                          : "Clear Offline Cache"}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {currentLanguage === "hi"
+                        ? "अस्थायी ब्राउज़र कैश साफ़ करें (डेटा सुरक्षित रहता है)"
+                        : "Frees temporary browser cache without deleting study data"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="settings-clear-cache-btn"
+                    onClick={handleClearOfflineCache}
+                    disabled={isClearingCache}
+                    className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold shrink-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isClearingCache
+                      ? "Clearing..."
+                      : currentLanguage === "hi"
+                      ? "कैश साफ़ करें"
+                      : "Clear Cache"}
+                  </button>
+                </div>
+
+                {/* Option C: Clear Active Student Workspace Data (Keep Profile) */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <Eraser className="w-3.5 h-3.5 text-amber-400" />
+                      <span>
+                        {currentLanguage === "hi"
+                          ? "वर्तमान छात्र का अध्ययन डेटा साफ़ करें"
+                          : "Clear Active Student Study Data"}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {currentLanguage === "hi"
+                        ? "प्रोफाइल बनाए रखते हुए सभी कार्य, नोट्स, लक्ष्य और सत्र खाली करें"
+                        : "Empties tasks, notes, goals & study logs while keeping your profile & settings"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="settings-clear-student-data-btn"
+                    onClick={() => setShowConfirmClearStudent(true)}
+                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold shrink-0 cursor-pointer"
+                  >
+                    {currentLanguage === "hi"
+                      ? "अध्ययन डेटा साफ़ करें"
+                      : "Clear Study Data"}
+                  </button>
+                </div>
+
+                {/* Option D: Factory Reset All OS Data */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-rose-500/30 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span>
+                        {currentLanguage === "hi"
+                          ? "सम्पूर्ण गारिया ओएस रीसेट करें"
+                          : "Factory Reset All OS Data"}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {currentLanguage === "hi"
+                        ? "सभी प्रोफाइल, कार्य, नोट्स और सेटिंग्स स्थायी रूप से हटाएं"
+                        : "Deletes all student profiles, tasks, notes, and settings"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="settings-clear-all-data-btn"
+                    onClick={() => setShowConfirmClearAll(true)}
+                    className="px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-200 hover:text-white border border-rose-500/40 text-xs font-bold shrink-0 transition-colors cursor-pointer"
+                  >
+                    {currentLanguage === "hi" ? "सब कुछ हटाएं" : "Reset All Data"}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setShowConfirmClearAll(true)}
-            className="px-4 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 text-xs font-bold transition-colors"
-          >
-            {currentLanguage === "hi" ? "सभी डेटा हटाएं" : "Clear All Data"}
-          </button>
-        </div>
-      </div>
 
-      {/* 7. Application & PWA Installation */}
-      <PWAInstallOption variant="card" currentLanguage={currentLanguage} />
+          {/* App Installation & System Info */}
+          <PWAInstallOption variant="card" currentLanguage={currentLanguage} />
 
-      {/* 8. About & System Information Section */}
-      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-        <h3 className="text-lg font-bold font-heading text-white flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Info className="w-5 h-5 text-emerald-400" />
-            <span>{currentLanguage === "hi" ? "गारिया ओएस के बारे में व सिस्टम जानकारी" : "About Garia OS & System Information"}</span>
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <h3 className="text-base font-bold font-heading text-white flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {currentLanguage === "hi"
+                    ? "सिस्टम जानकारी"
+                    : "About Garia OS"}
+                </span>
+              </span>
+              <span className="text-xs font-mono text-emerald-400">
+                v{APP_VERSION}
+              </span>
+            </h3>
+            <ProductionVersionBadge variant="card" showCopy={true} />
           </div>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-            v{APP_VERSION} Release
-          </span>
-        </h3>
-
-        {/* Permanent Production Version Badge */}
-        <ProductionVersionBadge variant="card" showCopy={true} />
-
-        <div className="text-xs text-slate-300 space-y-1 font-mono p-3 rounded-2xl bg-slate-900/50 border border-white/5">
-          <p>
-            <strong>System:</strong> Garia OS (Android & Web Edition)
-          </p>
-          <p>
-            <strong>Package:</strong> com.gariaos.app
-          </p>
-          <p>
-            <strong>Built-In AI:</strong> Abya AI (Powered by Google Gemini 2.5 Flash)
-          </p>
-          <p>
-            <strong>Storage Engine:</strong> Profile-Isolated Storage Engine
-          </p>
         </div>
-      </div>
+      )}
 
-      {/* Destructive Confirm Dialog */}
-      {showConfirmClearAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+      {/* Confirmation Modal: Clear Active Student Study Data */}
+      {showConfirmClearStudent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          onClick={() => setShowConfirmClearStudent(false)}
+        >
           <div
-            className="w-full max-w-md glass-card rounded-3xl border border-rose-500/30 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md glass-card rounded-3xl border border-amber-500/40 p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-amber-400">
+              <Eraser className="w-7 h-7 shrink-0" />
+              <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                {currentLanguage === "hi"
+                  ? "क्या आप वर्तमान छात्र का अध्ययन डेटा साफ़ करना चाहते हैं?"
+                  : "Clear Active Student Study Data?"}
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {currentLanguage === "hi"
+                ? "यह वर्तमान छात्र के सभी कार्यों, नोट्स, लक्ष्यों, अध्ययन सत्रों और आदतों को खाली कर देगा, लेकिन आपका प्रोफाइल, स्ट्रीम और सेटिंग्स सुरक्षित रहेंगे।"
+                : "This will clear all tasks, notes, goals, study sessions, habits, and chat history for the current student so you can start with a clean workspace. Your student profile, stream, theme, and PIN lock will be kept."}
+            </p>
+            <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowConfirmClearStudent(false)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                {t.cancel || "Cancel"}
+              </button>
+              <button
+                type="button"
+                id="confirm-clear-student-data-btn"
+                onClick={handleConfirmClearStudentWorkspace}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer"
+              >
+                {currentLanguage === "hi"
+                  ? "हाँ, अध्ययन डेटा साफ़ करें"
+                  : "Yes, Clear Study Data"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Factory Reset All OS Data */}
+      {showConfirmClearAll && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4"
+          onClick={() => setShowConfirmClearAll(false)}
+        >
+          <div
+            className="w-full max-w-md glass-card rounded-3xl border border-rose-500/40 p-6 shadow-2xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 text-rose-400">
-              <AlertTriangle className="w-8 h-8 shrink-0" />
-              <h3 className="text-lg font-bold font-heading text-white">
-                {currentLanguage === "hi" ? "क्या आप सभी ओएस डेटा रीसेट करना चाहते हैं?" : "Confirm Reset All OS Data?"}
+              <AlertTriangle className="w-7 h-7 shrink-0" />
+              <h3 className="text-base sm:text-lg font-bold font-heading text-white">
+                {currentLanguage === "hi"
+                  ? "क्या आप सम्पूर्ण ओएस डेटा रीसेट करना चाहते हैं?"
+                  : "Confirm Factory Reset All OS Data?"}
               </h3>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
               {currentLanguage === "hi"
-                ? "यह आपके सभी कार्यों, नोट्स, अध्ययन विषयों, आदतों और चैट संदेशों को स्थायी रूप से हटा देगा।"
-                : "This will permanently delete all your tasks, notes, study subjects, habit streaks, water logs, and chat messages. This action cannot be undone unless you exported a backup JSON."}
+                ? "यह सभी छात्र प्रोफाइल, कार्यों, नोट्स, अध्ययन विषयों, आदतों और सेटिंग्स को स्थायी रूप से हटा देगा।"
+                : "This will permanently delete all student profiles, tasks, notes, study subjects, habit streaks, and settings, returning Garia OS to the initial setup screen."}
             </p>
 
             <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
               <button
+                type="button"
                 onClick={() => setShowConfirmClearAll(false)}
-                className="px-4 py-2 rounded-xl glass-pill text-slate-300 text-xs"
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold cursor-pointer"
               >
-                {t.cancel}
+                {t.cancel || "Cancel"}
               </button>
               <button
+                type="button"
+                id="confirm-factory-reset-btn"
                 onClick={() => {
                   onClearAllOSData();
                   setShowConfirmClearAll(false);
-                  showToast(currentLanguage === "hi" ? "गारिया ओएस डेटा रीसेट कर दिया गया है।" : "Garia OS data has been reset.");
+                  showToast(
+                    currentLanguage === "hi"
+                      ? "गारिया ओएस डेटा रीसेट कर दिया गया है।"
+                      : "Garia OS data has been reset."
+                  );
                 }}
-                className="px-5 py-2 rounded-xl bg-rose-500 text-white font-bold text-xs"
+                className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs cursor-pointer"
               >
-                {currentLanguage === "hi" ? "हाँ, सभी डेटा हटाएं" : "Yes, Reset All Data"}
+                {currentLanguage === "hi"
+                  ? "हाँ, सभी डेटा हटाएं"
+                  : "Yes, Reset Everything"}
               </button>
             </div>
           </div>

@@ -26,11 +26,39 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[Garia OS ErrorBoundary] Uncaught runtime error:", error, errorInfo);
+    const isChunkError =
+      error?.name === "ChunkLoadError" ||
+      error?.message?.includes("Failed to fetch dynamically imported module") ||
+      error?.message?.includes("dynamically imported module") ||
+      error?.message?.includes("Loading chunk");
+
+    if (isChunkError && typeof window !== "undefined") {
+      const recovered = sessionStorage.getItem("garia_sw_cache_purged");
+      if (!recovered) {
+        sessionStorage.setItem("garia_sw_cache_purged", "true");
+        if (window.caches) {
+          window.caches
+            .keys()
+            .then((names) => Promise.all(names.map((n) => window.caches.delete(n))))
+            .finally(() => window.location.reload());
+          return;
+        }
+        window.location.reload();
+      }
+    }
   }
 
   private handleReload = () => {
     try {
       sessionStorage.removeItem("garia_chunk_reload");
+      sessionStorage.removeItem("garia_sw_cache_purged");
+      if (window.caches) {
+        window.caches
+          .keys()
+          .then((names) => Promise.all(names.map((n) => window.caches.delete(n))))
+          .finally(() => window.location.reload());
+        return;
+      }
     } catch (e) {}
     window.location.reload();
   };

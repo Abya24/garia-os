@@ -7,11 +7,10 @@ import {
   Trash2,
   Edit3,
   X,
-  ChevronRight,
   TrendingUp,
   BookOpen,
-  ArrowLeft,
   Filter,
+  Sliders,
 } from "lucide-react";
 import { Goal, Subject } from "../types";
 import { getTodayString } from "../utils/storage";
@@ -31,10 +30,12 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   onAddGoal,
   onUpdateGoal,
   onDeleteGoal,
-  onBack,
 }) => {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "completed">("all");
+  const [filterSubjectId, setFilterSubjectId] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"deadline" | "progress_desc" | "progress_asc" | "alpha">("deadline");
+  const [minProgressFilter, setMinProgressFilter] = useState<number>(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
@@ -116,15 +117,24 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
     });
   };
 
-  // Filter Goals
-  const filteredGoals = goals.filter((g) => {
-    if (filterCategory !== "all" && g.category.toLowerCase() !== filterCategory.toLowerCase()) {
-      return false;
-    }
-    if (filterStatus === "active" && g.completed) return false;
-    if (filterStatus === "completed" && !g.completed) return false;
-    return true;
-  });
+  // Filter & Sort Goals
+  const filteredGoals = goals
+    .filter((g) => {
+      if (filterCategory !== "all" && g.category.toLowerCase() !== filterCategory.toLowerCase()) {
+        return false;
+      }
+      if (filterStatus === "active" && g.completed) return false;
+      if (filterStatus === "completed" && !g.completed) return false;
+      if (filterSubjectId !== "all" && g.subjectId !== filterSubjectId) return false;
+      if (g.progress < minProgressFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "progress_desc") return b.progress - a.progress;
+      if (sortBy === "progress_asc") return a.progress - b.progress;
+      if (sortBy === "alpha") return a.title.localeCompare(b.title);
+      return (a.targetDate || "").localeCompare(b.targetDate || "");
+    });
 
   const categories = ["all", "Academic", "Personal", "Health", "Career"];
 
@@ -200,35 +210,92 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
         </div>
       </div>
 
-      {/* Filter Dropdown Selectors */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 glass-card p-3 rounded-2xl border border-white/10">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-          <span className="text-xs text-slate-400 font-medium shrink-0">Category:</span>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat} className="bg-slate-900 text-white">
-                {cat.charAt(0).toUpperCase() + cat.slice(1)} Goals
-              </option>
-            ))}
-          </select>
+      {/* Classic Filter Dropdowns & Minimum Progress Slider */}
+      <div className="glass-card classic-frame p-4 rounded-2xl border border-amber-500/25 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex items-center gap-2 bg-slate-950/85 px-3 py-2 rounded-xl border border-white/10">
+            <Filter className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs text-slate-400 font-medium shrink-0">Category:</span>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="w-full bg-transparent text-xs font-bold text-emerald-300 focus:outline-none cursor-pointer"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)} Goals
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-950/85 px-3 py-2 rounded-xl border border-white/10">
+            <span className="text-xs text-slate-400 font-medium shrink-0">Status:</span>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="w-full bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Statuses</option>
+              <option value="active" className="bg-slate-900 text-white">Active Only</option>
+              <option value="completed" className="bg-slate-900 text-white">Completed</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-950/85 px-3 py-2 rounded-xl border border-white/10">
+            <BookOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-xs text-slate-400 font-medium shrink-0">Subject:</span>
+            <select
+              id="goals-subject-filter-select"
+              value={filterSubjectId}
+              onChange={(e) => setFilterSubjectId(e.target.value)}
+              className="w-full bg-transparent text-xs font-bold text-amber-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all" className="bg-slate-900 text-white">All Subjects</option>
+              {subjects.map((sub) => (
+                <option key={sub.id} value={sub.id} className="bg-slate-900 text-white">
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-950/85 px-3 py-2 rounded-xl border border-white/10">
+            <span className="text-xs text-slate-400 font-medium shrink-0">Sort By:</span>
+            <select
+              id="goals-sort-select"
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value as "deadline" | "progress_desc" | "progress_asc" | "alpha")
+              }
+              className="w-full bg-transparent text-xs font-bold text-purple-300 focus:outline-none cursor-pointer"
+            >
+              <option value="deadline" className="bg-slate-900 text-white">Deadline (Soonest)</option>
+              <option value="progress_desc" className="bg-slate-900 text-white">Progress (High → Low)</option>
+              <option value="progress_asc" className="bg-slate-900 text-white">Progress (Low → High)</option>
+              <option value="alpha" className="bg-slate-900 text-white">Alphabetical (A–Z)</option>
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs text-slate-400 font-medium shrink-0">Status:</span>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl glass-pill text-xs font-bold text-emerald-300 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-slate-900 shadow-sm"
-          >
-            <option value="all" className="bg-slate-900 text-white">All Statuses</option>
-            <option value="active" className="bg-slate-900 text-white">Active Only</option>
-            <option value="completed" className="bg-slate-900 text-white">Done (Completed)</option>
-          </select>
+        {/* Minimum Progress Threshold Slider */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/10">
+          <div className="flex items-center gap-2 text-xs">
+            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-300 font-semibold">Minimum Progress Filter Slider:</span>
+            <span className="font-mono font-bold text-emerald-300">{minProgressFilter}%+</span>
+          </div>
+          <input
+            id="goals-min-progress-slider"
+            type="range"
+            min={0}
+            max={90}
+            step={10}
+            value={minProgressFilter}
+            onChange={(e) => setMinProgressFilter(Number(e.target.value))}
+            aria-label="Minimum Goal Progress Filter Slider"
+            className="w-full sm:w-56 accent-emerald-400 cursor-pointer"
+          />
         </div>
       </div>
 
@@ -345,6 +412,27 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
                           : "bg-amber-400"
                       }`}
                       style={{ width: `${goal.progress}%` }}
+                    />
+                  </div>
+
+                  {/* Interactive Goal Progress Slider */}
+                  <div className="space-y-1.5 pt-1">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={goal.progress}
+                      onChange={(e) => {
+                        const nextProg = Number(e.target.value);
+                        onUpdateGoal({
+                          ...goal,
+                          progress: nextProg,
+                          completed: nextProg >= 100,
+                        });
+                      }}
+                      aria-label={`Adjust progress for ${goal.title}`}
+                      className="w-full accent-emerald-400 cursor-pointer"
                     />
                   </div>
 

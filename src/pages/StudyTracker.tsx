@@ -18,7 +18,6 @@ import {
   Search,
   Filter,
   CheckCircle2,
-  ArrowLeft,
   Flame,
   TrendingUp,
   Trophy,
@@ -26,6 +25,7 @@ import {
   Copy,
   Check,
   Download,
+  Sliders,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -106,8 +106,8 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   onLogStudySession,
   onDeleteStudySession,
   onUpdateStudySession,
-  onBack,
 }) => {
+  const [quickSliderMinutes, setQuickSliderMinutes] = useState<number>(45);
   const profileId = activeStudent?.id || "default-student";
   const timerStorageKey = `garia_timer_state_${profileId}`;
 
@@ -745,6 +745,89 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           >
             <Plus className="w-4 h-4" />
             <span>New Subject</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Classic Study Command Bar with Dropdowns & Quick Duration Slider */}
+      <div className="classic-paper-header rounded-2xl p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select
+            id="study-tracker-subject-dropdown"
+            aria-label="Select Active Study Subject"
+            value={activeSubjectId}
+            onChange={(e) => setActiveSubjectId(e.target.value)}
+            className="classic-select text-xs font-semibold rounded-lg px-3 py-2 cursor-pointer"
+          >
+            {subjects.map((subj) => (
+              <option key={subj.id} value={subj.id}>
+                Active Subject: {subj.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            id="study-tracker-history-filter-dropdown"
+            aria-label="Filter Logged Study Sessions by Subject"
+            value={sessionSubjectFilter}
+            onChange={(e) => setSessionSubjectFilter(e.target.value)}
+            className="classic-select text-xs font-semibold rounded-lg px-3 py-2 cursor-pointer"
+          >
+            <option value="ALL">History Filter: All Subjects</option>
+            {subjects.map((subj) => (
+              <option key={subj.id} value={subj.id}>
+                Filter: {subj.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/70 px-3.5 py-2 rounded-xl border border-amber-500/20">
+          <div className="flex items-center gap-2.5 flex-1 min-w-[180px]">
+            <Sliders className="w-4 h-4 text-amber-400 shrink-0" />
+            <label
+              htmlFor="study-tracker-quick-duration-slider"
+              className="text-xs font-bold text-slate-300 whitespace-nowrap"
+            >
+              Session Slider:
+            </label>
+            <input
+              id="study-tracker-quick-duration-slider"
+              type="range"
+              min={15}
+              max={180}
+              step={5}
+              value={quickSliderMinutes}
+              onChange={(e) => setQuickSliderMinutes(Number(e.target.value))}
+              aria-label="Quick Study Session Duration Slider"
+              className="classic-slider flex-1"
+            />
+            <span className="text-xs font-mono font-bold text-amber-300 min-w-[3.2rem] text-right">
+              {quickSliderMinutes}m
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const targetSubj =
+                subjects.find((s) => s.id === activeSubjectId) || subjects[0];
+              if (!targetSubj) return;
+              const newSession = {
+                subjectId: targetSubj.id,
+                subjectName: targetSubj.name,
+                durationMinutes: quickSliderMinutes,
+                durationSeconds: quickSliderMinutes * 60,
+                date: getTodayString(),
+                notes: `Logged via Quick Duration Slider (${quickSliderMinutes}m)`,
+              };
+              triggerSessionLoggedStreakAnimation(newSession);
+              onLogStudySession(newSession);
+              showToast(`Logged ${quickSliderMinutes}m for ${targetSubj.name}!`);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer transition-colors shrink-0"
+          >
+            + Log {quickSliderMinutes}m
           </button>
         </div>
       </div>

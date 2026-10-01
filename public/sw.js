@@ -1,4 +1,4 @@
-const CACHE_NAME = "garia-os-v3.1.0-cache-v2";
+const CACHE_NAME = "garia-os-v3.2.0-cache-v4";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -49,16 +49,34 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Never intercept API routes or non-http/https protocols
-  if (url.pathname.startsWith("/api/") || !url.protocol.startsWith("http")) {
+  // Never intercept API routes, Vite dev module routes, or non-http/https protocols
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/@") ||
+    url.pathname.startsWith("/src/") ||
+    url.pathname.startsWith("/node_modules/") ||
+    !url.protocol.startsWith("http")
+  ) {
     return;
   }
 
-  // Network-First strategy with cache fallback for standard web UI assets
+  const isAssetFile =
+    url.pathname.startsWith("/assets/") ||
+    /\.(js|mjs|css)$/i.test(url.pathname);
+
+  // Network-First strategy with strict MIME verification for scripts/styles
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+          const contentType = (networkResponse.headers.get("content-type") || "").toLowerCase();
+          // Never cache HTML fallback responses under a JS/CSS asset URL
+          if (isAssetFile && contentType.includes("text/html")) {
+            return new Response("Asset not found", {
+              status: 404,
+              headers: { "Content-Type": "text/plain" },
+            });
+          }
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
@@ -68,18 +86,27 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => {
         return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
+          if (cachedResponse) {
+            const cachedType = (cachedResponse.headers.get("content-type") || "").toLowerCase();
+            if (isAssetFile && cachedType.includes("text/html")) {
+              return new Response("Offline asset unavailable", {
+                status: 404,
+                headers: { "Content-Type": "text/plain" },
+              });
+            }
+            return cachedResponse;
+          }
           // Only provide SPA fallback for navigation requests
           if (event.request.mode === "navigate") {
             return caches.match("/index.html").then((htmlRes) => {
               return htmlRes || caches.match("/");
             });
           }
-          return undefined;
+          return new Response("Network error", {
+            status: 408,
+            headers: { "Content-Type": "text/plain" },
+          });
         });
       })
   );
 });
-
-
-

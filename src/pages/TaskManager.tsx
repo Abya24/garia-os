@@ -30,10 +30,12 @@ import {
   ArrowUpDown,
   Flag,
   BookOpen,
+  Timer,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { Task, Subtask, Priority, TaskCategory, SharedWorkspace, WorkspaceMember } from "../types";
 import { getTodayString } from "../utils/storage";
+import { saveQuickFocusSessionState } from "./FocusTimer";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
 import { getTaskMilestones } from "../utils/gamificationEngine";
 import { MilestoneBadgesCard } from "../components/MilestoneBadgesCard";
@@ -98,6 +100,7 @@ interface TaskManagerProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onBulkDeleteTasks?: (ids: string[]) => void;
+  onStartFocusForTask?: (task: Task) => void;
   onBack?: () => void;
   currentUserId?: string;
   currentUserName?: string;
@@ -110,6 +113,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   onUpdateTask,
   onDeleteTask,
   onBulkDeleteTasks,
+  onStartFocusForTask,
   onBack,
   currentUserId,
   currentUserName,
@@ -166,6 +170,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   const [showQuickSubtasks, setShowQuickSubtasks] = useState(false);
   const [quickSubtaskInput, setQuickSubtaskInput] = useState("");
   const [quickSubtasks, setQuickSubtasks] = useState<Subtask[]>([]);
+  const [taskFocusDuration, setTaskFocusDuration] = useState<number>(25);
 
   const handleAddQuickSubtask = () => {
     const trimmed = quickSubtaskInput.trim();
@@ -891,17 +896,107 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       {/* PERSONAL TASKS TAB CONTENT */}
       {activeViewMode === "personal" && (
         <>
-          {/* Task Milestone Badges & Achievements Section */}
-          <MilestoneBadgesCard
-            title="Task Milestones & Achievements"
-            subtitle="Complete daily and study tasks to unlock milestone achievement badges and earn XP bonus."
-            category="tasks"
-            badges={taskMilestones.badges}
-            unlockedCount={taskMilestones.unlockedCount}
-            totalCount={taskMilestones.totalCount}
-            latestUnlocked={taskMilestones.latestUnlocked}
-            defaultExpanded={true}
-          />
+          {/* Classic Task Command Bar with Dropdowns & Focus Duration Slider */}
+          <div className="classic-paper-header rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <select
+                id="tasks-status-dropdown"
+                aria-label="Filter Tasks by Status"
+                value={selectedStatusFilter}
+                onChange={(e) =>
+                  setSelectedStatusFilter(
+                    e.target.value as "all" | "pending" | "completed"
+                  )
+                }
+                className="classic-select text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer"
+              >
+                <option value="all">Status: All Tasks ({tasks.length})</option>
+                <option value="pending">
+                  Status: Pending ({tasks.filter((t) => !t.completed).length})
+                </option>
+                <option value="completed">
+                  Status: Completed ({tasks.filter((t) => t.completed).length})
+                </option>
+              </select>
+
+              <select
+                id="tasks-priority-dropdown"
+                aria-label="Filter Tasks by Priority"
+                value={selectedPriorityFilter}
+                onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+                className="classic-select text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer"
+              >
+                <option value="all">Priority: All Levels</option>
+                <option value="high">Priority: High Only</option>
+                <option value="medium">Priority: Medium Only</option>
+                <option value="low">Priority: Low Only</option>
+              </select>
+
+              <select
+                id="tasks-category-dropdown"
+                aria-label="Filter Tasks by Category"
+                value={selectedCategoryFilter}
+                onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                className="classic-select text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer"
+              >
+                <option value="all">Category: All Categories</option>
+                {allCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    Category: {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                id="tasks-sort-dropdown"
+                aria-label="Sort Tasks Order"
+                value={sortBy}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as
+                      | "priority_high_to_low"
+                      | "priority_low_to_high"
+                      | "due_date_asc"
+                      | "created_desc"
+                  )
+                }
+                className="classic-select text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer"
+              >
+                <option value="priority_high_to_low">
+                  Sort: Priority (High → Low)
+                </option>
+                <option value="priority_low_to_high">
+                  Sort: Priority (Low → High)
+                </option>
+                <option value="due_date_asc">Sort: Due Date (Earliest)</option>
+                <option value="created_desc">Sort: Recently Created</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3 bg-slate-950/70 px-3.5 py-2 rounded-xl border border-amber-500/25">
+              <Timer className="w-4 h-4 text-amber-400 shrink-0" />
+              <label
+                htmlFor="tasks-focus-duration-slider"
+                className="text-xs font-bold text-slate-300 whitespace-nowrap"
+              >
+                Task Focus Slider:
+              </label>
+              <input
+                id="tasks-focus-duration-slider"
+                type="range"
+                min={10}
+                max={90}
+                step={5}
+                value={taskFocusDuration}
+                onChange={(e) => setTaskFocusDuration(Number(e.target.value))}
+                aria-label="Task Focus Session Duration Slider"
+                className="classic-slider w-24 sm:w-32"
+              />
+              <span className="text-xs font-mono font-bold text-amber-300 min-w-[3rem] text-right">
+                {taskFocusDuration}m
+              </span>
+            </div>
+          </div>
 
           {/* Color-Coded Priority Levels Summary Strip (High / Medium / Low) */}
           <div
@@ -1791,6 +1886,32 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                           </button>
                         ) : (
                           <>
+                            {!task.completed && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  saveQuickFocusSessionState({
+                                    isRunning: true,
+                                    mode: "focus",
+                                    durationMinutes: taskFocusDuration,
+                                    remainingSeconds: taskFocusDuration * 60,
+                                    updatedAt: Date.now(),
+                                    activeTaskId: task.id,
+                                    activeTaskTitle: task.title,
+                                  });
+                                  if (onStartFocusForTask) {
+                                    onStartFocusForTask(task);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 font-bold text-xs inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                title={`Start ${taskFocusDuration}-minute Focus session on this task`}
+                              >
+                                <Timer className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Focus ({taskFocusDuration}m)</span>
+                              </button>
+                            )}
+
                             {/* Share to workspace if workspaces exist */}
                             {sharedWorkspaces.length > 0 && (
                               <select

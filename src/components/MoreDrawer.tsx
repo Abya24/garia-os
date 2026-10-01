@@ -1,38 +1,32 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
-  Compass,
+  Home,
+  CheckSquare,
+  Timer,
+  Sparkles,
+  ShieldAlert,
+  Layers,
   BookOpen,
   FileText,
-  Calendar,
+  Compass,
   Target,
+  Calendar,
+  Flame,
+  Droplet,
   BarChart2,
-  Download,
-  Palette,
-  ShieldCheck,
-  Bell,
-  Database,
-  HelpCircle,
-  ChevronDown,
-  ChevronRight,
-  Globe,
   Settings,
-  Sparkles,
-  Sun,
-  Star,
-  Check,
-  RotateCw,
-  Layers,
+  Users,
+  ChevronRight,
 } from "lucide-react";
-import { ActiveTab, StudentProfile, UserSettings, AppTheme } from "../types";
-import { APP_VERSION } from "../constants/version";
+import { ActiveTab, StudentProfile, UserSettings } from "../types";
 import { PWAInstallOption } from "./PWAInstallOption";
 import { AppLanguage, translations } from "../utils/i18n";
 import {
-  reconcilePendingQueueWithFirestore,
-  subscribeToOfflineQueue,
-} from "../utils/offlineQueue";
+  getStudentDisplayName,
+  getStudentAvatarInitials,
+} from "../utils/studentNameUtils";
 
 interface MoreDrawerProps {
   isOpen: boolean;
@@ -48,121 +42,173 @@ interface MoreDrawerProps {
   onClearAllData?: () => void;
 }
 
+interface ModuleNavItem {
+  id: ActiveTab;
+  label: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}
+
 export const MoreDrawer: React.FC<MoreDrawerProps> = ({
   isOpen,
   onClose,
   onNavigate,
+  activeTab,
   currentLanguage = "en",
-  onUpdateLanguage,
+  onOpenStudentModal,
+  activeStudent,
   settings,
-  onUpdateSettings,
 }) => {
-  // Expandable category state (accordion)
-  const [expandedSection, setExpandedSection] = useState<string | null>("special_tools");
-  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
-
-  useEffect(() => {
-    const unsub = subscribeToOfflineQueue((state) => {
-      setPendingQueueCount(state.pendingCount);
-    });
-    return () => unsub();
-  }, []);
-
-  const toggleSection = (sectionId: string) => {
-    setExpandedSection((prev) => (prev === sectionId ? null : sectionId));
-  };
-
   const t = translations[currentLanguage] || translations.en;
+  const studentName = getStudentDisplayName(activeStudent, settings, "Student");
 
-  const handleForceSync = async () => {
-    setIsSyncing(true);
-    setSyncStatusMsg("Reconciling with Firestore...");
-    try {
-      const res = await reconcilePendingQueueWithFirestore();
-      if (res.success) {
-        setSyncStatusMsg(`Synced (${res.processed} items)`);
-      } else {
-        setSyncStatusMsg("Cloud Synced");
-      }
-    } catch {
-      setSyncStatusMsg("Offline (queued locally)");
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => setSyncStatusMsg(null), 3000);
-    }
-  };
-
-  const customPrimary =
-    settings?.customTheme?.primary ||
-    settings?.customThemeColors?.primary ||
-    "#10b981";
-
-  const themes: { id: AppTheme; label: string; color: string }[] = [
-    { id: "high-contrast", label: "High Contrast", color: "#ffffff" },
-    { id: "dark", label: "Dark Modern", color: "#0f172a" },
-    { id: "amoled", label: "AMOLED Pure Black", color: "#000000" },
-    { id: "midnight", label: "Midnight Navy", color: "#0b132b" },
-    { id: "emerald", label: "Emerald Focus", color: "#064e3b" },
-    { id: "graphite", label: "Graphite Studio", color: "#18181b" },
-    { id: "arctic", label: "Arctic Frost", color: "#0c4a6e" },
-    { id: "light", label: "Pure Light", color: "#f8fafc" },
-    { id: "system", label: "System Default", color: "#334155" },
-    { id: "custom", label: "Custom Theme", color: customPrimary },
+  const coreModules: ModuleNavItem[] = [
+    {
+      id: "home",
+      label: t.home || "Home Dashboard",
+      desc: "Daily overview, insights & tasks",
+      icon: Home,
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
+    },
+    {
+      id: "tasks",
+      label: t.tasks || "Task Manager",
+      desc: "Priorities, subjects & to-do list",
+      icon: CheckSquare,
+      color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/25",
+    },
+    {
+      id: "focus",
+      label: t.focus || "Focus Timer",
+      desc: "Pomodoro deep work & ambient audio",
+      icon: Timer,
+      color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25",
+    },
+    {
+      id: "abya",
+      label: t.abyaAI || "Abya AI Coach",
+      desc: "Doubt solver, study plans & mentor",
+      icon: Sparkles,
+      color: "text-purple-400 bg-purple-500/10 border-purple-500/25",
+    },
   ];
 
-  const specialTools = [
+  const academicModules: ModuleNavItem[] = [
     {
-      id: "flashcards" as ActiveTab,
-      label: "Flashcards & Spaced Repetition",
-      desc: "Study decks, terms, definitions & SM-2 mastery quiz",
+      id: "exam",
+      label: t.examIntelligence || "Exam Center",
+      desc: "Readiness, syllabus, mock tests & PYQs",
+      icon: ShieldAlert,
+      color: "text-amber-400 bg-amber-500/10 border-amber-500/25",
+    },
+    {
+      id: "flashcards",
+      label: currentLanguage === "hi" ? "फ़्लैशकार्ड" : "Flashcards",
+      desc: "Spaced repetition decks & active recall",
       icon: Layers,
-      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
     },
     {
-      id: "career" as ActiveTab,
-      label: t.careerCenter || "Career Center",
-      desc: "Science, Commerce, Arts, Govt Jobs & Roadmaps",
-      icon: Compass,
-      color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-    },
-    {
-      id: "study" as ActiveTab,
+      id: "study",
       label: t.studyTracker || "Study Tracker",
-      desc: "Subject study logs, chapters & session timers",
+      desc: "Subject timers, chapter logs & hours",
       icon: BookOpen,
-      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+      color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/25",
     },
     {
-      id: "notes" as ActiveTab,
+      id: "notes",
       label: t.notes || "Notes & Docs",
-      desc: "Rich markdown notes, tags & attachments",
+      desc: "Markdown notes, formulas & summaries",
       icon: FileText,
-      color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+      color: "text-blue-400 bg-blue-500/10 border-blue-500/25",
     },
     {
-      id: "calendar" as ActiveTab,
-      label: t.calendar || "Calendar & Events",
-      desc: "Timetable, deadlines & scheduled events",
-      icon: Calendar,
-      color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-    },
-    {
-      id: "goals" as ActiveTab,
-      label: t.goals || "Goals & Targets",
-      desc: "Academic targets & milestone tracker",
-      icon: Target,
-      color: "text-teal-400 bg-teal-500/10 border-teal-500/20",
-    },
-    {
-      id: "stats" as ActiveTab,
-      label: t.analytics || "Advanced Analytics",
-      desc: "Productivity scores & study trends",
-      icon: BarChart2,
-      color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+      id: "career",
+      label: t.careerCenter || "Career Center",
+      desc: "Stream roadmaps, exams & career paths",
+      icon: Compass,
+      color: "text-teal-400 bg-teal-500/10 border-teal-500/25",
     },
   ];
+
+  const planningModules: ModuleNavItem[] = [
+    {
+      id: "goals",
+      label: t.goals || "Goals & Targets",
+      desc: "Academic milestones & target scores",
+      icon: Target,
+      color: "text-purple-400 bg-purple-500/10 border-purple-500/25",
+    },
+    {
+      id: "calendar",
+      label: t.calendar || "Calendar & Events",
+      desc: "Schedule, deadlines & Google Calendar sync",
+      icon: Calendar,
+      color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25",
+    },
+    {
+      id: "habits",
+      label: t.habits || "Habits & Streaks",
+      desc: "Daily study routines & consistency",
+      icon: Flame,
+      color: "text-rose-400 bg-rose-500/10 border-rose-500/25",
+    },
+    {
+      id: "water",
+      label: t.waterTracker || "Water Tracker",
+      desc: "Daily hydration log & reminders",
+      icon: Droplet,
+      color: "text-sky-400 bg-sky-500/10 border-sky-500/25",
+    },
+    {
+      id: "stats",
+      label: t.analytics || "Analytics",
+      desc: "Performance trends & study insights",
+      icon: BarChart2,
+      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
+    },
+  ];
+
+  const renderModuleCard = (tool: ModuleNavItem) => {
+    const Icon = tool.icon;
+    const isCurrent = activeTab === tool.id;
+    return (
+      <button
+        key={tool.id}
+        type="button"
+        onClick={() => {
+          onNavigate(tool.id);
+          onClose();
+        }}
+        className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all group cursor-pointer ${
+          isCurrent
+            ? "bg-emerald-500/15 border-emerald-500/40 text-white shadow-sm"
+            : "bg-slate-900/80 hover:bg-slate-800/90 border-white/10 text-slate-200"
+        }`}
+      >
+        <div
+          className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${tool.color}`}
+        >
+          <Icon className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors truncate flex items-center gap-1.5">
+            <span className="truncate">{tool.label}</span>
+            {isCurrent && (
+              <span className="text-[10px] font-mono text-emerald-400 shrink-0">
+                · Active
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+            {tool.desc}
+          </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 shrink-0" />
+      </button>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -174,7 +220,7 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm"
           />
 
           {/* Drawer Panel */}
@@ -182,259 +228,191 @@ export const MoreDrawer: React.FC<MoreDrawerProps> = ({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 350, damping: 32 }}
-            className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] bg-slate-900/98 text-slate-100 border-t border-white/10 rounded-t-3xl shadow-2xl flex flex-col backdrop-blur-2xl overflow-hidden max-w-2xl mx-auto"
+            transition={{ type: "spring", stiffness: 360, damping: 34 }}
+            id="more-modules-drawer"
+            className="fixed bottom-0 left-0 right-0 z-50 max-h-[88vh] bg-slate-950/98 text-slate-100 border-t border-white/15 rounded-t-3xl shadow-2xl flex flex-col backdrop-blur-2xl overflow-hidden max-w-3xl mx-auto"
           >
             {/* Grab bar */}
-            <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-3 mb-1" />
+            <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-3 mb-1 shrink-0" />
 
             {/* Header */}
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-3.5 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
               <div>
-                <h2 className="text-base font-bold text-white font-heading">
-                  More Features
+                <h2 className="text-base sm:text-lg font-bold text-white font-heading">
+                  {currentLanguage === "hi"
+                    ? "सभी मॉड्यूल और नेविगेशन"
+                    : "All Modules & Workspace Navigation"}
                 </h2>
-                <p className="text-[11px] text-slate-400">
-                  Specialized tools and advanced settings
+                <p className="text-xs text-slate-400">
+                  {currentLanguage === "hi"
+                    ? "किसी भी अध्ययन उपकरण, ट्रैकर या सेटिंग पर सीधे जाएं"
+                    : "Jump directly to any study module, tracker, or system setting"}
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={onClose}
                 aria-label="Close More Menu"
-                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Content: Expandable Categorized Sections */}
-            <div className="flex-1 overflow-y-auto p-4 pb-12 sm:pb-6 space-y-3 custom-scrollbar">
-              
-              {/* CATEGORY 1: SPECIAL & ADVANCED TOOLS */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("special_tools")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4" />
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-10 space-y-5 custom-scrollbar">
+              {/* Active Student Profile & Quick Settings Strip */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${
+                      activeStudent?.avatarColor || "from-emerald-400 to-cyan-400"
+                    } flex items-center justify-center text-slate-950 font-bold text-sm shrink-0`}
+                  >
+                    {getStudentAvatarInitials(studentName)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate" dir="ltr">
+                      {studentName}
                     </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Special & Advanced Tools</div>
-                      <div className="text-[11px] text-slate-400">Career, Study Logs, Notes, Analytics</div>
+                    <div className="text-xs text-slate-400 truncate">
+                      {activeStudent?.classLevel || "Class 12"} ·{" "}
+                      {activeStudent?.stream || "Commerce"} ·{" "}
+                      {activeStudent?.board || "CBSE"}
                     </div>
                   </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "special_tools" ? "rotate-180 text-cyan-400" : ""
-                    }`}
-                  />
-                </button>
+                </div>
 
-                {expandedSection === "special_tools" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-2 mt-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {specialTools.map((tool) => {
-                        const Icon = tool.icon;
-                        return (
-                          <button
-                            key={tool.id}
-                            onClick={() => {
-                              onNavigate(tool.id);
-                              onClose();
-                            }}
-                            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-white/5 text-left flex items-start gap-2.5 transition-all group active:scale-98"
-                          >
-                            <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${tool.color}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
-                                {tool.label}
-                              </div>
-                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                {tool.desc}
-                              </p>
-                            </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 mt-1 shrink-0" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* CATEGORY 2: PERSONALIZATION */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("personalization")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                      <Palette className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Personalization</div>
-                      <div className="text-[11px] text-slate-400">Themes, Solar Sync & Language</div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "personalization" ? "rotate-180 text-emerald-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedSection === "personalization" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    {/* Theme Grid */}
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Theme</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {themes.map((th) => (
-                          <button
-                            key={th.id}
-                            onClick={() => {
-                              if (settings && onUpdateSettings) {
-                                if (th.id === "custom") {
-                                  const p =
-                                    settings.customTheme?.primary ||
-                                    settings.customThemeColors?.primary ||
-                                    "#10b981";
-                                  const b =
-                                    settings.customTheme?.background ||
-                                    settings.customThemeColors?.background ||
-                                    "#0b0f19";
-                                  onUpdateSettings({
-                                    ...settings,
-                                    theme: "custom",
-                                    customTheme: { primary: p, background: b },
-                                    customThemeColors: { primary: p, background: b },
-                                  });
-                                } else {
-                                  onUpdateSettings({ ...settings, theme: th.id });
-                                }
-                              }
-                            }}
-                            className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-2 transition-all ${
-                              settings?.theme === th.id
-                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold"
-                                : "bg-slate-800/80 border-white/5 text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: th.color }} />
-                            <span className="truncate text-[11px]">{th.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Language selector */}
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Language</label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onUpdateLanguage && onUpdateLanguage("en")}
-                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 ${
-                            currentLanguage === "en"
-                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                              : "bg-slate-800/80 border-white/5 text-slate-400"
-                          }`}
-                        >
-                          <Globe className="w-3.5 h-3.5" />
-                          <span>English</span>
-                        </button>
-                        <button
-                          onClick={() => onUpdateLanguage && onUpdateLanguage("hi")}
-                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 ${
-                            currentLanguage === "hi"
-                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                              : "bg-slate-800/80 border-white/5 text-slate-400"
-                          }`}
-                        >
-                          <Globe className="w-3.5 h-3.5" />
-                          <span>हिंदी (Hindi)</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* CATEGORY 3: CLOUD SYNC & SYSTEM */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden bg-slate-800/40">
-                <button
-                  onClick={() => toggleSection("system")}
-                  className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                      <Database className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">System & Cloud Sync</div>
-                      <div className="text-[11px] text-slate-400">Cloud database, offline queue & settings</div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform ${
-                      expandedSection === "system" ? "rotate-180 text-amber-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedSection === "system" && (
-                  <div className="p-3.5 pt-0 border-t border-white/5 space-y-3 mt-2">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-white/5">
-                      <div>
-                        <div className="text-xs font-bold text-white">Cloud Firestore Sync</div>
-                        <div className="text-[11px] text-slate-400">
-                          {pendingQueueCount > 0
-                            ? `${pendingQueueCount} pending actions in offline queue`
-                            : "All data synced to cloud"}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleForceSync}
-                        disabled={isSyncing}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        <RotateCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                        <span>{isSyncing ? "Syncing..." : "Sync Now"}</span>
-                      </button>
-                    </div>
-
-                    {syncStatusMsg && (
-                      <div className="text-xs text-emerald-400 font-mono text-center">
-                        {syncStatusMsg}
-                      </div>
-                    )}
-
-                    {/* PWA App Installation Option */}
-                    <PWAInstallOption variant="menu-item" currentLanguage={currentLanguage} />
-
+                <div className="flex items-center gap-2 shrink-0">
+                  {onOpenStudentModal && (
                     <button
+                      type="button"
                       onClick={() => {
-                        onNavigate("settings");
                         onClose();
+                        onOpenStudentModal();
                       }}
-                      className="w-full p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/5 text-xs font-bold text-slate-200 flex items-center justify-between transition-colors"
+                      className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <span className="flex items-center gap-2">
-                        <Settings className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Open Full System Settings</span>
+                      <Users className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>
+                        {currentLanguage === "hi" ? "प्रोफाइल बदलें" : "Switch Profile"}
                       </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                     </button>
-                  </div>
-                )}
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onNavigate("settings");
+                      onClose();
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      activeTab === "settings"
+                        ? "bg-emerald-500 text-slate-950"
+                        : "bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300"
+                    }`}
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>{t.settings || "Settings"}</span>
+                  </button>
+                </div>
               </div>
 
+              {/* Section 1: Academic & Exam Modules */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold text-slate-400 px-1">
+                  {currentLanguage === "hi"
+                    ? "01. शैक्षणिक और परीक्षा केंद्र"
+                    : "01. Academic & Exam Intelligence"}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {academicModules.map(renderModuleCard)}
+                </div>
+              </div>
+
+              {/* Section 2: Planning, Habits & Analytics */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold text-slate-400 px-1">
+                  {currentLanguage === "hi"
+                    ? "02. योजना, आदतें और विश्लेषण"
+                    : "02. Planning, Habits & Analytics"}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {planningModules.map(renderModuleCard)}
+                </div>
+              </div>
+
+              {/* Section 3: Primary Daily Workspace */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold text-slate-400 px-1">
+                  {currentLanguage === "hi"
+                    ? "03. मुख्य दैनिक कार्यक्षेत्र"
+                    : "03. Core Daily Workspace"}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {coreModules.map((item) => {
+                    const Icon = item.icon;
+                    const isCurrent = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          onNavigate(item.id);
+                          onClose();
+                        }}
+                        className={`p-3 rounded-2xl border text-left flex flex-col justify-between gap-2 transition-all cursor-pointer ${
+                          isCurrent
+                            ? "bg-emerald-500/15 border-emerald-500/40 text-white"
+                            : "bg-slate-900/80 hover:bg-slate-800 border-white/10 text-slate-300"
+                        }`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center ${item.color}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white truncate">
+                            {item.label}
+                          </div>
+                          <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                            {item.desc}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 4: App Install & About Garia OS v3.0 */}
+              <div className="pt-2 border-t border-white/10 space-y-2.5">
+                <PWAInstallOption
+                  variant="menu-item"
+                  currentLanguage={currentLanguage}
+                />
+
+                <div
+                  id="more-drawer-about-app-card"
+                  className="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/25 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-white font-heading">
+                      Garia OS v3.0.0 · Focus & Execution Edition
+                    </span>
+                    <span className="text-[11px] font-mono text-emerald-400 font-semibold">
+                      Stable
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    {currentLanguage === "hi"
+                      ? "नया रीडिज़ाइन: नाउ फोकस मोड स्टूडियो, त्वरित कार्य प्रबंधन, स्मार्ट होम डैशबोर्ड और ऑफ़लाइन-फर्स्ट क्लाउड सिंक।"
+                      : "Redesigned with Now Focus Mode Studio, instant task execution, decluttered Bento Home Dashboard, and hybrid local/cloud sync."}
+                  </p>
+                </div>
+              </div>
             </div>
           </motion.div>
         </>
