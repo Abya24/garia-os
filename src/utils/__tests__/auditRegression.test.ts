@@ -1926,4 +1926,1195 @@ describe("Garia OS Production Audit Regression Suite", () => {
     clearStudentWorkspaceData(p1.id);
     expect(loadTasks(p2.id)[0].title).toBe("P2 Accountancy Task");
   });
+
+  it("23. P2 Phase 1: Verifies BSEB Class 11 & 12 Commerce foundation (Accountancy, BST, Economics, English, Urdu), curriculum verification status, PYQ source integrity, Decision Engine daily action plan, Abya AI Hindi/Hinglish routing, and Analytics integration", async () => {
+    const {
+      normalizeCurriculumBoard,
+      getBoardCurriculumHierarchy,
+      getCurriculumVerificationReport,
+      getLocalizedSubjectName,
+      getLocalizedChapterTitle,
+    } = await import("../../data/masterCurriculum");
+    const {
+      getDefaultSubjectsForStream,
+      getDefaultChaptersForStream,
+    } = await import("../academicEngine");
+    const { generateAcademicDecisionReport } = await import("../academicDecisionEngine");
+    const {
+      getQuestionsForCurriculum,
+      auditQuestionBank,
+    } = await import("../questionBankEngine");
+    const { generateAbyaFallbackResponse } = await import("../abyaFallbackEngine");
+    const { computePerformanceIntelligence } = await import("../studentPerformanceAnalytics");
+    const {
+      resolveEffectiveLanguage,
+      resolveAcademicContentLanguage,
+    } = await import("../i18n");
+
+    // 1. India-first board normalization
+    expect(normalizeCurriculumBoard("BSEB")).toBe("BSEB");
+    expect(normalizeCurriculumBoard("Bihar School Examination Board")).toBe("BSEB");
+    expect(normalizeCurriculumBoard("MP Board (MPBSE)")).toBe("MP Board");
+    expect(normalizeCurriculumBoard("Maharashtra Board (MSBSHSE)")).toBe("Maharashtra Board");
+
+    // 2. BSEB Class 11 & Class 12 Commerce curriculum hierarchy (Accountancy, BST, Economics, English, Urdu)
+    const bsebComm11 = getBoardCurriculumHierarchy("BSEB", "Class 11", "Commerce");
+    expect(bsebComm11.board).toBe("BSEB");
+    expect(bsebComm11.verificationStatus).toBe("SOURCE-REQUIRED");
+    const comm11Names = bsebComm11.subjects.map((s) => s.name);
+    expect(comm11Names.includes("Accountancy")).toBe(true);
+    expect(comm11Names.includes("Business Studies")).toBe(true);
+    expect(comm11Names.includes("Economics")).toBe(true);
+    expect(comm11Names.includes("English Core")).toBe(true);
+    expect(comm11Names.includes("Urdu")).toBe(true);
+
+    const bsebComm12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce");
+    expect(bsebComm12.board).toBe("BSEB");
+    expect(bsebComm12.boardMetadata.objectiveWeightagePct).toBe(50);
+    const comm12Names = bsebComm12.subjects.map((s) => s.name);
+    expect(comm12Names.includes("Accountancy")).toBe(true);
+    expect(comm12Names.includes("Business Studies")).toBe(true);
+    expect(comm12Names.includes("Economics")).toBe(true);
+    expect(comm12Names.includes("English Core")).toBe(true);
+    expect(comm12Names.includes("Urdu")).toBe(true);
+
+    const acc12 = bsebComm12.subjects.find((s) => s.name === "Accountancy")!;
+    expect(acc12.chapters.some((c) => c.title.includes("Not-for-Profit Organisations (NPO)"))).toBe(
+      true
+    );
+
+    const urdu12 = bsebComm12.subjects.find((s) => s.name === "Urdu")!;
+    expect(urdu12.code).toBe("URD-303");
+    expect(urdu12.chapters.length >= 3).toBe(true);
+    expect(getLocalizedSubjectName(urdu12, "ur").includes("اردو")).toBe(true);
+    expect(getLocalizedChapterTitle(urdu12.chapters[0], "ur").includes("کہکشاں")).toBe(true);
+
+    // UI language vs Academic Content language separation
+    const bsebUrduProfile = addStudentProfile({
+      name: "Zoya Khan",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+      uiLanguage: "en",
+      contentLanguage: "ur",
+    });
+    expect(resolveEffectiveLanguage(bsebUrduProfile)).toBe("en");
+    expect(resolveAcademicContentLanguage(bsebUrduProfile.contentLanguage)).toBe("ur");
+
+    const verifReport = getCurriculumVerificationReport("BSEB", "Class 12", "Commerce");
+    expect(verifReport.overallStatus).toBe("SOURCE-REQUIRED");
+    expect(verifReport.verifiedSubjects).toHaveLength(0);
+    expect(verifReport.sourceRequiredItems.length >= 5).toBe(true);
+
+    // 3. Academic Engine & Decision Engine BSEB Commerce integration
+    const commDefaultSubs = getDefaultSubjectsForStream("Commerce", "Class 12", "BSEB");
+    expect(commDefaultSubs.some((s) => s.name === "Urdu")).toBe(true);
+    expect(commDefaultSubs.every((s) => s.board === "BSEB")).toBe(true);
+
+    const comm12Chaps = getDefaultChaptersForStream("Commerce", "Class 12", "BSEB");
+    expect(comm12Chaps.some((c) => c.title.includes("Kahkashan"))).toBe(true);
+    expect(comm12Chaps.some((c) => c.title.includes("Not-for-Profit Organisations (NPO)"))).toBe(
+      true
+    );
+
+    const decision = generateAcademicDecisionReport({
+      student: bsebUrduProfile,
+    });
+    expect(decision.board).toBe("BSEB");
+    expect(decision.boardExamPattern.includes("50% OMR")).toBe(true);
+    expect(decision.dailyStudyActionPlan).toHaveLength(3);
+    expect(
+      decision.dailyStudyActionPlan.some((slot) => slot.activity.includes("50% OMR"))
+    ).toBe(true);
+
+    // 4. Question Bank & PYQ Integrity (no fabricated official PYQs)
+    const urduQuestions = getQuestionsForCurriculum("Class 12", "Urdu", undefined, undefined, "BSEB");
+    expect(urduQuestions.mcqs.length >= 25).toBe(true);
+    expect(urduQuestions.practice.length >= 10).toBe(true);
+    expect(urduQuestions.pyqs.length >= 3).toBe(true);
+    // Synthesized board-pattern items must be marked SAMPLE PRACTICE + SOURCE-REQUIRED, never fabricated as VERIFIED PYQ
+    const synUrduPyqs = urduQuestions.pyqs.filter((p) => p.id.startsWith("syn-pyq-"));
+    expect(synUrduPyqs.length >= 3).toBe(true);
+    expect(synUrduPyqs.every((p) => p.sourceType === "SAMPLE PRACTICE")).toBe(true);
+    expect(synUrduPyqs.every((p) => p.verificationStatus === "SOURCE-REQUIRED")).toBe(true);
+
+    // Seed PYQs without an embedded official board paper citation are also honestly labeled SAMPLE PRACTICE + SOURCE-REQUIRED
+    const accQuestions = getQuestionsForCurriculum("Class 12", "Accountancy", undefined, undefined, "CBSE");
+    const seedAccPyqs = accQuestions.pyqs.filter((p) => p.id === "pyq-c12-acc-pf-2024");
+    expect(seedAccPyqs).toHaveLength(1);
+    expect(seedAccPyqs[0].sourceType).toBe("SAMPLE PRACTICE");
+    expect(seedAccPyqs[0].verificationStatus).toBe("SOURCE-REQUIRED");
+
+    const fullAudit = auditQuestionBank();
+    expect(fullAudit.isAuditClean).toBe(true);
+    expect(fullAudit.coveragePercentage).toBe(100);
+
+    // 5. Abya AI natural Hindi/Hinglish routing & BSEB curriculum context + Analytics integration
+    const todayPlanReply = generateAbyaFallbackResponse(
+      "general",
+      "aaj kya padhna chahiye",
+      { profile: bsebUrduProfile }
+    );
+    expect(todayPlanReply.includes("BSEB")).toBe(true);
+    expect(todayPlanReply.includes("50% OMR")).toBe(true);
+
+    const accChaptersReply = generateAbyaFallbackResponse(
+      "general",
+      "BSEB Accountancy important chapters",
+      { profile: bsebUrduProfile }
+    );
+    expect(accChaptersReply.includes("Accountancy")).toBe(true);
+    expect(accChaptersReply.includes("Not-for-Profit Organisations (NPO)")).toBe(true);
+
+    const urduReply = generateAbyaFallbackResponse(
+      "general",
+      "Urdu Kahkashan important topics",
+      { profile: bsebUrduProfile }
+    );
+    expect(urduReply.includes("Kahkashan Part-II")).toBe(true);
+
+    const perfIntel = computePerformanceIntelligence({
+      tasks: [],
+      subjects: [],
+      studySessions: [],
+      habits: [],
+      focusLogs: [],
+      water: { date: "2026-10-01", glasses: 6, goal: 8 },
+      goals: [],
+      activeStudent: bsebUrduProfile,
+    });
+    expect(perfIntel.board).toBe("BSEB");
+    expect(perfIntel.curriculumVerificationStatus).toBe("SOURCE-REQUIRED");
+    expect(perfIntel.subjectsAnalytics.some((s) => s.subjectName === "Urdu")).toBe(true);
+    expect(perfIntel.subjectsAnalytics.some((s) => s.subjectName === "Accountancy")).toBe(true);
+  });
+
+  // =========================================================================
+  // 24. P2 PHASE 2: OFFICIAL CURRICULUM VERIFICATION & SOURCE PROVENANCE LAYER
+  // =========================================================================
+  it("enforces official curriculum provenance validation, source versioning, conflict/outdated handling, board isolation, PYQ provenance gate, priority separation, and Abya source honesty", async () => {
+    const {
+      validateCurriculumProvenance,
+      createCurriculumSourceConflict,
+      registerCustomCurriculumProvenance,
+      clearCustomCurriculumProvenance,
+      getBoardCurriculumHierarchy,
+      getCurriculumVerificationReport,
+      getLocalizedSubjectName,
+      getLocalizedChapterTitle,
+      normalizeVerificationStatus,
+    } = await import("../../data/masterCurriculum");
+    const {
+      validatePYQProvenance,
+      getQuestionsForCurriculum,
+      getQuestionBankProvenanceAudit,
+    } = await import("../questionBankEngine");
+    const {
+      getDefaultSubjectsForStream,
+      getDefaultChaptersForStream,
+    } = await import("../academicEngine");
+    const {
+      generateAbyaFallbackResponse,
+      formatAbyaCurriculumSourceDisclosure,
+    } = await import("../abyaFallbackEngine");
+    const {
+      resolveEffectiveLanguage,
+      resolveAcademicContentLanguage,
+      getProvenanceStatusBadgeLabel,
+    } = await import("../i18n");
+
+    clearCustomCurriculumProvenance();
+
+    // 1. Provenance Schema & Validator Security:
+    // - Empty, pending, placeholder, and user-generated source IDs are rejected
+    // - Unknown status enums fail safely to SOURCE-REQUIRED
+    expect(normalizeVerificationStatus("UNKNOWN_INVALID_STATUS" as any)).toBe("SOURCE-REQUIRED");
+    expect(validateCurriculumProvenance(undefined).verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "pending-bseb-acc",
+        board: "BSEB",
+        authority: "BSEB",
+        documentTitle: "Pending Verification",
+        documentType: "BOARD_SYLLABUS_PDF",
+        academicYear: "2026-27",
+        verificationStatus: "VERIFIED",
+        verificationNotes: "Attempted upgrade without locatable primary reference",
+      }).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "user-custom-bseb-2026",
+        board: "BSEB",
+        authority: "BSEB",
+        documentTitle: "Bihar School Examination Board Intermediate Commerce Syllabus 2026-27",
+        documentType: "BOARD_NOTIFICATION",
+        academicYear: "2026-27",
+        pageReference: "Section II, pp. 12-18",
+        verificationStatus: "VERIFIED",
+      }).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+    // - A source URL alone (without pageReference or chapterReference) cannot establish VERIFIED
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "bseb-official-notif-2026-comm-acc",
+        board: "BSEB",
+        authority: "BSEB",
+        documentTitle: "Bihar School Examination Board Intermediate Commerce Syllabus 2026-27",
+        documentType: "BOARD_NOTIFICATION",
+        academicYear: "2026-27",
+        sourceUrl: "https://biharboardonline.bihar.gov.in/syllabus-2026-27.pdf",
+        verificationStatus: "VERIFIED",
+      }).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+    // - Unofficial third-party URLs cannot establish VERIFIED even with pageReference
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "bseb-official-notif-2026-comm-acc",
+        board: "BSEB",
+        authority: "BSEB",
+        documentTitle: "Bihar School Examination Board Intermediate Commerce Syllabus 2026-27",
+        documentType: "BOARD_NOTIFICATION",
+        academicYear: "2026-27",
+        sourceUrl: "https://some-coaching-blog.example.com/bseb-syllabus.pdf",
+        pageReference: "Section II, pp. 12-18",
+        verificationStatus: "VERIFIED",
+      }).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+    // - Mismatched authority (e.g. CBSE authority for BSEB board) cannot become VERIFIED
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "bseb-official-notif-2026-comm-acc",
+        board: "BSEB",
+        authority: "CBSE",
+        documentTitle: "Bihar School Examination Board Intermediate Commerce Syllabus 2026-27",
+        documentType: "BOARD_NOTIFICATION",
+        academicYear: "2026-27",
+        pageReference: "Section II, pp. 12-18",
+        verificationStatus: "VERIFIED",
+      }).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // 2. PARTIALLY-VERIFIED returned when partial authoritative metadata exists or explicitly marked PARTIALLY-VERIFIED
+    expect(
+      validateCurriculumProvenance({
+        sourceId: "bseb-c12-acc-partial-2026",
+        board: "BSEB",
+        authority: "BSEB",
+        documentTitle: "BSEB Intermediate Commerce Syllabus Structure",
+        documentType: "BOARD_SYLLABUS_PDF",
+        academicYear: "2026-27",
+        verificationStatus: "PARTIALLY-VERIFIED",
+        verificationNotes: "Subject structure confirmed; chapter-level weightage awaits official blueprint PDF.",
+      }).verificationStatus
+    ).toBe("PARTIALLY-VERIFIED");
+
+    // 3. Full authoritative provenance required for VERIFIED
+    const validOfficialProvenance = {
+      sourceId: "bseb-official-notif-2026-comm-acc",
+      board: "BSEB" as const,
+      authority: "BSEB" as const,
+      documentTitle: "Bihar School Examination Board Intermediate Commerce Syllabus 2026-27",
+      documentType: "BOARD_NOTIFICATION" as const,
+      academicYear: "2026-27",
+      publicationDate: "2026-04-15",
+      accessedDate: "2026-10-01",
+      sourceUrl: "https://biharboardonline.bihar.gov.in/syllabus-2026-27.pdf",
+      pageReference: "Section II - Accountancy (Code 220), pp. 12-18",
+      chapterReference: "Units 1-5",
+      verificationStatus: "VERIFIED" as const,
+      verificationNotes: "Official primary board notification verified.",
+    };
+    expect(validateCurriculumProvenance(validOfficialProvenance, "2026-27").verificationStatus).toBe("VERIFIED");
+
+    // 4. SOURCE-CONFLICT returned when conflicting authoritative sources exist
+    const conflictProv = createCurriculumSourceConflict({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      subject: "Accountancy",
+      academicYear: "2026-27",
+      sourceA: "Bihar State Textbook Accountancy Part-I (2022 Print) — Lists NPO as Unit 1",
+      sourceB: "Draft Academic Circular 2026 — Lists Partnership Fundamentals as Unit 1",
+      conflictDescription: "NPO chapter placement differs between older state textbook print and draft circular.",
+      recommendedReviewAction: "Do not guess silently; mark SOURCE-CONFLICT until official clarification is archived.",
+    });
+    expect(validateCurriculumProvenance(conflictProv, "2026-27").verificationStatus).toBe("SOURCE-CONFLICT");
+    expect(conflictProv.conflictDetails).toBeDefined();
+
+    // 5. OUTDATED returned when source academicYear is older than requested academicYear
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validOfficialProvenance,
+          academicYear: "2022-23",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("OUTDATED");
+
+    // 6. BSEB Class 11 & Class 12 Commerce Provenance Resolution & Urdu / Kahkashan / Qawaid Provenance
+    const bseb11 = getBoardCurriculumHierarchy("BSEB", "Class 11", "Commerce", "2026-27");
+    expect(bseb11.academicYear).toBe("2026-27");
+    expect(bseb11.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(bseb11.provenance.board).toBe("BSEB");
+    expect(bseb11.subjects.every((s) => s.verificationStatus === "SOURCE-REQUIRED")).toBe(true);
+
+    const bseb12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce", "2026-27");
+    expect(bseb12.academicYear).toBe("2026-27");
+    expect(bseb12.verificationStatus).toBe("SOURCE-REQUIRED");
+    const urdu12 = bseb12.subjects.find((s) => s.name === "Urdu")!;
+    expect(urdu12.provenance?.board).toBe("BSEB");
+    expect(urdu12.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(urdu12.chapters.some((c) => c.title.includes("Kahkashan Part-II"))).toBe(true);
+    expect(urdu12.chapters.some((c) => c.title.includes("Urdu Qawaid"))).toBe(true);
+
+    // Test dynamic upgrade via provenance registry when an official source IS registered
+    registerCustomCurriculumProvenance("BSEB::Class 12::Commerce::Accountancy", validOfficialProvenance, "2026-27");
+    const bseb12AfterUpgrade = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce", "2026-27");
+    const upgradedAcc = bseb12AfterUpgrade.subjects.find((s) => s.name === "Accountancy")!;
+    expect(upgradedAcc.verificationStatus).toBe("VERIFIED");
+    expect(upgradedAcc.provenance?.sourceId).toBe("bseb-official-notif-2026-comm-acc");
+    expect(bseb12AfterUpgrade.verificationStatus).toBe("PARTIALLY-VERIFIED");
+    const upgradedReport = getCurriculumVerificationReport("BSEB", "Class 12", "Commerce", "2026-27");
+    expect(upgradedReport.verifiedSubjects.includes("Accountancy")).toBe(true);
+    expect(upgradedReport.overallStatus).toBe("PARTIALLY-VERIFIED");
+    clearCustomCurriculumProvenance();
+
+    // 7. Strict Board Isolation: No BSEB leakage into CBSE / UP Board / MP Board / Maharashtra Board / ICSE
+    for (const nonBsebBoard of ["CBSE", "UP Board", "MP Board", "Maharashtra Board", "ICSE"] as const) {
+      const hierarchy12 = getBoardCurriculumHierarchy(nonBsebBoard, "Class 12", "Commerce", "2026-27");
+      const accSub = hierarchy12.subjects.find((s) => s.name === "Accountancy")!;
+      // NPO & Dissolution (ch-c12-acc-4) is BSEB-specific in Class 12 Accountancy and must not leak into non-BSEB boards
+      expect(accSub.chapters.some((c) => c.id === "ch-c12-acc-4")).toBe(false);
+      // No chapter notes or topics in non-BSEB boards may contain "BSEB" or "50% OMR"
+      for (const sub of hierarchy12.subjects) {
+        for (const ch of sub.chapters) {
+          expect(ch.title.includes("Kahkashan")).toBe(false);
+          expect(ch.notesSummary.includes("BSEB")).toBe(false);
+          expect(ch.notesSummary.includes("50% OMR")).toBe(false);
+          for (const top of ch.topics) {
+            expect(top.name.includes("Kahkashan")).toBe(false);
+            expect(top.summaryNote.includes("BSEB")).toBe(false);
+            expect(top.vviPoints.some((v) => v.includes("BSEB"))).toBe(false);
+          }
+        }
+      }
+      const engineChaps = getDefaultChaptersForStream("Commerce", "Class 12", nonBsebBoard);
+      expect(engineChaps.some((c) => c.id === "ch-acc-5")).toBe(false);
+      expect(engineChaps.some((c) => c.title.includes("Kahkashan"))).toBe(false);
+    }
+
+    // 8. Priority vs Official Syllabus Separation
+    const bsebAccCh1 = bseb12.subjects.find((s) => s.name === "Accountancy")!.chapters[0];
+    expect(bsebAccCh1.priorityBreakdown).toBeDefined();
+    expect(bsebAccCh1.priorityBreakdown?.officialSyllabusStatus).toBe("SOURCE-REQUIRED");
+    expect(bsebAccCh1.priorityBreakdown?.applicationPriority).toBe("VVI");
+    expect(bsebAccCh1.priorityBreakdown?.priorityBasis).toBe("APPLICATION_DERIVED_PRIORITY");
+    expect(bsebAccCh1.priorityBreakdown?.verifiedPyqCount).toBe(0);
+
+    // 9. PYQ Provenance Gate
+    const unverifiedPyqCheck = validatePYQProvenance({
+      id: "pyq-test-unverified",
+      classLevel: "Class 12",
+      subjectName: "Accountancy",
+      chapterTitle: "Accounting for Partnership Firms - Fundamentals",
+      year: 2024,
+      board: "BSEB",
+      questionText: "Sample question without paper code",
+      questionType: "Short Answer",
+      marks: 2,
+      answerSolution: "Sample answer",
+      difficulty: "Easy",
+      sourceType: "VERIFIED PYQ", // Even if someone tries to pass VERIFIED PYQ without pyqProvenance
+      verificationStatus: "VERIFIED",
+    });
+    expect(unverifiedPyqCheck.isVerifiedPyq).toBe(false);
+    expect(unverifiedPyqCheck.effectiveSourceType).toBe("SAMPLE PRACTICE");
+    expect(unverifiedPyqCheck.effectiveVerificationStatus).toBe("SOURCE-REQUIRED");
+
+    const verifiedPyqCheck = validatePYQProvenance({
+      id: "pyq-test-verified",
+      classLevel: "Class 12",
+      subjectName: "Accountancy",
+      chapterTitle: "Accounting for Partnership Firms - Fundamentals",
+      year: 2024,
+      board: "BSEB",
+      questionText: "What is Partner's Current Account?",
+      questionType: "Short Answer",
+      marks: 2,
+      answerSolution: "Account maintained under fixed capital method.",
+      difficulty: "Easy",
+      sourceType: "VERIFIED PYQ",
+      verificationStatus: "VERIFIED",
+      pyqProvenance: {
+        sourceId: "bseb-2024-acc-set-a",
+        board: "BSEB",
+        authority: "BSEB",
+        year: 2024,
+        academicYear: "2023-24",
+        classLevel: "Class 12",
+        subjectName: "Accountancy",
+        paperCode: "I.Com-ACC-220-Set-A",
+        questionNumber: "Section-B Q.4",
+        documentTitle: "BSEB Intermediate Annual Examination 2024 Accountancy Question Paper",
+        pageReference: "Page 6, Q.4",
+        verificationStatus: "VERIFIED",
+      },
+    });
+    expect(verifiedPyqCheck.isVerifiedPyq).toBe(true);
+    expect(verifiedPyqCheck.effectiveSourceType).toBe("VERIFIED PYQ");
+    expect(verifiedPyqCheck.effectiveVerificationStatus).toBe("VERIFIED");
+
+    const qbAudit = getQuestionBankProvenanceAudit("BSEB", "Class 12");
+    expect(qbAudit.verifiedPyqCount).toBe(0);
+    expect(qbAudit.samplePracticeCount > 0).toBe(true);
+    expect(qbAudit.sourceRequiredCount > 0).toBe(true);
+
+    // 10. Abya AI Source-Honest Wording
+    const sourceReqDisclosure = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      hierarchy: bseb12,
+    });
+    expect(sourceReqDisclosure.includes("SOURCE-REQUIRED")).toBe(true);
+    expect(sourceReqDisclosure.includes("Based on your current Commerce study curriculum in Garia OS")).toBe(true);
+    expect(sourceReqDisclosure.includes("confirm final board syllabus updates with official BSEB notifications")).toBe(true);
+
+    const abyaAccResponse = generateAbyaFallbackResponse(
+      "general",
+      "BSEB Class 12 Accountancy syllabus and important chapters",
+      {
+        profile: {
+          id: "stu-prov-1",
+          name: "Aarav",
+          classLevel: "Class 12",
+          stream: "Commerce",
+          board: "BSEB",
+          uiLanguage: "en",
+          contentLanguage: "ur",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      }
+    );
+    expect(abyaAccResponse.includes("Based on your current Commerce study curriculum in Garia OS")).toBe(true);
+    expect(abyaAccResponse.includes("From Your Important Revision Priorities")).toBe(true);
+    expect(abyaAccResponse.includes("confirm final board syllabus updates with official BSEB notifications")).toBe(true);
+    expect(abyaAccResponse.toLowerCase().includes("guaranteed board question")).toBe(false);
+    expect(abyaAccResponse.toLowerCase().includes("officially confirmed")).toBe(false);
+
+    // 11. UI Language vs Content Language Preservation with Provenance
+    expect(
+      resolveEffectiveLanguage({ uiLanguage: "en", language: "en" })
+    ).toBe("en");
+    expect(resolveAcademicContentLanguage("ur")).toBe("ur");
+    expect(getLocalizedSubjectName(urdu12, "ur").includes("اردو")).toBe(true);
+    expect(getLocalizedChapterTitle(urdu12.chapters[0], "ur").includes("کہکشاں")).toBe(true);
+    expect(getProvenanceStatusBadgeLabel("SOURCE-REQUIRED", "en").includes("Source Pending")).toBe(true);
+    expect(getProvenanceStatusBadgeLabel("VERIFIED", "hi").includes("VERIFIED")).toBe(true);
+  });
+
+  // =========================================================================
+  // 25. P2 PHASE 3: OFFICIAL SOURCE INGESTION & CURRICULUM DATA COMPLETION
+  // =========================================================================
+  it("25. P2 Phase 3: verifies source ingestion rules, BSEB Class 11 & 12 Commerce subject codes & Rainbow/Kahkashan provenance, board-pattern vs subject marking-scheme separation, cross-board isolation, PYQ wrong-board/outdated rejection, Abya AI 5-state disclosures, and machine-readable source audit output", async () => {
+    const {
+      validateCurriculumProvenance,
+      createCurriculumSourceConflict,
+      registerCustomCurriculumProvenance,
+      clearCustomCurriculumProvenance,
+      getBoardCurriculumHierarchy,
+      getCurriculumSourceIngestionAudit,
+      CURRICULUM_PROVENANCE_REGISTRY,
+    } = await import("../../data/masterCurriculum");
+    const { validatePYQProvenance } = await import("../questionBankEngine");
+    const { formatAbyaCurriculumSourceDisclosure } = await import("../abyaFallbackEngine");
+
+    clearCustomCurriculumProvenance();
+
+    // 1. Source Ingestion Gate Tests (Section 24):
+    // - Valid official BSEB source -> VERIFIED
+    const validBsebSource = validateCurriculumProvenance(
+      {
+        sourceId: "bseb-2026-27-icom-acc-circular-01",
+        authority: "BSEB",
+        board: "BSEB",
+        classLevel: "Class 12",
+        stream: "Commerce",
+        subject: "Accountancy",
+        academicYear: "2026-27",
+        documentTitle: "BSEB Intermediate Commerce Accountancy Syllabus Notification 2026-27",
+        documentType: "BOARD_NOTIFICATION",
+        sourceUrl: "https://biharboardonline.bihar.gov.in/icom-acc-2026-27.pdf",
+        publicationDate: "2026-04-10",
+        accessedDate: "2026-10-02",
+        pageReference: "pp. 4-9",
+        chapterReference: "Part A (NPO & Partnership) & Part B (Company Accounts)",
+        verificationStatus: "VERIFIED",
+      },
+      "2026-27"
+    );
+    expect(validBsebSource.verificationStatus).toBe("VERIFIED");
+
+    // - Missing page/chapter reference -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          pageReference: undefined,
+          chapterReference: undefined,
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // - Wrong academic year -> OUTDATED
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          academicYear: "2024-25",
+          applicableAcademicYears: ["2024-25"],
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("OUTDATED");
+
+    // - Unofficial source URL -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          sourceUrl: "https://unofficial-coaching-portal.org/bseb-syllabus.pdf",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // - Wrong authority (UNVERIFIED) -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          authority: "UNVERIFIED",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // - Board-authority mismatch (CISCE authority for BSEB board) -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          authority: "CISCE",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // - Placeholder sourceId -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          sourceId: "placeholder-bseb-acc-2026",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // - Pending document type/title -> rejected (SOURCE-REQUIRED)
+    expect(
+      validateCurriculumProvenance(
+        {
+          ...validBsebSource,
+          documentType: "PENDING_OFFICIAL_SOURCE",
+        },
+        "2026-27"
+      ).verificationStatus
+    ).toBe("SOURCE-REQUIRED");
+
+    // 2. BSEB Class 12 & Class 11 Commerce Subject Codes, Provenance & BSEB English (Rainbow) Differentiation
+    const bseb12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce", "2026-27");
+    const bseb11 = getBoardCurriculumHierarchy("BSEB", "Class 11", "Commerce", "2026-27");
+
+    const expectedCodes: Record<string, string> = {
+      Accountancy: "ACC-055",
+      "Business Studies": "BST-054",
+      Economics: "ECO-030",
+      "English Core": "ENG-301",
+      Urdu: "URD-303",
+    };
+
+    for (const [subName, code] of Object.entries(expectedCodes)) {
+      const sub12 = bseb12.subjects.find((s) => s.name === subName);
+      expect(sub12).toBeDefined();
+      expect(sub12!.code).toBe(code);
+      expect(sub12!.verificationStatus).toBe("SOURCE-REQUIRED");
+
+      const sub11 = bseb11.subjects.find((s) => s.name === subName);
+      expect(sub11).toBeDefined();
+      expect(sub11!.code).toBe(code);
+      expect(sub11!.verificationStatus).toBe("SOURCE-REQUIRED");
+    }
+
+    // BSEB English Core references BSTBPC Rainbow Part-II (Class 12) & Rainbow Part-I (Class 11), not CBSE Flamingo/Hornbill
+    const bsebEng12 = bseb12.subjects.find((s) => s.name === "English Core")!;
+    expect(bsebEng12.chapters[0].title.includes("Rainbow Part-II")).toBe(true);
+    const bsebEng11 = bseb11.subjects.find((s) => s.name === "English Core")!;
+    expect(bsebEng11.chapters[0].title.includes("Rainbow Part-I")).toBe(true);
+
+    // 3. Board-Level Exam Pattern vs Subject-Level Curriculum Provenance Separation (Section 11)
+    expect(CURRICULUM_PROVENANCE_REGISTRY["BSEB::2026-27::EXAM_PATTERN"]).toBeDefined();
+    expect(
+      CURRICULUM_PROVENANCE_REGISTRY["BSEB::2026-27::Class 12::Commerce::Accountancy::MARKING_SCHEME"]
+    ).toBeDefined();
+
+    // Upgrading a single subject's syllabus provenance must NOT falsely mark boardMetadata (exam pattern) as VERIFIED
+    registerCustomCurriculumProvenance(
+      "BSEB::2026-27::Class 12::Commerce::Accountancy",
+      validBsebSource,
+      "2026-27"
+    );
+    const bseb12WithOneSubVerified = getBoardCurriculumHierarchy(
+      "BSEB",
+      "Class 12",
+      "Commerce",
+      "2026-27"
+    );
+    expect(bseb12WithOneSubVerified.boardMetadata.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(bseb12WithOneSubVerified.verificationStatus).toBe("PARTIALLY-VERIFIED");
+    clearCustomCurriculumProvenance();
+
+    // 4. Board Isolation: BSEB NPO, Kahkashan, Rainbow Part-I/II, and 50% OMR excluded from CBSE, UP, MP, Maharashtra, ICSE
+    for (const otherBoard of ["CBSE", "UP Board", "MP Board", "Maharashtra Board", "ICSE"] as const) {
+      const h12 = getBoardCurriculumHierarchy(otherBoard, "Class 12", "Commerce", "2026-27");
+      const h11 = getBoardCurriculumHierarchy(otherBoard, "Class 11", "Commerce", "2026-27");
+      for (const h of [h12, h11]) {
+        for (const s of h.subjects) {
+          for (const c of s.chapters) {
+            expect(c.id === "ch-c12-acc-4").toBe(false);
+            expect(c.title.includes("Kahkashan")).toBe(false);
+            expect(c.title.includes("Rainbow Part-")).toBe(false);
+            expect(c.notesSummary.includes("50% OMR")).toBe(false);
+            expect(c.notesSummary.includes("BSEB")).toBe(false);
+          }
+        }
+      }
+    }
+
+    // 5. PYQ Integrity: complete provenance -> VERIFIED PYQ; missing/fabricated -> SAMPLE PRACTICE; wrong board -> rejected; outdated paper -> OUTDATED
+    const wrongBoardPyq = validatePYQProvenance(
+      {
+        id: "pyq-wrong-board",
+        classLevel: "Class 12",
+        subjectName: "Accountancy",
+        chapterTitle: "Partnership",
+        year: 2024,
+        board: "CBSE",
+        questionText: "State two features of Partnership.",
+        questionType: "Short Answer",
+        marks: 2,
+        answerSolution: "Two or more persons, agreement.",
+        difficulty: "Easy",
+        sourceType: "VERIFIED PYQ",
+        verificationStatus: "VERIFIED",
+        pyqProvenance: {
+          sourceId: "bseb-2024-acc-set-a",
+          board: "BSEB",
+          authority: "BSEB",
+          year: 2024,
+          academicYear: "2023-24",
+          classLevel: "Class 12",
+          subjectName: "Accountancy",
+          paperCode: "I.Com-ACC-220-Set-A",
+          questionNumber: "Q.1",
+          documentTitle: "BSEB Intermediate Annual Examination 2024 Accountancy Question Paper",
+          pageReference: "Page 2",
+          verificationStatus: "VERIFIED",
+        },
+      },
+      "CBSE",
+      "2026-27"
+    );
+    expect(wrongBoardPyq.isVerifiedPyq).toBe(false);
+    expect(wrongBoardPyq.effectiveSourceType).toBe("SAMPLE PRACTICE");
+    expect(wrongBoardPyq.effectiveVerificationStatus).toBe("SOURCE-REQUIRED");
+
+    const outdatedPyq = validatePYQProvenance(
+      {
+        id: "pyq-outdated-paper",
+        classLevel: "Class 12",
+        subjectName: "Accountancy",
+        chapterTitle: "Partnership",
+        year: 2019,
+        board: "BSEB",
+        questionText: "Old syllabus question.",
+        questionType: "Long Answer",
+        marks: 5,
+        answerSolution: "Old scheme.",
+        difficulty: "Medium",
+        sourceType: "VERIFIED PYQ",
+        verificationStatus: "VERIFIED",
+        pyqProvenance: {
+          sourceId: "bseb-2019-acc-old",
+          board: "BSEB",
+          authority: "BSEB",
+          year: 2019,
+          academicYear: "2018-19",
+          applicableAcademicYears: ["2018-19", "2019-20"],
+          classLevel: "Class 12",
+          subjectName: "Accountancy",
+          paperCode: "I.Com-ACC-2019",
+          questionNumber: "Q.12",
+          documentTitle: "BSEB Intermediate Examination 2019 Accountancy Paper",
+          pageReference: "Page 8",
+          verificationStatus: "VERIFIED",
+        },
+      },
+      "BSEB",
+      "2026-27"
+    );
+    expect(outdatedPyq.isVerifiedPyq).toBe(false);
+    expect(outdatedPyq.effectiveSourceType).toBe("SAMPLE PRACTICE");
+    expect(outdatedPyq.effectiveVerificationStatus).toBe("OUTDATED");
+
+    // 6. Abya AI 5-State Provenance Disclosures (VERIFIED, PARTIALLY-VERIFIED, SOURCE-REQUIRED, SOURCE-CONFLICT, OUTDATED)
+    const verifiedDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: {
+        ...bseb12.subjects[0],
+        verificationStatus: "VERIFIED",
+        provenance: validBsebSource,
+      },
+    });
+    expect(verifiedDisc.includes("VERIFIED (")).toBe(true);
+    expect(verifiedDisc.includes("Academic Year 2026-27")).toBe(true);
+    expect(verifiedDisc.includes(validBsebSource.documentTitle)).toBe(true);
+    expect(verifiedDisc.includes("BSEB")).toBe(true);
+
+    const partialDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: {
+        ...bseb12.subjects[0],
+        verificationStatus: "PARTIALLY-VERIFIED",
+      },
+    });
+    expect(partialDisc.includes("PARTIALLY-VERIFIED")).toBe(true);
+    expect(partialDisc.includes("still unverified pending official BSEB notifications")).toBe(true);
+
+    const conflictDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: {
+        ...bseb12.subjects[0],
+        verificationStatus: "SOURCE-CONFLICT",
+        provenance: createCurriculumSourceConflict({
+          board: "BSEB",
+          classLevel: "Class 12",
+          stream: "Commerce",
+          subject: "Accountancy",
+          academicYear: "2026-27",
+          sourceA: "Doc A",
+          sourceB: "Doc B",
+          conflictDescription: "Chapter sequence conflict.",
+          recommendedReviewAction: "Verify primary board circular.",
+        }),
+      },
+    });
+    expect(conflictDisc.includes("SOURCE-CONFLICT")).toBe(true);
+
+    const outdatedDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: {
+        ...bseb12.subjects[0],
+        verificationStatus: "OUTDATED",
+      },
+    });
+    expect(outdatedDisc.includes("OUTDATED")).toBe(true);
+
+    // 7. Machine-readable Source Audit Output (Section 25)
+    const auditEntries = getCurriculumSourceIngestionAudit("2026-27");
+    expect(auditEntries.length >= 16).toBe(true);
+    for (const entry of auditEntries) {
+      expect(typeof entry.sourceId).toBe("string");
+      expect(typeof entry.authority).toBe("string");
+      expect(typeof entry.board).toBe("string");
+      expect(typeof entry.academicYear).toBe("string");
+      expect(typeof entry.documentTitle).toBe("string");
+      expect(typeof entry.documentType).toBe("string");
+      expect(typeof entry.previousStatus).toBe("string");
+      expect(typeof entry.newStatus).toBe("string");
+      expect(entry.newStatus).toBe("SOURCE-REQUIRED");
+    }
+  });
+
+  // =========================================================================
+  // 26. P2 PHASE 3B: OFFICIAL SCERT / BSTBPC EVIDENCE INGESTION & SOURCE COMPLETION
+  // =========================================================================
+  it("26. P2 Phase 3B: verifies 4-tier evidence separation (official resource vs content support vs academic-year applicability vs 2026-27 verification), real SCERT Bihar/BSTBPC evidence ingestion, chapter-level Accountancy Part-I mapping, and non-inflation of VERIFIED status", async () => {
+    const {
+      validateCurriculumProvenance,
+      getBoardCurriculumHierarchy,
+      getCurriculumSourceIngestionAudit,
+      CURRICULUM_PROVENANCE_REGISTRY,
+      clearCustomCurriculumProvenance,
+    } = await import("../../data/masterCurriculum");
+    const { formatAbyaCurriculumSourceDisclosure } = await import("../abyaFallbackEngine");
+
+    clearCustomCurriculumProvenance();
+
+    // 1. OFFICIAL SOURCE FOUND !== 2026-27 SYLLABUS VERIFIED
+    // Even if caller passes verificationStatus: "VERIFIED" with an authentic 2024-25 BSTBPC textbook,
+    // because resourceAcademicYear ("2024-25") !== targetAcademicYear ("2026-27") and 2026-27 applicability is not proven,
+    // validateCurriculumProvenance MUST keep verificationStatus === "SOURCE-REQUIRED" while recording CURRICULUM_CONTENT_SUPPORTED.
+    const historicalTextbookAttempt = validateCurriculumProvenance(
+      {
+        sourceId: "scert-bstbpc-c12-acc-part1-2024",
+        authority: "SCERT_BIHAR",
+        board: "BSEB",
+        classLevel: "Class 12",
+        stream: "Commerce",
+        subject: "Accountancy",
+        academicYear: "2026-27",
+        resourceAcademicYear: "2024-25",
+        documentTitle:
+          "Accountancy – Partnership Accounts, Textbook for Class XII (BSTBPC Patna, March 2024)",
+        documentType: "OFFICIAL_TEXTBOOK",
+        sourceUrl: "https://scert.bihar.gov.in/public/uploads/eresources/Accountancy-XII.pdf",
+        publicationDate: "2024-06-21",
+        accessedDate: "2026-10-02",
+        pageReference: "Contents (p. ix), Chapters 1–4 (pp. 1–167)",
+        chapterReference: "Chapters 1–4 Partnership Accounts",
+        curriculumContentSupported: true,
+        currentYearApplicabilityProven: false,
+        verificationStatus: "VERIFIED",
+      },
+      "2026-27"
+    );
+    expect(historicalTextbookAttempt.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(historicalTextbookAttempt.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(historicalTextbookAttempt.officialResourceConfirmed).toBe(true);
+    expect(historicalTextbookAttempt.curriculumContentSupported).toBe(true);
+    expect(historicalTextbookAttempt.currentYearApplicabilityProven).toBe(false);
+
+    // 2. Inspect BSEB Class 12 Commerce Hierarchy & Chapter-Level Evidence
+    const bseb12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce", "2026-27");
+    const acc12 = bseb12.subjects.find((s) => s.name === "Accountancy")!;
+    expect(acc12.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(acc12.provenance?.authority).toBe("SCERT_BIHAR");
+    expect(acc12.provenance?.documentType).toBe("OFFICIAL_TEXTBOOK");
+    expect(acc12.provenance?.resourceAcademicYear).toBe("2024-25");
+    expect(acc12.provenance?.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(acc12.provenance?.officialResourceConfirmed).toBe(true);
+    expect(acc12.provenance?.curriculumContentSupported).toBe(true);
+    expect(acc12.provenance?.currentYearApplicabilityProven).toBe(false);
+    expect(acc12.provenance?.sourceUrl).toBe(
+      "https://scert.bihar.gov.in/public/uploads/eresources/Accountancy-XII.pdf"
+    );
+
+    // Chapters 1-3 (Partnership) have CURRICULUM_CONTENT_SUPPORTED; Chapter 4 (NPO) has OFFICIAL_RESOURCE_CONFIRMED (since NPO was rationalised out of the 2024 print on p. v)
+    const ch1 = acc12.chapters.find((c) => c.id === "ch-c12-acc-1")!;
+    const ch2 = acc12.chapters.find((c) => c.id === "ch-c12-acc-2")!;
+    const ch3 = acc12.chapters.find((c) => c.id === "ch-c12-acc-3")!;
+    const ch4 = acc12.chapters.find((c) => c.id === "ch-c12-acc-4")!;
+    expect(ch1.provenance?.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(ch2.provenance?.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(ch3.provenance?.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(ch4.provenance?.evidenceStage).toBe("OFFICIAL_RESOURCE_CONFIRMED");
+    expect(ch4.provenance?.curriculumContentSupported).toBe(false);
+    expect(ch1.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(ch4.verificationStatus).toBe("SOURCE-REQUIRED");
+
+    // 3. Inspect BSEB Class 12 Business Studies & Economics (OFFICIAL_RESOURCE_CONFIRMED, raster scan / partial PDF)
+    for (const subName of ["Business Studies", "Economics"]) {
+      const sub = bseb12.subjects.find((s) => s.name === subName)!;
+      expect(sub.verificationStatus).toBe("SOURCE-REQUIRED");
+      expect(sub.provenance?.authority).toBe("SCERT_BIHAR");
+      expect(sub.provenance?.evidenceStage).toBe("OFFICIAL_RESOURCE_CONFIRMED");
+      expect(sub.provenance?.officialResourceConfirmed).toBe(true);
+      expect(sub.provenance?.curriculumContentSupported).toBe(false);
+      expect(sub.provenance?.currentYearApplicabilityProven).toBe(false);
+    }
+
+    // 4. Inspect BSEB Class 11 Commerce Subjects
+    const bseb11 = getBoardCurriculumHierarchy("BSEB", "Class 11", "Commerce", "2026-27");
+    for (const subName of ["Accountancy", "Business Studies", "Economics"]) {
+      const sub = bseb11.subjects.find((s) => s.name === subName)!;
+      expect(sub.verificationStatus).toBe("SOURCE-REQUIRED");
+      expect(sub.provenance?.authority).toBe("SCERT_BIHAR");
+      expect(sub.provenance?.evidenceStage).toBe("OFFICIAL_RESOURCE_CONFIRMED");
+      expect(sub.provenance?.officialResourceConfirmed).toBe(true);
+      expect(sub.provenance?.curriculumContentSupported).toBe(false);
+      expect(sub.provenance?.currentYearApplicabilityProven).toBe(false);
+    }
+
+    // 5. Inspect English Core (Rainbow Part-I/II) & Urdu (Kahkashan Part-I/II) — remain SOURCE-REQUIRED (not hosted on SCERT e-Resources; BSTBPC HTTP 500)
+    for (const h of [bseb11, bseb12]) {
+      for (const langSub of ["English Core", "Urdu"]) {
+        const sub = h.subjects.find((s) => s.name === langSub)!;
+        expect(sub.verificationStatus).toBe("SOURCE-REQUIRED");
+        expect(sub.provenance?.authority).toBe("UNVERIFIED");
+        expect(sub.provenance?.evidenceStage).toBe("SOURCE-REQUIRED");
+        expect(sub.provenance?.officialResourceConfirmed).toBe(false);
+        expect(sub.provenance?.curriculumContentSupported).toBe(false);
+      }
+    }
+
+    // 6. Abya AI Disclosure for CURRICULUM_CONTENT_SUPPORTED vs OFFICIAL_RESOURCE_CONFIRMED
+    const accDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: acc12,
+    });
+    expect(accDisc.includes("SOURCE-REQUIRED")).toBe(true);
+    expect(accDisc.includes("Official Textbook Evidence: SCERT_BIHAR")).toBe(true);
+    expect(accDisc.includes("2026-27 exam applicability remains unverified")).toBe(true);
+
+    const bst12 = bseb12.subjects.find((s) => s.name === "Business Studies")!;
+    const bstDisc = formatAbyaCurriculumSourceDisclosure({
+      board: "BSEB",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      academicYear: "2026-27",
+      subject: bst12,
+    });
+    expect(bstDisc.includes("SOURCE-REQUIRED")).toBe(true);
+    expect(bstDisc.includes("Official Resource Cataloged: SCERT_BIHAR")).toBe(true);
+
+    // 7. Audit Table Verification
+    const audit = getCurriculumSourceIngestionAudit("2026-27");
+    const acc12Audit = audit.find((a) => a.sourceId === "scert-bstbpc-c12-acc-part1-2024");
+    expect(acc12Audit).toBeDefined();
+    expect(acc12Audit?.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(acc12Audit?.officialResourceConfirmed).toBe(true);
+    expect(acc12Audit?.curriculumContentSupported).toBe(true);
+    expect(acc12Audit?.currentYearApplicabilityProven).toBe(false);
+    expect(acc12Audit?.newStatus).toBe("SOURCE-REQUIRED");
+    expect(CURRICULUM_PROVENANCE_REGISTRY["BSEB::2026-27::EXAM_PATTERN"].verificationStatus).toBe(
+      "SOURCE-REQUIRED"
+    );
+  });
+
+  // =========================================================================
+  // 27. P2 PHASE 4: BSEB 2026-27 OFFICIAL SYLLABUS, EXAM PATTERN & PYQ EVIDENCE COMPLETION
+  // =========================================================================
+  it("27. P2 Phase 4: verifies official BSEB 2026 Intermediate Model Paper blueprint ingestion (Accountancy 220, Business Studies 217, Economics 219, English 105, Urdu 107/207), historical 2023-25/2024-26 syllabus year-scoping, NPO & Economics partial-evidence discrepancy tracking, textbook applicability status, and strict rejection of Model Papers as VERIFIED PYQs", async () => {
+    const {
+      validateCurriculumProvenance,
+      getBoardCurriculumHierarchy,
+      getCurriculumSourceIngestionAudit,
+      CURRICULUM_PROVENANCE_REGISTRY,
+      isOfficialBoardSourceUrl,
+      clearCustomCurriculumProvenance,
+    } = await import("../../data/masterCurriculum");
+    const { validatePYQProvenance } = await import("../questionBankEngine");
+
+    clearCustomCurriculumProvenance();
+
+    // 1. Official BSEB domain recognition (biharboardonline.com and seniorsecondary.biharboardonline.com)
+    expect(
+      isOfficialBoardSourceUrl(
+        "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf"
+      )
+    ).toBe(true);
+    expect(
+      isOfficialBoardSourceUrl(
+        "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf"
+      )
+    ).toBe(true);
+
+    // 2. Historical BSEB Class XI-XII Syllabus PDF (2023-25 and 2024-26) is strictly OUTDATED for 2026-27
+    const historicalBsebSyllabus = validateCurriculumProvenance(
+      {
+        sourceId: "bseb-syllabus-2023-25-2024-26",
+        authority: "BSEB",
+        board: "BSEB",
+        classLevel: "Class 12",
+        stream: "Commerce",
+        academicYear: "2024-26",
+        applicableAcademicYears: ["2023-25", "2024-26"],
+        documentTitle: "Class_XI -XII_Syllabus_2023-25_and_2024-26.pdf",
+        documentType: "BOARD_SYLLABUS_PDF",
+        sourceUrl:
+          "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
+        pageReference: "pp. 1-216",
+        verificationStatus: "VERIFIED",
+      },
+      "2026-27"
+    );
+    expect(historicalBsebSyllabus.verificationStatus).toBe("OUTDATED");
+    expect(historicalBsebSyllabus.evidenceStage).toBe("OUTDATED");
+    expect(historicalBsebSyllabus.textbookApplicabilityStatus).toBe("OUTDATED");
+    expect(historicalBsebSyllabus.currentYearApplicabilityProven).toBe(false);
+
+    // 3. Board-Level Exam Pattern (BSEB::2026-27::EXAM_PATTERN) records 2026 Model Paper & Passing Criteria evidence while remaining SOURCE-REQUIRED for 2026-27
+    const examPatternProv = CURRICULUM_PROVENANCE_REGISTRY["BSEB::2026-27::EXAM_PATTERN"];
+    expect(examPatternProv.verificationStatus).toBe("SOURCE-REQUIRED");
+    expect(examPatternProv.authority).toBe("BSEB");
+    expect(examPatternProv.documentType).toBe("EXAM_BLUEPRINT");
+    expect(examPatternProv.resourceAcademicYear).toBe("2025-26");
+    expect(examPatternProv.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+    expect(examPatternProv.officialResourceConfirmed).toBe(true);
+    expect(examPatternProv.curriculumContentSupported).toBe(true);
+    expect(examPatternProv.officialExamBlueprintFound).toBe(true);
+    expect(examPatternProv.currentYearApplicabilityProven).toBe(false);
+    expect((examPatternProv.supportingResources || []).length >= 3).toBe(true);
+
+    // 4. Subject-Specific Marking Scheme / Model Paper Blueprint Records (::MARKING_SCHEME)
+    const accBlueprint =
+      CURRICULUM_PROVENANCE_REGISTRY[
+        "BSEB::2026-27::Class 12::Commerce::Accountancy::MARKING_SCHEME"
+      ];
+    const bstBlueprint =
+      CURRICULUM_PROVENANCE_REGISTRY[
+        "BSEB::2026-27::Class 12::Commerce::Business Studies::MARKING_SCHEME"
+      ];
+    const ecoBlueprint =
+      CURRICULUM_PROVENANCE_REGISTRY[
+        "BSEB::2026-27::Class 12::Commerce::Economics::MARKING_SCHEME"
+      ];
+    const engBlueprint =
+      CURRICULUM_PROVENANCE_REGISTRY[
+        "BSEB::2026-27::Class 12::Commerce::English Core::MARKING_SCHEME"
+      ];
+    const urduBlueprint =
+      CURRICULUM_PROVENANCE_REGISTRY[
+        "BSEB::2026-27::Class 12::Commerce::Urdu::MARKING_SCHEME"
+      ];
+
+    for (const bp of [accBlueprint, bstBlueprint, ecoBlueprint, engBlueprint]) {
+      expect(bp.authority).toBe("BSEB");
+      expect(bp.documentType).toBe("EXAM_BLUEPRINT");
+      expect(bp.resourceAcademicYear).toBe("2025-26");
+      expect(bp.officialResourceConfirmed).toBe(true);
+      expect(bp.curriculumContentSupported).toBe(true);
+      expect(bp.officialExamBlueprintFound).toBe(true);
+      expect(bp.currentYearApplicabilityProven).toBe(false);
+      expect(bp.evidenceStage).toBe("CURRICULUM_CONTENT_SUPPORTED");
+      expect(bp.verificationStatus).toBe("SOURCE-REQUIRED");
+    }
+
+    // Urdu 2026 Model Paper (107_207_307_503_Urdu.pdf) is a 24-page Nasta'liq raster scan: OFFICIAL_RESOURCE_CONFIRMED, curriculumContentSupported === false
+    expect(urduBlueprint.authority).toBe("BSEB");
+    expect(urduBlueprint.documentType).toBe("EXAM_BLUEPRINT");
+    expect(urduBlueprint.officialResourceConfirmed).toBe(true);
+    expect(urduBlueprint.curriculumContentSupported).toBe(false);
+    expect(urduBlueprint.officialExamBlueprintFound).toBe(true);
+    expect(urduBlueprint.currentYearApplicabilityProven).toBe(false);
+    expect(urduBlueprint.evidenceStage).toBe("OFFICIAL_RESOURCE_CONFIRMED");
+    expect(urduBlueprint.verificationStatus).toBe("SOURCE-REQUIRED");
+
+    // 5. Partial Evidence & Discrepancy Tracking on BSEB Class 12 Commerce Subjects
+    const bseb12 = getBoardCurriculumHierarchy("BSEB", "Class 12", "Commerce", "2026-27");
+    const acc12 = bseb12.subjects.find((s) => s.name === "Accountancy")!;
+    expect(acc12.provenance?.textbookApplicabilityStatus).toBe(
+      "OFFICIAL_RESOURCE_CONFIRMED_ONLY"
+    );
+    expect(acc12.provenance?.partialEvidenceSummary).toBeDefined();
+    expect(acc12.provenance?.partialEvidenceSummary?.verifiedChapters || []).toHaveLength(0);
+    expect(
+      acc12.provenance?.partialEvidenceSummary?.unsupportedOrConflictedChapters.some((c) =>
+        c.includes("Not-for-Profit Organisation (NPO)")
+      )
+    ).toBe(true);
+
+    const eco12 = bseb12.subjects.find((s) => s.name === "Economics")!;
+    expect(eco12.provenance?.textbookApplicabilityStatus).toBe(
+      "OFFICIAL_RESOURCE_CONFIRMED_ONLY"
+    );
+    expect(
+      eco12.provenance?.partialEvidenceSummary?.unsupportedOrConflictedChapters.some((c) =>
+        c.includes("Introductory Microeconomics")
+      )
+    ).toBe(true);
+
+    const eng12 = bseb12.subjects.find((s) => s.name === "English Core")!;
+    expect(eng12.provenance?.textbookApplicabilityStatus).toBe("SOURCE-REQUIRED");
+    expect(
+      eng12.provenance?.supportingResources?.some((r) => r.url.includes("105_English.pdf"))
+    ).toBe(true);
+    expect(
+      eng12.provenance?.partialEvidenceSummary?.supportedHistoricalChapters.some((c) =>
+        c.includes("Rainbow Part-II")
+      )
+    ).toBe(true);
+
+    const urdu12 = bseb12.subjects.find((s) => s.name === "Urdu")!;
+    expect(urdu12.provenance?.textbookApplicabilityStatus).toBe("SOURCE-REQUIRED");
+    expect(
+      urdu12.provenance?.supportingResources?.some((r) =>
+        r.url.includes("107_207_307_503_Urdu.pdf")
+      )
+    ).toBe(true);
+
+    // 6. Strict PYQ vs Model Paper Rule: Model Question Papers CANNOT become VERIFIED PYQ
+    const modelPaperAsPyqAttempt = validatePYQProvenance(
+      {
+        id: "pyq-bseb-2026-model-attempt",
+        classLevel: "Class 12",
+        subjectName: "Accountancy",
+        chapterTitle: "Accounting for Not-for-Profit Organisation",
+        year: 2026,
+        board: "BSEB",
+        questionText: "Distinguish between Receipts and Payments Account and Income and Expenditures Account.",
+        questionType: "Long Answer",
+        marks: 5,
+        answerSolution: "Receipts & Payments is a summary of cash transactions; Income & Expenditure is on accrual basis.",
+        difficulty: "Medium",
+        sourceType: "VERIFIED PYQ",
+        verificationStatus: "VERIFIED",
+        pyqProvenance: {
+          sourceId: "bseb-2026-acc-paper-220",
+          board: "BSEB",
+          authority: "BSEB",
+          year: 2026,
+          examYear: 2026,
+          academicYear: "2025-26",
+          syllabusYear: "2025-26",
+          classLevel: "Class 12",
+          subjectName: "Accountancy",
+          paperCode: "I.Com-ACC-220",
+          questionNumber: "Section-B Q.33",
+          // Even if caller disguises documentTitle without the words "Model Paper", the InterModelPaper sourceUrl is caught
+          documentTitle: "BSEB Intermediate Examination 2026 Annual Accountancy Paper",
+          sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf",
+          pageReference: "Page 36, Q.33",
+          verificationStatus: "VERIFIED",
+        },
+      },
+      "BSEB",
+      "2026-27"
+    );
+    expect(modelPaperAsPyqAttempt.isVerifiedPyq).toBe(false);
+    expect(modelPaperAsPyqAttempt.effectiveSourceType).toBe("SAMPLE PRACTICE");
+    expect(modelPaperAsPyqAttempt.effectiveVerificationStatus).toBe("SOURCE-REQUIRED");
+
+    // 7. Audit table includes textbookApplicabilityStatus and supportingResourceCount while keeping 0 false VERIFIED entries
+    const audit = getCurriculumSourceIngestionAudit("2026-27");
+    expect(audit.every((a) => a.newStatus === "SOURCE-REQUIRED")).toBe(true);
+    const examPatternAudit = audit.find(
+      (a) => a.sourceId === "bseb-inter-exam-pattern-2026-model-evidence"
+    );
+    expect(examPatternAudit).toBeDefined();
+    expect(examPatternAudit?.officialExamBlueprintFound).toBe(true);
+    expect((examPatternAudit?.supportingResourceCount || 0) >= 3).toBe(true);
+  });
 });
+

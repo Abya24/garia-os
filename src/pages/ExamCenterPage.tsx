@@ -337,13 +337,26 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wide">
                   Garia OS v1.4.2
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   Exam Intelligence Engine
                 </span>
+                {v19Report.board && (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
+                      v19Report.curriculumVerificationStatus === "VERIFIED"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                        : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                    }`}
+                    title={v19Report.curriculumProvenanceNote}
+                  >
+                    {v19Report.board} ({v19Report.academicYear || "2025-26"}) •{" "}
+                    {v19Report.curriculumVerificationStatus || "SOURCE-REQUIRED"}
+                  </span>
+                )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight flex items-center gap-2">
                 <ShieldAlert className="w-7 h-7 text-cyan-400" />
@@ -1464,6 +1477,12 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                 >
                   <option value="BSEB">BSEB (Bihar School Examination Board)</option>
                   <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
+                  <option value="ICSE">ICSE / ISC (Council for the Indian School Certificate Exams)</option>
+                  <option value="UP Board">UP Board (UPMSP)</option>
+                  <option value="MP Board">MP Board (MPBSE)</option>
+                  <option value="Maharashtra Board">Maharashtra State Board (MSBSHSE)</option>
+                  <option value="NCERT">NCERT Core Framework</option>
+                  <option value="State Board">Other State Board</option>
                   <option value="Other">Other Board</option>
                 </select>
               </div>

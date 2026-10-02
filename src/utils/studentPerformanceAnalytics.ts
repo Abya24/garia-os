@@ -14,8 +14,11 @@ import {
   ExamTestRecord,
   StudentProfile,
   QuestionBankProfileProgress,
+  BoardType,
+  CurriculumVerificationStatus,
 } from "../types";
 import { getTodayString } from "./storage";
+import { getBoardCurriculumHierarchy } from "../data/masterCurriculum";
 
 export interface SubjectAnalyticsData {
   subjectId: string;
@@ -33,6 +36,8 @@ export interface SubjectAnalyticsData {
   mcqAccuracyPct: number;
   testsCount: number;
   avgTestScorePct: number;
+  revisionBacklogCount?: number;
+  practiceCompletedCount?: number;
   isStrongest: boolean;
   isWeakest: boolean;
 }
@@ -171,6 +176,9 @@ export interface PerformanceIntelligenceData {
 
   // Section 6: AI Insights
   aiInsights: AIInsightsData;
+  board?: BoardType;
+  boardExamPattern?: string;
+  curriculumVerificationStatus?: CurriculumVerificationStatus;
 }
 
 /**
@@ -336,6 +344,12 @@ export function computePerformanceIntelligence({
   // ==========================================
   // 2. SECTION 2: Subject Analytics
   // ==========================================
+  const boardHierarchy = getBoardCurriculumHierarchy(
+    activeStudent?.board || "CBSE",
+    activeStudent?.classLevel || "Class 12",
+    activeStudent?.stream || "Commerce"
+  );
+
   const unifiedSubjectList: { id: string; name: string; color: string }[] = [];
   const registeredIds = new Set<string>();
 
@@ -350,6 +364,17 @@ export function computePerformanceIntelligence({
       registeredIds.add(sub.id);
     }
   });
+
+  if (unifiedSubjectList.length === 0) {
+    boardHierarchy.subjects.forEach((cSub) => {
+      unifiedSubjectList.push({
+        id: cSub.id,
+        name: cSub.name,
+        color: cSub.color || "#06b6d4",
+      });
+      registeredIds.add(cSub.id);
+    });
+  }
 
   const totalStudySecondsAll = safeStudySessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0);
 
@@ -369,9 +394,20 @@ export function computePerformanceIntelligence({
 
     // 2. Chapters & Curriculum
     const subjChapters = safeAcademicChapters.filter(
-      (c) => c.subjectId === subj.id || c.subjectId === subj.name
+      (c) =>
+        c.subjectId === subj.id ||
+        c.subjectId === subj.name ||
+        c.subjectName?.toLowerCase() === subj.name.toLowerCase()
     );
-    const totalChapters = subjChapters.length;
+    const matchedCurriculumSub = boardHierarchy.subjects.find(
+      (cs) =>
+        cs.name.toLowerCase().includes(subj.name.toLowerCase()) ||
+        subj.name.toLowerCase().includes(cs.name.toLowerCase())
+    );
+    const totalChapters =
+      subjChapters.length > 0
+        ? subjChapters.length
+        : matchedCurriculumSub?.chapters.length || 0;
     const completedChapters = subjChapters.filter((c) => c.status === "Completed").length;
     const inProgressChapters = subjChapters.filter((c) => c.status === "In Progress").length;
     const chapterProgressPct =
@@ -417,7 +453,18 @@ export function computePerformanceIntelligence({
     );
 
     // 5. Readiness % (Mastery + Study Consistency + Revisions)
-    const subjRevisions = safeRevisions.filter((r) => r.subjectId === subj.id);
+    const subjRevisions = safeRevisions.filter(
+      (r) => r.subjectId === subj.id || r.subjectName?.toLowerCase() === subj.name.toLowerCase()
+    );
+    const revisionBacklogCount =
+      subjRevisions.filter((r) => !r.completed).length +
+      subjChapters.filter((c) => (c.revisionCount || 0) === 0).length;
+    const practiceCompletedCount =
+      safePractice.filter(
+        (p) => p.subjectId === subj.id || p.subjectName?.toLowerCase() === subj.name.toLowerCase()
+      ).length +
+      (qbankProgress?.practiceCompleted?.filter((id) => id.toLowerCase().includes(subj.name.toLowerCase().slice(0, 3)))
+        .length || 0);
     const revBonus = Math.min(10, subjRevisions.length * 2);
     const readinessPct = Math.min(
       100,
@@ -461,6 +508,8 @@ export function computePerformanceIntelligence({
       mcqAccuracyPct,
       testsCount: subjTests.length,
       avgTestScorePct,
+      revisionBacklogCount,
+      practiceCompletedCount,
       isStrongest: false,
       isWeakest: false,
     };
@@ -976,5 +1025,8 @@ export function computePerformanceIntelligence({
     goalTracking,
     weeklyProductivityInsights,
     aiInsights,
+    board: boardHierarchy.board,
+    boardExamPattern: boardHierarchy.boardMetadata.examPatternSummary,
+    curriculumVerificationStatus: boardHierarchy.verificationStatus,
   };
 }

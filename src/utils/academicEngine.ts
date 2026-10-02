@@ -13,55 +13,94 @@ import {
   StreamType,
 } from "../types";
 import { getTodayString, getOffsetLocalDateString } from "./storage";
-import { getCurriculumSubjects } from "../data/masterCurriculum";
+import {
+  DEFAULT_CURRICULUM_ACADEMIC_YEAR,
+  getBoardCurriculumHierarchy,
+  getCurriculumSubjects,
+  normalizeCurriculumBoard,
+} from "../data/masterCurriculum";
 
 export const DEFAULT_COMMERCE_SUBJECTS: AcademicSubject[] = [
-  { id: "sub-acc", name: "Accountancy", stream: "Commerce", color: "emerald" },
-  { id: "sub-bst", name: "Business Studies", stream: "Commerce", color: "cyan" },
-  { id: "sub-eco", name: "Economics", stream: "Commerce", color: "purple" },
-  { id: "sub-math-comm", name: "Mathematics", stream: "Commerce", color: "blue" },
-  { id: "sub-eng-comm", name: "English Core", stream: "Commerce", color: "amber" },
+  { id: "sub-acc", name: "Accountancy", stream: "Commerce", color: "emerald", code: "ACC-055", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-bst", name: "Business Studies", stream: "Commerce", color: "cyan", code: "BST-054", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-eco", name: "Economics", stream: "Commerce", color: "purple", code: "ECO-030", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-eng-comm", name: "English Core", stream: "Commerce", color: "amber", code: "ENG-301", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-urdu-comm", name: "Urdu", stream: "Commerce", color: "emerald", code: "URD-303", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-math-comm", name: "Mathematics", stream: "Commerce", color: "blue", code: "MATH-041", verificationStatus: "SOURCE-REQUIRED" },
 ];
 
 export const DEFAULT_SCIENCE_SUBJECTS: AcademicSubject[] = [
-  { id: "sub-phy", name: "Physics", stream: "Science", color: "cyan" },
-  { id: "sub-chem", name: "Chemistry", stream: "Science", color: "emerald" },
-  { id: "sub-bio", name: "Biology", stream: "Science", color: "rose" },
-  { id: "sub-math-sci", name: "Mathematics", stream: "Science", color: "blue" },
-  { id: "sub-eng-sci", name: "English Core", stream: "Science", color: "amber" },
+  { id: "sub-phy", name: "Physics", stream: "Science", color: "cyan", code: "PHY-042", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-chem", name: "Chemistry", stream: "Science", color: "emerald", code: "CHEM-043", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-bio", name: "Biology", stream: "Science", color: "rose", code: "BIO-044", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-math-sci", name: "Mathematics", stream: "Science", color: "blue", code: "MATH-041", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-eng-sci", name: "English Core", stream: "Science", color: "amber", code: "ENG-301", verificationStatus: "SOURCE-REQUIRED" },
 ];
 
 export const DEFAULT_ARTS_SUBJECTS: AcademicSubject[] = [
-  { id: "sub-hist", name: "History", stream: "Arts / Humanities", color: "amber" },
-  { id: "sub-pol", name: "Political Science", stream: "Arts / Humanities", color: "purple" },
-  { id: "sub-geo", name: "Geography", stream: "Arts / Humanities", color: "emerald" },
-  { id: "sub-soc", name: "Sociology", stream: "Arts / Humanities", color: "cyan" },
-  { id: "sub-eng-arts", name: "English Core", stream: "Arts / Humanities", color: "blue" },
+  { id: "sub-hist", name: "History", stream: "Arts / Humanities", color: "amber", code: "HIST-027", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-pol", name: "Political Science", stream: "Arts / Humanities", color: "purple", code: "POL-028", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-geo", name: "Geography", stream: "Arts / Humanities", color: "emerald", code: "GEO-029", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-soc", name: "Sociology", stream: "Arts / Humanities", color: "cyan", code: "SOC-039", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-eng-arts", name: "English Core", stream: "Arts / Humanities", color: "blue", code: "ENG-301", verificationStatus: "SOURCE-REQUIRED" },
 ];
 
 export const DEFAULT_CLASS10_SUBJECTS: AcademicSubject[] = [
-  { id: "sub-c10-math", name: "Mathematics", stream: "General", color: "blue" },
-  { id: "sub-c10-sci", name: "Science", stream: "General", color: "emerald" },
-  { id: "sub-c10-sst", name: "Social Science", stream: "General", color: "amber" },
-  { id: "sub-c10-eng", name: "English Language & Lit", stream: "General", color: "cyan" },
-  { id: "sub-c10-hin", name: "Hindi Course", stream: "General", color: "purple" },
+  { id: "sub-c10-math", name: "Mathematics", stream: "General", color: "blue", code: "MATH-041", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-c10-sci", name: "Science", stream: "General", color: "emerald", code: "SCI-086", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-c10-sst", name: "Social Science", stream: "General", color: "amber", code: "SST-087", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-c10-eng", name: "English Language & Lit", stream: "General", color: "cyan", code: "ENG-184", verificationStatus: "SOURCE-REQUIRED" },
+  { id: "sub-c10-hin", name: "Hindi Course", stream: "General", color: "purple", code: "HIN-002", verificationStatus: "SOURCE-REQUIRED" },
 ];
 
-export function getDefaultSubjectsForStream(stream: StreamType, classLevel?: string): AcademicSubject[] {
-  if (classLevel === "Class 10" || stream === "General") return DEFAULT_CLASS10_SUBJECTS;
-  if (stream === "Science") return DEFAULT_SCIENCE_SUBJECTS;
-  if (stream === "Arts / Humanities" || stream === "Arts") return DEFAULT_ARTS_SUBJECTS;
-  return DEFAULT_COMMERCE_SUBJECTS;
+export function getDefaultSubjectsForStream(
+  stream: StreamType,
+  classLevel?: string,
+  board?: string,
+  academicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): AcademicSubject[] {
+  const normalizedBoard = board ? normalizeCurriculumBoard(board) : undefined;
+  const hierarchy = getBoardCurriculumHierarchy(
+    normalizedBoard || "CBSE",
+    classLevel || "Class 12",
+    stream,
+    academicYear
+  );
+  let base: AcademicSubject[];
+  if (classLevel === "Class 10" || stream === "General") base = DEFAULT_CLASS10_SUBJECTS;
+  else if (stream === "Science") base = DEFAULT_SCIENCE_SUBJECTS;
+  else if (stream === "Arts / Humanities" || stream === "Arts") base = DEFAULT_ARTS_SUBJECTS;
+  else base = DEFAULT_COMMERCE_SUBJECTS;
+
+  return base.map((sub) => {
+    const matchedCurriculumSub = hierarchy.subjects.find(
+      (cs) =>
+        cs.name.toLowerCase().includes(sub.name.toLowerCase()) ||
+        sub.name.toLowerCase().includes(cs.name.toLowerCase())
+    );
+    return {
+      ...sub,
+      ...(normalizedBoard ? { board: normalizedBoard } : {}),
+      ...(classLevel ? { classLevel } : {}),
+      academicYear: hierarchy.academicYear,
+      verificationStatus: matchedCurriculumSub?.verificationStatus || hierarchy.verificationStatus,
+      sourceStatusNote: matchedCurriculumSub?.sourceStatusNote || hierarchy.sourceStatusSummary,
+      provenance: matchedCurriculumSub?.provenance || hierarchy.provenance,
+    };
+  });
 }
 
 export function getDefaultChaptersForStream(
   stream: StreamType,
   classLevel?: string,
-  board?: string
+  board?: string,
+  academicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
 ): AcademicChapter[] {
-  const subjects = getDefaultSubjectsForStream(stream, classLevel);
+  const normalizedBoard = board ? normalizeCurriculumBoard(board) : undefined;
+  const effectiveBoard = normalizedBoard || "CBSE";
+  const subjects = getDefaultSubjectsForStream(stream, classLevel, board, academicYear);
   if (classLevel && classLevel.includes("11")) {
-    const curriculumSubs = getCurriculumSubjects("Class 11", stream, board);
+    const curriculumSubs = getCurriculumSubjects("Class 11", stream, effectiveBoard, academicYear);
     const mappedChapters: AcademicChapter[] = [];
     for (const cSub of curriculumSubs) {
       const matchedAcademicSub =
@@ -75,6 +114,14 @@ export function getDefaultChaptersForStream(
         mappedChapters.push({
           id: ch.id,
           subjectId: matchedAcademicSub.id,
+          subjectName: matchedAcademicSub.name,
+          board: normalizedBoard,
+          academicYear: ch.academicYear || academicYear,
+          verificationStatus: ch.verificationStatus || cSub.verificationStatus || "SOURCE-REQUIRED",
+          provenance: ch.provenance || cSub.provenance,
+          priorityBreakdown: ch.priorityBreakdown,
+          estimatedStudyMinutes: ch.estimatedStudyMinutes,
+          examWeightageMarks: ch.examWeightageMarks,
           chapterNumber: ch.chapterNumber || idx + 1,
           title: ch.title,
           topics: ch.topics.map((t) => t.name),
@@ -92,9 +139,40 @@ export function getDefaultChaptersForStream(
       return mappedChapters;
     }
   }
-  const filtered = DEFAULT_INITIAL_CHAPTERS.filter((c) =>
-    subjects.some((s) => s.id === c.subjectId)
-  );
+
+  const hierarchy = getBoardCurriculumHierarchy(effectiveBoard, classLevel || "Class 12", stream, academicYear);
+  const filtered = DEFAULT_INITIAL_CHAPTERS.filter((c) => {
+    if (!subjects.some((s) => s.id === c.subjectId)) return false;
+    // Board Isolation: ch-acc-5 (NPO) is BSEB-specific in Class 12 Accountancy
+    if (effectiveBoard !== "BSEB" && c.id === "ch-acc-5") return false;
+    return true;
+  }).map((c) => {
+    const parentSub = subjects.find((s) => s.id === c.subjectId);
+    const isNonBseb = effectiveBoard !== "BSEB";
+    const safeTitle = isNonBseb
+      ? c.title.replace(/Kahkashan\s*/gi, "Urdu ")
+      : c.title;
+    const safeNotes = isNonBseb && c.notes
+      ? c.notes.replace(/BSEB\s*OMR/gi, `${effectiveBoard} Objective`).replace(/BSEB/gi, effectiveBoard)
+      : c.notes;
+    const chapStatus = parentSub?.verificationStatus || hierarchy.verificationStatus;
+    return {
+      ...c,
+      title: safeTitle,
+      notes: safeNotes,
+      ...(normalizedBoard ? { board: normalizedBoard } : {}),
+      academicYear: hierarchy.academicYear,
+      verificationStatus: chapStatus,
+      provenance: parentSub?.provenance || hierarchy.provenance,
+      priorityBreakdown: {
+        officialSyllabusStatus: chapStatus,
+        applicationPriority: c.priority || "Normal",
+        priorityBasis: "APPLICATION_DERIVED_PRIORITY" as const,
+        priorityDisclosure: `Chapter priority (${c.priority || "Normal"}) is application-derived by Garia OS, not an official ${effectiveBoard} designation.`,
+        verifiedPyqCount: 0,
+      },
+    };
+  });
   return filtered.length > 0 ? filtered : DEFAULT_INITIAL_CHAPTERS;
 }
 
@@ -157,6 +235,20 @@ export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [
     revisionCount: 1,
     testStatus: "Pending",
     notes: "Focus on non-cash adjustments and provision for tax.",
+  },
+  {
+    id: "ch-acc-5",
+    subjectId: "sub-acc",
+    chapterNumber: 5,
+    title: "Accounting for Not-for-Profit Organisations (NPO) & Dissolution",
+    topics: ["Receipts & Payments vs Income & Expenditure", "Subscription Account Adjustments", "Realisation Account on Dissolution"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+    notes: "BSEB high-yield compulsory unit: practice Subscription Account and Realisation entries.",
   },
 
   // Commerce - Economics
@@ -242,6 +334,78 @@ export const DEFAULT_INITIAL_CHAPTERS: AcademicChapter[] = [
     pyqStatus: "Pending",
     revisionCount: 0,
     testStatus: "Pending",
+  },
+
+  // Commerce - English Core
+  {
+    id: "ch-eng-comm-1",
+    subjectId: "sub-eng-comm",
+    chapterNumber: 1,
+    title: "Core Literature: Prose & Poetry Themes",
+    topics: ["Character Sketches & Moral Themes", "Poetic Devices & Central Idea", "Contextual Explanations"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 1,
+    testStatus: "Tested",
+  },
+  {
+    id: "ch-eng-comm-2",
+    subjectId: "sub-eng-comm",
+    chapterNumber: 2,
+    title: "Advanced Composition: Notices, Letters, Reports & Articles",
+    topics: ["Formal Notice & Invitation Layouts", "Letter to Editor & Job Application", "Article & Precis Writing"],
+    status: "Not Started",
+    priority: "Important",
+    isWeak: false,
+    pyqStatus: "Pending",
+    revisionCount: 0,
+    testStatus: "Pending",
+  },
+
+  // Commerce - Urdu
+  {
+    id: "ch-urdu-comm-1",
+    subjectId: "sub-urdu-comm",
+    chapterNumber: 1,
+    title: "Kahkashan Prose (Hissa-e-Nasr): Khaka, Inshaiya, Afsana & Khutoot",
+    topics: ["Nazir Ahmad ki Kahani (Khaka)", "Mitti ka Tel & Inshaiya Kya Hai", "Toba Tek Singh & Ibrahim Sikka (Afsana)", "Ghubar-e-Khatir Letters"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Pending",
+    revisionCount: 1,
+    testStatus: "Pending",
+    notes: "BSEB OMR focus: match Lesson Title with Genre (Sinf) and Author (Musannif).",
+  },
+  {
+    id: "ch-urdu-comm-2",
+    subjectId: "sub-urdu-comm",
+    chapterNumber: 2,
+    title: "Kahkashan Poetry (Hissa-e-Nazm): Nazm, Ghazal & Marsiya",
+    topics: ["Guftagu & Mera Safar (Ali Sardar Jafri)", "Classical Ghazals (Ghalib, Yagana)", "Marsiya ke Ajza-e-Tarkeebi (Mir Anis)"],
+    status: "Not Started",
+    priority: "VVI",
+    isWeak: true,
+    pyqStatus: "Pending",
+    revisionCount: 0,
+    testStatus: "Pending",
+    notes: "Practice Ash'ar ki Tashreeh with poet reference (Hawala) and Marsiya components.",
+  },
+  {
+    id: "ch-urdu-comm-3",
+    subjectId: "sub-urdu-comm",
+    chapterNumber: 3,
+    title: "Urdu Qawaid (Grammar), Mazmoon, Darkhwast & Talkhees",
+    topics: ["Wahid-Jama, Mutazad, Sabqa-Lahqa & Muhavare", "Mazmoon Nigari (8 Marks Essay)", "Darkhwast / Khutoot (5 Marks) & Talkhees (4 Marks)"],
+    status: "In Progress",
+    priority: "VVI",
+    isWeak: false,
+    pyqStatus: "Completed",
+    revisionCount: 1,
+    testStatus: "Tested",
+    notes: "High-scoring 30+ marks grammar and applied writing unit.",
   },
 
   // Science - Physics

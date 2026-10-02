@@ -11,15 +11,34 @@
 // - Class 12 / Dropper Arts (History, Political Science, Geography, Sociology, English)
 // =======================================================================
 
-import { StreamType, BoardType } from "../types";
+import {
+  StreamType,
+  BoardType,
+  CurriculumVerificationStatus,
+  AcademicContentLanguageCode,
+  CurriculumSourceProvenance,
+  CurriculumSourceAuthority,
+  CurriculumDocumentType,
+  CurriculumEvidenceStage,
+  CurriculumTextbookApplicabilityStatus,
+  CurriculumSupportingResource,
+  CurriculumSourceConflict,
+  CurriculumPriorityBreakdown,
+} from "../types";
+
+export const DEFAULT_CURRICULUM_ACADEMIC_YEAR = "2026-27";
 
 export interface BoardCurriculumMetadata {
   board: BoardType;
   fullName: string;
+  academicYear?: string;
   examPatternSummary: string;
   objectiveWeightagePct: number;
   descriptiveWeightagePct: number;
   syllabusFramework: string;
+  supportedContentLanguages?: AcademicContentLanguageCode[];
+  verificationStatus?: CurriculumVerificationStatus;
+  provenance?: CurriculumSourceProvenance;
 }
 
 export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetadata> = {
@@ -30,6 +49,8 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 25,
     descriptiveWeightagePct: 75,
     syllabusFramework: "NCERT Core Rationalised Framework",
+    supportedContentLanguages: ["en", "hi"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   BSEB: {
     board: "BSEB",
@@ -37,7 +58,9 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     examPatternSummary: "50% OMR Objective MCQs (with 2x option choice) + 50% Short & Long Answer Descriptive",
     objectiveWeightagePct: 50,
     descriptiveWeightagePct: 50,
-    syllabusFramework: "SCERT Bihar / NCERT Aligned Syllabus",
+    syllabusFramework: "SCERT Bihar / NCERT Aligned Syllabus (Intermediate & Secondary)",
+    supportedContentLanguages: ["en", "hi", "ur", "bn"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   ICSE: {
     board: "ICSE",
@@ -46,6 +69,8 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 20,
     descriptiveWeightagePct: 80,
     syllabusFramework: "CISCE Prescriptive Syllabus",
+    supportedContentLanguages: ["en"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   "UP Board": {
     board: "UP Board",
@@ -54,6 +79,28 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 30,
     descriptiveWeightagePct: 70,
     syllabusFramework: "UPMSP NCERT-Aligned Curriculum",
+    supportedContentLanguages: ["hi", "en", "ur"],
+    verificationStatus: "SOURCE-REQUIRED",
+  },
+  "MP Board": {
+    board: "MP Board",
+    fullName: "Madhya Pradesh Board of Secondary Education (MPBSE)",
+    examPatternSummary: "Objective Questions (40%) + Analytical & Descriptive Questions (60%)",
+    objectiveWeightagePct: 40,
+    descriptiveWeightagePct: 60,
+    syllabusFramework: "MPBSE NCERT-Aligned Curriculum",
+    supportedContentLanguages: ["hi", "en"],
+    verificationStatus: "SOURCE-REQUIRED",
+  },
+  "Maharashtra Board": {
+    board: "Maharashtra Board",
+    fullName: "Maharashtra State Board of Secondary & Higher Secondary Education (MSBSHSE)",
+    examPatternSummary: "Objective & Short Notes (25%) + Structured Problem Solving & Long Answers (75%)",
+    objectiveWeightagePct: 25,
+    descriptiveWeightagePct: 75,
+    syllabusFramework: "Balbharati / State SCF-Aligned Framework",
+    supportedContentLanguages: ["en", "hi", "ur"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   "State Board": {
     board: "State Board",
@@ -62,6 +109,8 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 30,
     descriptiveWeightagePct: 70,
     syllabusFramework: "State SCERT / NCERT Core Alignment",
+    supportedContentLanguages: ["en", "hi", "ur", "bn"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   NCERT: {
     board: "NCERT",
@@ -70,6 +119,8 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 35,
     descriptiveWeightagePct: 65,
     syllabusFramework: "National Curriculum Framework (NCF)",
+    supportedContentLanguages: ["en", "hi", "ur"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
   Other: {
     board: "Other",
@@ -78,49 +129,79 @@ export const CURRICULUM_BOARDS_METADATA: Record<BoardType, BoardCurriculumMetada
     objectiveWeightagePct: 30,
     descriptiveWeightagePct: 70,
     syllabusFramework: "Universal Secondary & Senior Secondary Framework",
+    supportedContentLanguages: ["en", "hi", "ur", "bn"],
+    verificationStatus: "SOURCE-REQUIRED",
   },
 };
 
 export interface CurriculumTopic {
   id: string;
   name: string;
+  localizedNames?: Partial<Record<AcademicContentLanguageCode, string>>;
   keyConcepts: string[];
   vviPoints: string[];
   summaryNote: string;
   bookReference: string;
   formulasOrRules?: string[];
+  difficulty?: "Easy" | "Medium" | "Hard";
+  examRelevance?: "High-Yield" | "Core" | "Foundational";
+  questionTypes?: ("MCQ" | "Short Answer" | "Long Answer" | "Numerical" | "Case Study")[];
+  verificationStatus?: CurriculumVerificationStatus;
+  provenance?: CurriculumSourceProvenance;
 }
 
 export interface CurriculumChapter {
   id: string;
   chapterNumber: number;
   title: string;
+  localizedTitles?: Partial<Record<AcademicContentLanguageCode, string>>;
+  unitTitle?: string;
   priority: "VVI" | "Important" | "Normal";
   topics: CurriculumTopic[];
   notesSummary: string;
   bookChapterTitle: string;
   resourceLinks: { title: string; type: "Mindmap" | "Formula Sheet" | "NCERT Book" | "Quick CheatSheet"; description: string }[];
+  estimatedStudyMinutes?: number;
+  examWeightageMarks?: number;
+  verificationStatus?: CurriculumVerificationStatus;
+  sourceStatusNote?: string;
+  academicYear?: string;
+  provenance?: CurriculumSourceProvenance;
+  priorityBreakdown?: CurriculumPriorityBreakdown;
 }
 
 export interface CurriculumSubject {
   id: string;
   name: string;
   code: string;
+  subjectCode?: string;
+  subjectName?: string;
+  localizedNames?: Partial<Record<AcademicContentLanguageCode, string>>;
+  supportedContentLanguages?: AcademicContentLanguageCode[];
   stream: StreamType;
   classLevel: "Class 10" | "Class 11" | "Class 12";
   board?: BoardType | string;
+  academicYear?: string;
   boardExamPattern?: string;
   color: string;
   iconName: string;
   chapters: CurriculumChapter[];
+  verificationStatus?: CurriculumVerificationStatus;
+  sourceStatusNote?: string;
+  provenance?: CurriculumSourceProvenance;
 }
 
 export interface BoardCurriculumHierarchy {
   board: BoardType;
+  academicYear: string;
   boardMetadata: BoardCurriculumMetadata;
   classLevel: "Class 10" | "Class 11" | "Class 12";
   stream: StreamType;
   subjects: CurriculumSubject[];
+  verificationStatus: CurriculumVerificationStatus;
+  sourceStatusSummary: string;
+  provenance: CurriculumSourceProvenance;
+  supportedContentLanguages: AcademicContentLanguageCode[];
 }
 
 
@@ -164,7 +245,7 @@ export const CLASS10_CURRICULUM: CurriculumSubject[] = [
             id: "top-c10-m-1-2",
             name: "Revisiting Irrational Numbers",
             keyConcepts: ["Proof by contradiction", "Proving √2, √3, √5 irrational", "Sum and product of rational & irrational"],
-            vviPoints: ["Direct 3-mark proof question guaranteed in CBSE board exam"],
+            vviPoints: ["Application-prioritized 3-mark proof practice on irrationality of √2, √3, √5 (official weightage SOURCE-REQUIRED)"],
             summaryNote: "Assume √p is rational (= a/b where a and b are co-prime). Show both a and b have a common factor p, contradicting co-primality.",
             bookReference: "NCERT Class 10 Maths - Section 1.3",
             formulasOrRules: ["Rational + Irrational = Irrational", "Non-zero Rational × Irrational = Irrational"],
@@ -248,7 +329,7 @@ export const CLASS10_CURRICULUM: CurriculumSubject[] = [
             id: "top-c10-m-4-1",
             name: "Quadratic Formula and Nature of Roots",
             keyConcepts: ["Discriminant D = b² - 4ac", "Two distinct real roots (D > 0)", "Two equal real roots (D = 0)", "No real roots (D < 0)"],
-            vviPoints: ["Questions on finding k when roots are equal (D = 0) are asked every year"],
+            vviPoints: ["Application-prioritized focus on finding k when roots are equal (D = 0) (official board weightage SOURCE-REQUIRED)"],
             summaryNote: "Roots given by x = (-b ± √D)/(2a). When D = 0, roots are rational and equal (-b/2a).",
             bookReference: "NCERT Section 4.4",
             formulasOrRules: ["D = b² - 4ac", "x = (-b ± √D) / (2a)"],
@@ -1280,7 +1361,7 @@ export const CLASS11_SCIENCE_CURRICULUM: CurriculumSubject[] = [
             id: "top-c11-m-4-1",
             name: "Evaluation of Limits and Derivatives from First Principles",
             keyConcepts: ["Algebra of limits", "Standard limits (0/0 indeterminate forms)", "Derivative by First Principle definition"],
-            vviPoints: ["First principle derivation of derivative of sin x, cos x, x^n is guaranteed question"],
+            vviPoints: ["First principle derivation of derivative of sin x, cos x, x^n (application-prioritized practice focus)"],
             summaryNote: "Derivative represents instantaneous rate of change of y with respect to x. d/dx(x^n) = n x^(n-1).",
             bookReference: "NCERT Chapter 12",
             formulasOrRules: ["lim(x->0) (sin x / x) = 1", "d/dx(u · v) = u'v + uv'", "d/dx(u / v) = (u'v - uv') / v²"],
@@ -1659,7 +1740,165 @@ export const CLASS11_COMMERCE_CURRICULUM: CurriculumSubject[] = [
             keyConcepts: ["Formal business letter formatting", "Classified advertisement word economy", "Resume/Bio-data layout for job applications"],
             vviPoints: ["Marks distribution: Format (1), Content (2), Expression/Accuracy (2)"],
             summaryNote: "Commercial writing prioritizes clarity, conciseness, professional courtesy, and accurate functional details.",
-            bookReference: "CBSE English Writing Standards",
+            bookReference: "CBSE & BSEB English Writing Standards",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "sub-c11-comm-urdu",
+    name: "Urdu",
+    code: "URD-303",
+    localizedNames: {
+      en: "Urdu",
+      hi: "उर्दू (Urdu)",
+      ur: "اردو (کہکشاں حصہ اول)",
+      bn: "উর্দু (Urdu)",
+    },
+    supportedContentLanguages: ["ur", "en", "hi"],
+    stream: "Commerce",
+    classLevel: "Class 11",
+    color: "emerald",
+    iconName: "BookOpen",
+    verificationStatus: "SOURCE-REQUIRED",
+    sourceStatusNote: "SOURCE-REQUIRED: Core SCERT Bihar / NCERT Intermediate Class 11 Urdu structure (Prose, Poetry, Qawaid & Composition); external official board circular & textbook edition verification required.",
+    chapters: [
+      {
+        id: "ch-c11-urdu-1",
+        chapterNumber: 1,
+        title: "Urdu Nasr (Prose): Classical & Modern Essays, Sketches and Short Stories",
+        localizedTitles: {
+          en: "Urdu Nasr (Prose): Classical & Modern Essays and Afsana",
+          hi: "उर्दू नस्र (गद्य): निबंध, खाका और अफ़साना",
+          ur: "حصہ نثر: مضامین، خاکہ اور افسانہ",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 120,
+        examWeightageMarks: 35,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "Core Urdu prose forms prescribed in Intermediate Class 11 (SCERT Bihar Kahkashan Part-I / NCERT Gulistan-e-Adab): Inshaiya (Light Essay), Mazmoon (Critical Essay), Khaka (Character Sketch), and Afsana (Short Story). Focus on author biography (Sawaneh Hayat), central theme (Markazi Khayal), and textual comprehension (Iqtibas ki Tashreeh).",
+        bookChapterTitle: "SCERT Bihar Kahkashan Part-I / NCERT Class 11 Urdu Prose",
+        resourceLinks: [
+          { title: "Urdu Nasr Genres & Author Biographies Sheet", type: "Quick CheatSheet", description: "Distinction between Afsana, Khaka, Inshaiya, and Sawaneh with key authors." },
+        ],
+        topics: [
+          {
+            id: "top-c11-urdu-1-1",
+            name: "Asnaf-e-Nasr: Afsana, Khaka, Inshaiya & Author Context",
+            localizedNames: {
+              en: "Prose Genres: Afsana, Khaka, Inshaiya & Author Context",
+              hi: "नस्र की विधाएँ: अफ़साना, खाका और इंशाइया",
+              ur: "اصنافِ نثر: افسانہ، خاکہ، انشائیہ اور مصنفین کا تعارف",
+            },
+            keyConcepts: [
+              "Difference between Dastan, Novel, and Afsana (unity of impression / Wahdat-e-Taassur)",
+              "Khaka Nigari (art of biographical character portrayal)",
+              "Inshaiya (informal reflective essay) vs Tahqeeqi Mazmoon",
+              "Siyaq-o-Sabaq (contextual explanation of prose passages)"
+            ],
+            vviPoints: [
+              "High-yield 5-mark question on Markazi Khayal (Central Idea) of prescribed prose lessons and author literary contributions"
+            ],
+            summaryNote: "Urdu prose in Class 11 builds foundational literary comprehension across classical and modern narrative forms, emphasizing authorial style and social realism.",
+            bookReference: "SCERT Bihar Kahkashan Part-I / NCERT Class 11 Urdu",
+            difficulty: "Medium",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
+          },
+        ],
+      },
+      {
+        id: "ch-c11-urdu-2",
+        chapterNumber: 2,
+        title: "Urdu Nazm & Ghazal (Poetry): Classical & Modern Verse",
+        localizedTitles: {
+          en: "Urdu Nazm & Ghazal (Poetry): Classical & Modern Verse",
+          hi: "उर्दू नज़्म और ग़ज़ल (पद्य): क्लासिकी और आधुनिक शायरी",
+          ur: "حصہ نظم و غزل: کلاسیکی اور جدید شاعری",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 110,
+        examWeightageMarks: 35,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "Structure and appreciation of Urdu poetry: Ghazal (Matla, Maqta, Qafiya, Radeef, Takhallus), Pabandi Nazm, Azad Nazm, Masnavi, Rubai, and Qasida. Tashreeh of couplets (Ash'ar ki Tashreeh) with poetic reference (Hawala-e-Shayar).",
+        bookChapterTitle: "SCERT Bihar Kahkashan Part-I / NCERT Class 11 Urdu Poetry",
+        resourceLinks: [
+          { title: "Ghazal & Nazm Poetic Terminology Guide", type: "Formula Sheet", description: "Definitions of Matla, Maqta, Radeef, Qafiya, Tashbeeh, and Isteara." },
+        ],
+        topics: [
+          {
+            id: "top-c11-urdu-2-1",
+            name: "Ghazal Structure, Poetic Devices & Ash'ar Tashreeh",
+            localizedNames: {
+              en: "Ghazal Structure, Poetic Devices & Couplet Interpretation",
+              hi: "ग़ज़ल की संरचना, मतला, मक़ता और अशआर की तशरीह",
+              ur: "غزل کی ہیئت، مطلع، مقطع، قافیہ، ردیف اور اشعار کی تشریح",
+            },
+            keyConcepts: [
+              "Matla (opening couplet with both hemistichs rhyming) and Maqta (closing couplet with poet's Takhallus)",
+              "Qafiya (rhyming pattern) and Radeef (repeating word/phrase at end of couplet)",
+              "Tashbeeh (Simile) and Isteara (Metaphor) in Urdu verse",
+              "Step-by-step Tashreeh format: Hawala, Mafhoom, and Adabi Khubiyan"
+            ],
+            vviPoints: [
+              "Direct OMR objective questions on identifying Matla, Maqta, Radeef, Qafiya, and Takhallus"
+            ],
+            summaryNote: "Mastering poetic terminology (Istilahat-e-Shayari) secures full marks in both BSEB 50% OMR objective questions and descriptive couplet explanations.",
+            bookReference: "SCERT Bihar Kahkashan Part-I Poetry Section",
+            difficulty: "Easy",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
+          },
+        ],
+      },
+      {
+        id: "ch-c11-urdu-3",
+        chapterNumber: 3,
+        title: "Urdu Qawaid (Grammar), Mazmoon & Khutoot Nigari",
+        localizedTitles: {
+          en: "Urdu Qawaid (Grammar), Essay & Letter Writing",
+          hi: "उर्दू क़वायद (व्याकरण), मज़मून और ख़ुतूत निगारी",
+          ur: "اردو قواعد، مضمون نویسی اور خطوط نگاری",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 90,
+        examWeightageMarks: 30,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "Urdu Grammar (Qawaid): Ism (Noun types: Ism-e-Marfa, Ism-e-Nakra), Zameer (Pronoun), Sifat (Adjective), Fel (Verb tenses), Wahid-Jama (Singular-Plural), Muzakkar-Muannas (Gender), Mutazad (Antonyms), Mutaradif (Synonyms), Muhavare & Zarb-ul-Amsal (Idioms & Proverbs). Applied writing: Mazmoon Nigari (Essay) and Darkhwast / Khutoot Nigari (Formal Application & Letter).",
+        bookChapterTitle: "BSEB / SCERT Intermediate Urdu Grammar & Composition",
+        resourceLinks: [
+          { title: "Wahid-Jama, Mutazad & Darkhwast Format Sheet", type: "Formula Sheet", description: "High-frequency BSEB OMR grammar items and formal application template." },
+        ],
+        topics: [
+          {
+            id: "top-c11-urdu-3-1",
+            name: "Qawaid (Wahid-Jama, Mutazad, Muhavare) & Darkhwast Layout",
+            localizedNames: {
+              en: "Urdu Grammar Rules, Idioms & Formal Application Format",
+              hi: "वाहिद-जमा, मुताज़ाद, मुहावरे और दरख़्वास्त लेखन",
+              ur: "واحد جمع، متضاد، محاورے، ضرب الامثال اور درخواست نویسی",
+            },
+            keyConcepts: [
+              "Ism-e-Marfa (Proper Noun) vs Ism-e-Nakra (Common Noun)",
+              "Wahid-Jama (Singular/Plural) and Muzakkar-Muannas (Gender agreement rules)",
+              "Mutazad Alfaz (Antonyms) and Muhavare usage in meaningful sentences",
+              "Formal Darkhwast (Application to Principal) and Khutoot Nigari structure"
+            ],
+            vviPoints: [
+              "Grammar (Qawaid) accounts for 20-25 marks in BSEB OMR Objective section; Essay (Mazmoon) carries 8 marks and Application (Darkhwast) carries 5 marks"
+            ],
+            summaryNote: "Consistent daily practice of Wahid-Jama, Mutazad, and Muhavare combined with clean Darkhwast formatting ensures 90%+ scoring in Urdu.",
+            bookReference: "SCERT Bihar Urdu Qawaid & Composition",
+            formulasOrRules: [
+              "Darkhwast Structure: Ba-khidmat Janab Principal -> Mauzoo (Subject) -> Adab-o-Guzarish -> Ikhtitam & Tareekh"
+            ],
+            difficulty: "Easy",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
           },
         ],
       },
@@ -2169,7 +2408,7 @@ export const CLASS12_SCIENCE_CURRICULUM: CurriculumSubject[] = [
             id: "top-c12-m-1-1",
             name: "Matrix Inversion Method and Equivalence Relations",
             keyConcepts: ["Proving equivalence relation", "Bijective function condition", "Adjoint properties: A(adj A) = |A| I", "Solving AX = B using X = A⁻¹B"],
-            vviPoints: ["Guaranteed 5-mark question on solving 3x3 system of linear equations using matrix method"],
+            vviPoints: ["Application-prioritized 5-mark practice on solving 3x3 system of linear equations using matrix method"],
             summaryNote: "A system of linear equations is consistent with unique solution if |A| ≠ 0; inconsistent if |A| = 0 and (adj A)B ≠ 0.",
             bookReference: "NCERT Maths Chapter 3 & 4",
             formulasOrRules: ["A⁻¹ = (1 / |A|) adj(A)", "A · adj(A) = |A| · I", "|adj(A)| = |A|^(n-1)", "X = A⁻¹ · B"],
@@ -2217,7 +2456,7 @@ export const CLASS12_SCIENCE_CURRICULUM: CurriculumSubject[] = [
             id: "top-c12-m-3-1",
             name: "Shortest Distance Between Skew Lines and Bayes' Theorem",
             keyConcepts: ["Shortest distance formula for skew lines", "Coplanarity of two lines", "Bayes' Theorem for posterior probability", "Probability distribution of random variable"],
-            vviPoints: ["Guaranteed 5-mark case study question on Bayes' Theorem in CBSE Class 12 board exam"],
+            vviPoints: ["Application-prioritized case-study practice on Bayes' Theorem and conditional probability"],
             summaryNote: "Bayes' Theorem calculates the conditional probability of an underlying cause given observed event evidence.",
             bookReference: "NCERT Maths Chapter 11 & 13",
             formulasOrRules: [
@@ -2319,9 +2558,9 @@ export const CLASS12_SCIENCE_CURRICULUM: CurriculumSubject[] = [
         title: "Advanced Composition: Notice, Invitations, Letters & Articles",
         priority: "Important",
         notesSummary: "Notice Writing (50 words), Formal and Informal Invitations & Replies (Card and letter formats), Letter to the Editor, Job Application with Bio-data / Resume, Article Writing, Report Writing for school magazine and newspapers.",
-        bookChapterTitle: "CBSE Class 12 English Core Writing Standards",
+        bookChapterTitle: "Senior Secondary Class 12 English Core Writing Standards",
         resourceLinks: [
-          { title: "Invitations & Job Application Official Formats", type: "Formula Sheet", description: "CBSE marking scheme guidelines for all composition questions." },
+          { title: "Invitations & Job Application Standard Formats", type: "Formula Sheet", description: "Structured composition guidelines for notice, invitation, letter, and article writing." },
         ],
         topics: [
           {
@@ -2329,8 +2568,8 @@ export const CLASS12_SCIENCE_CURRICULUM: CurriculumSubject[] = [
             name: "Formal Invitations, Job Applications and Article Layouts",
             keyConcepts: ["Formal card invitation printed layout rules (3rd person, no signatures)", "Job Application covering letter and structured curriculum vitae", "Article writing format with title, byline, introductory paragraph, analytical body, constructive conclusion"],
             vviPoints: ["Formal card invitations must be written in third person without salutations or date at the top"],
-            summaryNote: "Mastery of advanced composition guarantees maximum marks through precise formatting, rich vocabulary, and coherent progression of thought.",
-            bookReference: "CBSE Writing Guidelines",
+            summaryNote: "Mastery of advanced composition builds strong expression through precise formatting, rich vocabulary, and coherent progression of thought.",
+            bookReference: "Senior Secondary English Writing Guidelines",
           },
         ],
       },
@@ -2367,7 +2606,7 @@ export const CLASS12_COMMERCE_CURRICULUM: CurriculumSubject[] = [
             id: "top-c12-acc-1-1",
             name: "Admission, Retirement and Realization Account",
             keyConcepts: ["Sacrificing Ratio = Old Ratio - New Ratio", "Gaining Ratio = New Ratio - Old Ratio", "Revaluation profit/loss distribution in Old Ratio", "Realization Account entries on firm dissolution"],
-            vviPoints: ["Guaranteed 6-mark comprehensive question on Partner Admission / Retirement with Capital Adjustments"],
+            vviPoints: ["Application-prioritized comprehensive practice on Partner Admission / Retirement with Capital Adjustments"],
             summaryNote: "Partnership reconstitution requires revaluing assets and liabilities so that incoming/outgoing partners do not receive unearned gains or unfair burdens.",
             bookReference: "NCERT Accountancy Volume 1",
             formulasOrRules: [
@@ -2414,7 +2653,7 @@ export const CLASS12_COMMERCE_CURRICULUM: CurriculumSubject[] = [
             id: "top-c12-acc-3-1",
             name: "Accounting Ratios and Cash Flow from Operating Activities",
             keyConcepts: ["Current Ratio = Current Assets / Current Liabilities (Ideal 2:1)", "Debt-Equity Ratio = Long Term Debt / Shareholders' Funds (Ideal 2:1)", "Cash Flow Operating Activities: Net Profit before tax adjustments for non-cash/non-operating items and working capital changes"],
-            vviPoints: ["Guaranteed 6-mark question on preparing Cash Flow Statement with asset purchase/sale and provision for tax adjustments"],
+            vviPoints: ["Application-prioritized practice on preparing Cash Flow Statement with asset purchase/sale and provision for tax adjustments"],
             summaryNote: "Cash Flow Statement shows inflows and outflows of cash and cash equivalents, evaluating liquidity, financial flexibility, and operating health.",
             bookReference: "NCERT Analysis of Financial Statements Chapter 4 & 5",
             formulasOrRules: [
@@ -2423,6 +2662,56 @@ export const CLASS12_COMMERCE_CURRICULUM: CurriculumSubject[] = [
               "Inventory Turnover = Cost of Revenue from Operations / Average Inventory",
               "ROI = (Net Profit before Interest and Tax / Capital Employed) × 100"
             ],
+          },
+        ],
+      },
+      {
+        id: "ch-c12-acc-4",
+        chapterNumber: 4,
+        title: "Accounting for Not-for-Profit Organisations (NPO) & Dissolution",
+        localizedTitles: {
+          en: "Accounting for Not-for-Profit Organisations (NPO) & Dissolution",
+          hi: "गैर-लाभकारी संस्थाओं (NPO) का लेखांकन एवं फर्म का विघटन",
+          ur: "غیر منافع بخش تنظیموں (NPO) کا محاسبہ اور شراکت کا خاتمہ",
+          bn: "অলাভজনক সংস্থার হিসাবরক্ষণ (NPO) ও অংশীদারি কারবারের বিলোপসাধন",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 150,
+        examWeightageMarks: 20,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "BSEB & State Board High-Yield Unit: Not-for-Profit Organisations (NPO) — Meaning, Receipts and Payments Account vs Income and Expenditure Account, Treatment of Subscriptions, Consumable items, Endowment Fund, Entrance Fees, Legacy, Life Membership Fees, Preparation of Opening and Closing Balance Sheet. Dissolution of Partnership Firm — Settlement of accounts under Section 48 of Indian Partnership Act 1932, Realisation Account, Partner's Loan Account, Cash/Bank Account.",
+        bookChapterTitle: "SCERT Bihar / NCERT Class 12 Accountancy: NPO & Dissolution",
+        resourceLinks: [
+          { title: "NPO Subscription Calculation & Income-Expenditure Format", type: "Formula Sheet", description: "Adjustment of outstanding and advance subscriptions at beginning and end of year." },
+        ],
+        topics: [
+          {
+            id: "top-c12-acc-4-1",
+            name: "Receipts & Payments vs Income & Expenditure Account and Subscription Account",
+            localizedNames: {
+              en: "Receipts & Payments vs Income & Expenditure and Subscription A/c",
+              hi: "प्राप्ति एवं भुगतान खाता बनाम आय-व्यय खाता और चंदा (Subscription) गणना",
+              ur: "وصولی و ادائیگی کھاتہ بمقابلہ آمدنی و اخراجات کھاتہ اور چندہ کا حساب",
+            },
+            keyConcepts: [
+              "Receipts & Payments A/c is a summary of Cash Book (Real Account, Cash basis)",
+              "Income & Expenditure A/c is equivalent to Profit & Loss A/c (Nominal Account, Accrual basis)",
+              "Subscription income for current year = Received + Closing Outstanding + Opening Advance - Opening Outstanding - Closing Advance",
+              "Capital Receipts (Life Membership Fee, Specific Donation, Legacy) go to Balance Sheet Liabilities"
+            ],
+            vviPoints: [
+              "Application-prioritized focus for BSEB Class 12 Accountancy: NPO (Receipts & Payments vs Income & Expenditure and Subscription numericals; official weightage SOURCE-REQUIRED)"
+            ],
+            summaryNote: "NPO accounting separates capital receipts from revenue income on an accrual basis to determine surplus or deficit for the accounting period.",
+            bookReference: "NCERT Class 12 Accountancy Part-I Chapter 1 (BSEB Compulsory Core)",
+            formulasOrRules: [
+              "Subscription Credited to Income & Expenditure = Total Received + Outstanding (Current Year) - Outstanding (Previous Year) + Advance (Previous Year) - Advance (Current Year)",
+              "Materials Consumed = Opening Stock + Purchases (or Paid + Closing Creditors - Opening Creditors) - Closing Stock"
+            ],
+            difficulty: "Medium",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Numerical", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
           },
         ],
       },
@@ -2581,9 +2870,9 @@ export const CLASS12_COMMERCE_CURRICULUM: CurriculumSubject[] = [
         title: "Advanced Composition: Notices, Invitations, Reports & Articles",
         priority: "Important",
         notesSummary: "Notice Writing (50 words), Formal and Informal Invitations & Replies, Letter to Editor, Job Application with Resume, Article Writing, Report Writing for school magazine and newspapers.",
-        bookChapterTitle: "CBSE Class 12 English Core Writing Standards",
+        bookChapterTitle: "Senior Secondary Class 12 English Core Writing Standards",
         resourceLinks: [
-          { title: "Standard Writing Layouts & Marking Scheme", type: "Formula Sheet", description: "CBSE guidelines for all advanced composition questions." },
+          { title: "Standard Writing Layouts & Composition Guide", type: "Formula Sheet", description: "Structured guidelines for all advanced composition questions." },
         ],
         topics: [
           {
@@ -2592,7 +2881,166 @@ export const CLASS12_COMMERCE_CURRICULUM: CurriculumSubject[] = [
             keyConcepts: ["Card vs Letter format for invitations", "Job Application layout with cover letter and resume", "Article writing format with heading and byline"],
             vviPoints: ["Adherence to prescribed word counts and standard layouts"],
             summaryNote: "Clear written communication demonstrates professional polish, clarity, and precision.",
-            bookReference: "CBSE Writing Guidelines",
+            bookReference: "Senior Secondary English Writing Guidelines",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "sub-c12-comm-urdu",
+    name: "Urdu",
+    code: "URD-303",
+    localizedNames: {
+      en: "Urdu",
+      hi: "उर्दू (Urdu)",
+      ur: "اردو (کہکشاں حصہ دوم)",
+      bn: "উর্দু (Urdu)",
+    },
+    supportedContentLanguages: ["ur", "en", "hi"],
+    stream: "Commerce",
+    classLevel: "Class 12",
+    color: "emerald",
+    iconName: "BookOpen",
+    verificationStatus: "SOURCE-REQUIRED",
+    sourceStatusNote: "SOURCE-REQUIRED: BSEB Intermediate Class 12 Urdu (100 Marks: 50% OMR Objective + 50% Subjective based on SCERT Bihar Kahkashan Part-II & Urdu Qawaid); external official board circular & textbook edition verification required.",
+    chapters: [
+      {
+        id: "ch-c12-urdu-1",
+        chapterNumber: 1,
+        title: "Kahkashan Part-II (Hissa-e-Nasr): Khaka, Inshaiya, Afsana & Khutoot",
+        localizedTitles: {
+          en: "Kahkashan Part-II (Prose): Khaka, Inshaiya, Afsana & Letters",
+          hi: "कहकशाँ भाग-2 (गद्य): खाका, इंशाइया, अफ़साना और ख़ुतूत",
+          ur: "کہکشاں حصہ دوم (نثر): خاکہ، انشائیہ، افسانہ اور خطوط",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 140,
+        examWeightageMarks: 35,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "BSEB Class 12 Urdu Prose (Kahkashan Hissa Dom): Prescribed literary genres including Khaka (e.g., Nazir Ahmad ki Kahani by Farhatullah Beg), Inshaiya (Mitti ka Tel by Khwaja Hasan Nizami, बाज पुराने लफ़्ज़ों की नई तहक़ीक़ by Syed Sulaiman Nadvi, Inshaiya kya hai by Wazir Agha), Afsana (Toba Tek Singh by Saadat Hasan Manto, Bhole Bisre Geet, Ibrahim Sikka by Salam Bin Razzaq), Autobiography/Speech, and Makateeb (Ghubar-e-Khatir letters by Maulana Abul Kalam Azad).",
+        bookChapterTitle: "SCERT Bihar Class 12 Urdu: Kahkashan Part-II (Prose)",
+        resourceLinks: [
+          { title: "Kahkashan Part-II Prose Lessons & Authors Master Table", type: "Quick CheatSheet", description: "Complete mapping of Lesson Title -> Genre (Sinf) -> Author (Musannif) for BSEB OMR." },
+        ],
+        topics: [
+          {
+            id: "top-c12-urdu-1-1",
+            name: "Prescribed Prose Lessons, Authors (Musannifeen) & Markazi Khayal",
+            localizedNames: {
+              en: "Prescribed Prose Lessons, Authors & Central Themes",
+              hi: "निर्धारित गद्य पाठ, मुसन्निफ़ (लेखक) और मरकज़ी ख़याल",
+              ur: "نصاب کے نثری اسباق، مصنفین اور مرکزی خیال",
+            },
+            keyConcepts: [
+              "Mirza Farhatullah Beg — Khaka 'Nazir Ahmad ki Kahani: Kuch Unki Kuch Meri Zubani'",
+              "Khwaja Hasan Nizami ('Mitti ka Tel'), Syed Sulaiman Nadvi, and Wazir Agha ('Inshaiya Kya Hai')",
+              "Saadat Hasan Manto ('Toba Tek Singh' — Partition trauma), Salam Bin Razzaq ('Ibrahim Sikka')",
+              "Maulana Abul Kalam Azad — 'Ghubar-e-Khatir' letters written from Ahmednagar Fort prison"
+            ],
+            vviPoints: [
+              "In BSEB 100-Marks Urdu, matching Lesson Name with Genre (Khaka / Inshaiya / Afsana) and Author Name accounts for 12-15 direct OMR MCQ marks plus a 5-mark Khulasa (Summary) question"
+            ],
+            summaryNote: "Kahkashan Part-II Prose combines classical Indo-Islamic scholarship, humorous character sketches, progressive short fiction, and epistolary masterworks.",
+            bookReference: "SCERT Bihar Kahkashan Part-II (Class 12)",
+            difficulty: "Medium",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
+          },
+        ],
+      },
+      {
+        id: "ch-c12-urdu-2",
+        chapterNumber: 2,
+        title: "Kahkashan Part-II (Hissa-e-Nazm): Nazm, Ghazal, Marsiya & Qasida",
+        localizedTitles: {
+          en: "Kahkashan Part-II (Poetry): Nazm, Ghazal, Marsiya & Qasida",
+          hi: "कहकशाँ भाग-2 (पद्य): नज़्म, ग़ज़ल, मर्सिया और क़सीदा",
+          ur: "کہکشاں حصہ دوم (شاعری): نظم، غزل، مرثیہ اور قصیدہ",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 130,
+        examWeightageMarks: 35,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "BSEB Class 12 Urdu Poetry: Modern and Classical Nazms (Guftagu & Mera Safar by Ali Sardar Jafri, Kheti by Amiq Hanfi, Barq-e-Kalisa by Akbar Allahabadi, Mutashayer by Zafar Kamali), Classical Ghazals (Mirza Ghalib, Yagana Changezi, Khaleel-ur-Rahman Azmi, Ata Kakvi), and Marsiya (Mir Anis). Includes Tashreeh with context (Ba-hawala Siyaq-o-Sabaq) and poetic appreciation.",
+        bookChapterTitle: "SCERT Bihar Class 12 Urdu: Kahkashan Part-II (Poetry)",
+        resourceLinks: [
+          { title: "Ash'ar Tashreeh & Classical Poets Reference Sheet", type: "Quick CheatSheet", description: "Ghalib, Mir Anis, Ali Sardar Jafri, and Akbar Allahabadi key themes." },
+        ],
+        topics: [
+          {
+            id: "top-c12-urdu-2-1",
+            name: "Nazm Khulasa, Ghazal Tashreeh & Marsiya Components (Ajza-e-Tarkeebi)",
+            localizedNames: {
+              en: "Nazm Summary, Ghazal Couplet Analysis & Marsiya Structure",
+              hi: "नज़्म का ख़ुलासा, ग़ज़ल की तशरीह और मर्सिया के अजज़ा-ए-तरकीबी",
+              ur: "نظم کا خلاصہ، غزل کے اشعار کی تشریح اور مرثیہ کے اجزائے ترکیبی",
+            },
+            keyConcepts: [
+              "Marsiya Ajza-e-Tarkeebi: Chehra, Sarapa, Rukhsat, Aamad, Rajaz, Jang, Shahadat, Bain",
+              "Ali Sardar Jafri ('Guftagu' — Indo-Pak peace dialogue), Akbar Allahabadi satirical verse ('Barq-e-Kalisa')",
+              "Mirza Ghalib and Yagana Changezi ghazal diction and philosophical depth",
+              "Writing 4-mark Tashreeh of unseen/seen couplets with poet reference (Hawala)"
+            ],
+            vviPoints: [
+              "Application-prioritized focus on 'Marsiya ke Ajza-e-Tarkeebi' and Central Idea (Markazi Khayal) of a prescribed Nazm (official board weightage SOURCE-REQUIRED)"
+            ],
+            summaryNote: "Urdu poetry evaluation in BSEB tests both objective recall of poet biographies/titles and expressive interpretation of classical couplets.",
+            bookReference: "SCERT Bihar Kahkashan Part-II Poetry Section",
+            difficulty: "Medium",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
+          },
+        ],
+      },
+      {
+        id: "ch-c12-urdu-3",
+        chapterNumber: 3,
+        title: "Urdu Qawaid (Grammar), Mazmoon Nigari, Khutoot & Talkhees",
+        localizedTitles: {
+          en: "Urdu Grammar (Qawaid), Essay, Letter & Precis Writing (Talkhees)",
+          hi: "उर्दू क़वायद (व्याकरण), मज़मून, ख़ुतूत और तल्ख़ीस निगारी",
+          ur: "اردو قواعد، مضمون نگاری، خطوط/درخواست اور تلخیص نگاری",
+        },
+        priority: "VVI",
+        estimatedStudyMinutes: 120,
+        examWeightageMarks: 30,
+        verificationStatus: "SOURCE-REQUIRED",
+        notesSummary: "BSEB Class 12 Urdu Grammar & Applied Writing (30+ Marks): Ism, Sifat, Zameer, Fel, Sabqa & Lahqa (Prefixes & Suffixes), Wahid-Jama, Muzakkar-Muannas, Addad (Mutazad), Mutaradif, Muhavare & Zarb-ul-Amsal. Subjective Writing Section: Mazmoon Nigari (8 Marks Essay on current/educational/cultural topics), Khutoot / Darkhwast Nigari (5 Marks Formal Application or Letter), and Talkhees Nigari (4 Marks Precis writing in one-third length with suitable title).",
+        bookChapterTitle: "BSEB Intermediate Class 12 Urdu Grammar & Composition Blueprint",
+        resourceLinks: [
+          { title: "BSEB Urdu 100-Marks Paper Blueprint & Talkhees Rules", type: "Formula Sheet", description: "Section A (50 OMR out of 100) + Section B (Mazmoon 8M, Darkhwast 5M, Talkhees 4M, Short Qs 10M, Long Qs 15M, Tashreeh 8M)." },
+        ],
+        topics: [
+          {
+            id: "top-c12-urdu-3-1",
+            name: "Sabqa-Lahqa, Wahid-Jama, Mazmoon (8M), Darkhwast (5M) & Talkhees (4M)",
+            localizedNames: {
+              en: "Prefixes/Suffixes, Grammar, Essay (8M), Application (5M) & Precis (4M)",
+              hi: "साबक़ा-लाहक़ा, क़वायद, मज़मून (8 अंक), दरख़्वास्त (5 अंक) और तल्ख़ीस (4 अंक)",
+              ur: "سابقہ و لاحقہ، قواعد، مضمون نگاری، درخواست اور تلخیص نگاری",
+            },
+            keyConcepts: [
+              "Sabqa (Prefix attached before root word, e.g., Ba-adab, La-jawab) vs Lahqa (Suffix attached after root word, e.g., Aqal-mand, Khidmat-gar)",
+              "Talkhees Nigari (Precis Writing): Condense passage into 1/3rd length in own words with a concise Unwan (Title)",
+              "Mazmoon Nigari (8 Marks): Structured 4-paragraph Urdu essay (Tamheed, Nafs-e-Mazmoon, Dalail/Ash'ar, Khatima)",
+              "Darkhwast Nigari (5 Marks): Formal application to Principal/Authority for fee concession, leave, or certificate"
+            ],
+            vviPoints: [
+              "Application-prioritized focus on Talkhees Nigari, Darkhwast, and Mazmoon Nigari in Class 12 Urdu (official board marks distribution SOURCE-REQUIRED)"
+            ],
+            summaryNote: "High scoring in BSEB Class 12 Urdu combines rapid accuracy in 50 OMR grammar/textbook questions with structured presentation in Mazmoon, Darkhwast, and Talkhees.",
+            bookReference: "BSEB Intermediate Urdu Examination Blueprint",
+            formulasOrRules: [
+              "Talkhees Length = (Total Words of Passage) / 3 + Mandatory Unwan (Title)",
+              "BSEB Paper Pattern = 50 Marks OMR (Attempt 50 of 100) + 50 Marks Descriptive"
+            ],
+            difficulty: "Easy",
+            examRelevance: "High-Yield",
+            questionTypes: ["MCQ", "Short Answer", "Long Answer"],
+            verificationStatus: "SOURCE-REQUIRED",
           },
         ],
       },
@@ -2900,12 +3348,20 @@ export const CLASS12_ARTS_CURRICULUM: CurriculumSubject[] = [
 export function normalizeCurriculumBoard(board?: string): BoardType {
   if (!board) return "CBSE";
   const b = board.trim().toUpperCase();
-  if (b === "BSEB" || b.includes("BIHAR")) return "BSEB";
-  if (b === "CBSE" || b.includes("CENTRAL")) return "CBSE";
-  if (b === "ICSE" || b === "ISC" || b.includes("CISCE")) return "ICSE";
-  if (b === "UP BOARD" || b === "UPMSP" || b.includes("UTTAR PRADESH")) return "UP Board";
+  if (b === "BSEB" || b.includes("BSEB") || b.includes("BIHAR")) return "BSEB";
+  if (b === "CBSE" || b.includes("CBSE") || b.includes("CENTRAL")) return "CBSE";
+  if (b === "ICSE" || b === "ISC" || b.includes("ICSE") || b.includes("CISCE")) return "ICSE";
+  if (b === "UP BOARD" || b.includes("UP BOARD") || b.includes("UPMSP") || b.includes("UTTAR PRADESH")) {
+    return "UP Board";
+  }
+  if (b === "MP BOARD" || b.includes("MP BOARD") || b.includes("MPBSE") || b.includes("MADHYA PRADESH")) {
+    return "MP Board";
+  }
+  if (b === "MAHARASHTRA BOARD" || b.includes("MSBSHSE") || b.includes("MAHARASHTRA")) {
+    return "Maharashtra Board";
+  }
   if (b === "STATE BOARD" || b.includes("STATE")) return "State Board";
-  if (b === "NCERT") return "NCERT";
+  if (b === "NCERT" || b.includes("NCERT")) return "NCERT";
   return "Other";
 }
 
@@ -2930,15 +3386,1517 @@ export function normalizeCurriculumStream(
   return "Science";
 }
 
+const DEFAULT_SUBJECT_LOCALIZED_NAMES: Record<string, Partial<Record<AcademicContentLanguageCode, string>>> = {
+  Accountancy: {
+    en: "Accountancy",
+    hi: "लेखाशास्त्र (Accountancy)",
+    ur: "محاسبہ (Accountancy)",
+    bn: "হিসাবশাস্ত্র (Accountancy)",
+  },
+  "Business Studies": {
+    en: "Business Studies",
+    hi: "व्यवसाय अध्ययन (Business Studies)",
+    ur: "کاروباری مطالعہ (Business Studies)",
+    bn: "ব্যবসায় শিক্ষা (Business Studies)",
+  },
+  Economics: {
+    en: "Economics",
+    hi: "अर्थशास्त्र (Economics)",
+    ur: "معاشیات (Economics)",
+    bn: "অর্থনীতি (Economics)",
+  },
+  "English Core": {
+    en: "English Core",
+    hi: "अंग्रेज़ी (English Core)",
+    ur: "انگریزی (English Core)",
+    bn: "ইংরেজি (English Core)",
+  },
+  English: {
+    en: "English",
+    hi: "अंग्रेज़ी (English)",
+    ur: "انگریزی (English)",
+    bn: "ইংরেজি (English)",
+  },
+  Urdu: {
+    en: "Urdu",
+    hi: "उर्दू (Urdu)",
+    ur: "اردو (Urdu)",
+    bn: "উর্দু (Urdu)",
+  },
+  Physics: {
+    en: "Physics",
+    hi: "भौतिक विज्ञान (Physics)",
+    ur: "طبیعیات (Physics)",
+    bn: "পদার্থবিজ্ঞান (Physics)",
+  },
+  Chemistry: {
+    en: "Chemistry",
+    hi: "रसायन विज्ञान (Chemistry)",
+    ur: "کیمیا (Chemistry)",
+    bn: "রসায়ন (Chemistry)",
+  },
+  Mathematics: {
+    en: "Mathematics",
+    hi: "गणित (Mathematics)",
+    ur: "ریاضی (Mathematics)",
+    bn: "গণিত (Mathematics)",
+  },
+  Biology: {
+    en: "Biology",
+    hi: "जीव विज्ञान (Biology)",
+    ur: "حیاتیات (Biology)",
+    bn: "জীববিজ্ঞান (Biology)",
+  },
+  History: {
+    en: "History",
+    hi: "इतिहास (History)",
+    ur: "تاریخ (History)",
+    bn: "ইতিহাস (History)",
+  },
+  "Political Science": {
+    en: "Political Science",
+    hi: "राजनीति विज्ञान (Political Science)",
+    ur: "سیاسیات (Political Science)",
+    bn: "রাষ্ট্রবিজ্ঞান (Political Science)",
+  },
+  Geography: {
+    en: "Geography",
+    hi: "भूगोल (Geography)",
+    ur: "جغرافیہ (Geography)",
+    bn: "ভূগোল (Geography)",
+  },
+  Sociology: {
+    en: "Sociology",
+    hi: "समाजशास्त्र (Sociology)",
+    ur: "عمرانیات (Sociology)",
+    bn: "সমাজতত্ত্ব (Sociology)",
+  },
+};
+
+export function getLocalizedSubjectName(
+  subject: Pick<CurriculumSubject, "name" | "localizedNames">,
+  lang: AcademicContentLanguageCode | string = "en"
+): string {
+  const code = (lang || "en").toLowerCase() as AcademicContentLanguageCode;
+  if (subject.localizedNames?.[code]) return subject.localizedNames[code]!;
+  const fallbackMap = DEFAULT_SUBJECT_LOCALIZED_NAMES[subject.name];
+  if (fallbackMap?.[code]) return fallbackMap[code]!;
+  return subject.name;
+}
+
+export function getLocalizedChapterTitle(
+  chapter: Pick<CurriculumChapter, "title" | "localizedTitles">,
+  lang: AcademicContentLanguageCode | string = "en"
+): string {
+  const code = (lang || "en").toLowerCase() as AcademicContentLanguageCode;
+  return chapter.localizedTitles?.[code] || chapter.title;
+}
+
+export function getLocalizedTopicName(
+  topic: Pick<CurriculumTopic, "name" | "localizedNames">,
+  lang: AcademicContentLanguageCode | string = "en"
+): string {
+  const code = (lang || "en").toLowerCase() as AcademicContentLanguageCode;
+  return topic.localizedNames?.[code] || topic.name;
+}
+
+export const AUTHORITATIVE_CURRICULUM_AUTHORITIES: CurriculumSourceAuthority[] = [
+  "BSEB",
+  "SCERT_BIHAR",
+  "BSTBPC",
+  "CBSE",
+  "NCERT",
+  "CISCE",
+  "UPMSP",
+  "MPBSE",
+  "MSBSHSE",
+  "STATE_BOARD",
+];
+
+export const AUTHORITATIVE_DOCUMENT_TYPES: CurriculumDocumentType[] = [
+  "BOARD_NOTIFICATION",
+  "SCERT_DOCUMENT",
+  "BOARD_SYLLABUS_PDF",
+  "OFFICIAL_TEXTBOOK",
+  "EXAM_BLUEPRINT",
+  "QUESTION_PAPER_ARCHIVE",
+];
+
+export const VALID_VERIFICATION_STATUSES: CurriculumVerificationStatus[] = [
+  "VERIFIED",
+  "PARTIALLY-VERIFIED",
+  "SOURCE-REQUIRED",
+  "SOURCE-CONFLICT",
+  "OUTDATED",
+  "NOT VERIFIED",
+];
+
+export function normalizeVerificationStatus(
+  status?: unknown,
+  fallback: CurriculumVerificationStatus = "SOURCE-REQUIRED"
+): CurriculumVerificationStatus {
+  if (typeof status === "string" && VALID_VERIFICATION_STATUSES.includes(status as CurriculumVerificationStatus)) {
+    return status as CurriculumVerificationStatus;
+  }
+  return fallback;
+}
+
+export const BOARD_ALLOWED_AUTHORITIES: Record<BoardType, CurriculumSourceAuthority[]> = {
+  BSEB: ["BSEB", "SCERT_BIHAR", "BSTBPC"],
+  CBSE: ["CBSE", "NCERT"],
+  ICSE: ["CISCE"],
+  "UP Board": ["UPMSP", "STATE_BOARD"],
+  "MP Board": ["MPBSE", "STATE_BOARD"],
+  "Maharashtra Board": ["MSBSHSE", "STATE_BOARD"],
+  "State Board": ["STATE_BOARD"],
+  NCERT: ["NCERT"],
+  Other: ["STATE_BOARD"],
+};
+
+export const AUTHORITATIVE_OFFICIAL_HOSTS: string[] = [
+  "biharboardonline.bihar.gov.in",
+  "biharboardonline.com",
+  "secondary.biharboardonline.com",
+  "seniorsecondary.biharboardonline.com",
+  "bstbpc.gov.in",
+  "scert.bihar.gov.in",
+  "cbseacademic.nic.in",
+  "cbse.gov.in",
+  "ncert.nic.in",
+  "cisce.org",
+  "upmsp.edu.in",
+  "mpbse.nic.in",
+  "mahahsscboard.in",
+];
+
+const PLACEHOLDER_OR_USER_ID_REGEX =
+  /^(pending|unverified|placeholder|todo|sample|mock|temp|draft|unknown|tbd|none|test|user|custom|student|client|local|fake)([-_\s:]|$)/i;
+
+const UNOFFICIAL_DOC_TITLE_REGEX =
+  /\b(pending|unverified|placeholder|todo|sample|mock|temp|draft|unofficial|coaching|blog|youtube|guess|synthesized|user-generated|custom)\b/i;
+
+const INVALID_LOCATOR_REFERENCE_REGEX =
+  /^(n\/a|na|tbd|todo|pending|unverified|placeholder|sample|mock|temp|draft|unknown|none|null|undefined|fake|test|---|\?+|0|p\.?\s*0|page\s*0)$/i;
+
+const FAKE_LOCATOR_KEYWORD_REGEX =
+  /\b(placeholder|fake|unverified|pending|tbd|todo|mock|guessed|fabricated)\b/i;
+
+export function isValidDocumentSectionLocator(rawRef?: string): boolean {
+  if (!rawRef) return false;
+  const trimmed = rawRef.trim();
+  if (trimmed.length < 2) return false;
+  if (INVALID_LOCATOR_REFERENCE_REGEX.test(trimmed)) return false;
+  if (FAKE_LOCATOR_KEYWORD_REGEX.test(trimmed)) return false;
+  return true;
+}
+
+export function isOfficialBoardSourceUrl(rawUrl?: string): boolean {
+  if (!rawUrl || !rawUrl.trim()) return false;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+      AUTHORITATIVE_OFFICIAL_HOSTS.includes(host) ||
+      host.endsWith(".gov.in") ||
+      host.endsWith(".nic.in")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function validateCurriculumProvenance(
+  input?: Partial<CurriculumSourceProvenance>,
+  targetAcademicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): CurriculumSourceProvenance {
+  const effectiveBoard: BoardType = input?.board ? normalizeCurriculumBoard(input.board) : "Other";
+  const effectiveYear = (input?.academicYear || targetAcademicYear).trim() || DEFAULT_CURRICULUM_ACADEMIC_YEAR;
+  const baseAuthority: CurriculumSourceAuthority =
+    input?.authority && AUTHORITATIVE_CURRICULUM_AUTHORITIES.includes(input.authority)
+      ? input.authority
+      : "UNVERIFIED";
+  const baseDocType: CurriculumDocumentType =
+    input?.documentType && AUTHORITATIVE_DOCUMENT_TYPES.includes(input.documentType)
+      ? input.documentType
+      : "PENDING_OFFICIAL_SOURCE";
+  const baseDocTitle = (input?.documentTitle || "").trim();
+  const normalizedInputStatus = normalizeVerificationStatus(input?.verificationStatus, "SOURCE-REQUIRED");
+
+  // 1. Conflict handling (Section 14): never silently resolve conflicts
+  if (
+    normalizedInputStatus === "SOURCE-CONFLICT" ||
+    Boolean(
+      input?.conflictDetails &&
+        input.conflictDetails.sourceA?.trim() &&
+        input.conflictDetails.sourceB?.trim() &&
+        input.conflictDetails.conflictDescription?.trim()
+    )
+  ) {
+    const conflict: CurriculumSourceConflict = input?.conflictDetails || {
+      sourceA: "Source A (unspecified)",
+      sourceB: "Source B (unspecified)",
+      conflictDescription: "Unresolved discrepancy between curriculum sources.",
+      academicYear: effectiveYear,
+      recommendedReviewAction: "Attach primary board circular for target academic year to resolve conflict.",
+    };
+    return {
+      sourceId: input?.sourceId || `conflict-${effectiveBoard.toLowerCase().replace(/\s+/g, "-")}-${effectiveYear}`,
+      authority: baseAuthority,
+      board: effectiveBoard,
+      classLevel: input?.classLevel,
+      stream: input?.stream,
+      subject: input?.subject,
+      academicYear: effectiveYear,
+      resourceAcademicYear: input?.resourceAcademicYear,
+      applicableAcademicYears: input?.applicableAcademicYears,
+      documentTitle: baseDocTitle || `Conflicting Sources (${conflict.sourceA} vs ${conflict.sourceB})`,
+      documentType: baseDocType,
+      sourceUrl: input?.sourceUrl,
+      publicationDate: input?.publicationDate,
+      accessedDate: input?.accessedDate,
+      pageReference: input?.pageReference,
+      chapterReference: input?.chapterReference,
+      verificationStatus: "SOURCE-CONFLICT",
+      evidenceStage: "SOURCE-CONFLICT",
+      textbookApplicabilityStatus: input?.textbookApplicabilityStatus || "SOURCE-REQUIRED",
+      officialResourceConfirmed: Boolean(input?.officialResourceConfirmed),
+      curriculumContentSupported: Boolean(input?.curriculumContentSupported),
+      currentYearApplicabilityProven: false,
+      officialSyllabusDocumentFound: Boolean(input?.officialSyllabusDocumentFound),
+      officialExamBlueprintFound: Boolean(input?.officialExamBlueprintFound),
+      supportingResources: input?.supportingResources,
+      partialEvidenceSummary: input?.partialEvidenceSummary,
+      verificationNotes:
+        input?.verificationNotes ||
+        `SOURCE-CONFLICT: ${conflict.conflictDescription} Recommended action: ${conflict.recommendedReviewAction}`,
+      conflictDetails: conflict,
+    };
+  }
+
+  // 2. Outdated source handling (Section 15): older academic year without explicit applicability rule
+  const isYearApplicable =
+    effectiveYear === targetAcademicYear ||
+    Boolean(input?.applicableAcademicYears?.includes(targetAcademicYear));
+
+  if (input?.academicYear && !isYearApplicable) {
+    return {
+      sourceId: input.sourceId || `outdated-${effectiveBoard.toLowerCase().replace(/\s+/g, "-")}-${effectiveYear}`,
+      authority: baseAuthority,
+      board: effectiveBoard,
+      classLevel: input.classLevel,
+      stream: input.stream,
+      subject: input.subject,
+      academicYear: effectiveYear,
+      resourceAcademicYear: input.resourceAcademicYear || effectiveYear,
+      applicableAcademicYears: input.applicableAcademicYears,
+      documentTitle: baseDocTitle || `Historical ${effectiveBoard} Syllabus (${effectiveYear})`,
+      documentType: baseDocType,
+      sourceUrl: input.sourceUrl,
+      publicationDate: input.publicationDate,
+      accessedDate: input.accessedDate,
+      pageReference: input.pageReference,
+      chapterReference: input.chapterReference,
+      verificationStatus: "OUTDATED",
+      evidenceStage: "OUTDATED",
+      textbookApplicabilityStatus: "OUTDATED",
+      officialResourceConfirmed: Boolean(input.officialResourceConfirmed),
+      curriculumContentSupported: Boolean(input.curriculumContentSupported),
+      currentYearApplicabilityProven: false,
+      officialSyllabusDocumentFound: Boolean(input.officialSyllabusDocumentFound),
+      officialExamBlueprintFound: Boolean(input.officialExamBlueprintFound),
+      supportingResources: input.supportingResources,
+      partialEvidenceSummary: input.partialEvidenceSummary,
+      verificationNotes:
+        input.verificationNotes ||
+        `OUTDATED: Source belongs to academic year ${effectiveYear} and has no applicability rule for ${targetAcademicYear}.`,
+    };
+  }
+
+  // 3. Strict VERIFIED gate (Sections 2, 3, 4, 5, 6, 7, 16):
+  // - Rejects empty/placeholder/user-generated sourceIds
+  // - Requires authority to match board's allowed official authorities
+  // - Requires official document type and non-unofficial document title
+  // - Requires explicit valid pageReference or chapterReference (fake/placeholder references rejected; sourceUrl alone CANNOT establish VERIFIED)
+  // - If sourceUrl is provided, it must be an official HTTPS board/government domain
+  // - If resourceAcademicYear differs from targetAcademicYear or currentYearApplicabilityProven === false, CANNOT upgrade to VERIFIED
+  const rawSourceId = (input?.sourceId || "").trim();
+  const hasValidSourceId =
+    rawSourceId.length > 5 && !PLACEHOLDER_OR_USER_ID_REGEX.test(rawSourceId);
+  const allowedBoardAuthorities = BOARD_ALLOWED_AUTHORITIES[effectiveBoard] || [];
+  const hasAuthoritativeBody =
+    AUTHORITATIVE_CURRICULUM_AUTHORITIES.includes(baseAuthority) &&
+    allowedBoardAuthorities.includes(baseAuthority);
+  const hasAuthoritativeDocType = AUTHORITATIVE_DOCUMENT_TYPES.includes(baseDocType);
+  const hasValidDocTitle =
+    baseDocTitle.length > 5 && !UNOFFICIAL_DOC_TITLE_REGEX.test(baseDocTitle);
+  const hasExplicitDocumentSectionLocator =
+    isValidDocumentSectionLocator(input?.pageReference) ||
+    isValidDocumentSectionLocator(input?.chapterReference);
+  const hasValidUrlIfProvided = input?.sourceUrl?.trim()
+    ? isOfficialBoardSourceUrl(input.sourceUrl)
+    : true;
+  const hasUnprovenResourceYear =
+    input?.currentYearApplicabilityProven === false ||
+    Boolean(
+      input?.resourceAcademicYear &&
+        input.resourceAcademicYear.trim() !== targetAcademicYear &&
+        input?.currentYearApplicabilityProven !== true
+    );
+
+  if (
+    normalizedInputStatus === "VERIFIED" &&
+    effectiveBoard !== "Other" &&
+    hasValidSourceId &&
+    hasAuthoritativeBody &&
+    hasAuthoritativeDocType &&
+    hasValidDocTitle &&
+    hasExplicitDocumentSectionLocator &&
+    hasValidUrlIfProvided &&
+    isYearApplicable &&
+    !hasUnprovenResourceYear
+  ) {
+    return {
+      sourceId: rawSourceId,
+      authority: baseAuthority,
+      board: effectiveBoard,
+      classLevel: input!.classLevel,
+      stream: input!.stream,
+      subject: input!.subject,
+      academicYear: effectiveYear,
+      resourceAcademicYear: input!.resourceAcademicYear || effectiveYear,
+      applicableAcademicYears: input!.applicableAcademicYears,
+      documentTitle: baseDocTitle,
+      documentType: baseDocType,
+      sourceUrl: input!.sourceUrl,
+      publicationDate: input!.publicationDate,
+      accessedDate: input!.accessedDate,
+      pageReference: input!.pageReference,
+      chapterReference: input!.chapterReference,
+      verificationStatus: "VERIFIED",
+      evidenceStage: "CURRENT_YEAR_VERIFIED",
+      textbookApplicabilityStatus: "CURRENT_YEAR_VERIFIED",
+      officialResourceConfirmed: true,
+      curriculumContentSupported: true,
+      currentYearApplicabilityProven: true,
+      officialSyllabusDocumentFound: input!.officialSyllabusDocumentFound ?? true,
+      officialExamBlueprintFound: Boolean(input!.officialExamBlueprintFound),
+      supportingResources: input!.supportingResources,
+      partialEvidenceSummary: input!.partialEvidenceSummary,
+      verificationNotes:
+        input!.verificationNotes ||
+        `VERIFIED against ${baseDocTitle} (${baseAuthority}, Academic Year ${effectiveYear}).`,
+    };
+  }
+
+  if (
+    normalizedInputStatus === "PARTIALLY-VERIFIED" &&
+    effectiveBoard !== "Other" &&
+    hasValidSourceId &&
+    hasAuthoritativeBody &&
+    hasAuthoritativeDocType &&
+    hasValidDocTitle &&
+    hasValidUrlIfProvided &&
+    isYearApplicable &&
+    !hasUnprovenResourceYear
+  ) {
+    return {
+      sourceId: rawSourceId,
+      authority: baseAuthority,
+      board: effectiveBoard,
+      classLevel: input!.classLevel,
+      stream: input!.stream,
+      subject: input!.subject,
+      academicYear: effectiveYear,
+      resourceAcademicYear: input!.resourceAcademicYear || effectiveYear,
+      applicableAcademicYears: input!.applicableAcademicYears,
+      documentTitle: baseDocTitle,
+      documentType: baseDocType,
+      sourceUrl: input!.sourceUrl,
+      publicationDate: input!.publicationDate,
+      accessedDate: input!.accessedDate,
+      pageReference: input!.pageReference,
+      chapterReference: input!.chapterReference,
+      verificationStatus: "PARTIALLY-VERIFIED",
+      evidenceStage: hasExplicitDocumentSectionLocator
+        ? "CURRICULUM_CONTENT_SUPPORTED"
+        : "OFFICIAL_RESOURCE_CONFIRMED",
+      textbookApplicabilityStatus:
+        input!.textbookApplicabilityStatus || "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+      officialResourceConfirmed: true,
+      curriculumContentSupported: Boolean(
+        input!.curriculumContentSupported ?? hasExplicitDocumentSectionLocator
+      ),
+      currentYearApplicabilityProven: Boolean(input!.currentYearApplicabilityProven),
+      officialSyllabusDocumentFound: Boolean(input!.officialSyllabusDocumentFound),
+      officialExamBlueprintFound: Boolean(input!.officialExamBlueprintFound),
+      supportingResources: input!.supportingResources,
+      partialEvidenceSummary: input!.partialEvidenceSummary,
+      verificationNotes:
+        input!.verificationNotes ||
+        `PARTIALLY-VERIFIED: ${baseDocTitle} referenced; full chapter/page circular verification pending.`,
+    };
+  }
+
+  // 4. Official Resource Evidence Preserved WITHOUT Upgrading to VERIFIED (Sections 1, 6, 7, 16, 17):
+  // When an authoritative SCERT/BSTBPC/Board resource exists (valid sourceId, valid authority, valid docType, valid docTitle, and valid official HTTPS URL),
+  // record OFFICIAL_RESOURCE_CONFIRMED or CURRICULUM_CONTENT_SUPPORTED while keeping verificationStatus === "SOURCE-REQUIRED"
+  // whenever 2026-27 applicability or required locators are not yet established.
+  const hasConfirmedOfficialResource =
+    effectiveBoard !== "Other" &&
+    hasValidSourceId &&
+    hasAuthoritativeBody &&
+    hasAuthoritativeDocType &&
+    hasValidDocTitle &&
+    Boolean(input?.sourceUrl?.trim()) &&
+    hasValidUrlIfProvided &&
+    input?.officialResourceConfirmed !== false;
+
+  if (hasConfirmedOfficialResource) {
+    const contentSupported = Boolean(
+      input?.curriculumContentSupported && hasExplicitDocumentSectionLocator
+    );
+    const evidenceStage: CurriculumEvidenceStage = contentSupported
+      ? "CURRICULUM_CONTENT_SUPPORTED"
+      : "OFFICIAL_RESOURCE_CONFIRMED";
+    return {
+      sourceId: rawSourceId,
+      authority: baseAuthority,
+      board: effectiveBoard,
+      classLevel: input?.classLevel,
+      stream: input?.stream,
+      subject: input?.subject,
+      academicYear: effectiveYear,
+      resourceAcademicYear: input?.resourceAcademicYear,
+      applicableAcademicYears: input?.applicableAcademicYears,
+      documentTitle: baseDocTitle,
+      documentType: baseDocType,
+      sourceUrl: input?.sourceUrl,
+      publicationDate: input?.publicationDate,
+      accessedDate: input?.accessedDate,
+      pageReference: isValidDocumentSectionLocator(input?.pageReference)
+        ? input?.pageReference
+        : undefined,
+      chapterReference: isValidDocumentSectionLocator(input?.chapterReference)
+        ? input?.chapterReference
+        : undefined,
+      verificationStatus: "SOURCE-REQUIRED",
+      evidenceStage,
+      textbookApplicabilityStatus:
+        input?.textbookApplicabilityStatus || "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+      officialResourceConfirmed: true,
+      curriculumContentSupported: contentSupported,
+      currentYearApplicabilityProven: false,
+      officialSyllabusDocumentFound: Boolean(input?.officialSyllabusDocumentFound),
+      officialExamBlueprintFound: Boolean(input?.officialExamBlueprintFound),
+      supportingResources: input?.supportingResources,
+      partialEvidenceSummary: input?.partialEvidenceSummary,
+      verificationNotes:
+        input?.verificationNotes ||
+        `SOURCE-REQUIRED (${evidenceStage}): Official ${baseAuthority} resource confirmed (${baseDocTitle}), but explicit ${targetAcademicYear} syllabus applicability notification is required before marking VERIFIED.`,
+    };
+  }
+
+  // 5. Fallback: SOURCE-REQUIRED (no verified official resource or failed validation)
+  return {
+    sourceId:
+      input?.sourceId && !input.sourceId.startsWith("verified-")
+        ? input.sourceId
+        : `pending-${effectiveBoard.toLowerCase().replace(/\s+/g, "-")}-${(input?.classLevel || "all")
+            .toString()
+            .toLowerCase()
+            .replace(/\s+/g, "")}-${(input?.subject || "general")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")}-${effectiveYear}`,
+    authority: "UNVERIFIED",
+    board: effectiveBoard,
+    classLevel: input?.classLevel,
+    stream: input?.stream,
+    subject: input?.subject,
+    academicYear: effectiveYear,
+    resourceAcademicYear: input?.resourceAcademicYear,
+    applicableAcademicYears: input?.applicableAcademicYears,
+    documentTitle:
+      baseDocTitle ||
+      `Pending Official ${effectiveBoard} Syllabus / Textbook Notification (${effectiveYear})`,
+    documentType: "PENDING_OFFICIAL_SOURCE",
+    sourceUrl: input?.sourceUrl,
+    publicationDate: input?.publicationDate,
+    accessedDate: input?.accessedDate,
+    pageReference: isValidDocumentSectionLocator(input?.pageReference)
+      ? input?.pageReference
+      : undefined,
+    chapterReference: isValidDocumentSectionLocator(input?.chapterReference)
+      ? input?.chapterReference
+      : undefined,
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "SOURCE-REQUIRED",
+    textbookApplicabilityStatus: input?.textbookApplicabilityStatus || "SOURCE-REQUIRED",
+    officialResourceConfirmed: false,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: input?.supportingResources,
+    partialEvidenceSummary: input?.partialEvidenceSummary,
+    verificationNotes:
+      input?.verificationNotes ||
+      `SOURCE-REQUIRED: Official ${effectiveBoard} syllabus circular, textbook edition index, and exam marking blueprint for ${effectiveYear} must be attached before marking VERIFIED.`,
+  };
+}
+
+export function createCurriculumSourceConflict(params: {
+  board: BoardType | string;
+  classLevel?: string;
+  stream?: StreamType;
+  subject?: string;
+  academicYear?: string;
+  sourceA: string;
+  sourceB: string;
+  conflictDescription: string;
+  recommendedReviewAction: string;
+}): CurriculumSourceProvenance {
+  const normalizedBoard = normalizeCurriculumBoard(params.board);
+  const year = params.academicYear || DEFAULT_CURRICULUM_ACADEMIC_YEAR;
+  return validateCurriculumProvenance(
+    {
+      board: normalizedBoard,
+      classLevel: params.classLevel,
+      stream: params.stream,
+      subject: params.subject,
+      academicYear: year,
+      verificationStatus: "SOURCE-CONFLICT",
+      conflictDetails: {
+        sourceA: params.sourceA,
+        sourceB: params.sourceB,
+        conflictDescription: params.conflictDescription,
+        academicYear: year,
+        recommendedReviewAction: params.recommendedReviewAction,
+      },
+    },
+    year
+  );
+}
+
+const CUSTOM_PROVENANCE_OVERRIDES: Record<string, CurriculumSourceProvenance> = {};
+
+export function registerCustomCurriculumProvenance(
+  key: string,
+  provenance: Partial<CurriculumSourceProvenance>,
+  targetAcademicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): CurriculumSourceProvenance {
+  const validated = validateCurriculumProvenance(provenance, targetAcademicYear);
+  CUSTOM_PROVENANCE_OVERRIDES[key] = validated;
+  return validated;
+}
+
+export function clearCustomCurriculumProvenance(): void {
+  for (const key of Object.keys(CUSTOM_PROVENANCE_OVERRIDES)) {
+    delete CUSTOM_PROVENANCE_OVERRIDES[key];
+  }
+}
+
+export interface CurriculumSourceAuditEntry {
+  sourceId: string;
+  authority: CurriculumSourceAuthority;
+  board: BoardType;
+  classLevel: string;
+  stream: string;
+  subject: string;
+  academicYear: string;
+  resourceAcademicYear: string;
+  documentTitle: string;
+  documentType: CurriculumDocumentType;
+  sourceUrl: string;
+  publicationDate: string;
+  accessedDate: string;
+  pageReference: string;
+  chapterReference: string;
+  evidenceStage: CurriculumEvidenceStage;
+  textbookApplicabilityStatus: CurriculumTextbookApplicabilityStatus;
+  officialResourceConfirmed: boolean;
+  curriculumContentSupported: boolean;
+  currentYearApplicabilityProven: boolean;
+  officialSyllabusDocumentFound: boolean;
+  officialExamBlueprintFound: boolean;
+  supportingResourceCount: number;
+  previousStatus: CurriculumVerificationStatus;
+  newStatus: CurriculumVerificationStatus;
+  verificationNotes: string;
+}
+
+export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProvenance> = {
+  // BSEB Board-Level Examination Pattern Registry (Separate from Subject Syllabus & Marking Schemes per Section 13)
+  "BSEB::2026-27::EXAM_PATTERN": validateCurriculumProvenance({
+    sourceId: "bseb-inter-exam-pattern-2026-model-evidence",
+    authority: "BSEB",
+    board: "BSEB",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper Instructions & Passing Criteria Circular",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    pageReference: "Cover & Candidate Instructions (pp. 1–2); Passing Criteria Circular (pp. 1–6)",
+    chapterReference:
+      "Section-A: 100 Objective MCQs (attempt any 50 on OMR = 50 Marks); Section-B: 30 Short Answer (attempt any 15 = 30 Marks) + 8 Long Answer (attempt any 4 = 20 Marks); Total = 100 Marks, Time = 3 Hours 15 Minutes",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    supportingResources: [
+      {
+        title: "BSEB Intermediate Examination 2026 Annual Model Question Papers Portal",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/modelpaperinter.html",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "pp. 1–2 across Subject Codes 105, 107/207, 217, 219, 220",
+        proves:
+          "Confirms official BSEB 2026 Intermediate Annual Exam Pattern (100 Marks = 50 OMR Objective [attempt 50 of 100] + 50 Descriptive [15 of 30 Short × 2M + 4 of 8 Long × 5M for Commerce electives]). Does not establish 2026-27 / 2027 cycle applicability.",
+      },
+      {
+        title: "BSEB Passing Criteria Notification (Passing Criteria.pdf)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://biharboardonline.com/files/Passing%20Criteria.pdf",
+        publicationDate: "2020-05-26",
+        resourceAcademicYear: "Standing Regulation",
+        pageReference: "pp. 1–6",
+        proves:
+          "Confirms standing BSEB Intermediate passing criteria (30% qualifying marks in theory, 40% in practical).",
+      },
+      {
+        title: "BSEB Class XI–XII Syllabus 2023-25 and 2024-26 (Class_XI -XII_Syllabus_2023-25_and_2024-26.pdf)",
+        authority: "BSEB",
+        documentType: "BOARD_SYLLABUS_PDF",
+        url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
+        publicationDate: "2024-04-10",
+        resourceAcademicYear: "2023-25 and 2024-26",
+        pageReference: "216 pages (unindexed raster scan)",
+        proves:
+          "Confirms official BSEB Class XI–XII syllabus PDF hosted on biharboardonline.com is explicitly scoped by filename to sessions 2023-25 and 2024-26 (outdated for 2026-27 without an official continuation circular).",
+      },
+    ],
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Intermediate Model Papers (biharboardonline.com/modelpaperinter.html, 2025-11-28) and Passing Criteria circular confirm the 50% OMR (50/100) + 50% Descriptive pattern for the 2026 exam, while the official syllabus PDF on biharboardonline.com is explicitly titled 'Class_XI -XII_Syllabus_2023-25_and_2024-26.pdf'. A 2026-27 / 2027 BSEB notification is still required before marking VERIFIED.",
+  }),
+
+  // =========================================================================
+  // BSEB CLASS 11 COMMERCE — OFFICIAL SCERT BIHAR / BSTBPC / BSEB EVIDENCE
+  // =========================================================================
+  "BSEB::2026-27::Class 11::Commerce::Accountancy": validateCurriculumProvenance({
+    sourceId: "scert-bihar-c11-acc-econtent-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 11",
+    stream: "Commerce",
+    subject: "Accountancy",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    documentTitle:
+      "Accountancy Financial Accountancy Part-II (लेखाशास्त्र - वित्तीय लेखांकन भाग-II) & Accountancy Part-I, Class XI",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl:
+      "https://scert.bihar.gov.in/public/uploads/eresources/All_Lekhashastra_-_Vittiya_Lekhankan_Bhag_II.pdf",
+    publicationDate: "2024-06-25",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: [
+      {
+        title: "Accountancy Financial Accountancy Part-II (Class XI)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/accountancy-financial-accountancy-part-ii-1719308595",
+        publicationDate: "2024-06-25",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XI Financial Accounting Part-II PDF (223.9 MB CMYK raster scan; no extractable text TOC or 2026-27 syllabus notification).",
+      },
+      {
+        title: "Accountancy (Financial Accounting Part-I, Class XI)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/accountancy-1718976835",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XI Financial Accounting Part-I catalog listing and cover; linked external Drive file returns HTTP 404.",
+      },
+      {
+        title: "BSEB Class XI–XII Syllabus 2023-25 and 2024-26 (biharboardonline.com / scert.bihar.gov.in)",
+        authority: "BSEB",
+        documentType: "BOARD_SYLLABUS_PDF",
+        url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
+        publicationDate: "2024-04-10",
+        resourceAcademicYear: "2023-25 and 2024-26",
+        proves:
+          "Confirms the 216-page syllabus scan on biharboardonline.com and scert.bihar.gov.in is explicitly scoped to sessions 2023-25 and 2024-26 and lacks embedded text/OCR.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Introduction to Accounting & Theory Base",
+        "Recording of Transactions & Trial Balance",
+        "Depreciation, Provisions, Reserves & Bills of Exchange",
+        "Financial Statements of Sole Proprietorship",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Accountancy Part-I & Part-II e-resources confirmed on scert.bihar.gov.in (June 2024), while BSEB's hosted syllabus PDF is scoped to 2023-25/2024-26; Part-I PDF link is dead (404), Part-II is an unindexed raster scan, and 2026-27 BSEB syllabus applicability is not proven.",
+  }),
+
+  "BSEB::2026-27::Class 11::Commerce::Business Studies": validateCurriculumProvenance({
+    sourceId: "scert-bihar-c11-bst-econtent-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 11",
+    stream: "Commerce",
+    subject: "Business Studies",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    documentTitle: "Business Studies (व्यवसाय अध्ययन), Class XI (SCERT Bihar e-Resource)",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl: "https://scert.bihar.gov.in/eresources/business-studies-1719293876",
+    publicationDate: "2024-06-25",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: [
+      {
+        title: "Business Studies (Class XI Bilingual Cover & Catalog Record)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/public/uploads/eresources/00~11109_~Vyavsaya_Adhyayan_Cover_Page_1.jpg",
+        publicationDate: "2024-06-25",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XI Business Studies catalog entry and bilingual cover; linked external Drive file returns HTTP 404.",
+      },
+      {
+        title: "BSEB Class XI–XII Syllabus 2023-25 and 2024-26",
+        authority: "BSEB",
+        documentType: "BOARD_SYLLABUS_PDF",
+        url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
+        publicationDate: "2024-04-10",
+        resourceAcademicYear: "2023-25 and 2024-26",
+        proves:
+          "Confirms BSEB's hosted Class XI–XII syllabus PDF covers 2023-25 and 2024-26 sessions (outdated for 2026-27).",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Nature & Purpose of Business and Forms of Organisation",
+        "Public, Private & Global Enterprises and Business Services",
+        "Emerging Modes of Business & Social Responsibility",
+        "Sources of Business Finance, Small Business & Internal Trade",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Business Studies resource identity confirmed on scert.bihar.gov.in (2024-06-25), but internal chapter index is inaccessible (external Drive PDF 404) and 2026-27 BSEB syllabus applicability is not proven.",
+  }),
+
+  "BSEB::2026-27::Class 11::Commerce::Economics": validateCurriculumProvenance({
+    sourceId: "scert-bihar-c11-eco-econtent-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 11",
+    stream: "Commerce",
+    subject: "Economics",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    documentTitle:
+      "Statistics For Economics & Introductory Microeconomics, Class XI (SCERT Bihar e-Resources)",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl:
+      "https://scert.bihar.gov.in/public/uploads/eresources/Statistics_Class-11_all_pages.pdf",
+    publicationDate: "2024-06-21",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: [
+      {
+        title: "Statistics For Economics (Class XI)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/statistics-for-economics-1718977443",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XI Statistics for Economics PDF (200.5 MB CMYK raster scan).",
+      },
+      {
+        title: "Introductory Microeconomics (Cataloged under Class XI on SCERT Bihar)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/introductory-microeconomics-1718972784",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Introductory Microeconomics PDF (204.3 MB CMYK raster scan); whereas BSEB's 2026 Class XII I.Com. Economics Model Paper (219_Economics.pdf) tests Microeconomics in Class XII, creating a class-mapping ambiguity with Indian Economic Development.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [
+        "Introductory Microeconomics vs Indian Economic Development class-level assignment between SCERT Bihar e-Resources catalog (Microeconomics tagged Class XI, Indian Economic Development tagged Class XII) and BSEB I.Com. Class XII Model Paper 219_Economics.pdf (which tests Microeconomics + Macroeconomics in Class XII)",
+      ],
+      sourceRequiredChapters: [
+        "Statistics for Economics: Collection, Organisation & Presentation",
+        "Statistical Tools: Central Tendency, Dispersion, Correlation & Index Numbers",
+        "Consumer's Equilibrium & Demand",
+        "Producer Behaviour, Supply & Forms of Market",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Statistics for Economics and Introductory Microeconomics PDFs confirmed (2024-06-21), but both are unindexed CMYK raster scans and official 2026-27 BSEB Class 11 Economics paper mapping (Statistics + Indian Economic Development vs Statistics + Microeconomics) is not proven.",
+  }),
+
+  "BSEB::2026-27::Class 11::Commerce::English Core": validateCurriculumProvenance({
+    sourceId: "pending-bseb-c11-comm-eng-2026-27",
+    board: "BSEB",
+    classLevel: "Class 11",
+    stream: "Commerce",
+    subject: "English Core",
+    academicYear: "2026-27",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "SOURCE-REQUIRED",
+    textbookApplicabilityStatus: "SOURCE-REQUIRED",
+    officialResourceConfirmed: false,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Rainbow Part-I Prose & Poetry (BSEB Core)",
+        "Grammar, Reading Comprehension & Advanced Writing Skills",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources hosts only Class IX/X Panorama English Reader and does not host Class XI Rainbow Part-I; BSTBPC Class XI portal (bstbpc.gov.in/ClassXIth.aspx) returns HTTP 500; biharboardonline.com does not publish Class XI model papers.",
+  }),
+
+  "BSEB::2026-27::Class 11::Commerce::Urdu": validateCurriculumProvenance({
+    sourceId: "pending-bseb-c11-comm-urdu-2026-27",
+    board: "BSEB",
+    classLevel: "Class 11",
+    stream: "Commerce",
+    subject: "Urdu",
+    academicYear: "2026-27",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "SOURCE-REQUIRED",
+    textbookApplicabilityStatus: "SOURCE-REQUIRED",
+    officialResourceConfirmed: false,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Kahkashan Part-I (Hissa-e-Nasr & Hissa-e-Nazm)",
+        "Urdu Qawaid (Grammar), Mazmoon & Khutoot Nigari",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources hosts only primary/middle Urdu books (Gulshan-e-Urdu, Firozan) and does not host Class XI Kahkashan Part-I; BSTBPC Class XI portal returns HTTP 500; biharboardonline.com does not publish Class XI model papers.",
+  }),
+
+  // =========================================================================
+  // BSEB CLASS 12 COMMERCE — OFFICIAL SCERT BIHAR / BSTBPC / BSEB EVIDENCE
+  // =========================================================================
+  "BSEB::2026-27::Class 12::Commerce::Accountancy": validateCurriculumProvenance({
+    sourceId: "scert-bstbpc-c12-acc-part1-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Accountancy",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024-25",
+    documentTitle:
+      "Accountancy – Partnership Accounts (लेखाशास्त्र – साझेदारी खाते), Textbook for Class XII (Bilingual, BSTBPC Patna)",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl: "https://scert.bihar.gov.in/public/uploads/eresources/Accountancy-XII.pdf",
+    publicationDate: "2024-06-21",
+    accessedDate: "2026-10-02",
+    pageReference:
+      "Title Page (pp. i–iv), Rationalisation Note (p. v), Contents (p. ix / PDF pp. 7–8), Chapters 1–4 (pp. 1–167)",
+    chapterReference:
+      "Ch 1: Accounting for Partnership: Basic Concepts (pp. 1–48); Ch 2: Reconstitution – Admission of a Partner (pp. 49–109); Ch 3: Reconstitution – Retirement/Death of a Partner (pp. 110–162); Ch 4: Dissolution of Partnership Firm (pp. 163–167)",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    supportingResources: [
+      {
+        title:
+          "Accountancy – Partnership Accounts, Textbook for Class XII (Bilingual, First Edition March 2024, Free Distribution 2024-25)",
+        authority: "BSTBPC",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/accountancy-xii-1718963622",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024-25",
+        pageReference: "Contents (p. ix), Chapters 1–4 (pp. 1–167)",
+        chapterReference:
+          "Ch 1 Basic Concepts (1.1–1.7), Ch 2 Admission (2.1–2.9), Ch 3 Retirement/Death (3.1–3.9), Ch 4 Dissolution (4.1–4.4)",
+        proves:
+          "Directly verifies official BSTBPC/SCERT Bihar Class XII Accountancy Part-I Partnership chapters and topics. Shows NPO was omitted in the 2024 rationalised textbook (p. v) and explicitly prints 'Free Distribution-2024-25' (p. 2), so it does NOT prove 2026-27 BSEB exam syllabus verification.",
+      },
+      {
+        title:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Accountancy (Elective, I.Com., Subject Code 220)",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "pp. 1–37 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 32–37)",
+        chapterReference:
+          "Tests Not-for-Profit Organisation (Q3, Q4, Section-B Q7, Q30, Q33), Partnership (Basic Concepts, Goodwill, Revaluation, Admission, Retirement/Death, Dissolution), and Company Accounts & Financial Statement Analysis (Shares, Debentures, Ratios, Cash Flow)",
+        proves:
+          "Proves that in the 2026 BSEB Intermediate Annual Model Paper (Code 220), BSEB continues to test NPO alongside Partnership and Company Accounts/Financial Analysis despite NPO being omitted from the 2024 rationalised BSTBPC Part-I print textbook (p. v). Also confirms 100-mark exam pattern for 2026, but does not verify 2026-27 syllabus.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [
+        "Partnership Accounting: Fundamentals & Reconstitution (BSTBPC Part-I 2024-25 Ch 1–2, pp. 1–109 & BSEB 2026 Model Paper Code 220)",
+        "Retirement/Death of Partner & Dissolution of Firm (BSTBPC Part-I 2024-25 Ch 3–4, pp. 110–167 & BSEB 2026 Model Paper Code 220)",
+        "Company Accounts (Share Capital, Debentures) & Analysis of Financial Statements / Ratios / Cash Flow (Supported by BSEB 2026 Model Paper Code 220; Part-II textbook PDF not uploaded on SCERT portal)",
+      ],
+      unsupportedOrConflictedChapters: [
+        "Accounting for Not-for-Profit Organisation (NPO): Omitted on p. v of the 2024 rationalised BSTBPC/SCERT Bihar Part-I textbook (Accountancy-XII.pdf), YET actively tested in BSEB's 2026 Intermediate Model Paper (220_Accountancy.pdf: Section-A Q3, Q4; Section-B Q7, Q30, Q33)",
+      ],
+      sourceRequiredChapters: [
+        "All Class 12 Accountancy chapters require an official 2026-27 BSEB syllabus circular to confirm 2026-27 applicability and resolve the NPO textbook-vs-exam discrepancy",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSTBPC/SCERT Bihar Class XII Accountancy Part-I Bilingual textbook (March 2024, Free Distribution 2024-25) directly supports Partnership chapters (Ch 1–4, pp. 1–167), while BSEB's 2026 Model Paper (220_Accountancy.pdf) supports Company Accounts/Ratios/Cash Flow and actively tests NPO despite NPO's omission in the 2024 textbook (p. v). Official 2026-27 BSEB syllabus circular is required before marking VERIFIED.",
+  }),
+
+  "BSEB::2026-27::Class 12::Commerce::Business Studies": validateCurriculumProvenance({
+    sourceId: "scert-bihar-c12-bst-econtent-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Business Studies",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    documentTitle:
+      "Vyavshay Adhayayan Bhag-II (Business Studies Part-II) & Business Studies Part-I, Class XII",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl:
+      "https://scert.bihar.gov.in/public/uploads/eresources/Vyavshay_Adhayayan_Bhag-II_all_pages.pdf",
+    publicationDate: "2024-06-21",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    supportingResources: [
+      {
+        title: "Vyavshay Adhayayan Bhag-II (Class XII Bilingual)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/vyavshay-adhayayan-bhag-ii-1718963319",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XII Business Studies Part-II PDF (280.5 MB CMYK raster scan; no extractable text TOC).",
+      },
+      {
+        title: "Business Studies Part-I (Class XII)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/business-studies-part-i-1719294312",
+        publicationDate: "2024-06-25",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XII Business Studies Part-I catalog entry and cover; linked external Drive file returns HTTP 404.",
+      },
+      {
+        title:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Business Studies (Elective, I.Com., Subject Code 217)",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/files/InterModelPaper/2026/217_Business%20Studies.pdf",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "pp. 1–37 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 33–37)",
+        chapterReference:
+          "Part-A Management Principles & Functions (Nature of Management, Fayol & Taylor, Planning, Organising/Delegation, Staffing, Directing/Motivation/Communication, Controlling) & Part-B Business Finance, Stock Exchange, Marketing & Consumer Protection",
+        proves:
+          "Directly supports 2025-26/2026 exam topic coverage and 100-mark exam structure for BSEB Class XII Business Studies (Code 217), but does not establish 2026-27 syllabus verification.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [
+        "Principles and Functions of Management (Supported by BSEB 2026 Model Paper Code 217, pp. 3–37)",
+        "Organising, Staffing, Directing & Controlling (Supported by BSEB 2026 Model Paper Code 217, pp. 33–37)",
+        "Business Finance, Financial Markets, Marketing & Consumer Protection (Supported by SCERT Part-II raster PDF & BSEB 2026 Model Paper Code 217, pp. 35–37)",
+      ],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "All Class 12 Business Studies chapters require an indexed textbook TOC and official 2026-27 BSEB syllabus circular",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XII Business Studies Part-I (catalog) and Part-II (PDF) confirmed on scert.bihar.gov.in (June 2024), and BSEB 2026 Model Paper (217_Business Studies.pdf) confirms 2026 topic coverage, but Part-I textbook PDF is 404, Part-II is an unindexed raster scan, and 2026-27 BSEB syllabus applicability is not proven.",
+  }),
+
+  "BSEB::2026-27::Class 12::Commerce::Economics": validateCurriculumProvenance({
+    sourceId: "scert-bihar-c12-eco-econtent-2024",
+    authority: "SCERT_BIHAR",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Economics",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    documentTitle:
+      "Introductory Macroeconomics & Indian Economic Development, Class XII (SCERT Bihar e-Resources)",
+    documentType: "OFFICIAL_TEXTBOOK",
+    sourceUrl:
+      "https://scert.bihar.gov.in/public/uploads/eresources/01_Macro_Economics_Binder_all_pages.pdf",
+    publicationDate: "2024-06-21",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    textbookApplicabilityStatus: "OFFICIAL_RESOURCE_CONFIRMED_ONLY",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    supportingResources: [
+      {
+        title: "Introductory Macroeconomics (Class XII)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/introductory-macroeconomics-1718966160",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Class XII Introductory Macroeconomics PDF (295.1 MB CMYK raster scan).",
+      },
+      {
+        title: "Indian Economic Development (Cataloged under Class XII on SCERT Bihar)",
+        authority: "SCERT_BIHAR",
+        documentType: "OFFICIAL_TEXTBOOK",
+        url: "https://scert.bihar.gov.in/eresources/indian-economic-development-1718976312",
+        publicationDate: "2024-06-21",
+        resourceAcademicYear: "2024 Upload (Undated for 2026-27)",
+        proves:
+          "Confirms official SCERT Bihar Indian Economic Development PDF (320.1 MB CMYK raster scan) tagged Class XII in SCERT catalog.",
+      },
+      {
+        title:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Economics (Elective, I.Com., Subject Code 219)",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/files/InterModelPaper/2026/219_Economics.pdf",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "pp. 1–36 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 33–36)",
+        chapterReference:
+          "Part-A Introductory Microeconomics (Scarcity, PPC, Central Problems, Gossen's Law, Equimarginal Utility, Elasticity, Market Equilibrium) & Part-B Introductory Macroeconomics (Depreciation, MPC/MPS, RBI & Banking, Government Budget, Balance of Payments)",
+        proves:
+          "Proves that BSEB I.Com. Class XII Economics (Subject Code 219) in the 2026 Annual Model Paper examines Introductory Microeconomics + Introductory Macroeconomics, whereas SCERT Bihar's e-Resources portal catalogs Indian Economic Development under Class XII and Microeconomics under Class XI.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [
+        "National Income, Money & Banking, Government Budget & Balance of Payments (Supported by SCERT Macroeconomics PDF & BSEB 2026 Model Paper Code 219)",
+      ],
+      unsupportedOrConflictedChapters: [
+        "Part-B Paper Mapping Discrepancy: SCERT Bihar e-Resources tags Indian Economic Development under Class XII (and Introductory Microeconomics under Class XI), whereas BSEB's 2026 Intermediate I.Com. Economics Model Paper (219_Economics.pdf) tests Introductory Microeconomics + Introductory Macroeconomics in Class XII",
+      ],
+      sourceRequiredChapters: [
+        "All Class 12 Economics chapters require an official 2026-27 BSEB syllabus circular to confirm 2026-27 applicability and Part-A/Part-B paper mapping",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Introductory Macroeconomics and Indian Economic Development PDFs confirmed (2024-06-21), while BSEB's 2026 I.Com. Economics Model Paper (219_Economics.pdf) tests Introductory Microeconomics + Introductory Macroeconomics. Official 2026-27 BSEB Intermediate Economics syllabus circular is required before marking VERIFIED.",
+  }),
+
+  "BSEB::2026-27::Class 12::Commerce::English Core": validateCurriculumProvenance({
+    sourceId: "pending-bseb-c12-comm-eng-2026-27",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "English Core",
+    academicYear: "2026-27",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "SOURCE-REQUIRED",
+    textbookApplicabilityStatus: "SOURCE-REQUIRED",
+    officialResourceConfirmed: false,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: [
+      {
+        title:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – English (Compulsory, Subject Code 105/205/305)",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/files/InterModelPaper/2026/105_English.pdf",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "pp. 1–29 (Section-A Q1–60 Grammar, Q61–100 Literature; Section-B Q1–7 Descriptive)",
+        chapterReference:
+          "Rainbow Part-II Prose (Indian Civilization and Culture, Bharat is My Home, A Pinch of Snuff, I Have a Dream, Ideas That Have Helped Mankind, The Artist, A Child is Born, The Earth, India Through a Traveller's Eyes, A Marriage Proposal), Poetry (Now the Leaves are Falling Fast, The Soldier, Snake, etc.), & Story of English (Old English Dialects, University Wits, 18th-Century Novel, Samuel Johnson's Dictionary 1755, Dramatic Structure)",
+        proves:
+          "Directly confirms that BSEB Class XII English Compulsory (Code 105/205) for the 2026 exam tests BSTBPC Rainbow Part-II Prose & Poetry and Story of English (plus 60 Grammar MCQs and 50M Descriptive writing), NOT CBSE Flamingo/Vistas. Does not provide the primary Rainbow Part-II textbook PDF or 2026-27 syllabus circular.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [
+        "Rainbow Part-II Prose, Poetry & Story of English (Prose/Poetry titles and Story of English topics directly evidenced in BSEB 2026 Model Paper 105_English.pdf, Q61–100 & Section-B Q2–Q6)",
+        "Grammar, Usage & Descriptive Writing — Essay (8M), Explanation (8M), Letter/Application (5M), Short Answers (10M), Summary/Story of English/Matching/Translation (15M), Passage/Precis (4M) (Evidenced in 105_English.pdf, pp. 2–29)",
+      ],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Primary BSTBPC Rainbow Part-II & Story of English textbook PDFs (not hosted on scert.bihar.gov.in; bstbpc.gov.in/ClassXIIth.aspx returns HTTP 500) and official 2026-27 BSEB syllabus notification",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED FOR PRIMARY TEXTBOOK & 2026-27 SYLLABUS): Primary BSTBPC Rainbow Part-II & Story of English textbooks are not hosted on scert.bihar.gov.in and bstbpc.gov.in/ClassXIIth.aspx returns HTTP 500; however, official BSEB 2026 Model Paper (105_English.pdf on biharboardonline.com) confirms Rainbow Part-II & Story of English prescribed pieces and 2026 section blueprint.",
+  }),
+
+  "BSEB::2026-27::Class 12::Commerce::Urdu": validateCurriculumProvenance({
+    sourceId: "pending-bseb-c12-comm-urdu-2026-27",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Urdu",
+    academicYear: "2026-27",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "SOURCE-REQUIRED",
+    textbookApplicabilityStatus: "SOURCE-REQUIRED",
+    officialResourceConfirmed: false,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: false,
+    supportingResources: [
+      {
+        title:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Urdu (Subject Code 107/207/307/503)",
+        authority: "BSEB",
+        documentType: "EXAM_BLUEPRINT",
+        url: "https://biharboardonline.com/files/InterModelPaper/2026/107_207_307_503_Urdu.pdf",
+        publicationDate: "2025-11-28",
+        resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        pageReference: "24 pages (unindexed Nasta'liq raster scan)",
+        proves:
+          "Confirms official BSEB 2026 Intermediate Urdu Model Question Paper PDF (Subject Codes 107/207/307/503) on biharboardonline.com; however, all 24 pages are raster images without extractable text, and primary Kahkashan Part-II textbook is not hosted on SCERT/BSTBPC.",
+      },
+    ],
+    partialEvidenceSummary: {
+      verifiedChapters: [],
+      supportedHistoricalChapters: [],
+      unsupportedOrConflictedChapters: [],
+      sourceRequiredChapters: [
+        "Kahkashan Part-II (Hissa-e-Nasr): Khaka, Inshaiya, Afsana & Khutoot",
+        "Kahkashan Part-II (Hissa-e-Nazm): Nazm, Ghazal, Marsiya & Qasida",
+        "Urdu Qawaid (Grammar), Mazmoon Nigari, Khutoot & Talkhees",
+      ],
+    },
+    verificationNotes:
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources does not host Class XII Kahkashan Part-II or Urdu Qawaid manuals and BSTBPC Class XII portal returns HTTP 500; official BSEB 2026 Urdu Model Paper (107_207_307_503_Urdu.pdf) is confirmed on biharboardonline.com as a 24-page raster scan without extractable text.",
+  }),
+
+  // =========================================================================
+  // SEPARATE SUBJECT-SPECIFIC MARKING SCHEME / MODEL PAPER BLUEPRINT RECORDS
+  // =========================================================================
+  "BSEB::2026-27::Class 12::Commerce::Accountancy::MARKING_SCHEME": validateCurriculumProvenance({
+    sourceId: "bseb-2026-model-paper-220-acc",
+    authority: "BSEB",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Accountancy",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper – Accountancy (Elective, I.Com., Subject Code 220)",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    pageReference: "pp. 1–37 (Section-A Objective Q1–100 pp. 3–32; Section-B Descriptive Q1–38 pp. 32–37)",
+    chapterReference:
+      "Section-A: 100 MCQs (attempt any 50 × 1 = 50 Marks on OMR); Section-B: 30 Short Answer (attempt any 15 × 2 = 30 Marks) + 8 Long Answer (attempt any 4 × 5 = 20 Marks); Total = 100 Marks",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Accountancy Model Paper (Code 220, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) and tests NPO, Partnership, Company Accounts, Ratios & Cash Flow; official 2026-27 chapter weightage circular is still required before marking VERIFIED.",
+  }),
+  "BSEB::2026-27::Class 12::Commerce::Business Studies::MARKING_SCHEME": validateCurriculumProvenance({
+    sourceId: "bseb-2026-model-paper-217-bst",
+    authority: "BSEB",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Business Studies",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper – Business Studies (Elective, I.Com., Subject Code 217)",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/217_Business%20Studies.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    pageReference: "pp. 1–37 (Section-A Objective Q1–100 pp. 3–32; Section-B Descriptive Q1–38 pp. 33–37)",
+    chapterReference:
+      "Section-A: 100 MCQs (attempt any 50 × 1 = 50 Marks on OMR); Section-B: 30 Short Answer (attempt any 15 × 2 = 30 Marks) + 8 Long Answer (attempt any 4 × 5 = 20 Marks); Total = 100 Marks",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Business Studies Model Paper (Code 217, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) across Management Principles/Functions, Business Finance, Marketing & Consumer Protection; official 2026-27 blueprint circular is required before marking VERIFIED.",
+  }),
+  "BSEB::2026-27::Class 12::Commerce::Economics::MARKING_SCHEME": validateCurriculumProvenance({
+    sourceId: "bseb-2026-model-paper-219-eco",
+    authority: "BSEB",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Economics",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper – Economics (Elective, I.Com., Subject Code 219)",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/219_Economics.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    pageReference: "pp. 1–36 (Section-A Objective Q1–100 pp. 3–32; Section-B Descriptive Q1–38 pp. 33–36)",
+    chapterReference:
+      "Section-A: 100 MCQs (attempt any 50 × 1 = 50 Marks on OMR); Section-B: 30 Short Answer (attempt any 15 × 2 = 30 Marks) + 8 Long Answer (attempt any 4 × 5 = 20 Marks); Total = 100 Marks (Microeconomics + Macroeconomics)",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 I.Com. Economics Model Paper (Code 219, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) covering Introductory Microeconomics & Introductory Macroeconomics; official 2026-27 blueprint circular is required before marking VERIFIED.",
+  }),
+  "BSEB::2026-27::Class 12::Commerce::English Core::MARKING_SCHEME": validateCurriculumProvenance({
+    sourceId: "bseb-2026-model-paper-105-eng",
+    authority: "BSEB",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "English Core",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper – English (Compulsory, Subject Code 105/205/305)",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/105_English.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    pageReference: "pp. 1–29 (Section-A Objective Q1–100 pp. 2–24; Section-B Descriptive Q1–7 pp. 25–29)",
+    chapterReference:
+      "Section-A: 100 MCQs (Q1–60 Grammar/Usage, Q61–100 Rainbow Part-II & Story of English; attempt 50 × 1 = 50M); Section-B: Essay (8M), Prose Expl. (4M), Poetry Expl. (4M), Letter/App (5M), Short Qs (5×2=10M), Any 3 of Poem Summary/Prose Summary/Story of English/Matching/Translation (3×5=15M), Passage/Precis (4M) = 50M",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: true,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    verificationNotes:
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 English Compulsory Model Paper (Code 105, 2025-11-28) directly confirms the 2026 section-wise marking scheme (50M Objective + 50M Descriptive) and Rainbow Part-II / Story of English coverage; official 2026-27 notification is required before marking VERIFIED.",
+  }),
+  "BSEB::2026-27::Class 12::Commerce::Urdu::MARKING_SCHEME": validateCurriculumProvenance({
+    sourceId: "bseb-2026-model-paper-207-urdu",
+    authority: "BSEB",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subject: "Urdu",
+    academicYear: "2026-27",
+    resourceAcademicYear: "2025-26",
+    documentTitle:
+      "BSEB Intermediate Examination 2026 Annual Model Question Paper – Urdu (Subject Code 107/207/307/503)",
+    documentType: "EXAM_BLUEPRINT",
+    sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/107_207_307_503_Urdu.pdf",
+    publicationDate: "2025-11-28",
+    accessedDate: "2026-10-02",
+    verificationStatus: "SOURCE-REQUIRED",
+    evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+    officialResourceConfirmed: true,
+    curriculumContentSupported: false,
+    currentYearApplicabilityProven: false,
+    officialSyllabusDocumentFound: false,
+    officialExamBlueprintFound: true,
+    verificationNotes:
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official BSEB 2026 Urdu Model Question Paper PDF (Codes 107/207/307/503, 2025-11-28, 24 pages) is confirmed on biharboardonline.com, but all 24 pages are unindexed Nasta'liq raster scans without extractable text and 2026-27 applicability is not proven.",
+  }),
+};
+
+export function getCurriculumSourceIngestionAudit(
+  targetAcademicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): CurriculumSourceAuditEntry[] {
+  const allKeys = Array.from(
+    new Set([
+      ...Object.keys(CURRICULUM_PROVENANCE_REGISTRY),
+      ...Object.keys(CUSTOM_PROVENANCE_OVERRIDES),
+    ])
+  );
+  return allKeys.map((key) => {
+    const baseRecord = CURRICULUM_PROVENANCE_REGISTRY[key];
+    const overrideRecord = CUSTOM_PROVENANCE_OVERRIDES[key];
+    const effective = validateCurriculumProvenance(
+      overrideRecord || baseRecord,
+      targetAcademicYear
+    );
+    return {
+      sourceId: effective.sourceId,
+      authority: effective.authority,
+      board: effective.board,
+      classLevel: effective.classLevel || "ALL",
+      stream: effective.stream || "ALL",
+      subject: effective.subject || "BOARD_EXAM_PATTERN",
+      academicYear: effective.academicYear,
+      resourceAcademicYear: effective.resourceAcademicYear || "N/A",
+      documentTitle: effective.documentTitle,
+      documentType: effective.documentType,
+      sourceUrl: effective.sourceUrl || "N/A (Official Primary Source Pending)",
+      publicationDate: effective.publicationDate || "N/A",
+      accessedDate: effective.accessedDate || "N/A",
+      pageReference: effective.pageReference || "N/A",
+      chapterReference: effective.chapterReference || "N/A",
+      evidenceStage: effective.evidenceStage || "SOURCE-REQUIRED",
+      textbookApplicabilityStatus: effective.textbookApplicabilityStatus || "SOURCE-REQUIRED",
+      officialResourceConfirmed: Boolean(effective.officialResourceConfirmed),
+      curriculumContentSupported: Boolean(effective.curriculumContentSupported),
+      currentYearApplicabilityProven: Boolean(effective.currentYearApplicabilityProven),
+      officialSyllabusDocumentFound: Boolean(effective.officialSyllabusDocumentFound),
+      officialExamBlueprintFound: Boolean(effective.officialExamBlueprintFound),
+      supportingResourceCount: effective.supportingResources ? effective.supportingResources.length : 0,
+      previousStatus: baseRecord ? baseRecord.verificationStatus : "SOURCE-REQUIRED",
+      newStatus: effective.verificationStatus,
+      verificationNotes: effective.verificationNotes,
+    };
+  });
+}
+
+function sanitizeTextForNonBsebBoard(
+  text: string,
+  targetBoard: BoardType,
+  syllabusFramework: string
+): string {
+  if (!text || targetBoard === "BSEB") return text;
+  return text
+    .replace(/BSEB\s*&\s*State Board/gi, targetBoard)
+    .replace(/BSEB\s*Intermediate\s*Class\s*12/gi, `${targetBoard} Class 12`)
+    .replace(/BSEB\s*Intermediate/gi, `${targetBoard} Senior Secondary`)
+    .replace(/BSEB\s*Class\s*12/gi, `${targetBoard} Class 12`)
+    .replace(/BSEB\s*Class\s*11/gi, `${targetBoard} Class 11`)
+    .replace(/BSEB\s*100-Marks/gi, `${targetBoard} Board`)
+    .replace(/BSEB\s*Board\s*Exam/gi, `${targetBoard} Board Exam`)
+    .replace(/BSEB\s*OMR\s*Objective/gi, `${targetBoard} Objective`)
+    .replace(/BSEB\s*OMR/gi, `${targetBoard} Objective`)
+    .replace(/50%\s*OMR\s*\(Attempt\s*50\s*of\s*100\)\s*\+\s*50%\s*Marks\s*Descriptive/gi, `${targetBoard} Board Assessment Pattern`)
+    .replace(/50\s*Marks\s*OMR\s*\(Attempt\s*50\s*of\s*100\)\s*\+\s*50\s*Marks\s*Descriptive/gi, `${targetBoard} Board Assessment Pattern`)
+    .replace(/50%\s*OMR\s*Objective\s*\+\s*50%\s*Subjective/gi, `${targetBoard} Board Assessment Pattern`)
+    .replace(/50%\s*OMR/gi, `${targetBoard} Objective Section`)
+    .replace(/50\s*OMR/gi, `${targetBoard} Objective`)
+    .replace(/SCERT\s*Bihar\s*Kahkashan\s*Part-II/gi, `${syllabusFramework} Class 12 Urdu Literature`)
+    .replace(/SCERT\s*Bihar\s*Kahkashan\s*Part-I/gi, `${syllabusFramework} Class 11 Urdu Literature`)
+    .replace(/SCERT\s*Bihar\s*Class\s*12\s*Urdu:\s*Kahkashan\s*Part-II/gi, `${targetBoard} Class 12 Urdu Literature`)
+    .replace(/SCERT\s*Bihar/gi, syllabusFramework)
+    .replace(/Kahkashan\s*Part-II/gi, "Class 12 Urdu Literature")
+    .replace(/Kahkashan\s*Part-I/gi, "Class 11 Urdu Literature")
+    .replace(/Kahkashan\s*Hissa\s*Dom/gi, "Class 12 Urdu Prose")
+    .replace(/Kahkashan/gi, "Urdu Literature")
+    .replace(/Rainbow\s*Part-II\s*&\s*Story\s*of\s*English/gi, "Class 12 English Literature")
+    .replace(/Rainbow\s*Part-II/gi, "Class 12 English Literature")
+    .replace(/Rainbow\s*Part-I/gi, "Class 11 English Literature")
+    .replace(/BSTBPC/gi, syllabusFramework)
+    .replace(/\(BSEB\s*Compulsory\s*Core\)/gi, `(${targetBoard} Curriculum)`)
+    .replace(/BSEB/g, targetBoard);
+}
+
 export function getCurriculumSubjects(
   classLevel: string = "Class 10",
   stream: StreamType | string = "General",
-  board: BoardType | string = "CBSE"
+  board: BoardType | string = "CBSE",
+  academicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
 ): CurriculumSubject[] {
   const normalizedBoard = normalizeCurriculumBoard(board);
   const boardMeta = CURRICULUM_BOARDS_METADATA[normalizedBoard];
   const normalizedClass = normalizeCurriculumClassLevel(classLevel);
   const normalizedStream = normalizeCurriculumStream(stream, normalizedClass);
+  const effectiveYear = (academicYear || DEFAULT_CURRICULUM_ACADEMIC_YEAR).trim() || DEFAULT_CURRICULUM_ACADEMIC_YEAR;
 
   let baseSubjects: CurriculumSubject[];
   if (normalizedClass === "Class 10" || normalizedStream === "General") {
@@ -2962,29 +4920,351 @@ export function getCurriculumSubjects(
     }
   }
 
-  return baseSubjects.map((sub) => ({
-    ...sub,
-    board: normalizedBoard,
-    boardExamPattern: boardMeta.examPatternSummary,
-  }));
+  return baseSubjects.map((sub) => {
+    const registryKeyWithYear = `${normalizedBoard}::${effectiveYear}::${normalizedClass}::${normalizedStream}::${sub.name}`;
+    const registryKeyShort = `${normalizedBoard}::${normalizedClass}::${normalizedStream}::${sub.name}`;
+    const registeredProvenance =
+      CUSTOM_PROVENANCE_OVERRIDES[registryKeyWithYear] ||
+      CUSTOM_PROVENANCE_OVERRIDES[registryKeyShort] ||
+      CURRICULUM_PROVENANCE_REGISTRY[registryKeyWithYear] ||
+      CURRICULUM_PROVENANCE_REGISTRY[registryKeyShort];
+    const subjectProvenance = validateCurriculumProvenance(
+      CUSTOM_PROVENANCE_OVERRIDES[registryKeyWithYear] ||
+        CUSTOM_PROVENANCE_OVERRIDES[registryKeyShort] ||
+        sub.provenance ||
+        registeredProvenance || {
+          board: normalizedBoard,
+          classLevel: normalizedClass,
+          stream: normalizedStream,
+          subject: sub.name,
+          academicYear: effectiveYear,
+          verificationStatus: sub.verificationStatus || boardMeta.verificationStatus || "SOURCE-REQUIRED",
+          verificationNotes: sub.sourceStatusNote,
+        },
+      effectiveYear
+    );
+
+    const verificationStatus: CurriculumVerificationStatus = subjectProvenance.verificationStatus;
+    const localizedNames =
+      sub.localizedNames || DEFAULT_SUBJECT_LOCALIZED_NAMES[sub.name] || { en: sub.name };
+    const supportedContentLanguages: AcademicContentLanguageCode[] =
+      sub.supportedContentLanguages ||
+      boardMeta.supportedContentLanguages || ["en", "hi"];
+
+    // Board Isolation:
+    // 1. Non-BSEB Class 12 Accountancy excludes the BSEB-specific NPO chapter (ch-c12-acc-4)
+    // 2. BSEB Class 11 & Class 12 English Core do not assume CBSE Hornbill/Flamingo titles; they reference BSEB/BSTBPC Rainbow Part-I / Part-II & Story of English (SOURCE-REQUIRED)
+    const boardFilteredChapters =
+      normalizedBoard !== "BSEB" && sub.id === "sub-c12-comm-acc"
+        ? sub.chapters.filter((c) => c.id !== "ch-c12-acc-4")
+        : normalizedBoard === "BSEB" && sub.id === "sub-c12-comm-eng"
+        ? sub.chapters.map((c) =>
+            c.id === "ch-c12-comm-eng-1"
+              ? {
+                  ...c,
+                  title: "Rainbow Part-II Prose, Poetry & Story of English (BSEB Core)",
+                  bookChapterTitle:
+                    "BSTBPC Class 12 English: Rainbow Part-II & Story of English (SOURCE-REQUIRED)",
+                  notesSummary:
+                    "BSEB Intermediate Class 12 English Literature (Rainbow Part-II Prose & Poetry and Story of English) study framework; exact 2026-27 prescribed chapter index and section weightage remain SOURCE-REQUIRED pending official BSTBPC/BSEB notification.",
+                }
+              : c
+          )
+        : normalizedBoard === "BSEB" && sub.id === "sub-c11-comm-eng"
+        ? sub.chapters.map((c) =>
+            c.id === "ch-c11-comm-eng-1"
+              ? {
+                  ...c,
+                  title: "Rainbow Part-I Prose & Poetry (BSEB Core)",
+                  bookChapterTitle: "BSTBPC Class 11 English: Rainbow Part-I (SOURCE-REQUIRED)",
+                  notesSummary:
+                    "BSEB Intermediate Class 11 English Literature (Rainbow Part-I Prose & Poetry) study framework; exact 2026-27 prescribed chapter index remains SOURCE-REQUIRED pending official BSTBPC/BSEB notification.",
+                }
+              : c
+          )
+        : sub.chapters;
+
+    const enrichedChapters: CurriculumChapter[] = boardFilteredChapters.map((chap, idx) => {
+      const bsebAccChapterOverride: Partial<CurriculumSourceProvenance> | undefined =
+        normalizedBoard === "BSEB" &&
+        sub.id === "sub-c12-comm-acc" &&
+        subjectProvenance.verificationStatus === "SOURCE-REQUIRED"
+          ? chap.id === "ch-c12-acc-1"
+            ? {
+                ...subjectProvenance,
+                pageReference: "Contents (p. ix), Chapter 1 (pp. 1–48)",
+                chapterReference:
+                  "Chapter 1: Accounting for Partnership: Basic Concepts (1.1 Nature of Partnership to 1.7 Past Adjustments)",
+                curriculumContentSupported: true,
+                evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+              }
+            : chap.id === "ch-c12-acc-2"
+            ? {
+                ...subjectProvenance,
+                pageReference: "Contents (p. ix), Chapter 2 (pp. 49–109)",
+                chapterReference:
+                  "Chapter 2: Reconstitution of a Partnership Firm – Admission of a Partner (2.1–2.9)",
+                curriculumContentSupported: true,
+                evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+              }
+            : chap.id === "ch-c12-acc-3"
+            ? {
+                ...subjectProvenance,
+                pageReference: "Contents (p. ix), Chapter 3 (pp. 110–162)",
+                chapterReference:
+                  "Chapter 3: Reconstitution of a Partnership Firm – Retirement/Death of a Partner (3.1–3.9); Part-II Company Accounts PDF pending on SCERT portal",
+                curriculumContentSupported: true,
+                evidenceStage: "CURRICULUM_CONTENT_SUPPORTED",
+              }
+            : chap.id === "ch-c12-acc-4"
+            ? {
+                ...subjectProvenance,
+                pageReference: "Rationalisation Note (p. v), Contents (p. ix), Chapter 4 (pp. 163–167)",
+                chapterReference:
+                  "Chapter 4: Dissolution of Partnership Firm (pp. 163–167); NPO omitted in 2024 rationalised textbook (p. v) — requires official 2026-27 BSEB syllabus circular",
+                curriculumContentSupported: false,
+                evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
+              }
+            : undefined
+          : undefined;
+
+      const chapProvenance = validateCurriculumProvenance(
+        chap.provenance ||
+          bsebAccChapterOverride || {
+            ...subjectProvenance,
+            chapterReference: subjectProvenance.curriculumContentSupported
+              ? `Chapter ${chap.chapterNumber || idx + 1}: ${chap.title}`
+              : subjectProvenance.chapterReference,
+            verificationStatus: chap.verificationStatus || verificationStatus,
+          },
+        effectiveYear
+      );
+      const chapStatus = chapProvenance.verificationStatus;
+
+      const isolatedTitle = sanitizeTextForNonBsebBoard(
+        chap.title,
+        normalizedBoard,
+        boardMeta.syllabusFramework
+      );
+      const isolatedNotes = sanitizeTextForNonBsebBoard(
+        chap.notesSummary,
+        normalizedBoard,
+        boardMeta.syllabusFramework
+      );
+      const isolatedBookTitle = sanitizeTextForNonBsebBoard(
+        chap.bookChapterTitle,
+        normalizedBoard,
+        boardMeta.syllabusFramework
+      );
+
+      const priorityBreakdown: CurriculumPriorityBreakdown = {
+        officialSyllabusStatus: chapStatus,
+        applicationPriority: chap.priority,
+        priorityBasis: "APPLICATION_DERIVED_PRIORITY",
+        priorityDisclosure: `Chapter priority (${chap.priority}) and estimated study weightage are application-derived by Garia OS, not an official ${normalizedBoard} syllabus designation (Syllabus Status: ${chapStatus}).`,
+        verifiedPyqCount: 0,
+      };
+
+      return {
+        ...chap,
+        title: isolatedTitle,
+        notesSummary: isolatedNotes,
+        bookChapterTitle: isolatedBookTitle,
+        unitTitle: chap.unitTitle || `Unit ${idx + 1}`,
+        estimatedStudyMinutes:
+          chap.estimatedStudyMinutes ||
+          (chap.priority === "VVI" ? 150 : chap.priority === "Important" ? 110 : 80),
+        examWeightageMarks:
+          chap.examWeightageMarks ||
+          Math.max(10, Math.round(100 / Math.max(1, boardFilteredChapters.length))),
+        academicYear: effectiveYear,
+        verificationStatus: chapStatus,
+        provenance: chapProvenance,
+        priorityBreakdown,
+        topics: chap.topics.map((top) => ({
+          ...top,
+          name: sanitizeTextForNonBsebBoard(top.name, normalizedBoard, boardMeta.syllabusFramework),
+          summaryNote: sanitizeTextForNonBsebBoard(
+            top.summaryNote,
+            normalizedBoard,
+            boardMeta.syllabusFramework
+          ),
+          bookReference: sanitizeTextForNonBsebBoard(
+            top.bookReference,
+            normalizedBoard,
+            boardMeta.syllabusFramework
+          ),
+          vviPoints: top.vviPoints.map((pt) =>
+            sanitizeTextForNonBsebBoard(pt, normalizedBoard, boardMeta.syllabusFramework)
+          ),
+          formulasOrRules: top.formulasOrRules?.map((f) =>
+            sanitizeTextForNonBsebBoard(f, normalizedBoard, boardMeta.syllabusFramework)
+          ),
+          difficulty: top.difficulty || (chap.priority === "VVI" ? "Medium" : "Easy"),
+          examRelevance: top.examRelevance || (chap.priority === "VVI" ? "High-Yield" : "Core"),
+          questionTypes: top.questionTypes || ["MCQ", "Short Answer", "Long Answer"],
+          verificationStatus: top.verificationStatus ? chapStatus : chapStatus,
+          provenance: chapProvenance,
+        })),
+      };
+    });
+
+    const sanitizedSourceNote = sanitizeTextForNonBsebBoard(
+      sub.sourceStatusNote || subjectProvenance.verificationNotes,
+      normalizedBoard,
+      boardMeta.syllabusFramework
+    );
+
+    return {
+      ...sub,
+      subjectCode: sub.subjectCode || sub.code,
+      subjectName: sub.subjectName || sub.name,
+      localizedNames,
+      supportedContentLanguages,
+      board: normalizedBoard,
+      academicYear: effectiveYear,
+      boardExamPattern: boardMeta.examPatternSummary,
+      verificationStatus,
+      provenance: subjectProvenance,
+      sourceStatusNote:
+        verificationStatus === "VERIFIED"
+          ? `VERIFIED against ${subjectProvenance.documentTitle} (${effectiveYear}).`
+          : sanitizedSourceNote ||
+            `SOURCE-REQUIRED: ${boardMeta.syllabusFramework} core structure aligned (${effectiveYear}); official ${normalizedBoard} circular verification pending.`,
+      chapters: enrichedChapters,
+    };
+  });
 }
 
 export function getBoardCurriculumHierarchy(
   board: BoardType | string = "CBSE",
   classLevel: string = "Class 12",
-  stream: StreamType | string = "Science"
+  stream: StreamType | string = "Science",
+  academicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
 ): BoardCurriculumHierarchy {
   const normalizedBoard = normalizeCurriculumBoard(board);
   const normalizedClass = normalizeCurriculumClassLevel(classLevel);
   const normalizedStream = normalizeCurriculumStream(stream, normalizedClass);
-  const subjects = getCurriculumSubjects(normalizedClass, normalizedStream, normalizedBoard);
+  const effectiveYear = (academicYear || DEFAULT_CURRICULUM_ACADEMIC_YEAR).trim() || DEFAULT_CURRICULUM_ACADEMIC_YEAR;
+  const baseBoardMetadata = CURRICULUM_BOARDS_METADATA[normalizedBoard];
+  const examPatternKeyWithYear = `${normalizedBoard}::${effectiveYear}::EXAM_PATTERN`;
+  const examPatternKeyShort = `${normalizedBoard}::EXAM_PATTERN`;
+  const boardProvenance = validateCurriculumProvenance(
+    CUSTOM_PROVENANCE_OVERRIDES[examPatternKeyWithYear] ||
+      CUSTOM_PROVENANCE_OVERRIDES[examPatternKeyShort] ||
+      baseBoardMetadata.provenance ||
+      CURRICULUM_PROVENANCE_REGISTRY[examPatternKeyWithYear] ||
+      CURRICULUM_PROVENANCE_REGISTRY[examPatternKeyShort] || {
+        board: normalizedBoard,
+        classLevel: normalizedClass,
+        stream: normalizedStream,
+        academicYear: effectiveYear,
+        verificationStatus: baseBoardMetadata.verificationStatus || "SOURCE-REQUIRED",
+        verificationNotes: `SOURCE-REQUIRED: Official ${normalizedBoard} examination pattern & syllabus circular for ${effectiveYear} required.`,
+      },
+    effectiveYear
+  );
+  const subjects = getCurriculumSubjects(normalizedClass, normalizedStream, normalizedBoard, effectiveYear);
+  let verificationStatus: CurriculumVerificationStatus = boardProvenance.verificationStatus;
+  if (
+    boardProvenance.verificationStatus === "SOURCE-CONFLICT" ||
+    subjects.some((s) => s.verificationStatus === "SOURCE-CONFLICT")
+  ) {
+    verificationStatus = "SOURCE-CONFLICT";
+  } else if (subjects.length > 0 && subjects.every((s) => s.verificationStatus === "VERIFIED")) {
+    verificationStatus = "VERIFIED";
+  } else if (
+    boardProvenance.verificationStatus === "VERIFIED" ||
+    boardProvenance.verificationStatus === "PARTIALLY-VERIFIED" ||
+    subjects.some(
+      (s) => s.verificationStatus === "VERIFIED" || s.verificationStatus === "PARTIALLY-VERIFIED"
+    )
+  ) {
+    verificationStatus = "PARTIALLY-VERIFIED";
+  }
 
   return {
     board: normalizedBoard,
-    boardMetadata: CURRICULUM_BOARDS_METADATA[normalizedBoard],
+    academicYear: effectiveYear,
+    boardMetadata: {
+      ...baseBoardMetadata,
+      academicYear: effectiveYear,
+      // Board-level exam pattern verification status is strictly governed by boardProvenance (Section 11)
+      verificationStatus: boardProvenance.verificationStatus,
+      provenance: boardProvenance,
+    },
     classLevel: normalizedClass,
     stream: normalizedStream,
     subjects,
+    verificationStatus,
+    provenance: boardProvenance,
+    sourceStatusSummary:
+      verificationStatus === "VERIFIED"
+        ? `VERIFIED (${boardProvenance.documentTitle} • ${effectiveYear})`
+        : `${verificationStatus} (${baseBoardMetadata.syllabusFramework} • ${effectiveYear} — official ${normalizedBoard} notification verification required)`,
+    supportedContentLanguages: baseBoardMetadata.supportedContentLanguages || ["en", "hi"],
+  };
+}
+
+export function getCurriculumVerificationReport(
+  board: BoardType | string = "BSEB",
+  classLevel: string = "Class 12",
+  stream: StreamType | string = "Commerce",
+  academicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): {
+  board: BoardType;
+  academicYear: string;
+  classLevel: "Class 10" | "Class 11" | "Class 12";
+  stream: StreamType;
+  overallStatus: CurriculumVerificationStatus;
+  verifiedSubjects: string[];
+  sourceRequiredItems: string[];
+  conflictItems: string[];
+  outdatedItems: string[];
+  notVerifiedItems: string[];
+  totalChapters: number;
+  totalTopics: number;
+} {
+  const hierarchy = getBoardCurriculumHierarchy(board, classLevel, stream, academicYear);
+  const verifiedSubjects: string[] = [];
+  const sourceRequiredItems: string[] = [];
+  const conflictItems: string[] = [];
+  const outdatedItems: string[] = [];
+  const notVerifiedItems: string[] = [];
+  let totalChapters = 0;
+  let totalTopics = 0;
+
+  for (const sub of hierarchy.subjects) {
+    totalChapters += sub.chapters.length;
+    for (const ch of sub.chapters) {
+      totalTopics += ch.topics.length;
+    }
+    if (sub.verificationStatus === "VERIFIED") {
+      verifiedSubjects.push(sub.name);
+    } else if (sub.verificationStatus === "SOURCE-CONFLICT") {
+      conflictItems.push(`${sub.name} (${sub.provenance?.verificationNotes || "Source conflict"})`);
+    } else if (sub.verificationStatus === "OUTDATED") {
+      outdatedItems.push(`${sub.name} (${sub.provenance?.verificationNotes || "Outdated academic year"})`);
+    } else if (sub.verificationStatus === "SOURCE-REQUIRED") {
+      sourceRequiredItems.push(`${sub.name} (${sub.sourceStatusNote || "Official circular pending"})`);
+    } else {
+      notVerifiedItems.push(sub.name);
+    }
+  }
+
+  return {
+    board: hierarchy.board,
+    academicYear: hierarchy.academicYear,
+    classLevel: hierarchy.classLevel,
+    stream: hierarchy.stream,
+    overallStatus: hierarchy.verificationStatus,
+    verifiedSubjects,
+    sourceRequiredItems,
+    conflictItems,
+    outdatedItems,
+    notVerifiedItems,
+    totalChapters,
+    totalTopics,
   };
 }
 

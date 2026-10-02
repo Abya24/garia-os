@@ -7,8 +7,10 @@ import {
   AcademicRevisionItem,
   AcademicPracticeSession,
   CareerProfile,
-  AcademicTest,
+  BoardType,
+  CurriculumVerificationStatus,
 } from "../types";
+import { getBoardCurriculumHierarchy } from "../data/masterCurriculum";
 
 export interface ExamTestRecord {
   id: string;
@@ -83,6 +85,11 @@ export interface ExamIntelligenceReport {
   strongestSubject?: any;
   highYieldRecommendations?: any[];
   lastUpdated?: string;
+  board?: BoardType;
+  academicYear?: string;
+  boardExamPattern?: string;
+  curriculumVerificationStatus?: CurriculumVerificationStatus;
+  curriculumProvenanceNote?: string;
 }
 
 /**
@@ -115,7 +122,15 @@ export function getCareerPrioritySubjectNames(
   const c = (targetCareerTitle || "").toLowerCase();
 
   if (s.includes("commerce") || c.includes("ca") || c.includes("account")) {
-    return ["accountancy", "economics", "business studies", "entrepreneurship", "mathematics"];
+    return [
+      "accountancy",
+      "economics",
+      "business studies",
+      "entrepreneurship",
+      "mathematics",
+      "english",
+      "urdu",
+    ];
   }
   if (s.includes("science") || c.includes("neet") || c.includes("doctor") || c.includes("medical")) {
     return ["biology", "chemistry", "physics", "zoology", "botany"];
@@ -513,6 +528,12 @@ export function generateExamIntelligenceReport(
     }
   }
 
+  const boardHierarchy = getBoardCurriculumHierarchy(
+    profile?.board || examProfile?.board || "CBSE",
+    profile?.classLevel || examProfile?.classLevel || "Class 12",
+    profile?.stream || examProfile?.stream || "Commerce"
+  );
+
   return {
     overallReadinessScore,
     readinessCategory,
@@ -528,5 +549,10 @@ export function generateExamIntelligenceReport(
     nextBestAction,
     latestTestPercentage,
     lastCalculatedAt: Date.now(),
+    board: boardHierarchy.board,
+    academicYear: boardHierarchy.academicYear,
+    boardExamPattern: boardHierarchy.boardMetadata.examPatternSummary,
+    curriculumVerificationStatus: boardHierarchy.verificationStatus,
+    curriculumProvenanceNote: boardHierarchy.sourceStatusSummary,
   };
 }

@@ -11,6 +11,58 @@ import {
   AbyaInsightCard,
   AbyaQuickActionType,
 } from "../types";
+import {
+  CurriculumSubject,
+  BoardCurriculumHierarchy,
+  getBoardCurriculumHierarchy,
+  normalizeCurriculumBoard,
+  normalizeVerificationStatus,
+} from "../data/masterCurriculum";
+
+/**
+ * Formats an honest, source-aware curriculum disclosure for Abya AI responses.
+ * Never claims official board verification when status is SOURCE-REQUIRED, PARTIALLY-VERIFIED, SOURCE-CONFLICT, or OUTDATED.
+ */
+export function formatAbyaCurriculumSourceDisclosure(params: {
+  board: string;
+  classLevel: string;
+  stream: string;
+  academicYear?: string;
+  subject?: CurriculumSubject;
+  hierarchy?: BoardCurriculumHierarchy;
+}): string {
+  const normalizedBoard = normalizeCurriculumBoard(params.board);
+  const rawStatus =
+    params.subject?.verificationStatus ||
+    params.hierarchy?.verificationStatus ||
+    "SOURCE-REQUIRED";
+  const status = normalizeVerificationStatus(rawStatus, "SOURCE-REQUIRED");
+  const year =
+    params.subject?.academicYear ||
+    params.hierarchy?.academicYear ||
+    "2026-27";
+  const prov = params.subject?.provenance || params.hierarchy?.provenance;
+
+  if (status === "VERIFIED" && prov) {
+    return `✅ **Curriculum Status:** VERIFIED (${prov.authority} • ${prov.documentTitle} • Academic Year ${year})`;
+  }
+  if (status === "PARTIALLY-VERIFIED") {
+    return `🌓 **Curriculum Status:** PARTIALLY-VERIFIED (${year}) — Core chapter structure is aligned (${prov?.documentTitle || normalizedBoard}), while remaining chapter/blueprint details are still unverified pending official ${normalizedBoard} notifications.`;
+  }
+  if (status === "SOURCE-CONFLICT") {
+    return `⚠️ **Curriculum Status:** SOURCE-CONFLICT (${year}) — Based on your current ${params.stream} study curriculum in Garia OS. Conflicting syllabus references were detected; please confirm final chapter updates with official ${normalizedBoard} notifications.`;
+  }
+  if (status === "OUTDATED") {
+    return `⚠️ **Curriculum Status:** OUTDATED (${year}) — Based on your current ${params.stream} study curriculum in Garia OS. This reference belongs to an older academic session; please confirm final board syllabus updates with official ${normalizedBoard} notifications.`;
+  }
+  if (prov?.curriculumContentSupported && prov.documentTitle) {
+    return `ℹ️ **Curriculum Status:** ${status} (${year} • Official Textbook Evidence: ${prov.authority} — ${prov.documentTitle}, ${prov.resourceAcademicYear || "Historical Edition"}) — Based on your current ${params.stream} study curriculum in Garia OS and from your important revision priorities. Chapter content is supported by the official textbook edition, while 2026-27 exam applicability remains unverified; practice these core topics and confirm final board syllabus updates with official ${normalizedBoard} notifications.`;
+  }
+  if (prov?.officialResourceConfirmed && prov.documentTitle) {
+    return `ℹ️ **Curriculum Status:** ${status} (${year} • Official Resource Cataloged: ${prov.authority} — ${prov.documentTitle}) — Based on your current ${params.stream} study curriculum in Garia OS and from your important revision priorities. Official ${prov.authority} resource identity is cataloged, while chapter-level text and 2026-27 syllabus applicability remain unverified; practice these core topics and confirm final board syllabus updates with official ${normalizedBoard} notifications.`;
+  }
+  return `ℹ️ **Curriculum Status:** ${status} (${year}) — Based on your current ${params.stream} study curriculum in Garia OS and from your important revision priorities. Practice these core topics and confirm final board syllabus updates with official ${normalizedBoard} notifications.`;
+}
 
 interface ActiveStudentData {
   profile?: StudentProfile | null;
@@ -72,7 +124,7 @@ export const generateAbyaInsightCards = (
       recommendation: `"${priorityChapter.title}" needs immediate focus`,
       reason: priorityChapter.isWeak
         ? "Marked as weak topic requiring extra conceptual practice."
-        : "VVI High-Weightage Chapter in your syllabus.",
+        : "Application-derived high-priority (VVI) chapter in your Garia OS study curriculum.",
       actionText: "Study Topic",
       actionTab: "study",
     });
@@ -208,24 +260,79 @@ export const generateAbyaFallbackResponse = (
   const profileName = profile?.name || "Student";
   const profileClass = profile?.classLevel || examProfile.classLevel || "Class 12";
   const profileStream = profile?.stream || examProfile.stream || "General";
-  const profileBoard = profile?.board || examProfile.board || "CBSE";
+  const rawBoard = profile?.board || examProfile.board || "CBSE";
+  const lowerPromptRaw = (userPrompt || "").toLowerCase();
+  const explicitBoardInPrompt = lowerPromptRaw.includes("bseb") || lowerPromptRaw.includes("bihar board")
+    ? "BSEB"
+    : lowerPromptRaw.includes("up board")
+    ? "UP Board"
+    : lowerPromptRaw.includes("mp board")
+    ? "MP Board"
+    : lowerPromptRaw.includes("icse") || lowerPromptRaw.includes("isc")
+    ? "ICSE"
+    : undefined;
+  const profileBoard = normalizeCurriculumBoard(explicitBoardInPrompt || rawBoard);
+  const boardHierarchy = getBoardCurriculumHierarchy(profileBoard, profileClass, profileStream);
+  const boardPatternNote = boardHierarchy.boardMetadata.examPatternSummary;
+  const hierarchyDisclosure = formatAbyaCurriculumSourceDisclosure({
+    board: profileBoard,
+    classLevel: profileClass,
+    stream: profileStream,
+    academicYear: boardHierarchy.academicYear,
+    hierarchy: boardHierarchy,
+  });
 
-  switch (actionType) {
+  // Natural-language Hindi / Hinglish / English intent routing when actionType === "general"
+  let effectiveAction: AbyaQuickActionType | "general" = actionType;
+  if (effectiveAction === "general" && lowerPromptRaw.length > 2) {
+    if (
+      lowerPromptRaw.includes("aaj kya padh") ||
+      lowerPromptRaw.includes("aaj ka plan") ||
+      lowerPromptRaw.includes("today study plan") ||
+      lowerPromptRaw.includes("kya padhna chahiye")
+    ) {
+      effectiveAction = "study_plan";
+    } else if (
+      lowerPromptRaw.includes("weak subject") ||
+      lowerPromptRaw.includes("kamzor subject") ||
+      lowerPromptRaw.includes("weak topic") ||
+      lowerPromptRaw.includes("kaunsa subject weak")
+    ) {
+      effectiveAction = "weak_topics";
+    } else if (
+      lowerPromptRaw.includes("kya revise karu") ||
+      lowerPromptRaw.includes("exam se pehle kya revise") ||
+      lowerPromptRaw.includes("revision queue") ||
+      lowerPromptRaw.includes("revise")
+    ) {
+      effectiveAction = "revision_plan";
+    }
+  }
+
+  switch (effectiveAction) {
     case "study_plan":
     case "plan_day": {
       const pendingTasks = tasks.filter((t) => !t.completed);
-      const weakOrVvi = chapters.filter((c) => c.isWeak || c.priority === "VVI").slice(0, 3);
+      const curriculumChapters = boardHierarchy.subjects.flatMap((s) =>
+        s.chapters.map((ch) => ({ title: ch.title, priority: ch.priority, subjectName: s.name }))
+      );
+      const weakOrVvi =
+        chapters.filter((c) => c.isWeak || c.priority === "VVI").length > 0
+          ? chapters.filter((c) => c.isWeak || c.priority === "VVI").slice(0, 3)
+          : curriculumChapters.filter((c) => c.priority === "VVI").slice(0, 3);
       const primaryChap = weakOrVvi[0]?.title || "Core Chapter";
       const secondaryChap = weakOrVvi[1]?.title || "Revision Topic";
 
-      return `Arre ${profileName}! Chalo aaj ka ekdum focused aur high-yield study plan banate hain (${profileClass} ${profileStream} • ${profileBoard}).
+      return `Arre ${profileName}! Chalo aaj ka ekdum focused study plan banate hain (${profileClass} ${profileStream} • ${profileBoard}).
 
+📋 **Board Study Pattern (${profileBoard}):** ${boardPatternNote}
+${hierarchyDisclosure}
 🎯 **Aaj Ka Study Target:** ${examProfile.dailyStudyHours || 4} Ghante | ⏳ **Exam Countdown:** ${daysRemaining} Days remaining
 
-📌 **Aaj Ka Step-by-Step Schedule:**
+📌 **Aaj Ka Step-by-Step Schedule (Application-Derived Priorities):**
 1. 🌅 **Block 1 (Deep Concept Study - 2 hrs):** Sabse pehle "${primaryChap}" ke core concepts padho aur 2-3 important formulas/definitions note kar lo.
 2. ☕ **Quick Break (15 mins):** Thoda stretch karo, paani piyo aur aankhon ko rest do.
-3. ⚡ **Block 2 (Practice & PYQs - 1.5 hrs):** "${secondaryChap}" ke 5 previous year questions practice karo.
+3. ⚡ **Block 2 (${profileBoard === "BSEB" ? "50% OMR MCQ + Descriptive Practice" : "Practice & Board-Pattern Questions"} - 1.5 hrs):** "${secondaryChap}" ke ${profileBoard === "BSEB" ? "20 OMR Objective MCQs aur 3 Short/Long Answer questions" : "5 board-pattern sample questions"} practice karo.
 4. 📝 **Block 3 (Daily Tasks & Revision - 1 hr):**
 ${
   pendingTasks.length > 0
@@ -234,7 +341,7 @@ ${
 }
 5. 🌙 **Night Wind-Down (20 mins):** Aaj jo padha usko dimag me recall karo aur kal ke liye ready ho jao!
 
-💡 *Mentor Tip: Ek saath continuous lambi padhai mat karo, 45 min ke baad 10 min break lene se retention 2x badh jata hai!*`;
+💡 *Mentor Tip: Ek saath continuous lambi padhai mat karo, 45 min ke baad 10 min break lene se retention badhta hai!*`;
     }
 
     case "weekly_schedule": {
@@ -315,13 +422,14 @@ ${weakChapters
       }
 
       return `Revision se hi memory strong hoti hai ${profileName}! 🔄
+${hierarchyDisclosure}
 
-📌 **Aaj Ka Priority Revision Queue:**
+📌 **Aaj Ka Priority Revision Queue (Application-Derived Garia OS Priority):**
 ${revisionQueue
   .map(
     (c, idx) => `**${idx + 1}. ${c.title}** (Revised: ${c.revisionCount}/3 baar)
-   • Priority: ${c.priority} | Status: ${c.isWeak ? "Extra practice required" : "In Progress"}
-   • Action: Formula sheet dekho aur 2 standard exam questions bina dekhe solve karo.`
+   • Application Priority: ${c.priority} | Status: ${c.isWeak ? "Extra practice required" : "In Progress"}
+   • Action: Formula sheet dekho aur 2 sample practice questions bina dekhe solve karo.`
   )
   .join("\n\n")}
 
@@ -364,39 +472,79 @@ ${revisionQueue
 
     case "exam_strategy":
     case "exam_coach": {
-      return `Exam pass aa raha hai ${profileName}, par sahi strategy se top score pakka hai! 🎯
+      return `Exam pass aa raha hai ${profileName}, structured preparation se strong score banega! 🎯
 
-📋 **Target Exam:** ${examProfile.board} ${examProfile.classLevel} (${examProfile.examName})
+📋 **Target Exam:** ${profileBoard} ${profileClass} (${examProfile.examName})
+${hierarchyDisclosure}
 ⏳ **Days Remaining:** ${daysRemaining} Din | 📈 **Readiness Score:** ${readinessScore}%
 
-🏆 **Board Exam Topper Strategy:**
+🏆 **Board Exam Preparation Strategy:**
 1. 📝 **3-Tier Question Strategy:**
-   - *Phase 1 (First 45 mins):* Sabse pehle Section A (MCQs / 1-markers) 100% accuracy se niptao.
+   - *Phase 1 (First 45 mins):* Sabse pehle Section A (MCQs / 1-markers) high accuracy se complete karo.
    - *Phase 2 (Next 90 mins):* 3-marker & 5-marker descriptive questions me step-by-step presentation, neat headings aur diagrams banao.
    - *Phase 3 (Last 30 mins):* Calculation re-checking aur unit/symbol verification.
-2. 📌 **PYQ Rule:** Pichhle 5 saal ke papers me se 70%+ concepts repeat hote hain. PYQs roz 5 zaroor solve karo.
-3. 🧘 **Mental Calm:** Exam ke aakhri dino me panic mat karo, roz 7 ghante neend aur light exercise brain power badhati hai!
+2. 📌 **Practice Rule:** Roz 5 board-pattern sample questions aur verified past papers (jab official paper archive attach ho) zaroor solve karo.
+3. 🧘 **Mental Calm:** Exam ke aakhri dino me panic mat karo, roz 7 ghante neend aur light exercise focus banaye rakhti hai!
 
 *Consistency hi success ki key hai. Abya is always with you!*`;
     }
 
     default: {
       const lowerPrompt = (userPrompt || "").toLowerCase();
+      const matchedCurriculumSubject = boardHierarchy.subjects.find(
+        (s) =>
+          lowerPrompt.includes(s.name.toLowerCase()) ||
+          (s.name === "Business Studies" && lowerPrompt.includes("bst")) ||
+          (s.name === "Accountancy" && lowerPrompt.includes("account")) ||
+          (s.name === "Economics" && lowerPrompt.includes("eco")) ||
+          (s.name === "Urdu" && (lowerPrompt.includes("urdu") || lowerPrompt.includes("kahkashan") || lowerPrompt.includes("qawaid")))
+      );
+
+      if (matchedCurriculumSubject) {
+        const chapBreakdown = matchedCurriculumSubject.chapters
+          .map(
+            (ch, idx) =>
+              `**${idx + 1}. ${ch.title}** [Garia OS Priority: ${ch.priority} • Est. Study Weight: ~${ch.examWeightageMarks || 20} Marks]\n   • *Core Topic:* ${ch.topics[0]?.name || ch.title}\n   • *Study Insight:* ${ch.topics[0]?.vviPoints[0] || ch.notesSummary.slice(0, 120)}`
+          )
+          .join("\n\n");
+
+        const sourceDisclosure = formatAbyaCurriculumSourceDisclosure({
+          board: profileBoard,
+          classLevel: profileClass,
+          stream: profileStream,
+          academicYear: matchedCurriculumSubject.academicYear || boardHierarchy.academicYear,
+          subject: matchedCurriculumSubject,
+          hierarchy: boardHierarchy,
+        });
+
+        return `Namaste ${profileName}! 📚 Based on your current ${profileStream} study curriculum in Garia OS for **${profileBoard} ${profileClass} ${matchedCurriculumSubject.name}** (${matchedCurriculumSubject.code}):
+
+📋 **${profileBoard} Study Pattern:** ${boardPatternNote}
+${sourceDisclosure}
+
+🔥 **From Your Important Revision Priorities (Application-Derived):**
+${chapBreakdown}
+
+🎯 **Recommended Study Plan (${profileBoard}):**
+1. ${profileBoard === "BSEB" ? "Practice 25 OMR-style Objective MCQs daily alongside structured descriptive answers." : "Solve core conceptual and structured board-pattern practice questions."}
+2. Practice these core topics and confirm final board syllabus updates with official ${profileBoard} notifications.`;
+      }
+
       const matchedChapter = chapters.find(
         (c) =>
           lowerPrompt.includes(c.title.toLowerCase()) ||
           c.title.toLowerCase().includes(lowerPrompt.slice(0, 8))
       );
-      const primarySubject = subjects[0]?.name || `${profileStream} Core`;
+      const primarySubject = subjects[0]?.name || boardHierarchy.subjects[0]?.name || `${profileStream} Core`;
 
       if (lowerPrompt.length > 3 && matchedChapter) {
-        return `Namaste ${profileName}! "${matchedChapter.title}" (${matchedChapter.subjectId}) ke baare me tumne pucha.
+        return `Namaste ${profileName}! Based on your current ${profileStream} study curriculum in Garia OS, here is the study breakdown for "${matchedChapter.title}" (${matchedChapter.subjectId}):
 
-📌 **Study Mentor Quick Breakdown for ${matchedChapter.title}:**
-1. 💡 **Core Fundamentals:** Pehle is chapter ki main definitions aur standard formula sheet review karo.
-2. 🎯 **Exam Weightage:** Is topic se Board Exams me ${matchedChapter.priority === "VVI" ? "heavy 5-mark / long questions" : "direct objective & short numerical questions"} aate hain.
-3. ✏️ **Action Step:** Pehle 2-3 solved examples dekho, fir 3 Past Year Questions (PYQs) solve karo.
-4. 🔄 **Revision Tracker:** Complete hone ke baad Academic Center me iska progress update kar dena!
+📌 **Study Mentor Quick Breakdown for ${matchedChapter.title} (${profileBoard}):**
+1. 💡 **Core Fundamentals:** Review the primary definitions and standard formula/rule sheet first.
+2. 🎯 **Study Priority:** From your important revision priorities (${matchedChapter.priority || "Important"}), practice ${matchedChapter.priority === "VVI" ? "structured 5-mark long answers and objective MCQs" : "direct objective & short analytical questions"}.
+3. ✏️ **Action Step:** Work through 2–3 solved examples, then practice sample board-pattern questions and confirm final board syllabus updates with official ${profileBoard} notifications.
+4. 🔄 **Revision Tracker:** Update your completion progress in the Academic Center after finishing!
 
 *Agar numerical me specific step ya formula me doubt hai, toh detail likho hum step-by-step decode karenge!*`;
       }
@@ -408,12 +556,12 @@ ${revisionQueue
         lowerPrompt.includes("aaj")
       ) {
         const pendingTasks = tasks.filter((t) => !t.completed);
-        return `Haan ${profileName}! Aaj ka balanced study plan ye raha:
+        return `Haan ${profileName}! Aaj ka balanced study plan ye raha (${profileBoard} • ${profileClass} ${profileStream}):
 
 🎯 **Target:** ${examProfile.dailyStudyHours || 4} Ghante | ⏳ **Days to Exam:** ${daysRemaining} Days
 
-1. 🌅 **Session 1 (Focus):** Core ${profileStream} ke sabse important chapter ka theory padho.
-2. ⚡ **Session 2 (PYQs):** 5 Previous Year Questions practice karo.
+1. 🌅 **Session 1 (Focus):** Core ${profileStream} (${primarySubject}) ke sabse important chapter ka theory padho.
+2. ⚡ **Session 2 (Practice):** ${profileBoard === "BSEB" ? "20 OMR Objective MCQs + 3 Short Answers" : "5 Board-Pattern Questions"} practice karo.
 3. 📝 **Session 3 (Tasks):** ${
           pendingTasks.length > 0
             ? pendingTasks.slice(0, 2).map((t) => `\n   • ${t.title}`).join("")
@@ -429,8 +577,10 @@ Kaise chal rahi hai taiyari?
 - 📈 **Exam Readiness:** ${readinessScore}%
 - ⏳ **Days Left:** ${daysRemaining} Days
 - 📚 **Focus Subject:** ${primarySubject}
+- 📋 **Board Pattern:** ${boardPatternNote}
+- ${hierarchyDisclosure}
 
-Tum mujhse koi bhi concept explanation, study plan, numericals ya PYQ strategy puch sakte ho!`;
+Tum mujhse koi bhi concept explanation, study plan, numericals ya board exam strategy puch sakte ho!`;
     }
   }
 };

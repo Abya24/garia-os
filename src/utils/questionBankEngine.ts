@@ -579,12 +579,64 @@ export const SEED_MCQS: TopicMCQ[] = [
     explanation: "Demographic dividend is the economic growth potential that results from shifts in a population's age structure, mainly when the working-age population is larger than the dependent population.",
     difficulty: "Easy",
     sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED",
     tags: ["Sociology", "Demography"]
+  },
+  // ----------------------------------------
+  // CLASS 12 COMMERCE - URDU (BSEB / SCERT KAHKASHAN PART-II & QAWAID)
+  // ----------------------------------------
+  {
+    id: "mcq-c12-urdu-1-1-1",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subjectName: "Urdu",
+    chapterTitle: "Kahkashan Part-II (Hissa-e-Nasr): Khaka, Inshaiya, Afsana & Khutoot",
+    topicName: "Prescribed Prose Lessons, Authors (Musannifeen) & Markazi Khayal",
+    questionType: "MCQ",
+    marks: 1,
+    questionText: "In Kahkashan Part-II, 'Nazir Ahmad ki Kahani: Kuch Unki Kuch Meri Zubani' belongs to which literary genre (Sinf-e-Adab) and who is its author?",
+    options: [
+      "Khaka (Character Sketch) by Mirza Farhatullah Beg",
+      "Afsana (Short Story) by Saadat Hasan Manto",
+      "Inshaiya (Light Essay) by Wazir Agha",
+      "Khutoot (Letters) by Maulana Abul Kalam Azad"
+    ],
+    correctOptionIndex: 0,
+    explanation: "'Nazir Ahmad ki Kahani' is a celebrated Urdu Khaka (biographical character sketch) written by Deputy Nazir Ahmad's pupil Mirza Farhatullah Beg.",
+    difficulty: "Easy",
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED",
+    tags: ["Urdu", "Kahkashan", "BSEB", "Khaka"]
+  },
+  {
+    id: "mcq-c12-urdu-3-1-1",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subjectName: "Urdu",
+    chapterTitle: "Urdu Qawaid (Grammar), Mazmoon Nigari, Khutoot & Talkhees",
+    topicName: "Sabqa-Lahqa, Wahid-Jama, Mazmoon (8M), Darkhwast (5M) & Talkhees (4M)",
+    questionType: "MCQ",
+    marks: 1,
+    questionText: "In Urdu Grammar (Qawaid), the word 'Ba-adab' (با ادب) is an example of:",
+    options: [
+      "Sabqa (Prefix)",
+      "Lahqa (Suffix)",
+      "Zarb-ul-Masal (Proverb)",
+      "Takhallus (Pen Name)"
+    ],
+    correctOptionIndex: 0,
+    explanation: "'Ba' (با) is attached before the root noun 'Adab' (ادب) to modify its meaning, making 'Ba-adab' an example of Sabqa (Prefix).",
+    difficulty: "Easy",
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED",
+    tags: ["Urdu", "Qawaid", "BSEB"]
   },
 ];
 
 // =======================================================================
-// SEED CHAPTER-WISE PYQs (VERIFIED PREVIOUS YEAR QUESTIONS)
+// SEED CHAPTER-WISE PYQs (BOARD-PATTERN PRACTICE; SOURCE-REQUIRED UNTIL PAPER CODE ARCHIVED)
 // =======================================================================
 
 export const SEED_PYQS: ChapterPYQ[] = [
@@ -601,7 +653,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 3,
     answerSolution: "1. Role of HCl: Creates an acidic medium (pH ~1.5-2) necessary for activation of pepsinogen to pepsin; kills harmful bacteria ingested with food.\n2. Protection: The inner mucosal lining secretes a thick layer of mucus which shields stomach walls from acid erosion.",
     difficulty: "Medium",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
   // Class 10 Math
   {
@@ -616,7 +669,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 5,
     answerSolution: "Proof by contradiction: Assume √5 = a/b where a, b are co-prime integers (b ≠ 0). 5 = a²/b² => a² = 5b². Thus 5 divides a², so 5 divides a. Let a = 5c => (5c)² = 5b² => 25c² = 5b² => b² = 5c². Thus 5 divides b. This contradicts that a and b are co-prime. Hence, √5 is irrational.",
     difficulty: "Medium",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
   // Class 11 Physics
   {
@@ -631,7 +685,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 3,
     answerSolution: "Acceleration a = v(dv/dx) => a dx = v dv. Integrating both sides with limits: a ∫[0 to s] dx = ∫[u to v] v dv => a[s] = [(v² - u²)/2] => 2as = v² - u² => v² = u² + 2as.",
     difficulty: "Medium",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
   // Class 12 Accountancy
   {
@@ -646,7 +701,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 3,
     answerSolution: "C's share of goodwill = ₹90,000 × (1/3) = ₹30,000. This ₹30,000 will be debited to remaining partners A and B in their gaining ratio (1:1), ₹15,000 each.",
     difficulty: "Medium",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
   // Class 12 Physics
   {
@@ -661,7 +717,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 5,
     answerSolution: "E_equatorial = (1 / 4πε₀) × (p / (r² + a²)^(3/2)). For a short dipole where r >> a, E_equatorial = (1 / 4πε₀) × (p / r³), oriented anti-parallel to dipole moment vector p.",
     difficulty: "Hard",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
   // Class 12 Economics
   {
@@ -676,7 +733,8 @@ export const SEED_PYQS: ChapterPYQ[] = [
     marks: 4,
     answerSolution: "1. Externalities: Negative externalities (e.g. industrial pollution) cause harm to society without penalty deducted from GDP; positive externalities provide welfare without addition to GDP.\n2. Non-monetary exchanges: Barter trade and household services by homemakers contribute immensely to welfare but are excluded from GDP calculations.",
     difficulty: "Medium",
-    sourceType: "VERIFIED PYQ"
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED"
   },
 ];
 
@@ -739,7 +797,25 @@ export const SEED_PRACTICE_QUESTIONS: PracticeQuestion[] = [
     answerSolution: "Field due to +q at origin E₁ = (q / 4πε₀ a²) along -x axis.\nField due to -2q at origin E₂ = (2q / 4πε₀ (4a)²) = (q / 32πε₀ a²) along +x axis.\nNet E = E₁ - E₂ = (31 q / 128πε₀ a²) along -x axis.",
     difficulty: "Hard",
     sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED",
     tags: ["Electric Field", "Vector"]
+  },
+  {
+    id: "prac-c12-urdu-1",
+    board: "BSEB",
+    classLevel: "Class 12",
+    stream: "Commerce",
+    subjectName: "Urdu",
+    chapterTitle: "Kahkashan Part-II (Hissa-e-Nasr): Khaka, Inshaiya, Afsana & Khutoot",
+    topicName: "Prescribed Prose Lessons, Authors (Musannifeen) & Markazi Khayal",
+    questionText: "Distinguish between 'Khaka' and 'Sawaneh' in Urdu prose with reference to Mirza Farhatullah Beg's 'Nazir Ahmad ki Kahani'.",
+    questionType: "Short Answer",
+    marks: 2,
+    answerSolution: "Khaka highlights salient personality traits and living anecdotes of an individual with wit and brevity, whereas Sawaneh presents a chronological, comprehensive biography from birth to death.",
+    difficulty: "Medium",
+    sourceType: "SAMPLE PRACTICE",
+    verificationStatus: "SOURCE-REQUIRED",
+    tags: ["Urdu", "Kahkashan", "BSEB"]
   },
 ];
 
@@ -755,77 +831,297 @@ import {
   SubjectGapSummary,
   QuestionBankGapReport,
   StreamType,
+  BoardType,
+  PYQSourceProvenance,
+  CurriculumVerificationStatus,
+  QuestionSourceType,
 } from "../types";
+import {
+  normalizeCurriculumBoard,
+  AUTHORITATIVE_CURRICULUM_AUTHORITIES,
+  BOARD_ALLOWED_AUTHORITIES,
+  DEFAULT_CURRICULUM_ACADEMIC_YEAR,
+  isOfficialBoardSourceUrl,
+  normalizeVerificationStatus,
+} from "../data/masterCurriculum";
+
+const PYQ_PLACEHOLDER_ID_REGEX =
+  /^(pending|unverified|placeholder|todo|sample|mock|temp|draft|unknown|tbd|none|test|user|custom|student|client|local|fake|syn-pyq)([-_\s:]|$)/i;
+
+export function validatePYQProvenance(
+  pyq: ChapterPYQ,
+  targetBoard?: BoardType | string,
+  targetAcademicYear: string = DEFAULT_CURRICULUM_ACADEMIC_YEAR
+): {
+  isVerifiedPyq: boolean;
+  effectiveSourceType: QuestionSourceType;
+  effectiveVerificationStatus: CurriculumVerificationStatus;
+  examYear?: number;
+  academicYear?: string;
+  syllabusYear?: string;
+  isCurrentYearSyllabusEvidence: boolean;
+} {
+  const prov = pyq.pyqProvenance;
+  const fallbackStatus = normalizeVerificationStatus(pyq.verificationStatus, "SOURCE-REQUIRED");
+  if (!prov) {
+    return {
+      isVerifiedPyq: false,
+      effectiveSourceType: "SAMPLE PRACTICE",
+      effectiveVerificationStatus:
+        fallbackStatus === "SOURCE-CONFLICT"
+          ? "SOURCE-CONFLICT"
+          : fallbackStatus === "OUTDATED"
+          ? "OUTDATED"
+          : "SOURCE-REQUIRED",
+      examYear: pyq.year,
+      isCurrentYearSyllabusEvidence: false,
+    };
+  }
+
+  const resolvedExamYear = prov.examYear || prov.year || pyq.year;
+  const resolvedAcademicYear =
+    prov.academicYear ||
+    (resolvedExamYear ? `${resolvedExamYear - 1}-${String(resolvedExamYear).slice(-2)}` : undefined);
+  const resolvedSyllabusYear = prov.syllabusYear || resolvedAcademicYear;
+
+  const provStatus = normalizeVerificationStatus(prov.verificationStatus, "SOURCE-REQUIRED");
+  if (provStatus === "SOURCE-CONFLICT") {
+    return {
+      isVerifiedPyq: false,
+      effectiveSourceType: "SAMPLE PRACTICE",
+      effectiveVerificationStatus: "SOURCE-CONFLICT",
+      examYear: resolvedExamYear,
+      academicYear: resolvedAcademicYear,
+      syllabusYear: resolvedSyllabusYear,
+      isCurrentYearSyllabusEvidence: false,
+    };
+  }
+
+  // Outdated paper detection: explicit OUTDATED status or explicit applicableAcademicYears excluding targetAcademicYear
+  const hasExplicitInapplicableYear =
+    Array.isArray(prov.applicableAcademicYears) &&
+    prov.applicableAcademicYears.length > 0 &&
+    !prov.applicableAcademicYears.includes(targetAcademicYear);
+
+  if (provStatus === "OUTDATED" || hasExplicitInapplicableYear) {
+    return {
+      isVerifiedPyq: false,
+      effectiveSourceType: "SAMPLE PRACTICE",
+      effectiveVerificationStatus: "OUTDATED",
+      examYear: resolvedExamYear,
+      academicYear: resolvedAcademicYear,
+      syllabusYear: resolvedSyllabusYear,
+      isCurrentYearSyllabusEvidence: false,
+    };
+  }
+
+  const normalizedProvBoard = normalizeCurriculumBoard(prov.board || pyq.board || "Other");
+  const normalizedPyqBoard = pyq.board ? normalizeCurriculumBoard(pyq.board) : normalizedProvBoard;
+  const normalizedTargetBoard = targetBoard ? normalizeCurriculumBoard(targetBoard) : normalizedPyqBoard;
+
+  // Reject wrong-board or cross-board provenance mismatch
+  const hasBoardMatch =
+    normalizedProvBoard !== "Other" &&
+    normalizedProvBoard === normalizedPyqBoard &&
+    normalizedProvBoard === normalizedTargetBoard;
+  const hasYearMatch = !pyq.year || !prov.year || pyq.year === prov.year;
+
+  const allowedAuthorities = BOARD_ALLOWED_AUTHORITIES[normalizedProvBoard] || [];
+  const hasValidAuthority =
+    hasBoardMatch &&
+    AUTHORITATIVE_CURRICULUM_AUTHORITIES.includes(prov.authority) &&
+    allowedAuthorities.includes(prov.authority);
+  const rawSourceId = (prov.sourceId || "").trim();
+  const isModelPaperSource =
+    /\b(model\s*question\s*paper|model\s*paper|sample\s*paper|specimen\s*paper)\b/i.test(
+      prov.documentTitle || ""
+    ) ||
+    /(intermodelpaper|matricmodelpaper|model[-_]?paper|modelpaper)/i.test(
+      `${prov.sourceId || ""} ${prov.paperCode || ""} ${prov.sourceUrl || ""}`
+    );
+  const hasValidSourceId =
+    rawSourceId.length > 5 &&
+    !PYQ_PLACEHOLDER_ID_REGEX.test(rawSourceId) &&
+    !isModelPaperSource;
+  const hasPaperCode =
+    Boolean(prov.paperCode && prov.paperCode.trim().length >= 3) && !isModelPaperSource;
+  const hasQuestionNum = Boolean(prov.questionNumber && prov.questionNumber.trim().length >= 1);
+  const hasDocTitle =
+    Boolean(prov.documentTitle && prov.documentTitle.trim().length > 5) &&
+    !isModelPaperSource &&
+    !/\b(pending|unverified|placeholder|sample|mock|unofficial|user|custom|model\s*question\s*paper|model\s*paper)\b/i.test(
+      prov.documentTitle
+    );
+  // Explicit pageReference is required; sourceUrl alone cannot verify a PYQ
+  const hasExplicitPageReference = Boolean(prov.pageReference && prov.pageReference.trim().length >= 2);
+  const hasValidUrlIfProvided = prov.sourceUrl?.trim()
+    ? isOfficialBoardSourceUrl(prov.sourceUrl)
+    : true;
+
+  if (
+    provStatus === "VERIFIED" &&
+    hasBoardMatch &&
+    hasYearMatch &&
+    hasValidAuthority &&
+    hasValidSourceId &&
+    hasPaperCode &&
+    hasQuestionNum &&
+    hasDocTitle &&
+    hasExplicitPageReference &&
+    hasValidUrlIfProvided
+  ) {
+    // Section 12 PYQ Year Rule: A verified past paper (e.g. 2024 or 2026 exam year for 2023-24 or 2025-26 academic year)
+    // is a genuine VERIFIED PYQ for its own exam year, but does NOT establish 2026-27 syllabus verification unless syllabusYear === targetAcademicYear
+    const isCurrentYearSyllabusEvidence =
+      resolvedSyllabusYear === targetAcademicYear &&
+      resolvedAcademicYear === targetAcademicYear;
+    return {
+      isVerifiedPyq: true,
+      effectiveSourceType: "VERIFIED PYQ",
+      effectiveVerificationStatus: "VERIFIED",
+      examYear: resolvedExamYear,
+      academicYear: resolvedAcademicYear,
+      syllabusYear: resolvedSyllabusYear,
+      isCurrentYearSyllabusEvidence,
+    };
+  }
+
+  return {
+    isVerifiedPyq: false,
+    effectiveSourceType: "SAMPLE PRACTICE",
+    effectiveVerificationStatus: "SOURCE-REQUIRED",
+    examYear: resolvedExamYear,
+    academicYear: resolvedAcademicYear,
+    syllabusYear: resolvedSyllabusYear,
+    isCurrentYearSyllabusEvidence: false,
+  };
+}
 
 export function getQuestionsForCurriculum(
   classLevel: string = "Class 10",
   subjectName?: string,
   chapterTitle?: string,
-  topicName?: string
+  topicName?: string,
+  board?: BoardType | string
 ): {
   mcqs: TopicMCQ[];
   pyqs: ChapterPYQ[];
   practice: PracticeQuestion[];
 } {
-  let mcqs = [...SEED_MCQS];
-  let pyqs = [...SEED_PYQS];
-  let practice = [...SEED_PRACTICE_QUESTIONS];
+  const normalizedBoard = board ? normalizeCurriculumBoard(board) : undefined;
+  let mcqs: TopicMCQ[] = SEED_MCQS.filter((m) => {
+    if (!normalizedBoard || !m.board) return true;
+    return normalizeCurriculumBoard(m.board) === normalizedBoard;
+  }).map((m) => ({
+    ...m,
+    board: m.board ? normalizeCurriculumBoard(m.board) : normalizedBoard || "CBSE",
+    questionType: m.questionType || ("MCQ" as const),
+    marks: m.marks || 1,
+    verificationStatus:
+      normalizeVerificationStatus(m.verificationStatus, "SOURCE-REQUIRED") === "VERIFIED"
+        ? ("SOURCE-REQUIRED" as CurriculumVerificationStatus)
+        : normalizeVerificationStatus(m.verificationStatus, "SOURCE-REQUIRED"),
+  }));
 
-  // Dynamic high-yield academic synthesis from Master Curriculum for 100% complete coverage
-  const allCurriculum = getAllCurriculumSubjects();
+  let pyqs: ChapterPYQ[] = SEED_PYQS.filter((p) => {
+    if (!normalizedBoard || !p.board) return true;
+    return normalizeCurriculumBoard(p.board) === normalizedBoard;
+  }).map((p) => {
+    const validated = validatePYQProvenance(p);
+    return {
+      ...p,
+      board: p.board ? normalizeCurriculumBoard(p.board) : normalizedBoard || "CBSE",
+      sourceType: validated.effectiveSourceType,
+      verificationStatus: validated.effectiveVerificationStatus,
+    };
+  });
+
+  let practice: PracticeQuestion[] = SEED_PRACTICE_QUESTIONS.filter((pr) => {
+    if (!normalizedBoard || !pr.board) return true;
+    return normalizeCurriculumBoard(pr.board) === normalizedBoard;
+  }).map((pr) => ({
+    ...pr,
+    board: pr.board ? normalizeCurriculumBoard(pr.board) : normalizedBoard || "CBSE",
+    verificationStatus:
+      normalizeVerificationStatus(pr.verificationStatus, "SOURCE-REQUIRED") === "VERIFIED"
+        ? ("SOURCE-REQUIRED" as CurriculumVerificationStatus)
+        : normalizeVerificationStatus(pr.verificationStatus, "SOURCE-REQUIRED"),
+  }));
+
+  // Dynamic high-yield academic synthesis from board-isolated Master Curriculum
+  const allCurriculum = normalizedBoard
+    ? [
+        ...getCurriculumSubjects("Class 10", "General", normalizedBoard),
+        ...getCurriculumSubjects("Class 11", "Science", normalizedBoard),
+        ...getCurriculumSubjects("Class 11", "Commerce", normalizedBoard),
+        ...getCurriculumSubjects("Class 11", "Arts", normalizedBoard),
+        ...getCurriculumSubjects("Class 12", "Science", normalizedBoard),
+        ...getCurriculumSubjects("Class 12", "Commerce", normalizedBoard),
+        ...getCurriculumSubjects("Class 12", "Arts", normalizedBoard),
+      ]
+    : getAllCurriculumSubjects();
+
   for (const sub of allCurriculum) {
     if (classLevel !== "ALL" && sub.classLevel.toLowerCase() !== classLevel.toLowerCase()) continue;
     if (subjectName && subjectName !== "ALL" && !sub.name.toLowerCase().includes(subjectName.toLowerCase()) && !subjectName.toLowerCase().includes(sub.name.toLowerCase())) continue;
 
+    const targetBoard = normalizedBoard || (sub.board ? normalizeCurriculumBoard(sub.board) : "CBSE");
+
     for (const chap of sub.chapters) {
       if (chapterTitle && chapterTitle !== "ALL" && !chap.title.toLowerCase().includes(chapterTitle.toLowerCase())) continue;
 
-      // Ensure Chapter PYQs (at least 3 authentic board exam years)
+      // Ensure board-pattern exam practice questions without fabricating official board PYQ citations
       const existingChapPYQs = pyqs.filter((p) => p.chapterTitle === chap.title);
       if (existingChapPYQs.length < 3) {
         pyqs.push({
           id: `syn-pyq-${chap.id}-2024`,
           classLevel: sub.classLevel,
+          stream: sub.stream,
           subjectName: sub.name,
           chapterTitle: chap.title,
           year: 2024,
-          board: "CBSE / State Board",
-          questionText: `[CBSE 2024 - 5 Marks] Discuss in detail the fundamental laws, applications, and conceptual derivations underlying ${chap.title}.`,
+          board: targetBoard,
+          questionText: `[${targetBoard} Board-Pattern Sample Practice - 5 Marks] Discuss in detail the fundamental laws, applications, and conceptual derivations underlying ${chap.title}.`,
           questionType: "Long Answer",
           marks: 5,
           answerSolution: `Model Board Answer Scheme:\n1. Core Concepts: ${chap.topics.map(t => t.name).join(", ")}.\n2. Key Principles: ${chap.notesSummary}\n3. References: ${chap.bookChapterTitle}.`,
           difficulty: "Medium",
-          sourceType: "VERIFIED PYQ",
+          sourceType: "SAMPLE PRACTICE",
+          verificationStatus: "SOURCE-REQUIRED",
         });
 
         pyqs.push({
           id: `syn-pyq-${chap.id}-2023`,
           classLevel: sub.classLevel,
+          stream: sub.stream,
           subjectName: sub.name,
           chapterTitle: chap.title,
           year: 2023,
-          board: "CBSE",
-          questionText: `[CBSE 2023 - 3 Marks] State the high-priority principles and give one practical illustration related to ${chap.title}.`,
+          board: targetBoard,
+          questionText: `[${targetBoard} Board-Pattern Sample Practice - 3 Marks] State the high-priority principles and give one practical illustration related to ${chap.title}.`,
           questionType: "Short Answer",
           marks: 3,
           answerSolution: `Key Evaluation Points:\n${chap.notesSummary.slice(0, 250)}\nHigh-Yield Formula / Law Applied.`,
           difficulty: "Easy",
-          sourceType: "VERIFIED PYQ",
+          sourceType: "SAMPLE PRACTICE",
+          verificationStatus: "SOURCE-REQUIRED",
         });
 
         pyqs.push({
           id: `syn-pyq-${chap.id}-2022`,
           classLevel: sub.classLevel,
+          stream: sub.stream,
           subjectName: sub.name,
           chapterTitle: chap.title,
           year: 2022,
-          board: "All India Board",
-          questionText: `[AISSCE 2022 - 4 Marks] Critical case-study & reasoning analysis on ${chap.title}. Explain why standard theoretical conditions are essential.`,
+          board: targetBoard,
+          questionText: `[${targetBoard} Board-Pattern Sample Practice - 4 Marks] Critical case-study & reasoning analysis on ${chap.title}. Explain why standard theoretical conditions are essential.`,
           questionType: "Conceptual",
           marks: 4,
           answerSolution: `Comprehensive Analytical Response: Evaluates theoretical parameters, step-by-step reasoning, and final conclusion.`,
           difficulty: "Hard",
-          sourceType: "VERIFIED PYQ",
+          sourceType: "SAMPLE PRACTICE",
+          verificationStatus: "SOURCE-REQUIRED",
         });
       }
 
@@ -1019,8 +1315,8 @@ export function getQuestionsForCurriculum(
               diff: "Hard" as const,
             },
             {
-              text: `What is the significance of the VVI exam insight: "${vvis[vvis.length - 1] || vvis[0]}"?`,
-              correct: `It represents a recurring board exam question hotspot with critical marking weightage`,
+              text: `What is the significance of the study priority insight: "${vvis[vvis.length - 1] || vvis[0]}"?`,
+              correct: `It represents an application-prioritized study focus point in the chapter`,
               distractors: [
                 `It is an optional trivia fact rarely tested in examinations`,
                 `It is an outdated historical dispute with no syllabus value`,
@@ -1131,17 +1427,22 @@ export function getQuestionsForCurriculum(
 
             mcqs.push({
               id: `syn-mcq-${top.id}-${i + 1}`,
+              board: targetBoard,
               classLevel: sub.classLevel,
+              stream: sub.stream,
               subjectName: sub.name,
               chapterTitle: chap.title,
               topicName: top.name,
+              questionType: "MCQ",
+              marks: 1,
               questionText: tpl.text,
               options: fullOptions,
               correctOptionIndex: 0,
               explanation: tpl.expl,
               difficulty: tpl.diff,
               sourceType: "SAMPLE PRACTICE",
-              tags: [sub.name, chap.title, "Mastery"],
+              verificationStatus: top.verificationStatus || chap.verificationStatus || sub.verificationStatus || "SOURCE-REQUIRED",
+              tags: [sub.name, chap.title, "Mastery", targetBoard],
             });
           }
         }
@@ -1236,7 +1537,9 @@ export function getQuestionsForCurriculum(
             const pTpl = practiceTemplates[pIdx];
             practice.push({
               id: `syn-prac-${top.id}-${pIdx + 1}`,
+              board: targetBoard,
               classLevel: sub.classLevel,
+              stream: sub.stream,
               subjectName: sub.name,
               chapterTitle: chap.title,
               topicName: top.name,
@@ -1246,7 +1549,8 @@ export function getQuestionsForCurriculum(
               answerSolution: pTpl.sol,
               difficulty: pTpl.diff,
               sourceType: "SAMPLE PRACTICE",
-              tags: [sub.name, "Comprehensive", pTpl.type],
+              verificationStatus: top.verificationStatus || chap.verificationStatus || sub.verificationStatus || "SOURCE-REQUIRED",
+              tags: [sub.name, "Comprehensive", pTpl.type, targetBoard],
             });
           }
         }
@@ -1381,7 +1685,7 @@ export function getFlashcardsForCurriculum(
           },
           {
             id: `fc-${top.id}-10-mastery`,
-            front: `🏆 Exam Score Booster: What guarantees full marks in a long-answer question on "${top.name}"?`,
+            front: `🏆 Exam Score Booster: What maximizes clarity and scoring in a long-answer question on "${top.name}"?`,
             back: `Include: Clear technical definition, labeled diagram or formal equation (${formulas[0]}), step-by-step reasoning, and final unit-checked conclusion.`,
             category: "High-Yield Point",
             tags: ["Score Booster", sub.name],
@@ -1451,9 +1755,10 @@ export function getChapterTestsForCurriculum(
 export function getVVIQuestionsForCurriculum(
   classLevel: string = "Class 10",
   subjectName?: string,
-  chapterTitle?: string
+  chapterTitle?: string,
+  board?: BoardType | string
 ): PracticeQuestion[] {
-  const { practice, pyqs } = getQuestionsForCurriculum(classLevel, subjectName, chapterTitle);
+  const { practice, pyqs } = getQuestionsForCurriculum(classLevel, subjectName, chapterTitle, undefined, board);
   const vviItems: PracticeQuestion[] = [];
 
   // Transform high-priority PYQs and practice into VVI format
@@ -1464,22 +1769,61 @@ export function getVVIQuestionsForCurriculum(
   }
 
   for (const pyq of pyqs) {
+    const validated = validatePYQProvenance(pyq);
+    const isVerifiedPyq = validated.isVerifiedPyq;
     vviItems.push({
       id: `vvi-${pyq.id}`,
+      board: pyq.board,
       classLevel: pyq.classLevel,
+      stream: pyq.stream,
       subjectName: pyq.subjectName,
       chapterTitle: pyq.chapterTitle,
-      questionText: `[PYQ ${pyq.year} - ${pyq.marks} Marks] ${pyq.questionText}`,
+      year: pyq.year,
+      questionText: isVerifiedPyq
+        ? `[VERIFIED PYQ ${pyq.year} - ${pyq.marks} Marks] ${pyq.questionText}`
+        : `${pyq.questionText}`,
       questionType: pyq.questionType,
       marks: pyq.marks,
       answerSolution: pyq.answerSolution,
       difficulty: pyq.difficulty,
-      sourceType: "VERIFIED PYQ",
+      sourceType: validated.effectiveSourceType,
+      verificationStatus: validated.effectiveVerificationStatus,
       tags: ["VVI", pyq.subjectName, `${pyq.year}`],
     });
   }
 
   return vviItems;
+}
+
+export function getQuestionBankProvenanceAudit(
+  board?: BoardType | string,
+  classLevel: string = "ALL"
+): {
+  verifiedPyqCount: number;
+  samplePracticeCount: number;
+  sourceRequiredCount: number;
+  conflictCount: number;
+  outdatedCount: number;
+} {
+  const pool = getQuestionsForCurriculum(classLevel, undefined, undefined, undefined, board);
+  const allItems = [...pool.mcqs, ...pool.pyqs, ...pool.practice];
+  const verifiedPyqCount = pool.pyqs.filter(
+    (p) => validatePYQProvenance(p).isVerifiedPyq && p.sourceType === "VERIFIED PYQ"
+  ).length;
+  const samplePracticeCount = allItems.filter((item) => item.sourceType === "SAMPLE PRACTICE").length;
+  const sourceRequiredCount = allItems.filter(
+    (item) => (item.verificationStatus || "SOURCE-REQUIRED") === "SOURCE-REQUIRED"
+  ).length;
+  const conflictCount = allItems.filter((item) => item.verificationStatus === "SOURCE-CONFLICT").length;
+  const outdatedCount = allItems.filter((item) => item.verificationStatus === "OUTDATED").length;
+
+  return {
+    verifiedPyqCount,
+    samplePracticeCount,
+    sourceRequiredCount,
+    conflictCount,
+    outdatedCount,
+  };
 }
 
 // =======================================================================
@@ -1537,6 +1881,7 @@ export function auditQuestionBank(
       Geography: ["Accounting Equation", "Quantum Numbers", "Double Entry", "Writs"],
       Sociology: ["Kinematics", "Quantum Numbers", "Trial Balance", "Double Entry"],
       Economics: ["Kinematics", "Quantum Numbers", "Photosynthesis", "Plate Tectonics"],
+      Urdu: ["Kinematics", "Quantum Numbers", "Photosynthesis", "Trial Balance", "Balance Sheet"],
     };
 
     for (const chap of sub.chapters) {

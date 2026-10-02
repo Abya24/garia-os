@@ -27,7 +27,16 @@ import {
   StreamType,
 } from "../types";
 import { CAREER_CATALOG } from "./careerEngine";
-import { CLASS10_CURRICULUM, CurriculumSubject, getCurriculumSubjects } from "../data/masterCurriculum";
+import {
+  CLASS10_CURRICULUM,
+  CURRICULUM_BOARDS_METADATA,
+  CurriculumSubject,
+  DEFAULT_CURRICULUM_ACADEMIC_YEAR,
+  getBoardCurriculumHierarchy,
+  getCurriculumSubjects,
+  normalizeCurriculumBoard,
+} from "../data/masterCurriculum";
+import { BoardType, CurriculumVerificationStatus } from "../types";
 
 export interface HighPriorityFocusDecision {
   subjectId: string;
@@ -143,8 +152,24 @@ export interface DecisionEngineAnalytics {
   weeklyTargetStudyHours: number;
 }
 
+export interface DailyStudyActionItem {
+  id: string;
+  slot: string;
+  subjectName: string;
+  chapterTitle: string;
+  activity: string;
+  durationMinutes: number;
+  reason: string;
+  priority: "CRITICAL" | "HIGH" | "MEDIUM";
+}
+
 export interface AcademicDecisionReport {
   studentName: string;
+  board: BoardType;
+  academicYear: string;
+  curriculumVerificationStatus: CurriculumVerificationStatus;
+  curriculumProvenanceNote: string;
+  boardExamPattern: string;
   stream: StreamType;
   classLevel: string;
   highPriorityFocus: HighPriorityFocusDecision;
@@ -158,6 +183,7 @@ export interface AcademicDecisionReport {
   predictedPerformance: PredictedPerformanceDecision;
   careerAlignment: CareerAlignmentDecision;
   analytics: DecisionEngineAnalytics;
+  dailyStudyActionPlan: DailyStudyActionItem[];
   generatedAt: number;
 }
 
@@ -221,6 +247,14 @@ const DEFAULT_STREAM_TOPICS: Record<
       chapters: [
         { title: "The Last Lesson & Lost Spring", topic: "Character Sketches & Central Themes", vvi: false },
         { title: "Writing Skills", topic: "Formal Invitations & Job Application", vvi: true },
+      ],
+    },
+    {
+      subject: "Urdu",
+      color: "#10b981",
+      chapters: [
+        { title: "Urdu Prose & Poetry", topic: "Prose Analysis, Literary Essays & Ghazal Appreciation", vvi: true },
+        { title: "Urdu Grammar & Composition", topic: "Grammar Rules, Essay Writing & Formal Applications", vvi: true },
       ],
     },
   ],
@@ -395,8 +429,16 @@ export function generateAcademicDecisionReport(params: {
     daysUntilExam <= 15 ? 1.6 : daysUntilExam <= 30 ? 1.35 : daysUntilExam <= 60 ? 1.15 : 1.0;
 
   // 2. Filter / Seed Stream & Class-Specific Curriculum Subjects (Rule 5)
-  const board = student?.board || examProfile?.board || "CBSE";
-  const curriculumSubs = getCurriculumSubjects(classLevel, stream, board);
+  const rawBoard = student?.board || examProfile?.board || "CBSE";
+  const normalizedBoard = normalizeCurriculumBoard(rawBoard);
+  const boardMeta = CURRICULUM_BOARDS_METADATA[normalizedBoard];
+  const boardHierarchy = getBoardCurriculumHierarchy(
+    normalizedBoard,
+    classLevel,
+    stream,
+    DEFAULT_CURRICULUM_ACADEMIC_YEAR
+  );
+  const curriculumSubs = boardHierarchy.subjects;
   const defaultStreamData =
     curriculumSubs.length > 0
       ? curriculumSubs.map((cs) => ({
@@ -555,7 +597,7 @@ export function generateAcademicDecisionReport(params: {
       : `${topCandidateChapter?.title || "Core Concepts"} Key Practice`;
 
   if (topCandidateChapter?.isWeak && topCandidateChapter.priority === "VVI") {
-    focusReason = `High-yield VVI board topic with low mastery scores (${weakestSubject?.accuracyPct || 55}% accuracy). Revision required before exam countdown reaches ${daysUntilExam} days.`;
+    focusReason = `Application-derived high-priority (VVI) study topic with low mastery scores (${weakestSubject?.accuracyPct || 55}% accuracy). Revision recommended before exam countdown reaches ${daysUntilExam} days.`;
     urgencyLevel = "CRITICAL";
     priorityScore = Math.min(99, Math.round(92 * examProximityMultiplier));
   } else if (weakestSubject && weakestSubject.readinessPct < 60) {
@@ -563,7 +605,7 @@ export function generateAcademicDecisionReport(params: {
     urgencyLevel = "HIGH";
     priorityScore = Math.min(95, Math.round(85 * examProximityMultiplier));
   } else if (daysUntilExam <= 30) {
-    focusReason = `Exam in ${daysUntilExam} days: Board past questions frequently test this high-weight topic. Complete a timed practice session today.`;
+    focusReason = `Exam in ${daysUntilExam} days: High-priority revision topic in your ${normalizedBoard} study curriculum. Complete a timed practice session today.`;
     urgencyLevel = "URGENT";
     priorityScore = 88;
   } else {
@@ -720,14 +762,17 @@ export function generateAcademicDecisionReport(params: {
     },
     {
       id: "opp-2",
-      opportunity: `Solve 2022-2024 Board Previous Year Questions (PYQs)`,
+      opportunity:
+        normalizedBoard === "BSEB"
+          ? `Practice ${normalizedBoard} 50% OMR Objective MCQs + Short/Long Descriptive Set`
+          : `Solve ${normalizedBoard} Board-Pattern Practice & Previous Year Questions`,
       potentialGain: "+8% speed & accuracy boost",
       actionText: "Open Exam Center",
       targetTab: "exam",
     },
     {
       id: "opp-3",
-      opportunity: `Clear doubts with Abya AI multimodal tutor`,
+      opportunity: `Clear ${normalizedBoard} ${classLevel} ${stream} doubts with Abya AI tutor`,
       potentialGain: "Rapid conceptual clarity",
       actionText: "Ask Abya AI",
       targetTab: "abya",
@@ -831,8 +876,49 @@ export function generateAcademicDecisionReport(params: {
     weeklyTargetStudyHours: targetStudyHoursWeekly,
   };
 
+  const dailyStudyActionPlan: DailyStudyActionItem[] = [
+    {
+      id: "action-slot-1",
+      slot: "Session 1 (Deep Focus)",
+      subjectName: highPriorityFocus.subjectName,
+      chapterTitle: highPriorityFocus.chapterTitle,
+      activity: `Concept Mastery & Notes: ${highPriorityFocus.topicTitle}`,
+      durationMinutes: highPriorityFocus.estimatedMinutes || 45,
+      reason: highPriorityFocus.reason,
+      priority: highPriorityFocus.urgencyLevel === "CRITICAL" ? "CRITICAL" : "HIGH",
+    },
+    {
+      id: "action-slot-2",
+      slot: "Session 2 (Spaced Revision)",
+      subjectName: revisionItems[0]?.subjectName || weakestSubject?.subjectName || highPriorityFocus.subjectName,
+      chapterTitle: revisionItems[0]?.chapterTitle || highPriorityFocus.chapterTitle,
+      activity: `Active Recall & Formula/Rule Revision (${revisionItems[0]?.daysText || "Due Today"})`,
+      durationMinutes: 35,
+      reason: `Prevents memory decay on ${revisionItems[0]?.priority || "VVI"} syllabus topics.`,
+      priority: "HIGH",
+    },
+    {
+      id: "action-slot-3",
+      slot: "Session 3 (Board Exam Drill)",
+      subjectName: weakestSubject?.subjectName || highPriorityFocus.subjectName,
+      chapterTitle: highPriorityFocus.chapterTitle,
+      activity:
+        normalizedBoard === "BSEB"
+          ? "BSEB 50% OMR Objective MCQ Sprint (25 Qs) + 2-Mark/5-Mark Answer Writing"
+          : `${normalizedBoard} Board-Pattern MCQ & Structured Descriptive Practice`,
+      durationMinutes: 40,
+      reason: `Aligned with ${boardMeta.examPatternSummary}.`,
+      priority: "MEDIUM",
+    },
+  ];
+
   return {
     studentName,
+    board: normalizedBoard,
+    academicYear: boardHierarchy.academicYear,
+    curriculumVerificationStatus: boardHierarchy.verificationStatus,
+    curriculumProvenanceNote: boardHierarchy.sourceStatusSummary,
+    boardExamPattern: boardMeta.examPatternSummary,
     stream,
     classLevel,
     highPriorityFocus,
@@ -846,6 +932,7 @@ export function generateAcademicDecisionReport(params: {
     predictedPerformance,
     careerAlignment,
     analytics,
+    dailyStudyActionPlan,
     generatedAt: Date.now(),
   };
 }

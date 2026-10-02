@@ -303,7 +303,28 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+              <div>
+                <label className="block text-slate-300 text-xs font-medium mb-1">
+                  Board
+                </label>
+                <select
+                  value={board}
+                  onChange={(e) => setBoard(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl glass-pill bg-slate-900 text-white text-xs border border-white/10 focus:outline-none focus:border-emerald-400"
+                >
+                  <option value="BSEB">BSEB (Bihar Board)</option>
+                  <option value="CBSE">CBSE</option>
+                  <option value="ICSE">ICSE / ISC</option>
+                  <option value="UP Board">UP Board</option>
+                  <option value="MP Board">MP Board</option>
+                  <option value="Maharashtra Board">Maharashtra Board</option>
+                  <option value="NCERT">NCERT Core</option>
+                  <option value="State Board">State Board</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-slate-300 text-xs font-medium mb-1">
                   Stream

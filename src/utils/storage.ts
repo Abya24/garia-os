@@ -1586,13 +1586,15 @@ export const saveSmartSuggestionsState = (state: SmartSuggestionsState, profileI
 export const loadAcademicSubjects = (
   stream: StreamType = "Commerce",
   profileId?: string,
-  classLevel?: string
+  classLevel?: string,
+  board?: string
 ): AcademicSubject[] => {
   const pId = profileId || loadActiveProfileId();
   const activeProf = loadProfiles().find((p) => p.id === pId);
   const actualClass = classLevel || activeProf?.classLevel || "Class 10";
   const actualStream = stream || activeProf?.stream || (actualClass === "Class 10" ? "General" : "Commerce");
-  const fallback = getDefaultSubjectsForStream(actualStream, actualClass);
+  const actualBoard = board || activeProf?.board;
+  const fallback = getDefaultSubjectsForStream(actualStream, actualClass, actualBoard);
   return getItem(getProfileKey(pId, STORAGE_KEYS.ACADEMIC_SUBJECTS), fallback);
 };
 export const saveAcademicSubjects = (subs: AcademicSubject[], profileId?: string): void => {

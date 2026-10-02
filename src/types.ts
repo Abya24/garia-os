@@ -484,11 +484,142 @@ export interface CareerRoadmap {
 }
 
 export type ChapterPriority = "VVI" | "Important" | "Normal";
+export type CurriculumVerificationStatus =
+  | "VERIFIED"
+  | "PARTIALLY-VERIFIED"
+  | "SOURCE-REQUIRED"
+  | "SOURCE-CONFLICT"
+  | "OUTDATED"
+  | "NOT VERIFIED";
+export type AcademicContentLanguageCode = "en" | "hi" | "ur" | "bn";
+
+export type CurriculumSourceAuthority =
+  | "BSEB"
+  | "SCERT_BIHAR"
+  | "BSTBPC"
+  | "CBSE"
+  | "NCERT"
+  | "CISCE"
+  | "UPMSP"
+  | "MPBSE"
+  | "MSBSHSE"
+  | "STATE_BOARD"
+  | "UNVERIFIED";
+
+export type CurriculumDocumentType =
+  | "BOARD_NOTIFICATION"
+  | "SCERT_DOCUMENT"
+  | "BOARD_SYLLABUS_PDF"
+  | "OFFICIAL_TEXTBOOK"
+  | "EXAM_BLUEPRINT"
+  | "QUESTION_PAPER_ARCHIVE"
+  | "PENDING_OFFICIAL_SOURCE";
+
+export type CurriculumEvidenceStage =
+  | "OFFICIAL_RESOURCE_CONFIRMED"
+  | "CURRICULUM_CONTENT_SUPPORTED"
+  | "CURRENT_YEAR_VERIFIED"
+  | "SOURCE-REQUIRED"
+  | "OUTDATED"
+  | "SOURCE-CONFLICT";
+
+export type CurriculumTextbookApplicabilityStatus =
+  | "CURRENT_YEAR_VERIFIED"
+  | "OFFICIAL_RESOURCE_CONFIRMED_ONLY"
+  | "SOURCE-REQUIRED"
+  | "OUTDATED";
+
+export interface CurriculumPartialEvidenceSummary {
+  verifiedChapters: string[];
+  supportedHistoricalChapters: string[];
+  unsupportedOrConflictedChapters: string[];
+  sourceRequiredChapters: string[];
+}
+
+export interface CurriculumSupportingResource {
+  title: string;
+  authority: CurriculumSourceAuthority;
+  documentType: CurriculumDocumentType;
+  url: string;
+  publicationDate?: string;
+  resourceAcademicYear?: string;
+  pageReference?: string;
+  chapterReference?: string;
+  proves: string;
+}
+
+export interface CurriculumSourceConflict {
+  sourceA: string;
+  sourceB: string;
+  conflictDescription: string;
+  academicYear: string;
+  recommendedReviewAction: string;
+}
+
+export interface CurriculumSourceProvenance {
+  sourceId: string;
+  authority: CurriculumSourceAuthority;
+  board: BoardType;
+  classLevel?: "Class 10" | "Class 11" | "Class 12" | string;
+  stream?: StreamType;
+  subject?: string;
+  academicYear: string;
+  resourceAcademicYear?: string;
+  applicableAcademicYears?: string[];
+  documentTitle: string;
+  documentType: CurriculumDocumentType;
+  sourceUrl?: string;
+  publicationDate?: string;
+  accessedDate?: string;
+  pageReference?: string;
+  chapterReference?: string;
+  verificationStatus: CurriculumVerificationStatus;
+  evidenceStage?: CurriculumEvidenceStage;
+  textbookApplicabilityStatus?: CurriculumTextbookApplicabilityStatus;
+  officialResourceConfirmed?: boolean;
+  curriculumContentSupported?: boolean;
+  currentYearApplicabilityProven?: boolean;
+  officialSyllabusDocumentFound?: boolean;
+  officialExamBlueprintFound?: boolean;
+  supportingResources?: CurriculumSupportingResource[];
+  partialEvidenceSummary?: CurriculumPartialEvidenceSummary;
+  verificationNotes: string;
+  conflictDetails?: CurriculumSourceConflict;
+}
+
+export interface CurriculumPriorityBreakdown {
+  officialSyllabusStatus: CurriculumVerificationStatus;
+  applicationPriority: ChapterPriority;
+  priorityBasis: "APPLICATION_DERIVED_PRIORITY";
+  priorityDisclosure: string;
+  verifiedPyqCount: number;
+}
+
+export interface PYQSourceProvenance {
+  sourceId: string;
+  authority: CurriculumSourceAuthority;
+  board: BoardType | string;
+  year: number;
+  examYear?: number;
+  academicYear?: string;
+  syllabusYear?: string;
+  applicableAcademicYears?: string[];
+  classLevel: string;
+  subjectName: string;
+  paperCode: string;
+  questionNumber: string;
+  documentTitle: string;
+  sourceUrl?: string;
+  pageReference?: string;
+  verificationStatus: CurriculumVerificationStatus;
+}
 
 export interface AcademicSubject {
   id: string;
   name: string;
   stream?: StreamType;
+  board?: BoardType | string;
+  academicYear?: string;
   color: string;
   isCustom?: boolean;
   code?: string;
@@ -497,6 +628,9 @@ export interface AcademicSubject {
   completedChapters?: number;
   targetHoursPerWeek?: number;
   classLevel?: string;
+  verificationStatus?: CurriculumVerificationStatus;
+  sourceStatusNote?: string;
+  provenance?: CurriculumSourceProvenance;
 }
 
 export interface AcademicChapter {
@@ -522,6 +656,13 @@ export interface AcademicChapter {
   completedQuestions?: number;
   masteryLevel?: number;
   subjectName?: string;
+  board?: BoardType | string;
+  academicYear?: string;
+  verificationStatus?: CurriculumVerificationStatus;
+  estimatedStudyMinutes?: number;
+  examWeightageMarks?: number;
+  provenance?: CurriculumSourceProvenance;
+  priorityBreakdown?: CurriculumPriorityBreakdown;
 }
 
 export interface AcademicTest {
@@ -715,6 +856,8 @@ export type BoardType =
   | "CBSE"
   | "ICSE"
   | "UP Board"
+  | "MP Board"
+  | "Maharashtra Board"
   | "State Board"
   | "NCERT"
   | "Other";
@@ -827,16 +970,22 @@ export type QuestionSourceType = "VERIFIED PYQ" | "SAMPLE PRACTICE" | "AI-GENERA
 
 export interface TopicMCQ {
   id: string;
+  board?: BoardType | string;
   classLevel: string; // "Class 10" | "Class 11" | "Class 12"
+  stream?: StreamType;
   subjectName: string;
   chapterTitle: string;
   topicName: string;
+  year?: number;
+  questionType?: QuestionType;
+  marks?: number;
   questionText: string;
   options: [string, string, string, string];
   correctOptionIndex: number;
   explanation: string;
   difficulty: QuestionDifficulty;
   sourceType: QuestionSourceType;
+  verificationStatus?: CurriculumVerificationStatus;
   tags?: string[];
 }
 
@@ -915,24 +1064,33 @@ export interface QuestionBankGapReport {
 export interface ChapterPYQ {
   id: string;
   classLevel: string; // "Class 10" | "Class 11" | "Class 12"
+  stream?: StreamType;
   subjectName: string;
   chapterTitle: string;
+  topicName?: string;
   year: number; // e.g. 2024, 2023, 2022
   board?: string; // "CBSE" | "BSEB" | "All Boards"
+  paperCode?: string;
+  questionNumber?: string;
   questionText: string;
   questionType: QuestionType;
   marks: number;
   answerSolution?: string;
   difficulty: QuestionDifficulty;
-  sourceType: QuestionSourceType; // "VERIFIED PYQ"
+  sourceType: QuestionSourceType; // "VERIFIED PYQ" only when pyqProvenance is verified
+  verificationStatus?: CurriculumVerificationStatus;
+  pyqProvenance?: PYQSourceProvenance;
 }
 
 export interface PracticeQuestion {
   id: string;
+  board?: BoardType | string;
   classLevel: string;
+  stream?: StreamType;
   subjectName: string;
   chapterTitle: string;
   topicName?: string;
+  year?: number;
   questionText: string;
   questionType: QuestionType;
   marks: number;
@@ -941,6 +1099,7 @@ export interface PracticeQuestion {
   answerSolution?: string;
   difficulty: QuestionDifficulty;
   sourceType: QuestionSourceType;
+  verificationStatus?: CurriculumVerificationStatus;
   tags?: string[];
 }
 

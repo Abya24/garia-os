@@ -1,4 +1,5 @@
 export type AppLanguage = "en" | "hi";
+export type SupportedAcademicContentLanguage = "en" | "hi" | "ur" | "bn";
 
 export const SUPPORTED_UI_LANGUAGES: {
   code: AppLanguage;
@@ -8,6 +9,27 @@ export const SUPPORTED_UI_LANGUAGES: {
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "hi", label: "Hindi", nativeLabel: "हिन्दी" },
 ];
+
+export const ACADEMIC_CONTENT_LANGUAGE_OPTIONS: {
+  code: SupportedAcademicContentLanguage;
+  label: string;
+  nativeLabel: string;
+}[] = [
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "hi", label: "Hindi", nativeLabel: "हिन्दी" },
+  { code: "ur", label: "Urdu", nativeLabel: "اردو" },
+  { code: "bn", label: "Bengali", nativeLabel: "বাংলা" },
+];
+
+export function resolveAcademicContentLanguage(
+  rawLang?: string | null
+): SupportedAcademicContentLanguage {
+  const raw = (rawLang || "").trim().toLowerCase();
+  if (raw === "hi" || raw.includes("hindi") || raw.includes("हिन्दी")) return "hi";
+  if (raw === "ur" || raw.includes("urdu") || raw.includes("اردو")) return "ur";
+  if (raw === "bn" || raw.includes("bengali") || raw.includes("বাংলা")) return "bn";
+  return "en";
+}
 
 export interface TranslationStrings {
   appName: string;
@@ -575,3 +597,37 @@ export function resolveEffectiveLanguage(
   }
   return getStoredLanguage();
 }
+
+export function getProvenanceStatusBadgeLabel(
+  status?: string,
+  lang: AppLanguage = "en"
+): string {
+  const normalized = status || "SOURCE-REQUIRED";
+  if (lang === "hi") {
+    switch (normalized) {
+      case "VERIFIED":
+        return "आधिकारिक रूप से सत्यापित (VERIFIED)";
+      case "PARTIALLY-VERIFIED":
+        return "आंशिक रूप से सत्यापित (PARTIALLY-VERIFIED)";
+      case "SOURCE-CONFLICT":
+        return "स्रोत विरोधाभास (SOURCE-CONFLICT)";
+      case "OUTDATED":
+        return "पुराना सत्र (OUTDATED)";
+      default:
+        return "स्रोत सत्यापन लंबित (SOURCE-REQUIRED)";
+    }
+  }
+  switch (normalized) {
+    case "VERIFIED":
+      return "Official Source Verified";
+    case "PARTIALLY-VERIFIED":
+      return "Partially Verified";
+    case "SOURCE-CONFLICT":
+      return "Source Conflict Detected";
+    case "OUTDATED":
+      return "Outdated Session Source";
+    default:
+      return "Board-Aligned Study Curriculum (Source Pending)";
+  }
+}
+

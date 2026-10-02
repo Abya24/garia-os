@@ -24,10 +24,13 @@ import { APP_VERSION } from "../constants/version";
 import { ProductionVersionBadge } from "./ProductionVersionBadge";
 import {
   AppLanguage,
+  SupportedAcademicContentLanguage,
   translations,
   saveStoredLanguage,
   SUPPORTED_UI_LANGUAGES,
+  ACADEMIC_CONTENT_LANGUAGE_OPTIONS,
   resolveEffectiveLanguage,
+  resolveAcademicContentLanguage,
 } from "../utils/i18n";
 import {
   getStudentAvatarInitials,
@@ -70,6 +73,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const [stream, setStream] = useState<StreamType>("General");
   const [board, setBoard] = useState<ExamBoard | string>("CBSE");
   const [language, setLanguage] = useState<AppLanguage>("en");
+  const [contentLanguage, setContentLanguage] = useState<SupportedAcademicContentLanguage>("en");
   const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENT_OPTIONS[0].value);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -104,6 +108,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setStream("General");
     setBoard("CBSE");
     setLanguage("en");
+    setContentLanguage("en");
     setAvatarColor(AVATAR_GRADIENT_OPTIONS[0].value);
     setEditingProfile(null);
   };
@@ -120,6 +125,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
     setLanguage(resolveEffectiveLanguage(p));
+    setContentLanguage(resolveAcademicContentLanguage(p.contentLanguage || p.language));
     setAvatarColor(p.avatarColor || AVATAR_GRADIENT_OPTIONS[0].value);
     setActiveTab("edit");
   };
@@ -145,6 +151,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       board,
       language,
       uiLanguage: language,
+      contentLanguage,
       avatarColor,
     });
     saveStoredLanguage(language);
@@ -165,6 +172,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       board,
       language,
       uiLanguage: language,
+      contentLanguage,
       avatarColor,
     });
     saveStoredLanguage(language);
@@ -454,7 +462,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* 2. Board */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -465,16 +473,19 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       onChange={(e) => setBoard(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
                     >
+                      <option value="BSEB">BSEB (Bihar Board)</option>
                       <option value="CBSE">CBSE Board</option>
                       <option value="ICSE">ICSE / ISC Board</option>
-                      <option value="BSEB">BSEB (Bihar Board)</option>
                       <option value="UP Board">UP Board (UPMSP)</option>
+                      <option value="MP Board">MP Board (MPBSE)</option>
+                      <option value="Maharashtra Board">Maharashtra Board</option>
                       <option value="NCERT">NCERT Core</option>
                       <option value="State Board">Other State Board</option>
+                      <option value="Other">Other Board</option>
                     </select>
                   </div>
 
-                  {/* 3. Language */}
+                  {/* 3. UI Language */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
                       <Globe className="w-3.5 h-3.5 text-cyan-400" />
@@ -488,6 +499,26 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       {SUPPORTED_UI_LANGUAGES.map((langOpt) => (
                         <option key={langOpt.code} value={langOpt.code}>
                           {langOpt.nativeLabel} ({langOpt.label} UI)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 3b. Academic Content Language */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Content Medium
+                    </label>
+                    <select
+                      value={contentLanguage}
+                      onChange={(e) =>
+                        setContentLanguage(e.target.value as SupportedAcademicContentLanguage)
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      {ACADEMIC_CONTENT_LANGUAGE_OPTIONS.map((opt) => (
+                        <option key={opt.code} value={opt.code}>
+                          {opt.nativeLabel} ({opt.label})
                         </option>
                       ))}
                     </select>

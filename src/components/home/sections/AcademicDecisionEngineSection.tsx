@@ -109,6 +109,7 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
   ]);
 
   const {
+    board,
     stream,
     classLevel,
     highPriorityFocus,
@@ -131,7 +132,18 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
             <span>Academic Decision Engine</span>
           </h2>
           <span className="text-[11px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded-full font-bold">
-            {stream} Stream • {classLevel}
+            {board} • {stream} Stream • {classLevel}
+          </span>
+          <span
+            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-semibold ${
+              decisionReport.curriculumVerificationStatus === "VERIFIED"
+                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
+                : "bg-amber-500/15 text-amber-300 border-amber-500/25"
+            }`}
+            title={decisionReport.curriculumProvenanceNote}
+          >
+            {decisionReport.academicYear || "2025-26"} •{" "}
+            {decisionReport.curriculumVerificationStatus || "SOURCE-REQUIRED"}
           </span>
           <span className="text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
             <Sparkles className="w-2.5 h-2.5 text-purple-400" />
