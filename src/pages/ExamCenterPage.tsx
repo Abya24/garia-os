@@ -63,6 +63,8 @@ import { WeakAreaDetectionSection } from "../components/WeakAreaDetectionSection
 import { SubjectComparisonView } from "../components/SubjectComparisonView";
 import { ExamReadinessScoreCard } from "../components/ExamReadinessScoreCard";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
+import { CurriculumHierarchyExplorer } from "../components/CurriculumHierarchyExplorer";
+import { CurriculumStatusBadge } from "../components/CurriculumStatusBadge";
 import {
   exportExamMilestoneIcs,
   exportAllMilestonesIcs,
@@ -127,6 +129,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<
     "overview" | "syllabus" | "queue" | "revision" | "tests" | "plan" | "milestones"
   >("overview");
+  const [syllabusViewMode, setSyllabusViewMode] = useState<"hierarchy" | "tracker">("hierarchy");
 
   const handleBack = () => {
     if (activeSubTab !== "overview") {
@@ -344,19 +347,12 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   Exam Intelligence Engine
                 </span>
-                {v19Report.board && (
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
-                      v19Report.curriculumVerificationStatus === "VERIFIED"
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                        : "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                    }`}
-                    title={v19Report.curriculumProvenanceNote}
-                  >
-                    {v19Report.board} ({v19Report.academicYear || "2025-26"}) •{" "}
-                    {v19Report.curriculumVerificationStatus || "SOURCE-REQUIRED"}
-                  </span>
-                )}
+                <CurriculumStatusBadge
+                  status={v19Report.curriculumVerificationStatus}
+                  academicYear={v19Report.academicYear || "2026-27"}
+                  sourceNote={v19Report.curriculumProvenanceNote}
+                  variant="compact"
+                />
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight flex items-center gap-2">
                 <ShieldAlert className="w-7 h-7 text-cyan-400" />
@@ -819,151 +815,221 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
       )}
 
       {/* ==========================================
-          SUB TAB 2: SYLLABUS PLANNER
+          SUB TAB 2: SYLLABUS PLANNER & CURRICULUM EXPLORER
       ========================================== */}
       {activeSubTab === "syllabus" && (
         <div className="space-y-6">
-          <div className="glass-card p-5 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Syllabus Sub-Navigation Toggle: Hierarchy Explorer vs Student Progress Tracker */}
+          <div className="glass-card p-4 sm:p-5 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-cyan-400" />
-                Exam Syllabus Planner
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-cyan-400" />
+                  <span>Exam Curriculum & Syllabus Center</span>
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/25 font-bold">
+                  2026–27 Board Intelligence
+                </span>
+              </div>
               <p className="text-xs text-slate-300 mt-1">
-                Connected directly with Academic Center. Track board chapter completion, VVI topics, PYQs, and test status.
+                Explore official board curriculum hierarchies, verify evidence provenance, and track your chapter mastery.
               </p>
             </div>
-            <div className="px-3 py-1.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono">
-              Labeling: Student / AI suggested priority
+
+            {/* Segmented Control */}
+            <div className="flex items-center bg-slate-950/80 p-1 rounded-2xl border border-white/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSyllabusViewMode("hierarchy")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  syllabusViewMode === "hierarchy"
+                    ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold shadow-md"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Curriculum Explorer
+              </button>
+              <button
+                type="button"
+                onClick={() => setSyllabusViewMode("tracker")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  syllabusViewMode === "tracker"
+                    ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold shadow-md"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                My Syllabus Progress
+              </button>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {academicSubjects.map((subj) => {
-              const chapters = academicChapters.filter((c) => c.subjectId === subj.id);
-              const completed = chapters.filter((c) => c.status === "Completed").length;
-              const pct = chapters.length > 0 ? Math.round((completed / chapters.length) * 100) : 0;
+          {/* View 1: Interactive Board Curriculum & Provenance Explorer */}
+          {syllabusViewMode === "hierarchy" && (
+            <CurriculumHierarchyExplorer
+              initialBoard={examProfile.board || "BSEB"}
+              initialAcademicYear={v19Report.academicYear || "2026-27"}
+              initialClass={examProfile.classLevel || "Class 12"}
+              initialStream={examProfile.stream || "Commerce"}
+              onAskAbya={(ctx) => handleAskAbya(ctx)}
+            />
+          )}
 
-              return (
-                <div key={subj.id} className="glass-card p-5 rounded-3xl border border-white/10">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-white/10">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-3 h-10 rounded-full"
-                        style={{ backgroundColor: subj.color || "#06b6d4" }}
-                      />
-                      <div>
-                        <h4 className="text-base font-bold text-white font-heading">{subj.name}</h4>
-                        <span className="text-xs text-slate-400 font-mono">
-                          {completed} of {chapters.length} chapters completed ({pct}%)
-                        </span>
+          {/* View 2: Personal Syllabus Progress Tracker */}
+          {syllabusViewMode === "tracker" && (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-3">
+                <span className="font-semibold">
+                  Note on Priority: All "VVI" and study priorities are Application-Derived recommendations generated by Garia OS, not official board mandates.
+                </span>
+                <span className="font-mono text-[10px] uppercase font-bold shrink-0">
+                  Application-Derived Signals
+                </span>
+              </div>
+
+              {academicSubjects.map((subj) => {
+                const chapters = academicChapters.filter((c) => c.subjectId === subj.id);
+                const completed = chapters.filter((c) => c.status === "Completed").length;
+                const pct = chapters.length > 0 ? Math.round((completed / chapters.length) * 100) : 0;
+
+                return (
+                  <div key={subj.id} className="glass-card p-5 rounded-3xl border border-white/10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-white/10">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-3 h-10 rounded-full"
+                          style={{ backgroundColor: subj.color || "#06b6d4" }}
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-base font-bold text-white font-heading">{subj.name}</h4>
+                            {subj.code && (
+                              <span className="px-2 py-0.2 rounded-md font-mono text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
+                                {subj.code}
+                              </span>
+                            )}
+                            <CurriculumStatusBadge
+                              status={subj.verificationStatus}
+                              academicYear={subj.academicYear || v19Report.academicYear || "2026-27"}
+                              sourceNote={subj.sourceStatusNote}
+                              variant="compact"
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400 font-mono">
+                            {completed} of {chapters.length} chapters completed ({pct}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-32 bg-slate-800 rounded-full h-2 overflow-hidden border border-white/10">
+                        <div
+                          className="h-2 rounded-full bg-cyan-400"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
 
-                    <div className="w-32 bg-slate-800 rounded-full h-2 overflow-hidden border border-white/10">
-                      <div
-                        className="h-2 rounded-full bg-cyan-400"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {chapters.map((chap) => (
-                      <div
-                        key={chap.id}
-                        className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => {
-                              const nextStatus =
+                    <div className="space-y-2">
+                      {chapters.map((chap) => (
+                        <div
+                          key={chap.id}
+                          className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                const nextStatus =
+                                  chap.status === "Completed"
+                                    ? "Not Started"
+                                    : chap.status === "Not Started"
+                                    ? "In Progress"
+                                    : "Completed";
+                                const updated = academicChapters.map((c) =>
+                                  c.id === chap.id ? { ...c, status: nextStatus } : c
+                                );
+                                onUpdateChapters(updated);
+                              }}
+                              className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
                                 chap.status === "Completed"
-                                  ? "Not Started"
-                                  : chap.status === "Not Started"
-                                  ? "In Progress"
-                                  : "Completed";
-                              const updated = academicChapters.map((c) =>
-                                c.id === chap.id ? { ...c, status: nextStatus } : c
-                              );
-                              onUpdateChapters(updated);
-                            }}
-                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
-                              chap.status === "Completed"
-                                ? "bg-emerald-500 border-emerald-400 text-slate-950"
-                                : chap.status === "In Progress"
-                                ? "bg-cyan-500/30 border-cyan-400 text-cyan-200"
-                                : "border-slate-600 hover:border-slate-400"
-                            }`}
-                          >
-                            {chap.status === "Completed" && <CheckCircle2 className="w-3.5 h-3.5" />}
-                          </button>
+                                  ? "bg-emerald-500 border-emerald-400 text-slate-950"
+                                  : chap.status === "In Progress"
+                                  ? "bg-cyan-500/30 border-cyan-400 text-cyan-200"
+                                  : "border-slate-600 hover:border-slate-400"
+                              }`}
+                            >
+                              {chap.status === "Completed" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            </button>
 
-                          <div>
-                            <span className="font-bold text-white font-heading text-sm">
-                              Ch {chap.chapterNumber}: {chap.title}
-                            </span>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span
-                                className={`px-2 py-0.2 rounded text-[10px] font-bold font-mono ${
-                                  chap.priority === "VVI"
-                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                                    : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                                }`}
-                              >
-                                {chap.priority}
+                            <div>
+                              <span className="font-bold text-white font-heading text-sm">
+                                Ch {chap.chapterNumber}: {chap.title}
                               </span>
-                              {chap.isWeak && (
-                                <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 font-mono">
-                                  Weak Topic
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span
+                                  className={`px-2 py-0.2 rounded text-[10px] font-bold font-mono ${
+                                    chap.priority === "VVI"
+                                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                      : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                  }`}
+                                  title={
+                                    chap.priority === "VVI"
+                                      ? "Application-derived high-priority topic; not an official board designation."
+                                      : "Application priority"
+                                  }
+                                >
+                                  {chap.priority === "VVI" ? "App-Derived VVI" : chap.priority}
                                 </span>
-                              )}
-                              <span className="text-slate-400 font-mono">
-                                PYQ: {chap.pyqStatus === "Completed" ? "✅ Completed" : "⏳ Pending"}
-                              </span>
-                              <span className="text-slate-400 font-mono">
-                                Revised: {chap.revisionCount || 0} times
-                              </span>
+                                {chap.isWeak && (
+                                  <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 font-mono">
+                                    Weak Topic
+                                  </span>
+                                )}
+                                <span className="text-slate-400 font-mono">
+                                  PYQ: {chap.pyqStatus === "Completed" ? "✅ Completed" : "⏳ Pending"}
+                                </span>
+                                <span className="text-slate-400 font-mono">
+                                  Revised: {chap.revisionCount || 0} times
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                          <button
-                            onClick={() => {
-                              const updated = academicChapters.map((c) =>
-                                c.id === chap.id
-                                  ? {
-                                      ...c,
-                                      pyqStatus: c.pyqStatus === "Completed" ? "Pending" : "Completed",
-                                    }
-                                  : c
-                              );
-                              onUpdateChapters(updated);
-                            }}
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-mono border transition-all ${
-                              chap.pyqStatus === "Completed"
-                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                                : "bg-white/5 text-slate-400 border-white/10 hover:border-cyan-500/30"
-                            }`}
-                          >
-                            PYQ {chap.pyqStatus === "Completed" ? "Done" : "Pending"}
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                            <button
+                              onClick={() => {
+                                const updated = academicChapters.map((c) =>
+                                  c.id === chap.id
+                                    ? {
+                                        ...c,
+                                        pyqStatus: c.pyqStatus === "Completed" ? "Pending" : "Completed",
+                                      }
+                                    : c
+                                );
+                                onUpdateChapters(updated);
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-[11px] font-mono border transition-all ${
+                                chap.pyqStatus === "Completed"
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : "bg-white/5 text-slate-400 border-white/10 hover:border-cyan-500/30"
+                              }`}
+                            >
+                              PYQ {chap.pyqStatus === "Completed" ? "Done" : "Pending"}
+                            </button>
 
-                          <button
-                            onClick={() => handleMarkChapterRevised(chap.id)}
-                            className="px-2.5 py-1 rounded-xl text-[11px] font-mono bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30"
-                          >
-                            + Revise
-                          </button>
+                            <button
+                              onClick={() => handleMarkChapterRevised(chap.id)}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-mono bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30"
+                            >
+                              + Revise
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

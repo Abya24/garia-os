@@ -3556,8 +3556,10 @@ export const BOARD_ALLOWED_AUTHORITIES: Record<BoardType, CurriculumSourceAuthor
 export const AUTHORITATIVE_OFFICIAL_HOSTS: string[] = [
   "biharboardonline.bihar.gov.in",
   "biharboardonline.com",
+  "intermediate.biharboardonline.com",
   "secondary.biharboardonline.com",
   "seniorsecondary.biharboardonline.com",
+  "ofssbihar.net",
   "bstbpc.gov.in",
   "scert.bihar.gov.in",
   "cbseacademic.nic.in",
@@ -3648,7 +3650,11 @@ export function validateCurriculumProvenance(
       stream: input?.stream,
       subject: input?.subject,
       academicYear: effectiveYear,
+      sessionYear: input?.sessionYear,
+      examYear: input?.examYear,
       resourceAcademicYear: input?.resourceAcademicYear,
+      resourceSessionYear: input?.resourceSessionYear,
+      resourceExamYear: input?.resourceExamYear,
       applicableAcademicYears: input?.applicableAcademicYears,
       documentTitle: baseDocTitle || `Conflicting Sources (${conflict.sourceA} vs ${conflict.sourceB})`,
       documentType: baseDocType,
@@ -3665,8 +3671,11 @@ export function validateCurriculumProvenance(
       currentYearApplicabilityProven: false,
       officialSyllabusDocumentFound: Boolean(input?.officialSyllabusDocumentFound),
       officialExamBlueprintFound: Boolean(input?.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(input?.official2027SubjectCodeConfirmed),
+      officialSubjectCode: input?.officialSubjectCode,
       supportingResources: input?.supportingResources,
       partialEvidenceSummary: input?.partialEvidenceSummary,
+      unresolvedConflicts: input?.unresolvedConflicts || [conflict],
       verificationNotes:
         input?.verificationNotes ||
         `SOURCE-CONFLICT: ${conflict.conflictDescription} Recommended action: ${conflict.recommendedReviewAction}`,
@@ -3688,7 +3697,11 @@ export function validateCurriculumProvenance(
       stream: input.stream,
       subject: input.subject,
       academicYear: effectiveYear,
+      sessionYear: input.sessionYear,
+      examYear: input.examYear,
       resourceAcademicYear: input.resourceAcademicYear || effectiveYear,
+      resourceSessionYear: input.resourceSessionYear,
+      resourceExamYear: input.resourceExamYear,
       applicableAcademicYears: input.applicableAcademicYears,
       documentTitle: baseDocTitle || `Historical ${effectiveBoard} Syllabus (${effectiveYear})`,
       documentType: baseDocType,
@@ -3705,8 +3718,11 @@ export function validateCurriculumProvenance(
       currentYearApplicabilityProven: false,
       officialSyllabusDocumentFound: Boolean(input.officialSyllabusDocumentFound),
       officialExamBlueprintFound: Boolean(input.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(input.official2027SubjectCodeConfirmed),
+      officialSubjectCode: input.officialSubjectCode,
       supportingResources: input.supportingResources,
       partialEvidenceSummary: input.partialEvidenceSummary,
+      unresolvedConflicts: input.unresolvedConflicts,
       verificationNotes:
         input.verificationNotes ||
         `OUTDATED: Source belongs to academic year ${effectiveYear} and has no applicability rule for ${targetAcademicYear}.`,
@@ -3717,9 +3733,9 @@ export function validateCurriculumProvenance(
   // - Rejects empty/placeholder/user-generated sourceIds
   // - Requires authority to match board's allowed official authorities
   // - Requires official document type and non-unofficial document title
-  // - Requires explicit valid pageReference or chapterReference (fake/placeholder references rejected; sourceUrl alone CANNOT establish VERIFIED)
+  // - Requires explicit valid pageReference or chapterReference
   // - If sourceUrl is provided, it must be an official HTTPS board/government domain
-  // - If resourceAcademicYear differs from targetAcademicYear or currentYearApplicabilityProven === false, CANNOT upgrade to VERIFIED
+  // - Independent checks on resourceAcademicYear vs targetAcademicYear, resourceExamYear vs examYear, and resourceSessionYear vs sessionYear
   const rawSourceId = (input?.sourceId || "").trim();
   const hasValidSourceId =
     rawSourceId.length > 5 && !PLACEHOLDER_OR_USER_ID_REGEX.test(rawSourceId);
@@ -3736,13 +3752,28 @@ export function validateCurriculumProvenance(
   const hasValidUrlIfProvided = input?.sourceUrl?.trim()
     ? isOfficialBoardSourceUrl(input.sourceUrl)
     : true;
+  const hasMismatchedResourceAcademicYear = Boolean(
+    input?.resourceAcademicYear &&
+      input.resourceAcademicYear.trim() !== targetAcademicYear &&
+      input?.currentYearApplicabilityProven !== true
+  );
+  const hasMismatchedResourceExamYear = Boolean(
+    input?.examYear !== undefined &&
+      input?.resourceExamYear !== undefined &&
+      String(input.examYear).trim() !== String(input.resourceExamYear).trim() &&
+      input?.currentYearApplicabilityProven !== true
+  );
+  const hasMismatchedResourceSessionYear = Boolean(
+    input?.sessionYear?.trim() &&
+      input?.resourceSessionYear?.trim() &&
+      input.sessionYear.trim() !== input.resourceSessionYear.trim() &&
+      input?.currentYearApplicabilityProven !== true
+  );
   const hasUnprovenResourceYear =
     input?.currentYearApplicabilityProven === false ||
-    Boolean(
-      input?.resourceAcademicYear &&
-        input.resourceAcademicYear.trim() !== targetAcademicYear &&
-        input?.currentYearApplicabilityProven !== true
-    );
+    hasMismatchedResourceAcademicYear ||
+    hasMismatchedResourceExamYear ||
+    hasMismatchedResourceSessionYear;
 
   if (
     normalizedInputStatus === "VERIFIED" &&
@@ -3764,7 +3795,11 @@ export function validateCurriculumProvenance(
       stream: input!.stream,
       subject: input!.subject,
       academicYear: effectiveYear,
+      sessionYear: input!.sessionYear,
+      examYear: input!.examYear,
       resourceAcademicYear: input!.resourceAcademicYear || effectiveYear,
+      resourceSessionYear: input!.resourceSessionYear || input!.sessionYear,
+      resourceExamYear: input!.resourceExamYear ?? input!.examYear,
       applicableAcademicYears: input!.applicableAcademicYears,
       documentTitle: baseDocTitle,
       documentType: baseDocType,
@@ -3781,8 +3816,11 @@ export function validateCurriculumProvenance(
       currentYearApplicabilityProven: true,
       officialSyllabusDocumentFound: input!.officialSyllabusDocumentFound ?? true,
       officialExamBlueprintFound: Boolean(input!.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(input!.official2027SubjectCodeConfirmed),
+      officialSubjectCode: input!.officialSubjectCode,
       supportingResources: input!.supportingResources,
       partialEvidenceSummary: input!.partialEvidenceSummary,
+      unresolvedConflicts: input!.unresolvedConflicts,
       verificationNotes:
         input!.verificationNotes ||
         `VERIFIED against ${baseDocTitle} (${baseAuthority}, Academic Year ${effectiveYear}).`,
@@ -3808,7 +3846,11 @@ export function validateCurriculumProvenance(
       stream: input!.stream,
       subject: input!.subject,
       academicYear: effectiveYear,
+      sessionYear: input!.sessionYear,
+      examYear: input!.examYear,
       resourceAcademicYear: input!.resourceAcademicYear || effectiveYear,
+      resourceSessionYear: input!.resourceSessionYear || input!.sessionYear,
+      resourceExamYear: input!.resourceExamYear ?? input!.examYear,
       applicableAcademicYears: input!.applicableAcademicYears,
       documentTitle: baseDocTitle,
       documentType: baseDocType,
@@ -3830,18 +3872,18 @@ export function validateCurriculumProvenance(
       currentYearApplicabilityProven: Boolean(input!.currentYearApplicabilityProven),
       officialSyllabusDocumentFound: Boolean(input!.officialSyllabusDocumentFound),
       officialExamBlueprintFound: Boolean(input!.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(input!.official2027SubjectCodeConfirmed),
+      officialSubjectCode: input!.officialSubjectCode,
       supportingResources: input!.supportingResources,
       partialEvidenceSummary: input!.partialEvidenceSummary,
+      unresolvedConflicts: input!.unresolvedConflicts,
       verificationNotes:
         input!.verificationNotes ||
         `PARTIALLY-VERIFIED: ${baseDocTitle} referenced; full chapter/page circular verification pending.`,
     };
   }
 
-  // 4. Official Resource Evidence Preserved WITHOUT Upgrading to VERIFIED (Sections 1, 6, 7, 16, 17):
-  // When an authoritative SCERT/BSTBPC/Board resource exists (valid sourceId, valid authority, valid docType, valid docTitle, and valid official HTTPS URL),
-  // record OFFICIAL_RESOURCE_CONFIRMED or CURRICULUM_CONTENT_SUPPORTED while keeping verificationStatus === "SOURCE-REQUIRED"
-  // whenever 2026-27 applicability or required locators are not yet established.
+  // 4. Official Resource Evidence Preserved WITHOUT Upgrading to VERIFIED
   const hasConfirmedOfficialResource =
     effectiveBoard !== "Other" &&
     hasValidSourceId &&
@@ -3867,7 +3909,11 @@ export function validateCurriculumProvenance(
       stream: input?.stream,
       subject: input?.subject,
       academicYear: effectiveYear,
+      sessionYear: input?.sessionYear,
+      examYear: input?.examYear,
       resourceAcademicYear: input?.resourceAcademicYear,
+      resourceSessionYear: input?.resourceSessionYear,
+      resourceExamYear: input?.resourceExamYear,
       applicableAcademicYears: input?.applicableAcademicYears,
       documentTitle: baseDocTitle,
       documentType: baseDocType,
@@ -3889,8 +3935,11 @@ export function validateCurriculumProvenance(
       currentYearApplicabilityProven: false,
       officialSyllabusDocumentFound: Boolean(input?.officialSyllabusDocumentFound),
       officialExamBlueprintFound: Boolean(input?.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(input?.official2027SubjectCodeConfirmed),
+      officialSubjectCode: input?.officialSubjectCode,
       supportingResources: input?.supportingResources,
       partialEvidenceSummary: input?.partialEvidenceSummary,
+      unresolvedConflicts: input?.unresolvedConflicts,
       verificationNotes:
         input?.verificationNotes ||
         `SOURCE-REQUIRED (${evidenceStage}): Official ${baseAuthority} resource confirmed (${baseDocTitle}), but explicit ${targetAcademicYear} syllabus applicability notification is required before marking VERIFIED.`,
@@ -3914,7 +3963,11 @@ export function validateCurriculumProvenance(
     stream: input?.stream,
     subject: input?.subject,
     academicYear: effectiveYear,
+    sessionYear: input?.sessionYear,
+    examYear: input?.examYear,
     resourceAcademicYear: input?.resourceAcademicYear,
+    resourceSessionYear: input?.resourceSessionYear,
+    resourceExamYear: input?.resourceExamYear,
     applicableAcademicYears: input?.applicableAcademicYears,
     documentTitle:
       baseDocTitle ||
@@ -3937,8 +3990,11 @@ export function validateCurriculumProvenance(
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: Boolean(input?.official2027SubjectCodeConfirmed),
+    officialSubjectCode: input?.officialSubjectCode,
     supportingResources: input?.supportingResources,
     partialEvidenceSummary: input?.partialEvidenceSummary,
+    unresolvedConflicts: input?.unresolvedConflicts,
     verificationNotes:
       input?.verificationNotes ||
       `SOURCE-REQUIRED: Official ${effectiveBoard} syllabus circular, textbook edition index, and exam marking blueprint for ${effectiveYear} must be attached before marking VERIFIED.`,
@@ -4004,7 +4060,11 @@ export interface CurriculumSourceAuditEntry {
   stream: string;
   subject: string;
   academicYear: string;
+  sessionYear: string;
+  examYear: number | string;
   resourceAcademicYear: string;
+  resourceSessionYear: string;
+  resourceExamYear: number | string;
   documentTitle: string;
   documentType: CurriculumDocumentType;
   sourceUrl: string;
@@ -4019,7 +4079,10 @@ export interface CurriculumSourceAuditEntry {
   currentYearApplicabilityProven: boolean;
   officialSyllabusDocumentFound: boolean;
   officialExamBlueprintFound: boolean;
+  official2027SubjectCodeConfirmed: boolean;
+  officialSubjectCode: string;
   supportingResourceCount: number;
+  unresolvedConflictCount: number;
   previousStatus: CurriculumVerificationStatus;
   newStatus: CurriculumVerificationStatus;
   verificationNotes: string;
@@ -4032,7 +4095,11 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     authority: "BSEB",
     board: "BSEB",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper Instructions & Passing Criteria Circular",
     documentType: "EXAM_BLUEPRINT",
@@ -4050,6 +4117,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "Compulsory 200M (205/206/207) + Elective 300M (217/218/219/220) = 500M",
     supportingResources: [
       {
         title: "BSEB Intermediate Examination 2026 Annual Model Question Papers Portal",
@@ -4058,9 +4127,27 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/modelpaperinter.html",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
         pageReference: "pp. 1–2 across Subject Codes 105, 107/207, 217, 219, 220",
         proves:
           "Confirms official BSEB 2026 Intermediate Annual Exam Pattern (100 Marks = 50 OMR Objective [attempt 50 of 100] + 50 Descriptive [15 of 30 Short × 2M + 4 of 8 Long × 5M for Commerce electives]). Does not establish 2026-27 / 2027 cycle applicability.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference:
+          "Compulsory Group-1 (100M: English 205, Hindi 206) + Compulsory Group-2 (100M: English 205, Hindi 206, Urdu 207, etc.) + Elective Group (3×100M=300M: Business Studies 217, Entrepreneurship 218, Economics 219, Accountancy 220)",
+        proves:
+          "Directly confirms for Academic Year 2026-27 (Session 2025-27, Intermediate Annual Examination 2027) the 500-Mark Faculty of Commerce subject group structure (200M Compulsory + 300M Elective + 100M optional Additional) and official numerical codes (205, 207, 217, 218, 219, 220), but does not specify internal question-paper OMR/Subjective split for 2027.",
       },
       {
         title: "BSEB Passing Criteria Notification (Passing Criteria.pdf)",
@@ -4080,13 +4167,33 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
         publicationDate: "2024-04-10",
         resourceAcademicYear: "2023-25 and 2024-26",
+        resourceSessionYear: "2023-25 and 2024-26",
+        resourceExamYear: "2025 / 2026",
         pageReference: "216 pages (unindexed raster scan)",
         proves:
           "Confirms official BSEB Class XI–XII syllabus PDF hosted on biharboardonline.com is explicitly scoped by filename to sessions 2023-25 and 2024-26 (outdated for 2026-27 without an official continuation circular).",
       },
     ],
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-exam-pattern-year-gap",
+        category: "EXAM_PATTERN_YEAR_GAP",
+        sourceA:
+          "BSEB Intermediate Examination 2026 Annual Model Papers (Codes 105, 107/207, 217, 219, 220; Exam Year 2026 / Session 2024-26) & BSEB Annual Exam 2027 Application Form (Ex-Student's Exam_Form.pdf, p. 11; Exam Year 2027 / Session 2025-27)",
+        sourceB:
+          "Pending BSEB Intermediate Annual Examination 2027 (Academic Year 2026-27 / Session 2025-27) Official Question-Paper Pattern Circular / 2027 Model Papers (biharboardonline.com/files/InterModelPaper/2027/ returns HTTP 404)",
+        conflictDescription:
+          "The 2027 Exam Application Form (Session 2025-27) confirms the 500-mark subject structure (2×100M Compulsory + 3×100M Elective), and the 2026 Model Papers confirm the 50% OMR (50/100) + 50% Descriptive blueprint for Exam Year 2026, but BSEB has not yet published a 2027 question-paper blueprint circular or 2027 Model Papers.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep BSEB::2026-27::EXAM_PATTERN at SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED) until BSEB publishes the 2027 Intermediate Model Papers or 2026-27 examination pattern circular.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Intermediate Model Papers (biharboardonline.com/modelpaperinter.html, 2025-11-28) and Passing Criteria circular confirm the 50% OMR (50/100) + 50% Descriptive pattern for the 2026 exam, while the official syllabus PDF on biharboardonline.com is explicitly titled 'Class_XI -XII_Syllabus_2023-25_and_2024-26.pdf'. A 2026-27 / 2027 BSEB notification is still required before marking VERIFIED.",
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Intermediate Model Papers (Exam Year 2026, 2025-11-28) confirm the 50% OMR (50/100) + 50% Descriptive pattern for 2026, and BSEB's Annual Exam 2027 Form (intermediate.biharboardonline.com/2025–27/, p. 11) confirms the 2027 Commerce 500-mark subject/code architecture, but a 2027 question-paper section blueprint circular is still required before marking VERIFIED.",
   }),
 
   // =========================================================================
@@ -4100,7 +4207,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Accountancy",
     academicYear: "2026-27",
+    sessionYear: "2026-28",
+    examYear: 2028,
     resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    resourceSessionYear: "Undated (2024 Upload)",
     documentTitle:
       "Accountancy Financial Accountancy Part-II (लेखाशास्त्र - वित्तीय लेखांकन भाग-II) & Accountancy Part-I, Class XI",
     documentType: "OFFICIAL_TEXTBOOK",
@@ -4116,6 +4226,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "220",
     supportingResources: [
       {
         title: "Accountancy Financial Accountancy Part-II (Class XI)",
@@ -4138,12 +4250,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
           "Confirms official SCERT Bihar Class XI Financial Accounting Part-I catalog listing and cover; linked external Drive file returns HTTP 404.",
       },
       {
+        title:
+          "BSEB Intermediate Examination 2028 Registration Form – Faculty of Commerce (Session 2026–28, Class 11 in 2026–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2026-28/assets/Notifications/Arts%20&%20Commerce%20pvt%20Registration%20Form%20session%202026-28.pdf",
+        publicationDate: "2026-08-09",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2026-28",
+        resourceExamYear: 2028,
+        pageReference: "pp. 4–6 (Faculty - COMMERCE, Item 32 Subject details with numerical codes, p. 6)",
+        chapterReference: "Elective Subject Group: Accountancy - 220 (100 Marks)",
+        proves:
+          "Officially confirms that for Session 2026-28 (Class 11 in 2026-27), Accountancy (Subject Code 220, 100 Marks) is a prescribed Commerce elective subject; does not provide Class 11 chapter-level syllabus.",
+      },
+      {
         title: "BSEB Class XI–XII Syllabus 2023-25 and 2024-26 (biharboardonline.com / scert.bihar.gov.in)",
         authority: "BSEB",
         documentType: "BOARD_SYLLABUS_PDF",
         url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
         publicationDate: "2024-04-10",
         resourceAcademicYear: "2023-25 and 2024-26",
+        resourceSessionYear: "2023-25 and 2024-26",
         proves:
           "Confirms the 216-page syllabus scan on biharboardonline.com and scert.bihar.gov.in is explicitly scoped to sessions 2023-25 and 2024-26 and lacks embedded text/OCR.",
       },
@@ -4160,7 +4288,7 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
       ],
     },
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Accountancy Part-I & Part-II e-resources confirmed on scert.bihar.gov.in (June 2024), while BSEB's hosted syllabus PDF is scoped to 2023-25/2024-26; Part-I PDF link is dead (404), Part-II is an unindexed raster scan, and 2026-27 BSEB syllabus applicability is not proven.",
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Accountancy Part-I & Part-II e-resources confirmed (June 2024) and BSEB Session 2026-28 Registration Form (p. 6) confirms Accountancy (Code 220, 100M), while BSEB's hosted syllabus PDF is scoped to 2023-25/2024-26; Part-I PDF link is 404, Part-II is an unindexed raster scan, and 2026-27 chapter syllabus applicability is not proven.",
   }),
 
   "BSEB::2026-27::Class 11::Commerce::Business Studies": validateCurriculumProvenance({
@@ -4171,7 +4299,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Business Studies",
     academicYear: "2026-27",
+    sessionYear: "2026-28",
+    examYear: 2028,
     resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    resourceSessionYear: "Undated (2024 Upload)",
     documentTitle: "Business Studies (व्यवसाय अध्ययन), Class XI (SCERT Bihar e-Resource)",
     documentType: "OFFICIAL_TEXTBOOK",
     sourceUrl: "https://scert.bihar.gov.in/eresources/business-studies-1719293876",
@@ -4185,6 +4316,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "217",
     supportingResources: [
       {
         title: "Business Studies (Class XI Bilingual Cover & Catalog Record)",
@@ -4197,12 +4330,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
           "Confirms official SCERT Bihar Class XI Business Studies catalog entry and bilingual cover; linked external Drive file returns HTTP 404.",
       },
       {
+        title:
+          "BSEB Intermediate Examination 2028 Registration Form – Faculty of Commerce (Session 2026–28, Class 11 in 2026–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2026-28/assets/Notifications/Arts%20&%20Commerce%20pvt%20Registration%20Form%20session%202026-28.pdf",
+        publicationDate: "2026-08-09",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2026-28",
+        resourceExamYear: 2028,
+        pageReference: "pp. 4–6 (Faculty - COMMERCE, Item 32 Subject details with numerical codes, p. 6)",
+        chapterReference: "Elective Subject Group: Business Studies - 217 (100 Marks)",
+        proves:
+          "Officially confirms Business Studies (Subject Code 217, 100 Marks) for Session 2026-28 (Class 11 in 2026-27), without chapter-level syllabus breakdown.",
+      },
+      {
         title: "BSEB Class XI–XII Syllabus 2023-25 and 2024-26",
         authority: "BSEB",
         documentType: "BOARD_SYLLABUS_PDF",
         url: "https://biharboardonline.com/files/Class_XI%20-XII_Syllabus_2023-25_and_2024-26.pdf",
         publicationDate: "2024-04-10",
         resourceAcademicYear: "2023-25 and 2024-26",
+        resourceSessionYear: "2023-25 and 2024-26",
         proves:
           "Confirms BSEB's hosted Class XI–XII syllabus PDF covers 2023-25 and 2024-26 sessions (outdated for 2026-27).",
       },
@@ -4219,7 +4368,7 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
       ],
     },
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Business Studies resource identity confirmed on scert.bihar.gov.in (2024-06-25), but internal chapter index is inaccessible (external Drive PDF 404) and 2026-27 BSEB syllabus applicability is not proven.",
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XI Business Studies resource identity confirmed (2024-06-25) and BSEB Session 2026-28 Registration Form (p. 6) confirms Business Studies (Code 217, 100M), but internal chapter index is inaccessible (external Drive PDF 404) and 2026-27 BSEB syllabus applicability is not proven.",
   }),
 
   "BSEB::2026-27::Class 11::Commerce::Economics": validateCurriculumProvenance({
@@ -4230,7 +4379,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Economics",
     academicYear: "2026-27",
+    sessionYear: "2026-28",
+    examYear: 2028,
     resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    resourceSessionYear: "Undated (2024 Upload)",
     documentTitle:
       "Statistics For Economics & Introductory Microeconomics, Class XI (SCERT Bihar e-Resources)",
     documentType: "OFFICIAL_TEXTBOOK",
@@ -4246,6 +4398,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "219",
     supportingResources: [
       {
         title: "Statistics For Economics (Class XI)",
@@ -4267,6 +4421,21 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         proves:
           "Confirms official SCERT Bihar Introductory Microeconomics PDF (204.3 MB CMYK raster scan); whereas BSEB's 2026 Class XII I.Com. Economics Model Paper (219_Economics.pdf) tests Microeconomics in Class XII, creating a class-mapping ambiguity with Indian Economic Development.",
       },
+      {
+        title:
+          "BSEB Intermediate Examination 2028 Registration Form – Faculty of Commerce (Session 2026–28, Class 11 in 2026–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2026-28/assets/Notifications/Arts%20&%20Commerce%20pvt%20Registration%20Form%20session%202026-28.pdf",
+        publicationDate: "2026-08-09",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2026-28",
+        resourceExamYear: 2028,
+        pageReference: "pp. 4–6 (Faculty - COMMERCE, Item 32 Subject details with numerical codes, p. 6)",
+        chapterReference: "Elective Subject Group: Economics - 219 (100 Marks)",
+        proves:
+          "Officially confirms Economics (Subject Code 219, 100 Marks) as a Commerce elective for Session 2026-28 (Class 11 in 2026-27).",
+      },
     ],
     partialEvidenceSummary: {
       verifiedChapters: [],
@@ -4281,8 +4450,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "Producer Behaviour, Supply & Forms of Market",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c11-eco-class-mapping-conflict",
+        category: "CLASS_RESOURCE_MAPPING_CONFLICT",
+        sourceA:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources/introductory-microeconomics-1718972784 & statistics-for-economics-1718977443, uploaded 2024-06-21, tagged Class XI)",
+        sourceB:
+          "BSEB Intermediate Examination 2026 Annual Model Paper – Economics (I.Com. Subject Code 219, 219_Economics.pdf, published 2025-11-28, which tests Introductory Microeconomics + Introductory Macroeconomics in Class XII)",
+        conflictDescription:
+          "SCERT Bihar e-Resources catalogs Introductory Microeconomics + Statistics for Economics under Class XI (and Indian Economic Development under Class XII), whereas BSEB's Class XII I.Com. Economics Model Paper (Code 219) examines Introductory Microeconomics in Class XII, leaving Class XI BSEB Economics paper composition (Statistics + Indian Economic Development vs Statistics + Microeconomics) unresolved.",
+        academicYear: "2026-27",
+        sessionYear: "2026-28",
+        examYear: 2028,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Preserve conflict disclosure and keep Class 11 Economics at SOURCE-REQUIRED until an official 2026-27 / 2026-28 BSEB Intermediate syllabus circular clarifies Class XI vs Class XII Economics textbook assignment.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Statistics for Economics and Introductory Microeconomics PDFs confirmed (2024-06-21), but both are unindexed CMYK raster scans and official 2026-27 BSEB Class 11 Economics paper mapping (Statistics + Indian Economic Development vs Statistics + Microeconomics) is not proven.",
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Statistics for Economics and Introductory Microeconomics PDFs confirmed (2024-06-21) and BSEB Session 2026-28 Registration Form (p. 6) confirms Economics (Code 219, 100M), but both textbooks are unindexed CMYK raster scans and official 2026-27 BSEB Class 11 Economics paper mapping (Statistics + Indian Economic Development vs Statistics + Microeconomics) is unresolved.",
   }),
 
   "BSEB::2026-27::Class 11::Commerce::English Core": validateCurriculumProvenance({
@@ -4292,6 +4479,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "English Core",
     academicYear: "2026-27",
+    sessionYear: "2026-28",
+    examYear: 2028,
     verificationStatus: "SOURCE-REQUIRED",
     evidenceStage: "SOURCE-REQUIRED",
     textbookApplicabilityStatus: "SOURCE-REQUIRED",
@@ -4300,6 +4489,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "205",
+    supportingResources: [
+      {
+        title:
+          "BSEB Intermediate Examination 2028 Registration Form – Faculty of Commerce (Session 2026–28, Class 11 in 2026–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2026-28/assets/Notifications/Arts%20&%20Commerce%20pvt%20Registration%20Form%20session%202026-28.pdf",
+        publicationDate: "2026-08-09",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2026-28",
+        resourceExamYear: 2028,
+        pageReference: "pp. 4–6 (Faculty - COMMERCE, Item 32 Subject details with numerical codes, p. 6)",
+        chapterReference:
+          "Compulsory Subject Group-1 / Group-2: English - 205 (100 Marks); Additional Subject Group: English - 223 (100 Marks)",
+        proves:
+          "Officially confirms English (Subject Code 205, 100 Marks) as a Compulsory Language Subject for Session 2026-28 (Class 11 in 2026-27), but does not provide the Rainbow Part-I textbook or chapter index.",
+      },
+    ],
     partialEvidenceSummary: {
       verifiedChapters: [],
       supportedHistoricalChapters: [],
@@ -4309,8 +4518,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "Grammar, Reading Comprehension & Advanced Writing Skills",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c11-eng-rainbow-part1-gap",
+        category: "TEXTBOOK_SYLLABUS_APPLICABILITY_GAP",
+        sourceA:
+          "BSEB Session 2026-28 Registration Form (Arts & Commerce pvt Registration Form session 2026-28.pdf, p. 6: Compulsory Subject English - 205, 100 Marks)",
+        sourceB:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources) & BSTBPC Class XI Portal (bstbpc.gov.in/ClassXIth.aspx returning HTTP 500)",
+        conflictDescription:
+          "BSEB Session 2026-28 Registration Form confirms English (Code 205, 100 Marks) for Class 11 entrants in 2026-27, but SCERT Bihar e-Resources hosts only Class IX/X Panorama and BSTBPC Class XI portal returns HTTP 500, leaving Rainbow Part-I chapter syllabus unverified.",
+        academicYear: "2026-27",
+        sessionYear: "2026-28",
+        examYear: 2028,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Class 11 English Core at SOURCE-REQUIRED until BSTBPC Rainbow Part-I PDF and official 2026-27 / 2026-28 BSEB syllabus circular become accessible.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources hosts only Class IX/X Panorama English Reader and does not host Class XI Rainbow Part-I; BSTBPC Class XI portal (bstbpc.gov.in/ClassXIth.aspx) returns HTTP 500; biharboardonline.com does not publish Class XI model papers.",
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): BSEB Session 2026-28 Registration Form (p. 6) confirms English (Code 205, 100M) for Class 11 in 2026-27, but SCERT Bihar e-Resources does not host Class XI Rainbow Part-I and BSTBPC Class XI portal (bstbpc.gov.in/ClassXIth.aspx) returns HTTP 500.",
   }),
 
   "BSEB::2026-27::Class 11::Commerce::Urdu": validateCurriculumProvenance({
@@ -4320,6 +4547,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Urdu",
     academicYear: "2026-27",
+    sessionYear: "2026-28",
+    examYear: 2028,
     verificationStatus: "SOURCE-REQUIRED",
     evidenceStage: "SOURCE-REQUIRED",
     textbookApplicabilityStatus: "SOURCE-REQUIRED",
@@ -4328,6 +4557,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "207",
+    supportingResources: [
+      {
+        title:
+          "BSEB Intermediate Examination 2028 Registration Form – Faculty of Commerce (Session 2026–28, Class 11 in 2026–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2026-28/assets/Notifications/Arts%20&%20Commerce%20pvt%20Registration%20Form%20session%202026-28.pdf",
+        publicationDate: "2026-08-09",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2026-28",
+        resourceExamYear: 2028,
+        pageReference: "pp. 4–6 (Faculty - COMMERCE, Item 32 Subject details with numerical codes, p. 6)",
+        chapterReference:
+          "Compulsory Subject Group-2: Urdu - 207 (100 Marks); Additional Subject Group: Urdu - 225 (100 Marks)",
+        proves:
+          "Officially confirms Urdu (Subject Code 207 Compulsory / 225 Additional, 100 Marks) for Session 2026-28 (Class 11 in 2026-27), but does not provide Kahkashan Part-I textbook or chapter index.",
+      },
+    ],
     partialEvidenceSummary: {
       verifiedChapters: [],
       supportedHistoricalChapters: [],
@@ -4337,8 +4586,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "Urdu Qawaid (Grammar), Mazmoon & Khutoot Nigari",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c11-urdu-kahkashan-part1-gap",
+        category: "TEXTBOOK_SYLLABUS_APPLICABILITY_GAP",
+        sourceA:
+          "BSEB Session 2026-28 Registration Form (Arts & Commerce pvt Registration Form session 2026-28.pdf, p. 6: Compulsory Group-2 Urdu - 207, 100 Marks)",
+        sourceB:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources) & BSTBPC Class XI Portal (bstbpc.gov.in/ClassXIth.aspx returning HTTP 500)",
+        conflictDescription:
+          "BSEB Session 2026-28 Registration Form confirms Urdu (Code 207, 100 Marks) for Class 11 entrants in 2026-27, but SCERT Bihar e-Resources hosts only Gulshan-e-Urdu/Firozan and BSTBPC Class XI portal returns HTTP 500, leaving Kahkashan Part-I chapter syllabus unverified.",
+        academicYear: "2026-27",
+        sessionYear: "2026-28",
+        examYear: 2028,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Class 11 Urdu at SOURCE-REQUIRED until BSTBPC Kahkashan Part-I PDF and official 2026-27 / 2026-28 BSEB syllabus circular become accessible.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources hosts only primary/middle Urdu books (Gulshan-e-Urdu, Firozan) and does not host Class XI Kahkashan Part-I; BSTBPC Class XI portal returns HTTP 500; biharboardonline.com does not publish Class XI model papers.",
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): BSEB Session 2026-28 Registration Form (p. 6) confirms Urdu (Code 207, 100M) for Class 11 in 2026-27, but SCERT Bihar e-Resources does not host Class XI Kahkashan Part-I and BSTBPC Class XI portal returns HTTP 500.",
   }),
 
   // =========================================================================
@@ -4352,7 +4619,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Accountancy",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2024-25",
+    resourceSessionYear: "2024-25 Free Distribution",
     documentTitle:
       "Accountancy – Partnership Accounts (लेखाशास्त्र – साझेदारी खाते), Textbook for Class XII (Bilingual, BSTBPC Patna)",
     documentType: "OFFICIAL_TEXTBOOK",
@@ -4371,6 +4641,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "220",
     supportingResources: [
       {
         title:
@@ -4380,6 +4652,7 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://scert.bihar.gov.in/eresources/accountancy-xii-1718963622",
         publicationDate: "2024-06-21",
         resourceAcademicYear: "2024-25",
+        resourceSessionYear: "2024-25",
         pageReference: "Contents (p. ix), Chapters 1–4 (pp. 1–167)",
         chapterReference:
           "Ch 1 Basic Concepts (1.1–1.7), Ch 2 Admission (2.1–2.9), Ch 3 Retirement/Death (3.1–3.9), Ch 4 Dissolution (4.1–4.4)",
@@ -4394,11 +4667,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/InterModelPaper/2026/220_Accountancy.pdf",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
         pageReference: "pp. 1–37 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 32–37)",
         chapterReference:
           "Tests Not-for-Profit Organisation (Q3, Q4, Section-B Q7, Q30, Q33), Partnership (Basic Concepts, Goodwill, Revaluation, Admission, Retirement/Death, Dissolution), and Company Accounts & Financial Statement Analysis (Shares, Debentures, Ratios, Cash Flow)",
         proves:
           "Proves that in the 2026 BSEB Intermediate Annual Model Paper (Code 220), BSEB continues to test NPO alongside Partnership and Company Accounts/Financial Analysis despite NPO being omitted from the 2024 rationalised BSTBPC Part-I print textbook (p. v). Also confirms 100-mark exam pattern for 2026, but does not verify 2026-27 syllabus.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference: "Elective Subject Group: Accountancy - 220 (100 Marks); Additional Subject Group: Accountancy - 220 (100 Marks)",
+        proves:
+          "Officially confirms for Academic Year 2026-27 (Session 2025-27, Intermediate Annual Examination 2027) that Accountancy (Subject Code 220, 100 Marks) is a core Commerce elective subject; does not specify internal chapter inclusions or NPO status.",
       },
     ],
     partialEvidenceSummary: {
@@ -4415,8 +4705,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "All Class 12 Accountancy chapters require an official 2026-27 BSEB syllabus circular to confirm 2026-27 applicability and resolve the NPO textbook-vs-exam discrepancy",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-acc-npo-textbook-vs-model-paper",
+        category: "CURRICULUM_CHAPTER_CONFLICT",
+        sourceA:
+          "BSTBPC / SCERT Bihar Class XII Accountancy – Partnership Accounts (March 2024 Rationalised Edition, Free Distribution 2024-25, Accountancy-XII.pdf, p. v & p. ix)",
+        sourceB:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Accountancy (Subject Code 220, 220_Accountancy.pdf, published 2025-11-28, Section-A Q3, Q4 & Section-B Q7, Q30, Q33)",
+        conflictDescription:
+          "The 2024 rationalised BSTBPC/SCERT Bihar Class XII Accountancy Part-I textbook explicitly lists 'Accounting for Not-for-Profit Organisation' as omitted on p. v (starting Chapter 1 with Partnership Basic Concepts), whereas BSEB's official 2026 Annual Model Paper (Code 220) actively tests NPO in both Objective Section-A (Q3 Subscriptions, Q4 Legacy) and Descriptive Section-B (Q7 Honorarium, Q30 Receipts & Payments vs Cash Book, Q33 Receipts & Payments vs Income & Expenditure A/c).",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Preserve NPO chapter (ch-c12-acc-4) in BSEB Class 12 Accountancy with OFFICIAL_RESOURCE_CONFIRMED / SOURCE-REQUIRED status and explicit conflict disclosure until BSEB issues a 2026-27 (Annual Exam 2027) syllabus circular or 2027 Model Paper.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSTBPC/SCERT Bihar Class XII Accountancy Part-I Bilingual textbook (March 2024, Free Distribution 2024-25) directly supports Partnership chapters (Ch 1–4, pp. 1–167), while BSEB's 2026 Model Paper (220_Accountancy.pdf) supports Company Accounts/Ratios/Cash Flow and actively tests NPO despite NPO's omission in the 2024 textbook (p. v). Official 2026-27 BSEB syllabus circular is required before marking VERIFIED.",
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSTBPC/SCERT Bihar Class XII Accountancy Part-I Bilingual textbook (March 2024, Free Distribution 2024-25) directly supports Partnership chapters (Ch 1–4, pp. 1–167), BSEB Annual Exam 2027 Form (p. 11) confirms Accountancy (Code 220, 100M), and BSEB's 2026 Model Paper (220_Accountancy.pdf) supports Company Accounts/Ratios/Cash Flow while actively testing NPO despite NPO's omission in the 2024 textbook (p. v). Official 2026-27 BSEB syllabus circular is required before marking VERIFIED.",
   }),
 
   "BSEB::2026-27::Class 12::Commerce::Business Studies": validateCurriculumProvenance({
@@ -4427,7 +4735,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Business Studies",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    resourceSessionYear: "Undated (2024 Upload)",
     documentTitle:
       "Vyavshay Adhayayan Bhag-II (Business Studies Part-II) & Business Studies Part-I, Class XII",
     documentType: "OFFICIAL_TEXTBOOK",
@@ -4443,6 +4754,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "217",
     supportingResources: [
       {
         title: "Vyavshay Adhayayan Bhag-II (Class XII Bilingual)",
@@ -4472,11 +4785,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/InterModelPaper/2026/217_Business%20Studies.pdf",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
         pageReference: "pp. 1–37 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 33–37)",
         chapterReference:
           "Part-A Management Principles & Functions (Nature of Management, Fayol & Taylor, Planning, Organising/Delegation, Staffing, Directing/Motivation/Communication, Controlling) & Part-B Business Finance, Stock Exchange, Marketing & Consumer Protection",
         proves:
           "Directly supports 2025-26/2026 exam topic coverage and 100-mark exam structure for BSEB Class XII Business Studies (Code 217), but does not establish 2026-27 syllabus verification.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference: "Elective Subject Group: Business Studies - 217 (100 Marks)",
+        proves:
+          "Officially confirms Business Studies (Subject Code 217, 100 Marks) for Intermediate Annual Examination 2027 (Session 2025-27).",
       },
     ],
     partialEvidenceSummary: {
@@ -4492,7 +4822,7 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
       ],
     },
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XII Business Studies Part-I (catalog) and Part-II (PDF) confirmed on scert.bihar.gov.in (June 2024), and BSEB 2026 Model Paper (217_Business Studies.pdf) confirms 2026 topic coverage, but Part-I textbook PDF is 404, Part-II is an unindexed raster scan, and 2026-27 BSEB syllabus applicability is not proven.",
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Class XII Business Studies Part-I (catalog) and Part-II (PDF) confirmed (June 2024), BSEB Annual Exam 2027 Form (p. 11) confirms Business Studies (Code 217, 100M), and BSEB 2026 Model Paper (217_Business Studies.pdf) confirms 2026 topic coverage, but Part-I textbook PDF is 404, Part-II is an unindexed raster scan, and 2026-27 BSEB syllabus applicability is not proven.",
   }),
 
   "BSEB::2026-27::Class 12::Commerce::Economics": validateCurriculumProvenance({
@@ -4503,7 +4833,10 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Economics",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2024 Edition (Undated for 2026-27)",
+    resourceSessionYear: "Undated (2024 Upload)",
     documentTitle:
       "Introductory Macroeconomics & Indian Economic Development, Class XII (SCERT Bihar e-Resources)",
     documentType: "OFFICIAL_TEXTBOOK",
@@ -4519,6 +4852,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "219",
     supportingResources: [
       {
         title: "Introductory Macroeconomics (Class XII)",
@@ -4548,11 +4883,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/InterModelPaper/2026/219_Economics.pdf",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
         pageReference: "pp. 1–36 (Section-A Q1–100 pp. 3–32; Section-B Q1–38 pp. 33–36)",
         chapterReference:
           "Part-A Introductory Microeconomics (Scarcity, PPC, Central Problems, Gossen's Law, Equimarginal Utility, Elasticity, Market Equilibrium) & Part-B Introductory Macroeconomics (Depreciation, MPC/MPS, RBI & Banking, Government Budget, Balance of Payments)",
         proves:
           "Proves that BSEB I.Com. Class XII Economics (Subject Code 219) in the 2026 Annual Model Paper examines Introductory Microeconomics + Introductory Macroeconomics, whereas SCERT Bihar's e-Resources portal catalogs Indian Economic Development under Class XII and Microeconomics under Class XI.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference: "Elective Subject Group: Economics - 219 (100 Marks)",
+        proves:
+          "Officially confirms Economics (Subject Code 219, 100 Marks) as a Commerce elective for Intermediate Annual Examination 2027 (Session 2025-27); note that Arts Economics uses Code 326 while Commerce Economics uses Code 219.",
       },
     ],
     partialEvidenceSummary: {
@@ -4567,8 +4919,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "All Class 12 Economics chapters require an official 2026-27 BSEB syllabus circular to confirm 2026-27 applicability and Part-A/Part-B paper mapping",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-eco-scert-catalog-vs-model-paper",
+        category: "CLASS_RESOURCE_MAPPING_CONFLICT",
+        sourceA:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources/indian-economic-development-1718976312 & introductory-macroeconomics-1718966160, uploaded 2024-06-21, tagged Class XII)",
+        sourceB:
+          "BSEB Intermediate Examination 2026 Annual Model Question Paper – Economics (Elective, I.Com., Subject Code 219, 219_Economics.pdf, published 2025-11-28, pp. 1–36)",
+        conflictDescription:
+          "SCERT Bihar's official e-Resources catalog assigns Introductory Macroeconomics + Indian Economic Development to Class XII (and Introductory Microeconomics to Class XI), whereas BSEB's official 2026 Class XII I.Com. Economics Model Paper (Code 219) examines Introductory Microeconomics + Introductory Macroeconomics and contains zero questions from Indian Economic Development.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Preserve conflict disclosure and keep Class 12 Economics at SOURCE-REQUIRED until an official 2026-27 (Annual Exam 2027) BSEB syllabus circular confirms whether I.Com. Economics (Code 219) prescribes Microeconomics + Macroeconomics or Macroeconomics + Indian Economic Development.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Introductory Macroeconomics and Indian Economic Development PDFs confirmed (2024-06-21), while BSEB's 2026 I.Com. Economics Model Paper (219_Economics.pdf) tests Introductory Microeconomics + Introductory Macroeconomics. Official 2026-27 BSEB Intermediate Economics syllabus circular is required before marking VERIFIED.",
+      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official SCERT Bihar Introductory Macroeconomics and Indian Economic Development PDFs confirmed (2024-06-21) and BSEB Annual Exam 2027 Form (p. 11) confirms Economics (Code 219, 100M), while BSEB's 2026 I.Com. Economics Model Paper (219_Economics.pdf) tests Introductory Microeconomics + Introductory Macroeconomics. Official 2026-27 BSEB Intermediate Economics syllabus circular is required before marking VERIFIED.",
   }),
 
   "BSEB::2026-27::Class 12::Commerce::English Core": validateCurriculumProvenance({
@@ -4578,6 +4948,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "English Core",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     verificationStatus: "SOURCE-REQUIRED",
     evidenceStage: "SOURCE-REQUIRED",
     textbookApplicabilityStatus: "SOURCE-REQUIRED",
@@ -4586,6 +4958,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "205",
     supportingResources: [
       {
         title:
@@ -4595,11 +4969,29 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/InterModelPaper/2026/105_English.pdf",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
         pageReference: "pp. 1–29 (Section-A Q1–60 Grammar, Q61–100 Literature; Section-B Q1–7 Descriptive)",
         chapterReference:
           "Rainbow Part-II Prose (Indian Civilization and Culture, Bharat is My Home, A Pinch of Snuff, I Have a Dream, Ideas That Have Helped Mankind, The Artist, A Child is Born, The Earth, India Through a Traveller's Eyes, A Marriage Proposal), Poetry (Now the Leaves are Falling Fast, The Soldier, Snake, etc.), & Story of English (Old English Dialects, University Wits, 18th-Century Novel, Samuel Johnson's Dictionary 1755, Dramatic Structure)",
         proves:
           "Directly confirms that BSEB Class XII English Compulsory (Code 105/205) for the 2026 exam tests BSTBPC Rainbow Part-II Prose & Poetry and Story of English (plus 60 Grammar MCQs and 50M Descriptive writing), NOT CBSE Flamingo/Vistas. Does not provide the primary Rainbow Part-II textbook PDF or 2026-27 syllabus circular.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference:
+          "Compulsory Subject Group-1 / Group-2: English - 205 (100 Marks); Additional Subject Group: English - 223 (100 Marks)",
+        proves:
+          "Officially confirms English (Subject Code 205, 100 Marks) as a Compulsory Language Subject for Intermediate Annual Examination 2027 (Session 2025-27).",
       },
     ],
     partialEvidenceSummary: {
@@ -4613,8 +5005,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "Primary BSTBPC Rainbow Part-II & Story of English textbook PDFs (not hosted on scert.bihar.gov.in; bstbpc.gov.in/ClassXIIth.aspx returns HTTP 500) and official 2026-27 BSEB syllabus notification",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-eng-rainbow-part2-applicability-gap",
+        category: "TEXTBOOK_SYLLABUS_APPLICABILITY_GAP",
+        sourceA:
+          "BSEB 2026 English Compulsory Model Paper (105_English.pdf, Exam Year 2026, Q61–100 & Section-B Q2–Q6) & BSEB Annual Exam 2027 Application Form (Ex-Student's Exam_Form.pdf, p. 11: English - 205, 100 Marks)",
+        sourceB:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources) & BSTBPC Class XII Portal (bstbpc.gov.in/ClassXIIth.aspx returning HTTP 500)",
+        conflictDescription:
+          "Official 2026 Model Paper (105_English.pdf) proves Rainbow Part-II Prose/Poetry and Story of English were tested in Exam Year 2026, and the 2027 Exam Form confirms English (Code 205, 100M) for Exam Year 2027, but the primary BSTBPC Rainbow Part-II and Story of English textbooks are unavailable on SCERT/BSTBPC and no 2026-27 syllabus circular is published.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Class 12 English Core at SOURCE-REQUIRED while preserving 2026 Model Paper Rainbow Part-II / Story of English evidence in supportingResources.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED FOR PRIMARY TEXTBOOK & 2026-27 SYLLABUS): Primary BSTBPC Rainbow Part-II & Story of English textbooks are not hosted on scert.bihar.gov.in and bstbpc.gov.in/ClassXIIth.aspx returns HTTP 500; however, official BSEB 2026 Model Paper (105_English.pdf on biharboardonline.com) confirms Rainbow Part-II & Story of English prescribed pieces and 2026 section blueprint.",
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED FOR PRIMARY TEXTBOOK & 2026-27 SYLLABUS): Primary BSTBPC Rainbow Part-II & Story of English textbooks are not hosted on scert.bihar.gov.in and bstbpc.gov.in/ClassXIIth.aspx returns HTTP 500; however, official BSEB Annual Exam 2027 Form (p. 11) confirms English (Code 205, 100M) and BSEB 2026 Model Paper (105_English.pdf) confirms Rainbow Part-II & Story of English prescribed pieces for 2026.",
   }),
 
   "BSEB::2026-27::Class 12::Commerce::Urdu": validateCurriculumProvenance({
@@ -4624,6 +5034,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Urdu",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     verificationStatus: "SOURCE-REQUIRED",
     evidenceStage: "SOURCE-REQUIRED",
     textbookApplicabilityStatus: "SOURCE-REQUIRED",
@@ -4632,6 +5044,8 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: false,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "207",
     supportingResources: [
       {
         title:
@@ -4641,9 +5055,29 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         url: "https://biharboardonline.com/files/InterModelPaper/2026/107_207_307_503_Urdu.pdf",
         publicationDate: "2025-11-28",
         resourceAcademicYear: "2025-26 (Exam Year 2026)",
-        pageReference: "24 pages (unindexed Nasta'liq raster scan)",
+        resourceSessionYear: "2024-26",
+        resourceExamYear: 2026,
+        pageReference: "pp. 1–24 (Cover & Section-A/B OCR layer pp. 1–2, 21–24; Nasta'liq raster body)",
+        chapterReference:
+          "Section-A: 100 Objective MCQs (attempt 50 × 1 = 50 Marks on OMR); Section-B: 7 Descriptive Questions (2×4=8M, 2×2=4M, 1×5=5M, 5×2=10M, 3×5=15M, 1×4=4M, 1×4=4M = 50 Marks)",
         proves:
-          "Confirms official BSEB 2026 Intermediate Urdu Model Question Paper PDF (Subject Codes 107/207/307/503) on biharboardonline.com; however, all 24 pages are raster images without extractable text, and primary Kahkashan Part-II textbook is not hosted on SCERT/BSTBPC.",
+          "Confirms official BSEB 2026 Intermediate Urdu Compulsory Model Question Paper (Subject Codes 107/207/307/503) and its 100-mark section structure via cover/header OCR layer; however, Nasta'liq question stems are unindexed raster scans and primary Kahkashan Part-II textbook is not hosted on SCERT/BSTBPC.",
+      },
+      {
+        title:
+          "BSEB Online Examination Application Form for Intermediate Annual Examination, 2027 (Faculty - Commerce, Session 2025–27)",
+        authority: "BSEB",
+        documentType: "BOARD_NOTIFICATION",
+        url: "https://intermediate.biharboardonline.com/2025%E2%80%9327/assets/Notifications/Ex-Student's%20Exam_Form.pdf",
+        publicationDate: "2026-08-25",
+        resourceAcademicYear: "2026-27",
+        resourceSessionYear: "2025-27",
+        resourceExamYear: 2027,
+        pageReference: "pp. 9–12 (Faculty - COMMERCE, Item 36 Subject details with Numerical codes, p. 11)",
+        chapterReference:
+          "Compulsory Subject Group-2: Urdu - 207 (100 Marks); Additional Subject Group: Urdu - 225 (100 Marks)",
+        proves:
+          "Officially confirms Urdu (Subject Code 207 Compulsory / 225 Additional, 100 Marks) for Intermediate Annual Examination 2027 (Session 2025-27).",
       },
     ],
     partialEvidenceSummary: {
@@ -4656,8 +5090,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
         "Urdu Qawaid (Grammar), Mazmoon Nigari, Khutoot & Talkhees",
       ],
     },
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-urdu-kahkashan-part2-applicability-gap",
+        category: "TEXTBOOK_SYLLABUS_APPLICABILITY_GAP",
+        sourceA:
+          "BSEB 2026 Urdu Compulsory Model Paper (107_207_307_503_Urdu.pdf, Exam Year 2026) & BSEB Annual Exam 2027 Application Form (Ex-Student's Exam_Form.pdf, p. 11: Urdu - 207, 100 Marks)",
+        sourceB:
+          "SCERT Bihar e-Resources Portal (scert.bihar.gov.in/eresources), BSTBPC Class XII Portal (bstbpc.gov.in/ClassXIIth.aspx returning HTTP 500), and unindexed Nasta'liq raster body of 107_207_307_503_Urdu.pdf",
+        conflictDescription:
+          "BSEB Annual Exam 2027 Form confirms Urdu (Code 207, 100M) for Exam Year 2027 and the 2026 Model Paper cover OCR confirms the 50M OMR + 50M Descriptive structure, but the Urdu question body is a Nasta'liq raster scan without extractable chapter text and Kahkashan Part-II is unavailable on SCERT/BSTBPC.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Class 12 Urdu at SOURCE-REQUIRED until BSTBPC Kahkashan Part-II textbook and an official 2026-27 BSEB Urdu syllabus circular are verified.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): SCERT Bihar e-Resources does not host Class XII Kahkashan Part-II or Urdu Qawaid manuals and BSTBPC Class XII portal returns HTTP 500; official BSEB 2026 Urdu Model Paper (107_207_307_503_Urdu.pdf) is confirmed on biharboardonline.com as a 24-page raster scan without extractable text.",
+      "SOURCE-REQUIRED (SOURCE ACCESS REQUIRED): BSEB Annual Exam 2027 Form (p. 11) confirms Urdu (Code 207, 100M) and BSEB 2026 Urdu Model Paper (107_207_307_503_Urdu.pdf) confirms the 2026 100-mark paper format, but Nasta'liq question stems are raster images without extractable chapter text and Kahkashan Part-II is not hosted on SCERT/BSTBPC.",
   }),
 
   // =========================================================================
@@ -4671,7 +5123,11 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Accountancy",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper – Accountancy (Elective, I.Com., Subject Code 220)",
     documentType: "EXAM_BLUEPRINT",
@@ -4688,6 +5144,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "220",
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-acc-blueprint-vs-marking-scheme",
+        category: "MARKING_SCHEME_BLUEPRINT_DISTINCTION",
+        sourceA:
+          "BSEB 2026 Accountancy Model Question Paper (220_Accountancy.pdf, Exam Year 2026: 50M OMR + 30M Short + 20M Long = 100M) & 2027 Exam Form (Code 220, 100M)",
+        sourceB:
+          "Pending BSEB 2026-27 (Annual Exam 2027) Official Chapter-Wise Weightage & Step-Wise Examiner Marking Scheme Circular",
+        conflictDescription:
+          "The 2026 Model Paper proves the 2026 paper section blueprint (50×1 + 15×2 + 4×5 = 100M), not an official 2026-27 chapter-wise weightage notification or examiner step-marking scheme.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Accountancy MARKING_SCHEME record at SOURCE-REQUIRED (documentType EXAM_BLUEPRINT) and do not mislabel model-paper section structure as a 2026-27 verified marking scheme.",
+      },
+    ],
     verificationNotes:
       "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Accountancy Model Paper (Code 220, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) and tests NPO, Partnership, Company Accounts, Ratios & Cash Flow; official 2026-27 chapter weightage circular is still required before marking VERIFIED.",
   }),
@@ -4699,7 +5175,11 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Business Studies",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper – Business Studies (Elective, I.Com., Subject Code 217)",
     documentType: "EXAM_BLUEPRINT",
@@ -4716,6 +5196,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "217",
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-bst-blueprint-vs-marking-scheme",
+        category: "MARKING_SCHEME_BLUEPRINT_DISTINCTION",
+        sourceA:
+          "BSEB 2026 Business Studies Model Question Paper (217_Business Studies.pdf, Exam Year 2026: 50M OMR + 30M Short + 20M Long = 100M) & 2027 Exam Form (Code 217, 100M)",
+        sourceB:
+          "Pending BSEB 2026-27 (Annual Exam 2027) Official Chapter-Wise Weightage & Step-Wise Examiner Marking Scheme Circular",
+        conflictDescription:
+          "The 2026 Model Paper proves the 2026 paper section blueprint (50×1 + 15×2 + 4×5 = 100M), not an official 2026-27 chapter-wise weightage notification or examiner step-marking scheme.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Business Studies MARKING_SCHEME record at SOURCE-REQUIRED (documentType EXAM_BLUEPRINT) and do not mislabel model-paper section structure as a 2026-27 verified marking scheme.",
+      },
+    ],
     verificationNotes:
       "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Business Studies Model Paper (Code 217, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) across Management Principles/Functions, Business Finance, Marketing & Consumer Protection; official 2026-27 blueprint circular is required before marking VERIFIED.",
   }),
@@ -4727,7 +5227,11 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Economics",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper – Economics (Elective, I.Com., Subject Code 219)",
     documentType: "EXAM_BLUEPRINT",
@@ -4744,6 +5248,26 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "219",
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-eco-blueprint-vs-marking-scheme",
+        category: "MARKING_SCHEME_BLUEPRINT_DISTINCTION",
+        sourceA:
+          "BSEB 2026 I.Com. Economics Model Question Paper (219_Economics.pdf, Exam Year 2026: 50M OMR + 30M Short + 20M Long = 100M) & 2027 Exam Form (Code 219, 100M)",
+        sourceB:
+          "Pending BSEB 2026-27 (Annual Exam 2027) Official Chapter-Wise Weightage & Step-Wise Examiner Marking Scheme Circular",
+        conflictDescription:
+          "The 2026 Model Paper proves the 2026 paper section blueprint (50×1 + 15×2 + 4×5 = 100M), not an official 2026-27 chapter-wise weightage notification or examiner step-marking scheme.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Economics MARKING_SCHEME record at SOURCE-REQUIRED (documentType EXAM_BLUEPRINT) and do not mislabel model-paper section structure as a 2026-27 verified marking scheme.",
+      },
+    ],
     verificationNotes:
       "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 I.Com. Economics Model Paper (Code 219, 2025-11-28) confirms the 2026 paper structure (50M OMR + 30M Short + 20M Long = 100M) covering Introductory Microeconomics & Introductory Macroeconomics; official 2026-27 blueprint circular is required before marking VERIFIED.",
   }),
@@ -4755,7 +5279,11 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "English Core",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper – English (Compulsory, Subject Code 105/205/305)",
     documentType: "EXAM_BLUEPRINT",
@@ -4772,8 +5300,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "205",
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-eng-blueprint-vs-marking-scheme",
+        category: "MARKING_SCHEME_BLUEPRINT_DISTINCTION",
+        sourceA:
+          "BSEB 2026 English Compulsory Model Question Paper (105_English.pdf, Exam Year 2026: 50M OMR + 50M Descriptive = 100M) & 2027 Exam Form (Code 205, 100M)",
+        sourceB:
+          "Pending BSEB 2026-27 (Annual Exam 2027) Official Chapter-Wise Weightage & Step-Wise Examiner Marking Scheme Circular",
+        conflictDescription:
+          "The 2026 Model Paper proves the 2026 paper section blueprint (50M Objective + 50M Descriptive), not an official 2026-27 chapter-wise weightage notification or examiner step-marking scheme.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep English Core MARKING_SCHEME record at SOURCE-REQUIRED (documentType EXAM_BLUEPRINT) and do not mislabel model-paper section structure as a 2026-27 verified marking scheme.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 English Compulsory Model Paper (Code 105, 2025-11-28) directly confirms the 2026 section-wise marking scheme (50M Objective + 50M Descriptive) and Rainbow Part-II / Story of English coverage; official 2026-27 notification is required before marking VERIFIED.",
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 English Compulsory Model Paper (Code 105, 2025-11-28) directly confirms the 2026 section-wise blueprint (50M Objective + 50M Descriptive) and Rainbow Part-II / Story of English coverage; official 2026-27 notification is required before marking VERIFIED.",
   }),
   "BSEB::2026-27::Class 12::Commerce::Urdu::MARKING_SCHEME": validateCurriculumProvenance({
     sourceId: "bseb-2026-model-paper-207-urdu",
@@ -4783,13 +5331,20 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     stream: "Commerce",
     subject: "Urdu",
     academicYear: "2026-27",
+    sessionYear: "2025-27",
+    examYear: 2027,
     resourceAcademicYear: "2025-26",
+    resourceSessionYear: "2024-26",
+    resourceExamYear: 2026,
     documentTitle:
       "BSEB Intermediate Examination 2026 Annual Model Question Paper – Urdu (Subject Code 107/207/307/503)",
     documentType: "EXAM_BLUEPRINT",
     sourceUrl: "https://biharboardonline.com/files/InterModelPaper/2026/107_207_307_503_Urdu.pdf",
     publicationDate: "2025-11-28",
     accessedDate: "2026-10-02",
+    pageReference: "pp. 1–24 (Cover & Section-A/B OCR layer pp. 1–2, 21–24; Nasta'liq raster body)",
+    chapterReference:
+      "Section-A: 100 Objective MCQs (attempt any 50 × 1 = 50 Marks on OMR); Section-B: 7 Descriptive Questions (2×4=8M, 2×2=4M, 1×5=5M, 5×2=10M, 3×5=15M, 1×4=4M, 1×4=4M = 50 Marks); Total = 100 Marks",
     verificationStatus: "SOURCE-REQUIRED",
     evidenceStage: "OFFICIAL_RESOURCE_CONFIRMED",
     officialResourceConfirmed: true,
@@ -4797,8 +5352,28 @@ export const CURRICULUM_PROVENANCE_REGISTRY: Record<string, CurriculumSourceProv
     currentYearApplicabilityProven: false,
     officialSyllabusDocumentFound: false,
     officialExamBlueprintFound: true,
+    official2027SubjectCodeConfirmed: true,
+    officialSubjectCode: "207",
+    unresolvedConflicts: [
+      {
+        conflictId: "bseb-2026-27-c12-urdu-blueprint-vs-marking-scheme",
+        category: "MARKING_SCHEME_BLUEPRINT_DISTINCTION",
+        sourceA:
+          "BSEB 2026 Urdu Compulsory Model Question Paper (107_207_307_503_Urdu.pdf, Exam Year 2026: 50M OMR + 50M Descriptive = 100M) & 2027 Exam Form (Code 207, 100M)",
+        sourceB:
+          "Pending BSEB 2026-27 (Annual Exam 2027) Official Chapter-Wise Weightage & Step-Wise Examiner Marking Scheme Circular",
+        conflictDescription:
+          "The 2026 Urdu Model Paper OCR layer confirms the 2026 section blueprint (50M OMR + 50M Descriptive across 7 question groups), not an official 2026-27 chapter-wise weightage notification or examiner step-marking scheme.",
+        academicYear: "2026-27",
+        sessionYear: "2025-27",
+        examYear: 2027,
+        conflictStatus: "UNRESOLVED_PENDING_2026_27_CIRCULAR",
+        recommendedReviewAction:
+          "Keep Urdu MARKING_SCHEME record at SOURCE-REQUIRED (documentType EXAM_BLUEPRINT) and do not mislabel model-paper section structure as a 2026-27 verified marking scheme.",
+      },
+    ],
     verificationNotes:
-      "SOURCE-REQUIRED (OFFICIAL_RESOURCE_CONFIRMED): Official BSEB 2026 Urdu Model Question Paper PDF (Codes 107/207/307/503, 2025-11-28, 24 pages) is confirmed on biharboardonline.com, but all 24 pages are unindexed Nasta'liq raster scans without extractable text and 2026-27 applicability is not proven.",
+      "SOURCE-REQUIRED (CURRICULUM_CONTENT_SUPPORTED): Official BSEB 2026 Urdu Model Question Paper PDF (Codes 107/207/307/503, 2025-11-28, 24 pages) confirms via its cover/section-header OCR layer the 2026 100-mark section blueprint (50M OMR + 50M Descriptive across Q1–Q7), while Nasta'liq question stems remain raster scans and 2026-27 applicability is not proven.",
   }),
 };
 
@@ -4826,7 +5401,11 @@ export function getCurriculumSourceIngestionAudit(
       stream: effective.stream || "ALL",
       subject: effective.subject || "BOARD_EXAM_PATTERN",
       academicYear: effective.academicYear,
+      sessionYear: effective.sessionYear || "N/A",
+      examYear: effective.examYear || "N/A",
       resourceAcademicYear: effective.resourceAcademicYear || "N/A",
+      resourceSessionYear: effective.resourceSessionYear || "N/A",
+      resourceExamYear: effective.resourceExamYear || "N/A",
       documentTitle: effective.documentTitle,
       documentType: effective.documentType,
       sourceUrl: effective.sourceUrl || "N/A (Official Primary Source Pending)",
@@ -4841,7 +5420,10 @@ export function getCurriculumSourceIngestionAudit(
       currentYearApplicabilityProven: Boolean(effective.currentYearApplicabilityProven),
       officialSyllabusDocumentFound: Boolean(effective.officialSyllabusDocumentFound),
       officialExamBlueprintFound: Boolean(effective.officialExamBlueprintFound),
+      official2027SubjectCodeConfirmed: Boolean(effective.official2027SubjectCodeConfirmed),
+      officialSubjectCode: effective.officialSubjectCode || "N/A",
       supportingResourceCount: effective.supportingResources ? effective.supportingResources.length : 0,
+      unresolvedConflictCount: effective.unresolvedConflicts ? effective.unresolvedConflicts.length : 0,
       previousStatus: baseRecord ? baseRecord.verificationStatus : "SOURCE-REQUIRED",
       newStatus: effective.verificationStatus,
       verificationNotes: effective.verificationNotes,

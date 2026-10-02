@@ -72,6 +72,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const [classLevel, setClassLevel] = useState("Class 10");
   const [stream, setStream] = useState<StreamType>("General");
   const [board, setBoard] = useState<ExamBoard | string>("CBSE");
+  const [academicYear, setAcademicYear] = useState<string>("2026-27");
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [contentLanguage, setContentLanguage] = useState<SupportedAcademicContentLanguage>("en");
   const [avatarColor, setAvatarColor] = useState(AVATAR_GRADIENT_OPTIONS[0].value);
@@ -107,6 +108,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setClassLevel("Class 10");
     setStream("General");
     setBoard("CBSE");
+    setAcademicYear("2026-27");
     setLanguage("en");
     setContentLanguage("en");
     setAvatarColor(AVATAR_GRADIENT_OPTIONS[0].value);
@@ -124,6 +126,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setClassLevel(p.classLevel);
     setStream(p.classLevel === "Class 10" ? "General" : (p.stream === "General" ? "Science" : p.stream));
     setBoard(p.board);
+    setAcademicYear(p.academicYear || "2026-27");
     setLanguage(resolveEffectiveLanguage(p));
     setContentLanguage(resolveAcademicContentLanguage(p.contentLanguage || p.language));
     setAvatarColor(p.avatarColor || AVATAR_GRADIENT_OPTIONS[0].value);
@@ -149,6 +152,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       classLevel,
       stream: finalStream,
       board,
+      academicYear,
       language,
       uiLanguage: language,
       contentLanguage,
@@ -170,6 +174,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       classLevel,
       stream: finalStream,
       board,
+      academicYear,
       language,
       uiLanguage: language,
       contentLanguage,
@@ -345,6 +350,9 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                           <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20">
                             {p.board}
                           </span>
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono font-semibold">
+                            {p.academicYear || "2026-27"}
+                          </span>
                           <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">
                             {p.language === "hi" ? "हिन्दी" : "English"}
                           </span>
@@ -462,7 +470,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                   {/* 2. Board */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -482,6 +490,21 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       <option value="NCERT">NCERT Core</option>
                       <option value="State Board">Other State Board</option>
                       <option value="Other">Other Board</option>
+                    </select>
+                  </div>
+
+                  {/* 2b. Academic Session */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Academic Session
+                    </label>
+                    <select
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="2026-27">2026–27 (Current)</option>
+                      <option value="2025-26">2025–26 (Historical)</option>
                     </select>
                   </div>
 

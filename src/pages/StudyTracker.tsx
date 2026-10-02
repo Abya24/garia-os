@@ -489,11 +489,9 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
   };
 
   const handleDeleteSession = (session: StudySession) => {
-    if (window.confirm(`Delete ${Math.round(session.durationSeconds / 60)} min session for ${session.subjectName}?`)) {
-      if (onDeleteStudySession) {
-        onDeleteStudySession(session.id);
-        showToast("Session deleted.");
-      }
+    if (onDeleteStudySession) {
+      onDeleteStudySession(session.id);
+      showToast("Session deleted.");
     }
   };
 
@@ -726,10 +724,8 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
           {onResetSubjectsToDefaults && (
             <button
               onClick={() => {
-                if (window.confirm("Restore default subjects for your stream? Custom subjects will be replaced with standard defaults.")) {
-                  onResetSubjectsToDefaults();
-                  showToast("Subjects restored to stream defaults.");
-                }
+                onResetSubjectsToDefaults();
+                showToast("Subjects restored to stream defaults.");
               }}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl glass-pill border border-white/10 text-slate-400 hover:text-white text-xs font-medium transition-all"
               title="Restore Default Stream Subjects"
@@ -1471,10 +1467,8 @@ export const StudyTracker: React.FC<StudyTrackerProps> = ({
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(`Delete subject "${subj.name}"?`)) {
-                              onDeleteSubject(subj.id);
-                              showToast(`Deleted "${subj.name}".`);
-                            }
+                            onDeleteSubject(subj.id);
+                            showToast(`Deleted "${subj.name}".`);
                           }}
                           className="p-1.5 rounded-lg glass-pill text-slate-500 hover:text-rose-400 transition-colors"
                           title="Delete Subject"

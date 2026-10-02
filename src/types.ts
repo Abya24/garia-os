@@ -357,6 +357,7 @@ export interface StudentProfile {
   classLevel: string;
   stream: StreamType;
   board: ExamBoard | string;
+  academicYear?: string;
   language?: string;
   uiLanguage?: "en" | "hi" | string;
   contentLanguage?: string;
@@ -543,16 +544,29 @@ export interface CurriculumSupportingResource {
   url: string;
   publicationDate?: string;
   resourceAcademicYear?: string;
+  resourceSessionYear?: string;
+  resourceExamYear?: number | string;
   pageReference?: string;
   chapterReference?: string;
   proves: string;
 }
 
 export interface CurriculumSourceConflict {
+  conflictId?: string;
+  category?:
+    | "CURRICULUM_CHAPTER_CONFLICT"
+    | "CLASS_RESOURCE_MAPPING_CONFLICT"
+    | "TEXTBOOK_SYLLABUS_APPLICABILITY_GAP"
+    | "EXAM_PATTERN_YEAR_GAP"
+    | "MARKING_SCHEME_BLUEPRINT_DISTINCTION"
+    | string;
   sourceA: string;
   sourceB: string;
   conflictDescription: string;
   academicYear: string;
+  sessionYear?: string;
+  examYear?: number | string;
+  conflictStatus?: "UNRESOLVED_PENDING_2026_27_CIRCULAR" | "RESOLVED";
   recommendedReviewAction: string;
 }
 
@@ -564,7 +578,11 @@ export interface CurriculumSourceProvenance {
   stream?: StreamType;
   subject?: string;
   academicYear: string;
+  sessionYear?: string;
+  examYear?: number | string;
   resourceAcademicYear?: string;
+  resourceSessionYear?: string;
+  resourceExamYear?: number | string;
   applicableAcademicYears?: string[];
   documentTitle: string;
   documentType: CurriculumDocumentType;
@@ -581,8 +599,11 @@ export interface CurriculumSourceProvenance {
   currentYearApplicabilityProven?: boolean;
   officialSyllabusDocumentFound?: boolean;
   officialExamBlueprintFound?: boolean;
+  official2027SubjectCodeConfirmed?: boolean;
+  officialSubjectCode?: string;
   supportingResources?: CurriculumSupportingResource[];
   partialEvidenceSummary?: CurriculumPartialEvidenceSummary;
+  unresolvedConflicts?: CurriculumSourceConflict[];
   verificationNotes: string;
   conflictDetails?: CurriculumSourceConflict;
 }

@@ -133,17 +133,15 @@ export const ShareWorkspaceModal: React.FC<ShareWorkspaceModalProps> = ({
   const handleRemoveMember = async (targetUserId: string) => {
     if (!isOwner) return;
     if (targetUserId === workspace.ownerId) return;
-    if (window.confirm("Are you sure you want to remove this collaborator?")) {
-      try {
-        const updated = await removeMemberFromWorkspace(
-          workspace,
-          targetUserId,
-          currentUser
-        );
-        onWorkspaceUpdated(updated);
-      } catch (err) {
-        console.error("Failed to remove member:", err);
-      }
+    try {
+      const updated = await removeMemberFromWorkspace(
+        workspace,
+        targetUserId,
+        currentUser
+      );
+      onWorkspaceUpdated(updated);
+    } catch (err) {
+      console.error("Failed to remove member:", err);
     }
   };
 

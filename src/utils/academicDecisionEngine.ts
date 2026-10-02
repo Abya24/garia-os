@@ -746,9 +746,9 @@ export function generateAcademicDecisionReport(params: {
   if (uncompletedVVICount >= 2) {
     riskIndicators.push({
       id: "risk-3",
-      risk: `${uncompletedVVICount} VVI Board Exam chapters pending first revision`,
+      risk: `${uncompletedVVICount} high-priority chapters pending first revision (Application-derived)`,
       severity: "High",
-      recommendation: "Prioritize VVI flashcards and formula sheets in revision queue.",
+      recommendation: "Prioritize high-yield flashcards and formula sheets in revision queue.",
     });
   }
 

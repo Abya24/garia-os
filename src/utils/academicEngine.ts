@@ -80,6 +80,7 @@ export function getDefaultSubjectsForStream(
     );
     return {
       ...sub,
+      ...(matchedCurriculumSub?.code ? { code: matchedCurriculumSub.code } : {}),
       ...(normalizedBoard ? { board: normalizedBoard } : {}),
       ...(classLevel ? { classLevel } : {}),
       academicYear: hierarchy.academicYear,

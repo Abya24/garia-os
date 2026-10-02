@@ -194,17 +194,15 @@ export const SharedTasksWorkspaceView: React.FC<SharedTasksWorkspaceViewProps> =
 
   const handleDeleteTask = async (taskId: string) => {
     if (isViewer) return;
-    if (window.confirm("Delete this shared task for all collaborators?")) {
-      try {
-        const updated = await deleteSharedTaskFromWorkspace(
-          workspace,
-          taskId,
-          currentUser
-        );
-        onWorkspaceUpdated(updated);
-      } catch (err) {
-        console.error("Failed to delete task:", err);
-      }
+    try {
+      const updated = await deleteSharedTaskFromWorkspace(
+        workspace,
+        taskId,
+        currentUser
+      );
+      onWorkspaceUpdated(updated);
+    } catch (err) {
+      console.error("Failed to delete task:", err);
     }
   };
 
