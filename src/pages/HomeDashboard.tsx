@@ -2753,6 +2753,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             revisions={academicRevisions}
             practiceSessions={academicPractice}
             examRecords={examTestRecords}
+            goals={combinedGoals}
             streakDays={gamification.currentStreak || 1}
             currentLanguage={currentLanguage}
             onNavigate={onNavigate}

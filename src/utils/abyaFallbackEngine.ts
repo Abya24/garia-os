@@ -18,6 +18,10 @@ import {
   normalizeCurriculumBoard,
   normalizeVerificationStatus,
 } from "../data/masterCurriculum";
+import {
+  generateUnifiedAdaptiveState,
+  loadProfileMistakes,
+} from "./adaptiveStudyEngine";
 
 /**
  * Formats an honest, source-aware curriculum disclosure for Abya AI responses.
@@ -286,6 +290,27 @@ export const generateAbyaFallbackResponse = (
   let effectiveAction: AbyaQuickActionType | "general" = actionType;
   if (effectiveAction === "general" && lowerPromptRaw.length > 2) {
     if (
+      lowerPromptRaw.includes("what should i study") ||
+      lowerPromptRaw.includes("what should i do") ||
+      lowerPromptRaw.includes("abhi kya") ||
+      lowerPromptRaw.includes("kya karna chahiye") ||
+      lowerPromptRaw.includes("what to do now")
+    ) {
+      effectiveAction = "what_should_i_do_now" as any;
+    } else if (
+      lowerPromptRaw.includes("mistake") ||
+      lowerPromptRaw.includes("galti") ||
+      lowerPromptRaw.includes("wrong answer")
+    ) {
+      effectiveAction = "mistake_review" as any;
+    } else if (
+      lowerPromptRaw.includes("this week") ||
+      lowerPromptRaw.includes("weekly focus") ||
+      lowerPromptRaw.includes("weekly review") ||
+      lowerPromptRaw.includes("is hafte")
+    ) {
+      effectiveAction = "weekly_focus" as any;
+    } else if (
       lowerPromptRaw.includes("aaj kya padh") ||
       lowerPromptRaw.includes("aaj ka plan") ||
       lowerPromptRaw.includes("today study plan") ||
@@ -309,7 +334,85 @@ export const generateAbyaFallbackResponse = (
     }
   }
 
-  switch (effectiveAction) {
+  switch (effectiveAction as string) {
+    case "what_should_i_do_now": {
+      const adaptiveState = generateUnifiedAdaptiveState({
+        student: profile,
+        subjects,
+        studySessions: [],
+        academicChapters: chapters,
+        examRecords: tests as any,
+        examProfile,
+        availableDailyMinutes: (examProfile.dailyStudyHours || 3) * 60,
+      });
+
+      const top3 = adaptiveState.topRecommendations.slice(0, 3);
+      const actionLines = top3.map((a, idx) => {
+        return `**${idx + 1}. ${a.action}** (~${a.estimatedMinutes} mins)\n   • 🎯 *Why:* ${a.reason}\n   • 💡 *Next:* ${a.postActionFeedback || "Moves chapter forward in study log"}`;
+      }).join("\n\n");
+
+      return `Arre ${profileName}! Abhi tumhare academic state ke mutabiq sabse pehle ye Top 3 actions prioritize kiye gaye hain (Application-Derived Priority):
+
+${hierarchyDisclosure}
+
+📌 **Abhi Kya Karein (Top Recommendations):**
+${actionLines}
+
+⚡ *Mentor Advice: Teenon ek saath mat socho, bas pehle Action 1 shuru karo aur 25-30 minute focused padhai karo!*`;
+    }
+
+    case "mistake_review": {
+      const profileId = profile?.id || "default-student";
+      const mistakes = loadProfileMistakes(profileId);
+      const pending = mistakes.filter((m) => m.status === "pending_review" || m.status === "retried_incorrect");
+
+      if (pending.length === 0) {
+        return `Bahut badhiya ${profileName}! 🎉 Tumhare mistake review log me abhi koi pending wrong question nahi hai.
+
+- Practice sessions ya test me jo questions tough lagein unhe bookmark ya retry mark karte raho.
+- Consistency banaye rakhne ke liye aaj 10 board-pattern practice questions solve karo!`;
+      }
+
+      const mistakeList = pending.slice(0, 3).map((m, idx) => {
+        return `**${idx + 1}. ${m.subjectName} — ${m.chapterTitle}**\n   • ❓ *Question:* "${m.questionText.slice(0, 70)}..."\n   • 💡 *Correct Concept:* ${m.conceptExplanation || m.correctAnswer || "Check formula/rule in notes"}`;
+      }).join("\n\n");
+
+      return `Galtiyon se hi seekhte hain ${profileName}! 📝 Tumhare paas **${pending.length} pending mistake items** hain:
+
+${mistakeList}
+
+🔄 **Mistake Learning Cycle:**
+1. Pehle samjho *kyun galat hua* (conceptual error ya calculation slip).
+2. Concept summary padho.
+3. Same question ko bina dekhe retry karo!`;
+    }
+
+    case "weekly_focus": {
+      const adaptiveState = generateUnifiedAdaptiveState({
+        student: profile,
+        subjects,
+        studySessions: [],
+        academicChapters: chapters,
+        examRecords: tests as any,
+        examProfile,
+        availableDailyMinutes: (examProfile.dailyStudyHours || 3) * 60,
+      });
+
+      const wr = adaptiveState.weeklyReview;
+      return `Namaste ${profileName}! 🗓️ Tumhara **Weekly Academic Focus & Review (${profileClass} ${profileStream})**:
+
+${hierarchyDisclosure}
+
+📊 **Status & Progress:**
+• 📚 **Weak Areas Identified:** ${wr.weakAreasIdentified.join(", ")}
+• ⏳ **Days to Target Exam:** ${daysRemaining} Din
+
+🎯 **This Week's Top Priorities (Application-Derived):**
+${wr.nextWeekPriorities.slice(0, 3).map((p, idx) => `${idx + 1}. ${p}`).join("\n")}
+
+💡 *Mentor Tip: Har din ek priority complete karo, week ke end me sara backlog clear ho jayega!*`;
+    }
+
     case "study_plan":
     case "plan_day": {
       const pendingTasks = tasks.filter((t) => !t.completed);

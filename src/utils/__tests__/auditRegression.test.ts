@@ -27,6 +27,17 @@ import { hashPassword } from "../auth";
 import { enqueueOfflineAction, getPendingQueue, removePendingAction } from "../offlineQueue";
 import { executeAbyaModuleAction } from "../abyaModuleActions";
 import { Habit, Task, UserSettings } from "../../types";
+import {
+  generateUnifiedAdaptiveState,
+  calculateNormalizedPriority,
+  determineMasteryState,
+  calculateRevisionStatus,
+  buildTimeAwareDailyPlan,
+  loadProfileMistakes,
+  recordQuestionMistake,
+  updateMistakeStatus,
+} from "../adaptiveStudyEngine";
+import { generateAbyaFallbackResponse } from "../abyaFallbackEngine";
 
 function expect(actual: any) {
   return {
@@ -3115,6 +3126,291 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(examPatternAudit).toBeDefined();
     expect(examPatternAudit?.officialExamBlueprintFound).toBe(true);
     expect((examPatternAudit?.supportingResourceCount || 0) >= 3).toBe(true);
+  });
+
+  it("28. P4 Adaptive Student Intelligence & Study Execution: verifies unified adaptive state, top 3 recommendations, priority formula, 6-stage mastery, time-aware planning (30m vs 3h), revision engine, mistake review loop, exam date separation, analytics-to-action, profile isolation, and Abya AI actionable coaching", async () => {
+    // 1. Profile Isolation Setup for Profile A and Profile B
+    const profA = addStudentProfile({
+      name: "Tanya Sharma",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+    });
+    const profB = addStudentProfile({
+      name: "Rahul Verma",
+      classLevel: "Class 11",
+      stream: "Science",
+      board: "CBSE",
+    });
+
+    // 2. Priority Model: transparent formula with normalized factors
+    const priorityExamSoon = calculateNormalizedPriority({
+      isWeak: true,
+      isVVI: true,
+      daysUntilExam: 10,
+      revisionDueDays: -3, // 3 days overdue
+      status: "In Progress",
+      accuracyPct: 45,
+      matchesActiveGoal: true,
+      streakDays: 4,
+    });
+    expect(priorityExamSoon.urgency).toBe(25);
+    expect(priorityExamSoon.weakness >= 15).toBe(true);
+    expect(priorityExamSoon.revisionNeed >= 20).toBe(true);
+    expect(priorityExamSoon.goalAlignment).toBe(10);
+    expect(priorityExamSoon.totalScore >= 85).toBe(true);
+    expect(priorityExamSoon.formulaDescription.includes("Priority")).toBe(true);
+
+    const priorityExamDistant = calculateNormalizedPriority({
+      isWeak: false,
+      isVVI: false,
+      daysUntilExam: 90,
+      status: "Completed",
+      matchesActiveGoal: false,
+      streakDays: 5,
+    });
+    expect(priorityExamDistant.urgency).toBe(10);
+    expect(priorityExamDistant.totalScore < priorityExamSoon.totalScore).toBe(true);
+
+    // 3. Multi-Signal 6-Stage Mastery Model: discrete states & honest "Not enough data"
+    const masteryNoData = determineMasteryState({
+      chapterId: "ch-test-1",
+      chapterTitle: "Partnership Basics",
+      subjectId: "sub-acc",
+      subjectName: "Accountancy",
+      practiceAttempts: 0,
+      revisionCount: 0,
+    });
+    expect(masteryNoData.hasEnoughData).toBe(false);
+    expect(masteryNoData.stage).toBe("Not Started");
+
+    const masteryImproving = determineMasteryState({
+      chapterId: "ch-test-2",
+      chapterTitle: "Admission of Partner",
+      subjectId: "sub-acc",
+      subjectName: "Accountancy",
+      practiceAttempts: 6,
+      practiceAccuracyPct: 48,
+      revisionCount: 1,
+      isWeak: true,
+    });
+    expect(masteryImproving.hasEnoughData).toBe(true);
+    expect(masteryImproving.stage).toBe("Improving");
+
+    const masteryStrong = determineMasteryState({
+      chapterId: "ch-test-3",
+      chapterTitle: "Principles of Management",
+      subjectId: "sub-bst",
+      subjectName: "Business Studies",
+      practiceAttempts: 15,
+      practiceAccuracyPct: 92,
+      revisionCount: 2,
+    });
+    expect(masteryStrong.stage).toBe("Strong");
+
+    const masteryOverdue = determineMasteryState({
+      chapterId: "ch-test-4",
+      chapterTitle: "National Income",
+      subjectId: "sub-eco",
+      subjectName: "Economics",
+      nextRevisionDue: Date.now() - 86400000, // yesterday
+    });
+    expect(masteryOverdue.stage).toBe("Needs Revision");
+    expect(masteryOverdue.isOverdueForRevision).toBe(true);
+
+    // 4. Revision Engine: explainable spaced intervals & honest non-pseudoscience copy
+    const revCycle1 = calculateRevisionStatus({
+      id: "rev-1",
+      subjectName: "Accountancy",
+      chapterTitle: "Cash Flow Statement",
+      cycleCount: 1,
+      lastStudiedDate: "2026-10-01",
+    });
+    expect(revCycle1.intervalDays).toBe(2);
+    expect(revCycle1.recommendationNote.includes("brain will forget")).toBe(false);
+    expect(revCycle1.recommendationNote.toLowerCase().includes("revision")).toBe(true);
+
+    const revOverdue = calculateRevisionStatus({
+      id: "rev-2",
+      subjectName: "Business Studies",
+      chapterTitle: "Financial Management",
+      customDueDate: "2026-09-20",
+    });
+    expect(revOverdue.urgencyBadge).toBe("Overdue");
+    expect(revOverdue.daysOverdue > 0).toBe(true);
+    expect(revOverdue.recommendationNote.includes("Overdue")).toBe(true);
+
+    // 5. Time-Aware Study Planning: 30-minute day vs 3-hour day
+    const candidateActions = [
+      {
+        id: "act-1",
+        rank: 1 as const,
+        action: "Study Accountancy Chapter 1",
+        category: "study" as const,
+        subjectName: "Accountancy",
+        subjectId: "sub-acc",
+        chapterTitle: "Partnership Basics",
+        reason: "Core syllabus foundation",
+        estimatedMinutes: 45,
+        sourceBasis: "APPLICATION-DERIVED" as const,
+        confidence: "High" as const,
+        priorityScore: 92,
+        isUrgent: true,
+        isWeak: false,
+        isVVI: true,
+        targetTab: "study" as const,
+      },
+      {
+        id: "act-2",
+        rank: 2 as const,
+        action: "Revise Economics Money & Banking",
+        category: "revision" as const,
+        subjectName: "Economics",
+        subjectId: "sub-eco",
+        chapterTitle: "Money and Banking",
+        reason: "Overdue revision",
+        estimatedMinutes: 30,
+        sourceBasis: "APPLICATION-DERIVED" as const,
+        confidence: "High" as const,
+        priorityScore: 86,
+        isUrgent: true,
+        isWeak: false,
+        isVVI: true,
+        targetTab: "exam" as const,
+      },
+      {
+        id: "act-3",
+        rank: 3 as const,
+        action: "Practice 10 Business Studies MCQs",
+        category: "practice" as const,
+        subjectName: "Business Studies",
+        subjectId: "sub-bst",
+        chapterTitle: "Principles of Management",
+        reason: "Board exam pattern drill",
+        estimatedMinutes: 25,
+        sourceBasis: "APPLICATION-DERIVED" as const,
+        confidence: "Moderate" as const,
+        priorityScore: 78,
+        isUrgent: false,
+        isWeak: false,
+        isVVI: false,
+        targetTab: "exam" as const,
+      },
+    ];
+
+    const plan30m = buildTimeAwareDailyPlan(30, candidateActions);
+    expect(plan30m.availableMinutes).toBe(30);
+    expect(plan30m.mustDo.length).toBe(1);
+    expect(plan30m.deferred.length >= 1).toBe(true);
+    expect(plan30m.deferred[0].reasonForDeferral.includes("budget")).toBe(true);
+
+    const plan180m = buildTimeAwareDailyPlan(180, candidateActions);
+    expect(plan180m.availableMinutes).toBe(180);
+    expect(plan180m.mustDo.length).toBe(1);
+    expect(plan180m.shouldDo.length >= 1).toBe(true);
+    expect(plan180m.breakMinutes >= 10).toBe(true);
+
+    // 6. Structured Mistake Review Loop & Profile Isolation
+    const mistakeA = recordQuestionMistake(profA.id, {
+      profileId: profA.id,
+      subjectId: "sub-acc",
+      subjectName: "Accountancy",
+      chapterTitle: "Partnership Basics",
+      questionText: "What is the maximum number of partners allowed in a banking partnership firm?",
+      studentAnswer: "10",
+      correctAnswer: "50 (as per Companies Rule 2014 Rule 10 / Section 464)",
+      conceptExplanation: "The Central Government prescribes limit up to 50 under Rule 10.",
+    });
+    expect(mistakeA.status).toBe("pending_review");
+    expect(mistakeA.retryCount).toBe(0);
+
+    const profAMistakes = loadProfileMistakes(profA.id);
+    expect(profAMistakes.length).toBe(1);
+    expect(profAMistakes[0].id).toBe(mistakeA.id);
+
+    // Verify Profile B has 0 mistakes (strict profile data isolation)
+    const profBMistakes = loadProfileMistakes(profB.id);
+    expect(profBMistakes.length).toBe(0);
+
+    // Retry mistake
+    updateMistakeStatus(profA.id, mistakeA.id, "retried_incorrect", "Forgot rule number");
+    const updatedMistakes1 = loadProfileMistakes(profA.id);
+    expect(updatedMistakes1[0].status).toBe("retried_incorrect");
+    expect(updatedMistakes1[0].retryCount).toBe(1);
+
+    updateMistakeStatus(profA.id, mistakeA.id, "resolved", "Now clear: 50 is the prescribed limit");
+    const updatedMistakes2 = loadProfileMistakes(profA.id);
+    expect(updatedMistakes2[0].status).toBe("resolved");
+
+    // 7. Unified Adaptive State Generation & Recommendations
+    const adaptiveStateA = generateUnifiedAdaptiveState({
+      student: profA,
+      subjects: [
+        { id: "sub-acc", name: "Accountancy", color: "#06b6d4" } as any,
+        { id: "sub-bst", name: "Business Studies", color: "#8b5cf6" } as any,
+        { id: "sub-eco", name: "Economics", color: "#10b981" } as any,
+      ],
+      examProfile: {
+        id: "exam-prof-a",
+        examName: "BSEB Class 12 Commerce Board Exam",
+        board: "BSEB",
+        classLevel: "Class 12",
+        stream: "Commerce",
+        startDate: "2027-02-01",
+      } as any,
+      availableDailyMinutes: 60,
+    });
+
+    // Max 3 primary recommendations
+    expect(adaptiveStateA.topRecommendations.length <= 3).toBe(true);
+    expect(adaptiveStateA.topRecommendations[0].sourceBasis).toBe("APPLICATION-DERIVED");
+    expect(adaptiveStateA.topRecommendations[0].estimatedMinutes > 0).toBe(true);
+
+    // Exam Readiness: date type distinction & honest missing data handling
+    expect(adaptiveStateA.examReadiness.dateType).toBe("STUDENT_TARGET_DATE");
+    expect(adaptiveStateA.examReadiness.hasEnoughData).toBe(false);
+    expect(adaptiveStateA.examReadiness.explanation.includes("not enough data")).toBe(true);
+
+    // 8. Abya AI: P4 Actionable Coach Intents
+    const abyaWhatToStudy = generateAbyaFallbackResponse(
+      "general",
+      "what should i study now?",
+      {
+        profile: profA,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy", color: "#06b6d4" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaWhatToStudy.includes("Application-Derived Priority")).toBe(true);
+    expect(abyaWhatToStudy.includes("Top Recommendations")).toBe(true);
+
+    const abyaMistakes = generateAbyaFallbackResponse(
+      "general",
+      "explain my mistake",
+      {
+        profile: profA,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaMistakes.includes("Mistake Learning Cycle") || abyaMistakes.includes("mistake")).toBe(true);
+
+    const abyaWeekly = generateAbyaFallbackResponse(
+      "general",
+      "what should i focus on this week?",
+      {
+        profile: profA,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaWeekly.includes("Weekly Academic Focus")).toBe(true);
   });
 });
 
