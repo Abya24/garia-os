@@ -22,6 +22,10 @@ import {
   generateUnifiedAdaptiveState,
   loadProfileMistakes,
 } from "./adaptiveStudyEngine";
+import {
+  generateLearningEffectivenessReport,
+  loadEnhancedMistakes,
+} from "./learningEffectivenessEngine";
 
 /**
  * Formats an honest, source-aware curriculum disclosure for Abya AI responses.
@@ -290,6 +294,30 @@ export const generateAbyaFallbackResponse = (
   let effectiveAction: AbyaQuickActionType | "general" = actionType;
   if (effectiveAction === "general" && lowerPromptRaw.length > 2) {
     if (
+      lowerPromptRaw.includes("improving") ||
+      lowerPromptRaw.includes("kya main improve") ||
+      lowerPromptRaw.includes("am i improving") ||
+      lowerPromptRaw.includes("actually improving")
+    ) {
+      effectiveAction = "improving_check" as any;
+    } else if (
+      lowerPromptRaw.includes("revision help") ||
+      lowerPromptRaw.includes("revision se fayda") ||
+      lowerPromptRaw.includes("did my revision help")
+    ) {
+      effectiveAction = "revision_effectiveness" as any;
+    } else if (
+      lowerPromptRaw.includes("performance drop") ||
+      lowerPromptRaw.includes("performance kyu gir") ||
+      lowerPromptRaw.includes("why is my performance dropping")
+    ) {
+      effectiveAction = "performance_drop_check" as any;
+    } else if (
+      lowerPromptRaw.includes("which subject needs attention") ||
+      lowerPromptRaw.includes("kaunse subject par dhyan")
+    ) {
+      effectiveAction = "subject_attention" as any;
+    } else if (
       lowerPromptRaw.includes("what should i study") ||
       lowerPromptRaw.includes("what should i do") ||
       lowerPromptRaw.includes("abhi kya") ||
@@ -335,6 +363,99 @@ export const generateAbyaFallbackResponse = (
   }
 
   switch (effectiveAction as string) {
+    case "improving_check": {
+      const p5Report = generateLearningEffectivenessReport({
+        student: profile,
+        subjects: subjects as any,
+        studySessions: [],
+        academicChapters: chapters,
+        revisions: [],
+        practiceSessions: [],
+        examRecords: tests as any,
+        examProfile: examProfile as any,
+      });
+
+      const q = p5Report.quantityVsEffectiveness;
+      if (q.learningSignal === "Not enough data yet" && p5Report.weakTopicsDiagnosed.length === 0) {
+        return `Namaste ${profileName}! I don't have enough performance data yet to answer that reliably. Keep logging your study and practice sessions to establish an improvement trend!`;
+      }
+
+      return `Namaste ${profileName}! 📈 **Learning Effectiveness & Performance Assessment:**
+
+${hierarchyDisclosure}
+
+• 🎯 **Learning Signal:** ${q.learningSignal}
+• 💡 **Signal Rationale:** ${q.signalRationale}
+• 📚 **Topics Progressing:** ${p5Report.weeklyReview2.topicsImprovedCount} topic(s) showing strong or practicing mastery
+• ⚠️ **Weak Diagnoses:** ${p5Report.weakTopicsDiagnosed.length > 0 ? p5Report.weakTopicsDiagnosed.map((w) => `${w.chapterTitle} (${w.diagnosisType.split("—")[1]?.trim()})`).join(", ") : "No critical weaknesses flagged"}
+
+*Focus on active recall and question drills to maintain positive improvement momentum!*`;
+    }
+
+    case "revision_effectiveness": {
+      const p5Report = generateLearningEffectivenessReport({
+        student: profile,
+        subjects: subjects as any,
+        studySessions: [],
+        academicChapters: chapters,
+        revisions: [],
+        practiceSessions: [],
+        examRecords: tests as any,
+        examProfile: examProfile as any,
+      });
+
+      const revList = p5Report.revisionEffectiveness;
+      if (revList.length === 0) {
+        return `Namaste ${profileName}! Abhi post-revision practice comparison ke liye data available nahi hai. Revision complete karne ke baad practice drill zaroor solve karein taaki before/after comparison generate ho sake!`;
+      }
+
+      const revLines = revList.slice(0, 3).map((r) => `• **${r.chapterTitle}**: ${r.signalMessage}`).join("\n");
+      return `Namaste ${profileName}! 🔄 **Revision Effectiveness Review:**\n\n${revLines}\n\n*Regular spaced revisions secure long-term conceptual recall.*`;
+    }
+
+    case "performance_drop_check": {
+      const p5Report = generateLearningEffectivenessReport({
+        student: profile,
+        subjects: subjects as any,
+        studySessions: [],
+        academicChapters: chapters,
+        revisions: [],
+        practiceSessions: [],
+        examRecords: tests as any,
+        examProfile: examProfile as any,
+      });
+
+      const bottlenecks = p5Report.learningBottlenecks;
+      if (bottlenecks.length === 0) {
+        return `Namaste ${profileName}! Tumhare study log me abhi koi significant performance drop ya bottleneck detect nahi hua hai. Regular revision schedule follow karte raho!`;
+      }
+
+      const bLines = bottlenecks.map((b) => `• ⚠️ **${b.title}**: ${b.description}\n   *Next Step:* ${b.suggestedAction}`).join("\n\n");
+      return `Namaste ${profileName}! 🔍 **Possible Learning Bottlenecks Identified:**\n\n${bLines}\n\n*Ye recommendations hain, kisi bhi ek test ke fluctuation se panic mat karo.*`;
+    }
+
+    case "subject_attention": {
+      const p5Report = generateLearningEffectivenessReport({
+        student: profile,
+        subjects: subjects as any,
+        studySessions: [],
+        academicChapters: chapters,
+        revisions: [],
+        practiceSessions: [],
+        examRecords: tests as any,
+        examProfile: examProfile as any,
+      });
+
+      const highPrioritySubs = p5Report.subjectPerformances.filter((s) => s.priority === "High");
+      const targetSub = highPrioritySubs[0] || p5Report.subjectPerformances[0];
+
+      if (!targetSub) {
+        return `Namaste ${profileName}! Sabhi subjects balanced chal rahe hain. Daily balanced study schedule maintain karein!`;
+      }
+
+      return `Namaste ${profileName}! 🎯 **Subject in Need of Attention: ${targetSub.subjectName}**\n\n• **Readiness Signal:** ${targetSub.readinessSignal}\n• **Coverage:** ${targetSub.coverageLevel} (${targetSub.coveragePct}%)\n• **Unresolved Mistakes:** ${targetSub.unresolvedMistakeCount}\n\n*Action: Aaj ${targetSub.subjectName} ke 10 board-pattern practice questions aur 1 core chapter revision complete karein.*`;
+    }
+
     case "what_should_i_do_now": {
       const adaptiveState = generateUnifiedAdaptiveState({
         student: profile,

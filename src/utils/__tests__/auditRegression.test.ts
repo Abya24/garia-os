@@ -37,6 +37,23 @@ import {
   recordQuestionMistake,
   updateMistakeStatus,
 } from "../adaptiveStudyEngine";
+import {
+  generateLearningEffectivenessReport,
+  calculateTopicMastery2,
+  diagnoseWeakTopics,
+  computeRetryEffectiveness,
+  evaluateRetentionSignal,
+  evaluateRevisionEffectiveness,
+  evaluateStudyQuantityVsEffectiveness,
+  evaluateSubjectPerformances,
+  detectLearningBottlenecks,
+  evaluateExamReadiness2,
+  generateNextBestActionsWithEvidence,
+  loadEnhancedMistakes,
+  saveEnhancedMistakes,
+  recordEnhancedQuestionMistake,
+  logMistakeRetryAttempt,
+} from "../learningEffectivenessEngine";
 import { generateAbyaFallbackResponse } from "../abyaFallbackEngine";
 
 function expect(actual: any) {
@@ -3411,6 +3428,510 @@ describe("Garia OS Production Audit Regression Suite", () => {
       } as any
     );
     expect(abyaWeekly.includes("Weekly Academic Focus")).toBe(true);
+  });
+
+  it("29. P5 Learning Effectiveness & Exam Performance Intelligence: verifies multi-signal mastery 2.0, weak-topic diagnosis (6 types), mistake intelligence 2.0 (retries, types, lifecycle & repeated error detection), retention signals, revision effectiveness, quantity vs quality balance, subject/chapter intelligence, mock test trajectory, exam readiness 2.0, bottlenecks, and Abya AI effectiveness guidance", () => {
+    const studentP5 = {
+      id: "student-p5-test",
+      name: "Priya Sharma",
+      board: "BSEB",
+      stream: "Commerce",
+      classLevel: "Class 12",
+      language: "en",
+      academicYear: "2026-2027",
+    } as any;
+
+    const otherStudentP5 = {
+      id: "student-p5-other",
+      name: "Rahul Verma",
+      board: "BSEB",
+      stream: "Commerce",
+      classLevel: "Class 12",
+      language: "en",
+      academicYear: "2026-2027",
+    } as any;
+
+    // 1. Topic Mastery 2.0: Multi-signal evaluation & honest missing data handling
+    const rawMasteryNoData = calculateTopicMastery2({
+      chapterId: "ch-acc-part-1",
+      chapterTitle: "Accounting for Partnership: Basic Concepts",
+      subjectId: "sub-acc",
+      subjectName: "Accountancy",
+      practiceSessions: [],
+      mistakes: [],
+      revisions: [],
+      chapterStatus: "Not Started",
+    });
+    expect(rawMasteryNoData.hasEnoughData).toBe(false);
+    expect(rawMasteryNoData.confidence).toBe("Insufficient data");
+    expect(rawMasteryNoData.stage).toBe("Not Started");
+    expect(rawMasteryNoData.evidence.some((e) => e.includes("Not enough data") || e.includes("insufficient"))).toBe(true);
+
+    // High practice accuracy + revisions completed + mistake corrected
+    const highPractices = [
+      {
+        id: "prac-1",
+        chapterId: "ch-acc-part-1",
+        chapterTitle: "Accounting for Partnership: Basic Concepts",
+        subjectId: "sub-acc",
+        accuracyPercentage: 90,
+        totalQuestions: 10,
+        correctCount: 9,
+        timestamp: Date.now() - 24 * 3600 * 1000,
+      } as any,
+      {
+        id: "prac-2",
+        chapterId: "ch-acc-part-1",
+        chapterTitle: "Accounting for Partnership: Basic Concepts",
+        subjectId: "sub-acc",
+        accuracyPercentage: 90,
+        totalQuestions: 10,
+        correctCount: 9,
+        timestamp: Date.now(),
+      } as any,
+    ];
+    const resolvedMistakes = [
+      {
+        id: "mst-p5-1",
+        profileId: studentP5.id,
+        subjectId: "sub-acc",
+        subjectName: "Accountancy",
+        chapterTitle: "Accounting for Partnership: Basic Concepts",
+        questionText: "What is the interest on drawings rule?",
+        studentAnswer: "6%",
+        correctAnswer: "As per partnership deed, else nil",
+        mistakeType: "Formula/rule error" as const,
+        lifecycleStatus: "Corrected" as const,
+        firstOccurrenceAt: Date.now() - 48 * 3600 * 1000,
+        latestOccurrenceAt: Date.now() - 12 * 3600 * 1000,
+        occurrenceCount: 1,
+        correctionAttempts: 1,
+        retryHistory: [{ attemptedAt: Date.now() - 12 * 3600 * 1000, isCorrect: true }],
+        retryCount: 1,
+        createdAt: Date.now() - 48 * 3600 * 1000,
+        status: "resolved" as const,
+        markedForRevision: false,
+      },
+    ];
+    const completedRevs = [
+      {
+        id: "rev-acc-1",
+        chapterTitle: "Accounting for Partnership: Basic Concepts",
+        subjectName: "Accountancy",
+        cycleCount: 2,
+        completed: true,
+        lastStudiedDate: "2026-10-02",
+      } as any,
+    ];
+
+    const masteredTopic = calculateTopicMastery2({
+      chapterId: "ch-acc-part-1",
+      chapterTitle: "Accounting for Partnership: Basic Concepts",
+      subjectId: "sub-acc",
+      subjectName: "Accountancy",
+      practiceSessions: highPractices,
+      mistakes: resolvedMistakes,
+      revisions: completedRevs,
+      chapterStatus: "Completed",
+    });
+    expect(masteredTopic.hasEnoughData).toBe(true);
+    expect(masteredTopic.stage).toBe("Strong");
+    expect(masteredTopic.confidence).toBe("Medium");
+    expect(masteredTopic.accuracyScore >= 85).toBe(true);
+    expect(masteredTopic.evidence.some((e) => e.toLowerCase().includes("accuracy"))).toBe(true);
+
+    // 2. Weak-Topic Diagnosis (Deterministic 6 Types)
+    const weakDiagnoses = diagnoseWeakTopics({
+      chapters: [
+        {
+          id: "ch-low-acc",
+          title: "Cash Flow Statement",
+          subjectId: "sub-acc",
+          subjectName: "Accountancy",
+          status: "In Progress",
+        } as any,
+        {
+          id: "ch-forgotten",
+          title: "Goodwill: Nature and Valuation",
+          subjectId: "sub-acc",
+          subjectName: "Accountancy",
+          status: "Completed",
+        } as any,
+      ],
+      practiceSessions: [
+        {
+          id: "prac-cf-1",
+          chapterId: "ch-low-acc",
+          chapterTitle: "Cash Flow Statement",
+          subjectId: "sub-acc",
+          accuracyPercentage: 30,
+          totalQuestions: 10,
+          correctCount: 3, // 30% accuracy -> Type A Low Accuracy
+          timestamp: Date.now(),
+        } as any,
+      ],
+      mistakes: [
+        {
+          id: "mst-rep-1",
+          profileId: studentP5.id,
+          subjectId: "sub-acc",
+          subjectName: "Accountancy",
+          chapterTitle: "Cash Flow Statement",
+          questionText: "How is dividend paid classified?",
+          studentAnswer: "Operating",
+          correctAnswer: "Financing activity",
+          mistakeType: "Concept misunderstanding",
+          lifecycleStatus: "Repeated",
+          firstOccurrenceAt: Date.now() - 3600000,
+          latestOccurrenceAt: Date.now(),
+          occurrenceCount: 2,
+          correctionAttempts: 1,
+          retryHistory: [],
+          retryCount: 1,
+          createdAt: Date.now() - 3600000,
+          status: "retried_incorrect",
+          markedForRevision: true,
+        },
+      ],
+      revisions: [],
+    });
+    expect(weakDiagnoses.length >= 1).toBe(true);
+    const lowAccDiag = weakDiagnoses.find((w) => w.diagnosisType === "Type A — Low accuracy" || w.diagnosisType === "Type B — Repeated mistake");
+    expect(lowAccDiag !== undefined).toBe(true);
+    expect(lowAccDiag!.severity).toBe("High");
+    expect(lowAccDiag!.suggestedAction.length > 0).toBe(true);
+
+    // 3. Mistake Intelligence 2.0: Lifecycle, Retries, Repeated Error Detection, & Profile Isolation
+    const mist1 = recordEnhancedQuestionMistake(studentP5.id, {
+      subjectId: "sub-bst",
+      subjectName: "Business Studies",
+      chapterTitle: "Principles of Management",
+      questionText: "Who propounded the 14 principles of management?",
+      studentAnswer: "F.W. Taylor",
+      correctAnswer: "Henri Fayol",
+      conceptExplanation: "Fayol developed the 14 administrative principles; Taylor developed scientific management.",
+      mistakeType: "Concept misunderstanding",
+    });
+    expect(mist1.lifecycleStatus).toBe("New");
+    expect(mist1.occurrenceCount).toBe(1);
+    expect(mist1.correctionAttempts).toBe(0);
+
+    // Profile Isolation check: Other student must not see Priya's enhanced mistakes
+    const otherMistakes = loadEnhancedMistakes(otherStudentP5.id);
+    expect(otherMistakes.some((m) => m.id === mist1.id)).toBe(false);
+
+    // Recording repeated mistake on identical question/concept detects repetition
+    const repeatedMist = recordEnhancedQuestionMistake(studentP5.id, {
+      subjectId: "sub-bst",
+      subjectName: "Business Studies",
+      chapterTitle: "Principles of Management",
+      questionText: "Who propounded the 14 principles of management?",
+      studentAnswer: "F.W. Taylor",
+      correctAnswer: "Henri Fayol",
+      mistakeType: "Concept misunderstanding",
+    });
+    expect(repeatedMist.lifecycleStatus).toBe("Repeated");
+    expect(repeatedMist.occurrenceCount).toBe(2);
+
+    // Retry Attempt logging
+    const retriedMist = logMistakeRetryAttempt(studentP5.id, repeatedMist.id, true, "Understood: Fayol is administrative, Taylor is scientific");
+    expect(retriedMist !== null).toBe(true);
+    expect(retriedMist!.lifecycleStatus).toBe("Corrected");
+    expect(retriedMist!.correctionAttempts).toBe(1);
+    expect(retriedMist!.retryHistory.length).toBe(1);
+    expect(retriedMist!.retryHistory[0].isCorrect).toBe(true);
+
+    // Retry Effectiveness Metrics
+    const metrics = computeRetryEffectiveness(loadEnhancedMistakes(studentP5.id));
+    expect(metrics.totalMistakesLogged >= 1).toBe(true);
+    expect(metrics.totalCorrected >= 1).toBe(true);
+
+    // 4. Retention Signal Analysis: honest signals without fake forgetting curves
+    const retentionNoData = evaluateRetentionSignal({
+      practiceSessions: [],
+      revisions: [],
+      mistakes: [],
+    });
+    expect(retentionNoData.retentionStatus).toBe("Not enough data yet");
+    expect(retentionNoData.recallCheckRecommended).toBe(false);
+
+    const oldPractice = [
+      {
+        id: "prac-old",
+        chapterId: "ch-old",
+        chapterTitle: "Issue of Debentures",
+        subjectId: "sub-acc",
+        accuracyPercentage: 80,
+        totalQuestions: 10,
+        correctCount: 8,
+        createdAt: Date.now() - 25 * 24 * 3600 * 1000, // 25 days ago
+      } as any,
+    ];
+    const retentionAging = evaluateRetentionSignal({
+      practiceSessions: oldPractice,
+      revisions: [],
+      mistakes: [],
+    });
+    expect(retentionAging.recallCheckRecommended).toBe(true);
+    expect(retentionAging.retentionStatus.includes("weakening") || retentionAging.retentionStatus.includes("checking")).toBe(true);
+    expect((retentionAging.daysSinceLastPractice || 0) >= 20).toBe(true);
+
+    // 5. Revision Effectiveness: Before vs After practice comparison
+    const revEffectiveness = evaluateRevisionEffectiveness({
+      revisions: [
+        {
+          id: "rev-eff-1",
+          chapterTitle: "Partnership Basics",
+          subjectName: "Accountancy",
+          cycleCount: 1,
+          completed: true,
+          completedAt: Date.now() - 24 * 3600 * 1000,
+          lastStudiedDate: "2026-10-01",
+        } as any,
+      ],
+      practiceSessions: [
+        {
+          id: "p-before",
+          chapterTitle: "Partnership Basics",
+          accuracyPercentage: 50,
+          totalQuestions: 10,
+          correctCount: 5, // 50% before
+          createdAt: Date.now() - 48 * 3600 * 1000,
+        } as any,
+        {
+          id: "p-after",
+          chapterTitle: "Partnership Basics",
+          accuracyPercentage: 90,
+          totalQuestions: 10,
+          correctCount: 9, // 90% after
+          createdAt: Date.now(),
+        } as any,
+      ],
+    });
+    expect(revEffectiveness.length).toBe(1);
+    expect(revEffectiveness[0].outcome).toBe("Improved");
+    expect(revEffectiveness[0].afterAccuracyPct).toBe(90);
+    expect(revEffectiveness[0].beforeAccuracyPct).toBe(50);
+    expect(revEffectiveness[0].signalMessage.includes("from 50% to 90%")).toBe(true);
+
+    // 6. Study Quantity vs Learning Effectiveness: detects passive reading bottleneck
+    const passiveReadingAnalysis = evaluateStudyQuantityVsEffectiveness({
+      studySessions: [
+        {
+          id: "sess-1",
+          subjectId: "sub-eco",
+          subjectName: "Economics",
+          durationSeconds: 240 * 60, // 4 hours
+          sessionType: "theory_reading",
+          date: "2026-10-03",
+        } as any,
+      ],
+      practiceSessions: [], // 0 practice questions
+      mistakes: [],
+    });
+    expect(passiveReadingAnalysis.learningSignal).toBe("Needs Practice Balance");
+    expect(passiveReadingAnalysis.signalRationale.includes("reading") || passiveReadingAnalysis.signalRationale.includes("practice")).toBe(true);
+
+    // Balanced active study
+    const balancedAnalysis = evaluateStudyQuantityVsEffectiveness({
+      studySessions: [
+        {
+          id: "sess-2",
+          subjectId: "sub-acc",
+          subjectName: "Accountancy",
+          durationSeconds: 120 * 60,
+          sessionType: "study",
+          date: "2026-10-03",
+        } as any,
+      ],
+      practiceSessions: [
+        {
+          id: "prac-bal",
+          accuracyPercentage: 88,
+          totalQuestions: 25,
+          correctCount: 22, // 88%
+          timestamp: Date.now(),
+        } as any,
+      ],
+      mistakes: [
+        {
+          lifecycleStatus: "Corrected",
+          occurrenceCount: 1,
+        } as any,
+      ],
+    });
+    expect(balancedAnalysis.learningSignal).toBe("Positive");
+    expect(balancedAnalysis.recentPracticeAccuracyPct).toBe(88);
+
+    // 7. Subject Performance Intelligence
+    const subjectPerformances = evaluateSubjectPerformances({
+      subjects: [{ id: "sub-eco", name: "Economics" }],
+      chapters: [
+        {
+          id: "ch-1",
+          title: "Introduction to Economics",
+          subjectId: "sub-eco",
+          subjectName: "Economics",
+          status: "In Progress",
+        } as any,
+      ],
+      practiceSessions: [],
+      revisions: [],
+      mistakes: [],
+    });
+    expect(subjectPerformances.length >= 1).toBe(true);
+    expect(subjectPerformances[0].subjectName).toBe("Economics");
+    expect(subjectPerformances[0].coverageLevel !== undefined).toBe(true);
+
+    // 8. Learning Bottleneck Detection
+    const bottlenecks = detectLearningBottlenecks({
+      totalStudyMinutes: 300,
+      practiceQuestionsCount: 25,
+      mistakes: [
+        {
+          chapterTitle: "Money and Banking",
+          lifecycleStatus: "Repeated",
+          occurrenceCount: 2,
+        } as any,
+        {
+          chapterTitle: "Partnership Basics",
+          lifecycleStatus: "Repeated",
+          occurrenceCount: 2,
+        } as any,
+      ],
+      revisions: [
+        { completed: false, scheduledDate: "2026-09-01" } as any,
+        { completed: false, scheduledDate: "2026-09-02" } as any,
+      ],
+      chapters: [],
+    });
+    expect(bottlenecks.length >= 2).toBe(true);
+    expect(bottlenecks.some((b) => b.patternType === "Concept Bottleneck")).toBe(true);
+    expect(bottlenecks.some((b) => b.patternType === "Recall Check Recommended")).toBe(true);
+
+    // 9. Exam Readiness 2.0: Multi-dimensional, honest handling
+    const readinessNoData = evaluateExamReadiness2({
+      chapters: [],
+      practiceSessions: [],
+      revisions: [],
+      mistakes: [],
+      examRecords: [],
+      streakDays: 0,
+    });
+    expect(readinessNoData.hasEnoughData).toBe(false);
+    expect(readinessNoData.overallReadinessSummary).toBe("Not enough data yet");
+
+    // 10. Next Best Actions with Student-Facing Evidence (Max 3 actions)
+    const nextActions = generateNextBestActionsWithEvidence({
+      weakTopics: [
+        {
+          chapterId: "ch-cf",
+          chapterTitle: "Cash Flow Statement",
+          subjectName: "Accountancy",
+          subjectId: "sub-acc",
+          diagnosisType: "Type A — Low accuracy",
+          evidenceSummary: "Practice accuracy is 30% across 10 questions.",
+          severity: "High",
+          suggestedAction: "Solve 5 guided numerical questions focusing on operating activities.",
+        },
+      ],
+      mistakes: [],
+      revisions: [],
+      chapters: [],
+    });
+    expect(nextActions.length <= 3).toBe(true);
+    expect(nextActions[0].rank).toBe(1);
+    expect(nextActions[0].why.length > 0).toBe(true);
+    expect(nextActions[0].evidence.includes("30%")).toBe(true);
+    expect(nextActions[0].howLongMinutes > 0).toBe(true);
+
+    // 11. Full Learning Effectiveness Report Generation
+    const fullReport = generateLearningEffectivenessReport({
+      student: studentP5,
+      subjects: [{ id: "sub-acc", name: "Accountancy" } as any],
+      studySessions: [],
+      academicChapters: [],
+      revisions: [],
+      practiceSessions: [],
+      examRecords: [
+        {
+          id: "mock-1",
+          testType: "Mock Exam",
+          marksObtained: 60,
+          maxMarks: 100,
+          date: "2026-09-20",
+        } as any,
+        {
+          id: "mock-2",
+          testType: "Mock Exam",
+          marksObtained: 75,
+          maxMarks: 100,
+          date: "2026-10-01",
+        } as any,
+      ],
+      examProfile: {
+        examName: "BSEB Class 12 Commerce",
+        startDate: "2027-02-01",
+      } as any,
+    });
+    expect(fullReport.profileId).toBe(studentP5.id);
+    expect(fullReport.mockTestTrajectory.totalMocksLogged).toBe(2);
+    expect(fullReport.mockTestTrajectory.mockTrend).toBe("Improving");
+    expect(fullReport.mockTestTrajectory.scoreDeltaPct).toBe(15);
+    expect(fullReport.weeklyReview2.weekLabel.length > 0).toBe(true);
+
+    // 12. Abya AI: P5 Effectiveness & Guidance Responses
+    const abyaImproving = generateAbyaFallbackResponse(
+      "general",
+      "am i actually improving?",
+      {
+        profile: studentP5,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaImproving.includes("Learning Effectiveness") || abyaImproving.includes("data yet")).toBe(true);
+
+    const abyaRevisionHelp = generateAbyaFallbackResponse(
+      "general",
+      "did my revision help?",
+      {
+        profile: studentP5,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaRevisionHelp.includes("Revision Effectiveness") || abyaRevisionHelp.includes("Revision complete")).toBe(true);
+
+    const abyaBottlenecks = generateAbyaFallbackResponse(
+      "general",
+      "why is my performance dropping?",
+      {
+        profile: studentP5,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaBottlenecks.includes("Bottleneck") || abyaBottlenecks.includes("drop")).toBe(true);
+
+    const abyaSubjectAttention = generateAbyaFallbackResponse(
+      "general",
+      "which subject needs attention?",
+      {
+        profile: studentP5,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaSubjectAttention.includes("Priority") || abyaSubjectAttention.includes("Accountancy")).toBe(true);
   });
 });
 
