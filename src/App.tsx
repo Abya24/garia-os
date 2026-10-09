@@ -2285,6 +2285,7 @@ export default function App() {
 
             {activeTab === "exam" && (
               <ExamCenterPage
+                activeStudent={activeStudent}
                 examProfile={examProfile}
                 examMilestones={examMilestones}
                 examMockTests={examMockTests}

@@ -107,7 +107,7 @@ async function startServer() {
         "image_analysis (gemini-3.1-pro-preview)",
         "low_latency (gemini-3.1-flash-lite)",
         "search_grounding (gemini-3.5-flash)",
-        "live_voice (gemini-3.1-flash-live-preview)",
+        "live_voice (gemini-3.8-live)",
       ],
     });
   });
@@ -406,7 +406,6 @@ async function startServer() {
       defaultModel: "gemini-3.8-flash",
       supportedModels: [
         "gemini-3.8-flash",
-        "gemini-3-flash-preview",
         "gemini-3.1-pro-preview",
         "gemini-3.1-flash-lite",
         "gemini-3.8-live",
@@ -416,20 +415,11 @@ async function startServer() {
     });
   });
 
-  let upstreamNetworkCooldownUntil = 0;
-
   function withUpstreamTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
     promise.catch(() => {});
-    if (Date.now() < upstreamNetworkCooldownUntil) {
-      const fastErr: any = new Error(`${label} skipped during upstream network cooldown`);
-      fastErr.code = "UPSTREAM_TIMEOUT";
-      fastErr.status = 504;
-      return Promise.reject(fastErr);
-    }
     let timer: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
-        upstreamNetworkCooldownUntil = Date.now() + 60000;
         const err: any = new Error(`${label} timed out after ${timeoutMs}ms`);
         err.code = "UPSTREAM_TIMEOUT";
         err.status = 504;
@@ -957,9 +947,8 @@ ${examContext ? `- Target Exam: "${safeExamName}", ${safeDaysRemaining} days rem
       } else {
         // Standard study mentor default
         candidates.push(
-          { model: "gemini-3-flash-preview", config: { systemInstruction } },
-          { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
           { model: "gemini-3.8-flash", config: { systemInstruction } },
+          { model: "gemini-3.1-flash-lite", config: { systemInstruction } },
           { model: "gemini-3.1-pro-preview", config: { systemInstruction } }
         );
       }
@@ -1068,13 +1057,6 @@ ${examContext ? `- Target Exam: "${safeExamName}", ${safeDaysRemaining} days rem
             console.warn(
               `[Abya AI Server] Candidate ${candidate.model} failed (status: ${err?.status || err?.code || "UNAVAILABLE"}). Trying next candidate...`
             );
-            if (
-              err?.code === "UPSTREAM_TIMEOUT" ||
-              err?.message?.includes("fetch failed")
-            ) {
-              upstreamNetworkCooldownUntil = Date.now() + 60000;
-              break;
-            }
           }
         }
       } finally {
@@ -1273,8 +1255,7 @@ Guidelines:
       if (ai) {
         const candidateLiveModels = [
           "gemini-3.8-live",
-          "gemini-3.1-flash-live-preview",
-          "gemini-2.5-flash-native-audio-preview-12-2025",
+          "gemini-3.8-live-extended-thinking",
         ];
         for (const candidateModel of candidateLiveModels) {
           try {

@@ -363,6 +363,7 @@ export interface StudentProfile {
   contentLanguage?: string;
   avatarColor?: string;
   currentClass?: string;
+  targetExam?: string;
   createdAt: number;
   updatedAt: number;
 }

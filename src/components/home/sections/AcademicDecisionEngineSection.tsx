@@ -68,6 +68,15 @@ import {
   logMistakeRetryAttempt,
   MistakeType,
 } from "../../../utils/learningEffectivenessEngine";
+import {
+  generateExamStrategyReport,
+  ExamStrategyReport,
+} from "../../../utils/examStrategyEngine";
+import {
+  buildAdaptivePracticeSession,
+  PracticeMode,
+  convertPracticePlanToStudyActions,
+} from "../../../utils/adaptivePracticeEngine";
 import { CurriculumStatusBadge } from "../../CurriculumStatusBadge";
 
 interface AcademicDecisionEngineSectionProps {
@@ -107,8 +116,12 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
 }) => {
   const profileId = activeStudent?.id || "default-student";
   const [activeSubTab, setActiveSubTab] = useState<
-    "all" | "actions" | "plan" | "effectiveness" | "weakness" | "mistakes" | "mastery" | "readiness" | "analytics"
+    "all" | "actions" | "strategy" | "practice" | "plan" | "effectiveness" | "weakness" | "mistakes" | "mastery" | "readiness" | "analytics"
   >("all");
+
+  // P7 Adaptive Practice Controls
+  const [selectedPracticeMode, setSelectedPracticeMode] = useState<PracticeMode>("BALANCED");
+  const [selectedPracticeDuration, setSelectedPracticeDuration] = useState<number>(30);
 
   // Interactive Student Controls (Section 8 & 20)
   const [dailyTimeBudgetMinutes, setDailyTimeBudgetMinutes] = useState<number>(
@@ -178,6 +191,63 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
     examRecords,
     examProfile,
     streakDays,
+  ]);
+
+  // P6 Exam Strategy & Score Improvement Intelligence Report
+  const p6Report: ExamStrategyReport = useMemo(() => {
+    return generateExamStrategyReport({
+      student: activeStudent,
+      examProfile,
+      subjects: academicSubjects,
+      chapters: academicChapters,
+      practiceSessions,
+      revisions,
+      examTestRecords: examRecords,
+      p5Report,
+    });
+  }, [
+    activeStudent,
+    examProfile,
+    academicSubjects,
+    academicChapters,
+    practiceSessions,
+    revisions,
+    examRecords,
+    p5Report,
+  ]);
+
+  // P7 Adaptive Practice Intelligence (What Should I Practice Now?)
+  const p7AdaptiveSession = useMemo(() => {
+    return buildAdaptivePracticeSession({
+      config: {
+        profileId: activeStudent?.id || "default",
+        durationMinutes: selectedPracticeDuration,
+        mode: selectedPracticeMode,
+      },
+      context: {
+        student: activeStudent,
+        examProfile,
+        academicSubjects,
+        academicChapters,
+        practiceSessions,
+        revisions,
+        examTestRecords: examRecords,
+        enhancedMistakes: enhancedMistakesList,
+        p6Report,
+      },
+    });
+  }, [
+    activeStudent,
+    examProfile,
+    academicSubjects,
+    academicChapters,
+    practiceSessions,
+    revisions,
+    examRecords,
+    enhancedMistakesList,
+    p6Report,
+    selectedPracticeDuration,
+    selectedPracticeMode,
   ]);
 
   // Backward-compatible decision report
@@ -320,6 +390,28 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
           }`}
         >
           Top 3 Actions
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("strategy")}
+          className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === "strategy"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          Exam Strategy 2.0
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("practice")}
+          className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === "practice"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          Adaptive Practice ({p7AdaptiveSession.totalQuestions})
         </button>
         <button
           type="button"
@@ -1030,6 +1122,482 @@ export const AcademicDecisionEngineSection: React.FC<AcademicDecisionEngineSecti
               <span className="text-[9px] font-mono text-slate-400 uppercase">Overall</span>
               <p className="font-bold text-cyan-400 mt-1">{p5Report.examReadiness2.overallReadinessSummary}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6B. EXAM STRATEGY & SCORE OPPORTUNITY INTELLIGENCE 2.0 (P6)              */}
+      {/* ========================================================================= */}
+      {(activeSubTab === "all" || activeSubTab === "strategy") && (
+        <div
+          id="section-p6-exam-strategy"
+          className="rounded-2xl p-4 sm:p-5 border border-amber-500/30 bg-slate-900/90 space-y-4 shadow-sm"
+        >
+          {/* Header with Exam Context & Provenance Badge */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">
+                <Target className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white font-heading flex items-center gap-2 flex-wrap">
+                  <span>Exam Strategy & Score Improvement Intelligence</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Application-derived score opportunity, marks-loss analysis, time pacing, and question selection.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full border ${
+                  p6Report.examContext.activeDateType === "OFFICIAL_EXAM_DATE"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                    : p6Report.examContext.activeDateType === "STUDENT_TARGET_DATE"
+                    ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                    : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                }`}
+                title={p6Report.examContext.dateProvenanceNote}
+              >
+                {p6Report.examContext.activeDateType.replace(/_/g, " ")}: {p6Report.examContext.daysRemaining} Days Left
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate("exam")}
+                className="text-xs text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1 cursor-pointer bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20"
+              >
+                <span>Exam Center</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Strategy Profile Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Accuracy Rating</span>
+              <p className="text-sm font-bold text-emerald-400 mt-0.5">{p6Report.strategyProfile.accuracyRating}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Speed / Pacing</span>
+              <p className="text-sm font-bold text-cyan-300 mt-0.5">{p6Report.strategyProfile.speedRating}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Careless Error Risk</span>
+              <p className="text-sm font-bold text-amber-300 mt-0.5">{p6Report.strategyProfile.carelessMistakeRisk}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Repeated Error Risk</span>
+              <p className="text-sm font-bold text-rose-300 mt-0.5">{p6Report.strategyProfile.repeatedMistakeRisk}</p>
+            </div>
+          </div>
+
+          {/* Score Opportunity & Marks-Loss Breakdown (Section 6 & 7) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Score Opportunity Card */}
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-amber-500/25 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Score Opportunity Analysis</span>
+                </span>
+                {p6Report.scoreOpportunity.recoverableMarksEstimate && (
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                    ~{p6Report.scoreOpportunity.recoverableMarksEstimate.totalRecoverablePotential} Recoverable Marks
+                  </span>
+                )}
+              </div>
+
+              {p6Report.scoreOpportunity.hasEnoughData ? (
+                <div className="space-y-2 text-xs">
+                  <p className="text-slate-300 leading-relaxed">
+                    Observed latest mock: <span className="font-bold text-white">{p6Report.scoreOpportunity.observedScore}/{p6Report.scoreOpportunity.maxScore}</span>.
+                  </p>
+                  <div className="p-2.5 rounded-lg bg-amber-950/20 border border-amber-500/20 text-[11px] text-amber-200">
+                    <span className="font-bold">Honest Evaluation: </span>
+                    {p6Report.scoreOpportunity.honestStatement}
+                  </div>
+                  <div className="space-y-1 text-[11px] text-slate-300">
+                    <span className="font-semibold text-slate-400 uppercase text-[10px] block">Potential Recovery Areas:</span>
+                    {p6Report.scoreOpportunity.potentialImprovementAreas.map((area, idx) => (
+                      <p key={idx} className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span>{area}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 italic py-2">
+                  Not enough data yet. Complete a full-length mock test in Exam Center to activate score opportunity modeling.
+                </div>
+              )}
+            </div>
+
+            {/* Transparent Marks-Loss Breakdown Card */}
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-rose-500/25 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Marks-Loss Breakdown</span>
+                </span>
+                {p6Report.marksLossAnalysis.isAvailable && (
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">
+                    {p6Report.marksLossAnalysis.totalMarksLost} Marks Lost
+                  </span>
+                )}
+              </div>
+
+              {p6Report.marksLossAnalysis.isAvailable ? (
+                <div className="space-y-2 text-xs">
+                  <p className="text-[11px] text-slate-300">
+                    Primary Loss Area: <span className="font-bold text-rose-300">{p6Report.marksLossAnalysis.primaryLossCategory}</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Concept Slips:</span>
+                      <span className="font-bold text-white">~{p6Report.marksLossAnalysis.conceptLossMarks} marks</span>
+                    </div>
+                    <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Calculation Slips:</span>
+                      <span className="font-bold text-white">~{p6Report.marksLossAnalysis.calculationLossMarks} marks</span>
+                    </div>
+                    <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Careless Slips:</span>
+                      <span className="font-bold text-white">~{p6Report.marksLossAnalysis.carelessLossMarks} marks</span>
+                    </div>
+                    <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Unattempted:</span>
+                      <span className="font-bold text-white">~{p6Report.marksLossAnalysis.unattemptedLossMarks} marks</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 italic py-2">
+                  Marks-loss breakdown unavailable from current data.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Personal Exam Time Plan & Question Strategy (Section 8, 9 & 10) */}
+          <div className="p-4 rounded-xl bg-slate-950/70 border border-cyan-500/25 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-cyan-400" />
+                <h4 className="text-xs font-bold text-white uppercase font-mono tracking-wider">
+                  Personal 4-Phase Exam Time Plan (180 Minutes)
+                </h4>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                Personal strategy recommendation
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+              {p6Report.timeManagementStrategy.personalTimePlan.phases.map((ph) => (
+                <div key={ph.phaseNumber} className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-cyan-300">Phase {ph.phaseNumber}</span>
+                    <span className="font-mono text-slate-400">~{ph.durationMinutes}m</span>
+                  </div>
+                  <p className="font-semibold text-white text-[11px]">{ph.phaseName.split(":")[1]?.trim() || ph.phaseName}</p>
+                  <p className="text-[10px] text-slate-400 leading-snug">{ph.targetActivity}</p>
+                  <p className="text-[9px] text-amber-300/90 pt-1 font-mono">💡 {ph.strategyRule}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Question Selection Rules */}
+            <div className="p-3 rounded-lg bg-slate-900/50 border border-white/5 text-xs space-y-1.5">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                Evidence-Based Question Selection Rules:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+                {p6Report.questionSelectionStrategy.selectionRules.map((rule, rIdx) => (
+                  <p key={rIdx} className="flex items-start gap-1">
+                    <span className="text-cyan-400 font-bold">•</span>
+                    <span>{rule}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Chapter Score Opportunities (Section 11) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 uppercase font-mono tracking-wider">
+                Chapter Score Opportunities (Recoverable Priority)
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">
+                {p6Report.chapterScoreOpportunities.filter((c) => c.classification === "High opportunity").length} High Opportunities
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {p6Report.chapterScoreOpportunities.slice(0, 3).map((co) => (
+                <div key={co.chapterId} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-cyan-300 truncate">{co.subjectName}</span>
+                    <span
+                      className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${
+                        co.classification === "High opportunity"
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                          : co.classification === "Medium opportunity"
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {co.classification}
+                    </span>
+                  </div>
+                  <h5 className="font-bold text-white text-xs truncate">{co.chapterTitle}</h5>
+                  <p className="text-[11px] text-slate-300 leading-snug">{co.reason}</p>
+                  <p className="text-[10px] text-slate-400 pt-1 border-t border-white/5">{co.evidence}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Proximity Strategy: Last 24 Hours / Last 7 Days / Exam Day (Section 13, 14, 15) */}
+          {p6Report.last24HoursStrategy?.isActive ? (
+            <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/30 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-rose-300 font-mono uppercase tracking-wider">
+                  🚨 Last 24 Hours Strategy (Final Preparation)
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Healthy Sleep Discipline</span>
+              </div>
+              <p className="text-slate-300 text-[11px]">{p6Report.last24HoursStrategy.restGuideline}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="space-y-1">
+                  <span className="font-semibold text-slate-400 uppercase text-[10px]">Material Checklist:</span>
+                  {p6Report.last24HoursStrategy.materialChecklist.slice(0, 3).map((item, idx) => (
+                    <p key={idx} className="text-slate-300">• {item}</p>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <span className="font-semibold text-slate-400 uppercase text-[10px]">Final Review Rules:</span>
+                  {p6Report.last24HoursStrategy.checklist.slice(0, 3).map((item, idx) => (
+                    <p key={idx} className="text-slate-300">• {item}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : p6Report.last7DaysStrategy?.isActive ? (
+            <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-purple-300 font-mono uppercase tracking-wider">
+                  🗓️ Last-7-Days Exam Strategy ({p6Report.last7DaysStrategy.daysRemaining} Days Left)
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Application Planning Template</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[11px]">
+                {p6Report.last7DaysStrategy.schedule.map((sc, sIdx) => (
+                  <div key={sIdx} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                    <span className="text-cyan-300 font-bold block">{sc.dayRange}</span>
+                    <p className="text-white font-medium">{sc.theme}</p>
+                    <p className="text-[10px] text-slate-400">{sc.suggestedFocus}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-300 font-mono uppercase tracking-wider">
+                  📝 Exam-Day Strategy Checklist
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Readiness Protocols</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+                <div className="space-y-1">
+                  <span className="text-cyan-400 font-semibold block text-[10px] uppercase">1. Before Starting:</span>
+                  {p6Report.examDayStrategy.beforeStartingChecklist.slice(0, 2).map((item, idx) => (
+                    <p key={idx}>• {item}</p>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <span className="text-amber-400 font-semibold block text-[10px] uppercase">2. During Paper:</span>
+                  {p6Report.examDayStrategy.duringExamChecklist.slice(0, 2).map((item, idx) => (
+                    <p key={idx}>• {item}</p>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <span className="text-emerald-400 font-semibold block text-[10px] uppercase">3. Final 15m Check:</span>
+                  {p6Report.examDayStrategy.reviewChecklist.slice(0, 2).map((item, idx) => (
+                    <p key={idx}>• {item}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6.5 P7 ADAPTIVE PRACTICE & QUESTION INTELLIGENCE 2.0 PANEL                */}
+      {/* ========================================================================= */}
+      {(activeSubTab === "all" || activeSubTab === "practice") && (
+        <div
+          id="section-p7-adaptive-practice"
+          className="rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-slate-900/90 space-y-4 shadow-sm"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                <Target className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white font-heading flex items-center gap-2">
+                  <span>P7 Adaptive Practice & Question Intelligence</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                    {p7AdaptiveSession.mode}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {p7AdaptiveSession.overallReason}
+                </p>
+              </div>
+            </div>
+
+            {/* Mode & Duration Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-white/10 text-xs">
+                <span className="text-slate-400 text-[10px] uppercase font-mono font-bold">Mode:</span>
+                <select
+                  value={selectedPracticeMode}
+                  onChange={(e) => setSelectedPracticeMode(e.target.value as PracticeMode)}
+                  className="bg-transparent text-xs font-bold text-cyan-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="BALANCED" className="bg-slate-900 text-white">Balanced Practice</option>
+                  <option value="WEAK_TOPIC" className="bg-slate-900 text-white">Weak-Topic Recovery</option>
+                  <option value="MISTAKE_RECOVERY" className="bg-slate-900 text-white">Mistake Recovery</option>
+                  <option value="EXAM_STRATEGY" className="bg-slate-900 text-white">Exam Strategy Focus</option>
+                  <option value="QUICK_PRACTICE" className="bg-slate-900 text-white">Quick Practice Sprint</option>
+                  <option value="REVISION_PRACTICE" className="bg-slate-900 text-white">Revision Practice</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1 bg-slate-950/80 px-2 py-1 rounded-xl border border-white/10 text-xs">
+                {[10, 20, 30, 45].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => setSelectedPracticeDuration(mins)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      selectedPracticeDuration === mins
+                        ? "bg-cyan-500 text-slate-900 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onNavigate("exam")}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold hover:brightness-110 transition-all flex items-center gap-1 cursor-pointer shadow-md shadow-cyan-500/20"
+              >
+                <span>Launch in Exam Center</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Question List Cards */}
+          {p7AdaptiveSession.allQuestions.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {p7AdaptiveSession.allQuestions.slice(0, 3).map((item, idx) => {
+                const q = item.question;
+                const sb = item.scoreBreakdown;
+                const isMust = item.category === "Must Practice";
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-3.5 rounded-xl border space-y-2.5 transition-all flex flex-col justify-between ${
+                      isMust
+                        ? "bg-rose-950/20 border-rose-500/40 shadow-sm"
+                        : "bg-slate-950/70 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-mono font-bold ${
+                              isMust ? "bg-rose-500 text-white" : "bg-slate-800 text-cyan-300"
+                            }`}
+                          >
+                            #{idx + 1}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10">
+                            {q.subjectName}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${
+                            isMust
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                              : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                          }`}
+                        >
+                          {item.category} • ~{item.estimatedTimeMinutes}m
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-bold text-white leading-snug line-clamp-2">
+                          {q.chapterTitle}
+                        </h4>
+                        <p className="text-[10px] text-cyan-300 font-medium truncate mt-0.5">
+                          {q.topicName || q.chapterTitle} ({q.difficulty} • {q.questionType})
+                        </p>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800/80 text-[10px] text-slate-300 leading-relaxed">
+                        <span className="font-semibold text-amber-300">Why Selected: </span>
+                        {sb.selectionReason}
+                      </div>
+
+                      <div className="p-1.5 rounded-lg bg-slate-950/60 border border-white/5 text-[9px] font-mono text-slate-400 flex items-center justify-between">
+                        <span>Weak: {sb.topicWeaknessFactor} | Mst: {sb.mistakeRecurrenceFactor} | Strat: {sb.examStrategyFactor}</span>
+                        <span className="font-bold text-cyan-300">Score: {sb.totalAdaptiveScore}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-400 font-mono truncate max-w-[170px]" title={q.provenanceNote}>
+                        🏛️ {q.provenanceType}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("exam")}
+                        className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>Practice</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-6 rounded-xl bg-slate-950/50 border border-slate-800 text-center space-y-1">
+              <p className="text-xs text-white font-semibold">No questions found matching criteria.</p>
+              <p className="text-[11px] text-slate-400">{p7AdaptiveSession.honestDisclaimer}</p>
+            </div>
+          )}
+
+          <div className="p-2.5 rounded-xl bg-slate-950/50 border border-white/5 text-[10px] text-slate-400 italic flex items-center justify-between">
+            <span>⚖️ {p7AdaptiveSession.honestDisclaimer}</span>
+            <span className="font-mono text-cyan-400 shrink-0 ml-2">Total Pool: {p7AdaptiveSession.totalQuestions} Questions</span>
           </div>
         </div>
       )}

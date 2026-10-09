@@ -26,6 +26,15 @@ import {
   generateLearningEffectivenessReport,
   loadEnhancedMistakes,
 } from "./learningEffectivenessEngine";
+import {
+  generateExamStrategyReport,
+} from "./examStrategyEngine";
+import {
+  buildAdaptivePracticeSession,
+  calculatePracticeEffectiveness,
+  loadStudentPracticeAttempts,
+  analyzePracticeCoverage,
+} from "./adaptivePracticeEngine";
 
 /**
  * Formats an honest, source-aware curriculum disclosure for Abya AI responses.
@@ -294,6 +303,130 @@ export const generateAbyaFallbackResponse = (
   let effectiveAction: AbyaQuickActionType | "general" = actionType;
   if (effectiveAction === "general" && lowerPromptRaw.length > 2) {
     if (
+      lowerPromptRaw.includes("what should i practice today") ||
+      lowerPromptRaw.includes("what should i practice") ||
+      lowerPromptRaw.includes("give me practice questions") ||
+      lowerPromptRaw.includes("practice questions") ||
+      lowerPromptRaw.includes("what to practice") ||
+      lowerPromptRaw.includes("kya practice karu")
+    ) {
+      effectiveAction = "what_should_i_practice" as any;
+    } else if (
+      lowerPromptRaw.includes("practice my weak topics") ||
+      lowerPromptRaw.includes("weak topic practice") ||
+      lowerPromptRaw.includes("kamzor topic practice")
+    ) {
+      effectiveAction = "practice_weak_topics" as any;
+    } else if (
+      lowerPromptRaw.includes("practice my mistakes") ||
+      lowerPromptRaw.includes("i keep getting this topic wrong") ||
+      lowerPromptRaw.includes("galti practice") ||
+      lowerPromptRaw.includes("mistake recovery practice")
+    ) {
+      effectiveAction = "practice_my_mistakes" as any;
+    } else if (
+      lowerPromptRaw.includes("why did you select this question") ||
+      lowerPromptRaw.includes("why this question") ||
+      lowerPromptRaw.includes("yeh question kyu")
+    ) {
+      effectiveAction = "why_selected_question" as any;
+    } else if (
+      lowerPromptRaw.includes("give me a 30 minute practice") ||
+      lowerPromptRaw.includes("30 min practice") ||
+      lowerPromptRaw.includes("quick practice")
+    ) {
+      effectiveAction = "quick_30m_practice" as any;
+    } else if (
+      lowerPromptRaw.includes("test me on this chapter") ||
+      lowerPromptRaw.includes("chapter practice")
+    ) {
+      effectiveAction = "test_me_chapter" as any;
+    } else if (
+      lowerPromptRaw.includes("what should i revise before practicing") ||
+      lowerPromptRaw.includes("revise before practice")
+    ) {
+      effectiveAction = "what_to_revise_before_practice" as any;
+    } else if (
+      lowerPromptRaw.includes("practice coverage") ||
+      lowerPromptRaw.includes("how much have i practiced") ||
+      lowerPromptRaw.includes("kitna practice hua") ||
+      lowerPromptRaw.includes("syllabus practice coverage")
+    ) {
+      effectiveAction = "practice_coverage" as any;
+    } else if (
+      lowerPromptRaw.includes("is practice helping") ||
+      lowerPromptRaw.includes("is my practice improving") ||
+      lowerPromptRaw.includes("practice se score badhega") ||
+      lowerPromptRaw.includes("practice effectiveness")
+    ) {
+      effectiveAction = "is_practice_helping" as any;
+    } else if (
+      lowerPromptRaw.includes("improve my mock score") ||
+      lowerPromptRaw.includes("improve score") ||
+      lowerPromptRaw.includes("mock score kaise badhaye")
+    ) {
+      effectiveAction = "mock_score_improvement" as any;
+    } else if (
+      lowerPromptRaw.includes("losing marks") ||
+      lowerPromptRaw.includes("marks loss") ||
+      lowerPromptRaw.includes("marks kahan kat rahe") ||
+      lowerPromptRaw.includes("where am i losing marks")
+    ) {
+      effectiveAction = "marks_loss_analysis" as any;
+    } else if (
+      lowerPromptRaw.includes("before my exam") ||
+      lowerPromptRaw.includes("what should i do before my exam") ||
+      lowerPromptRaw.includes("exam se pehle kya")
+    ) {
+      effectiveAction = "before_exam_strategy" as any;
+    } else if (
+      lowerPromptRaw.includes("how should i attempt my paper") ||
+      lowerPromptRaw.includes("attempt my paper") ||
+      lowerPromptRaw.includes("paper attempt") ||
+      lowerPromptRaw.includes("paper kaise attempt")
+    ) {
+      effectiveAction = "paper_attempt_strategy" as any;
+    } else if (
+      lowerPromptRaw.includes("which chapters can improve my score") ||
+      lowerPromptRaw.includes("chapters can improve my score") ||
+      lowerPromptRaw.includes("chapters improve")
+    ) {
+      effectiveAction = "chapter_score_opportunity" as any;
+    } else if (
+      lowerPromptRaw.includes("why did my mock score fall") ||
+      lowerPromptRaw.includes("mock score fall") ||
+      lowerPromptRaw.includes("score kyu gira") ||
+      lowerPromptRaw.includes("why did my score drop")
+    ) {
+      effectiveAction = "mock_score_drop" as any;
+    } else if (
+      lowerPromptRaw.includes("what mistakes are costing me marks") ||
+      lowerPromptRaw.includes("costing me marks") ||
+      lowerPromptRaw.includes("mistakes costing")
+    ) {
+      effectiveAction = "costly_mistakes" as any;
+    } else if (
+      lowerPromptRaw.includes("manage my time") ||
+      lowerPromptRaw.includes("manage time") ||
+      lowerPromptRaw.includes("time management") ||
+      lowerPromptRaw.includes("exam me time")
+    ) {
+      effectiveAction = "exam_time_management" as any;
+    } else if (
+      lowerPromptRaw.includes("make my exam strategy") ||
+      lowerPromptRaw.includes("make exam strategy") ||
+      lowerPromptRaw.includes("exam strategy") ||
+      lowerPromptRaw.includes("strategy banao")
+    ) {
+      effectiveAction = "make_exam_strategy" as any;
+    } else if (
+      lowerPromptRaw.includes("analyze my latest mock") ||
+      lowerPromptRaw.includes("analyze latest mock") ||
+      lowerPromptRaw.includes("latest mock analysis") ||
+      lowerPromptRaw.includes("latest mock")
+    ) {
+      effectiveAction = "latest_mock_analysis" as any;
+    } else if (
       lowerPromptRaw.includes("improving") ||
       lowerPromptRaw.includes("kya main improve") ||
       lowerPromptRaw.includes("am i improving") ||
@@ -363,6 +496,250 @@ export const generateAbyaFallbackResponse = (
   }
 
   switch (effectiveAction as string) {
+    case "what_should_i_practice": {
+      const p7Session = buildAdaptivePracticeSession({
+        config: {
+          profileId: profile?.id || "default",
+          durationMinutes: 30,
+          mode: "BALANCED",
+        },
+        context: {
+          student: profile,
+          academicSubjects: subjects as any,
+          academicChapters: chapters,
+          enhancedMistakes: loadEnhancedMistakes(profile?.id || "default"),
+        },
+      });
+      if (p7Session.totalQuestions === 0) {
+        return `Namaste ${profileName}! Abhi enough practice data nahi hai. Question Bank me jakar syllabus topics par practice start karein!`;
+      }
+      return `Namaste ${profileName}! 🎯 **Adaptive Practice Recommendations (Next Best Questions):**\n\n${p7Session.allQuestions.slice(0, 3).map((q, idx) => `• **#${idx + 1} ${q.question.subjectName} — ${q.question.chapterTitle}**\n   - *Topic:* ${q.question.topicName || q.question.chapterTitle} (${q.estimatedTimeMinutes}m)\n   - *Why Selected:* ${q.scoreBreakdown.selectionReason}\n   - *Provenance:* ${q.question.provenanceType}`).join("\n\n")}\n\n*${p7Session.honestDisclaimer}*`;
+    }
+
+    case "practice_weak_topics": {
+      const p7Session = buildAdaptivePracticeSession({
+        config: {
+          profileId: profile?.id || "default",
+          durationMinutes: 30,
+          mode: "WEAK_TOPIC",
+        },
+        context: {
+          student: profile,
+          academicSubjects: subjects as any,
+          academicChapters: chapters,
+          enhancedMistakes: loadEnhancedMistakes(profile?.id || "default"),
+        },
+      });
+      if (p7Session.totalQuestions === 0) {
+        return `Namaste ${profileName}! Abhi enough practice data nahi hai weak topics identify karne ke liye. Regular practice sessions log karein!`;
+      }
+      return `Namaste ${profileName}! 🔍 **Weak-Topic Targeted Practice Drill:**\n\n${p7Session.allQuestions.slice(0, 3).map((q, idx) => `• **${q.question.chapterTitle}** (${q.question.subjectName})\n   - *Adaptive Focus:* ${q.scoreBreakdown.selectionReason}`).join("\n")}\n\n*Start a focused 20-30m practice sprint in Exam Center!*`;
+    }
+
+    case "practice_my_mistakes": {
+      const mistakes = loadEnhancedMistakes(profile?.id || "default");
+      const unresolved = mistakes.filter((m) => m.lifecycleStatus !== "Corrected");
+      if (unresolved.length === 0) {
+        return `Namaste ${profileName}! Great news: All your logged mistakes are resolved or no unresolved errors recorded yet. Practice balanced questions to maintain retention!`;
+      }
+      return `Namaste ${profileName}! ⚠️ **Mistake Recovery Practice Priority:**\n\n${unresolved.slice(0, 3).map((m, idx) => `• **#${idx + 1} ${m.chapterTitle}** (${m.subjectName})\n   - *Concept/Error:* "${m.questionText.slice(0, 70)}..."\n   - *Type:* ${m.mistakeType} (Retries: ${m.retryCount})`).join("\n\n")}\n\n*Retry these specific questions in Mistake Intelligence to convert them to 'Corrected'!*`;
+    }
+
+    case "why_selected_question": {
+      return `Namaste ${profileName}! 💡 **How Garia OS Selects Questions Adaptively:**\n\n1. **Topic Weakness (35%):** Prioritizes chapters where your accuracy is below 60%.\n2. **Mistake Recurrence (30%):** Flags questions connected to unresolved or repeated slips.\n3. **Exam Strategy (25%):** Aligns with P6 marks-loss targets (e.g. calculation slips or concept gaps).\n4. **Revision Cadence (20%):** Surfaces topics overdue for active recall.\n5. **Coverage Gaps (15%):** Ensures no curriculum chapter remains completely untouched.\n\n*Application-derived evidence model with zero arbitrary probability claims.*`;
+    }
+
+    case "quick_30m_practice": {
+      const p7Session = buildAdaptivePracticeSession({
+        config: {
+          profileId: profile?.id || "default",
+          durationMinutes: 30,
+          mode: "QUICK_PRACTICE",
+        },
+        context: {
+          student: profile,
+          academicSubjects: subjects as any,
+          academicChapters: chapters,
+          enhancedMistakes: loadEnhancedMistakes(profile?.id || "default"),
+        },
+      });
+      return `Namaste ${profileName}! ⏱️ **Your 30-Minute Adaptive Practice Plan:**\n\n• ⚡ **Must Practice (~15m):**\n${(p7Session.mustPractice.length > 0 ? p7Session.mustPractice : p7Session.allQuestions.slice(0, 2)).map((q) => `   - ${q.question.chapterTitle} (${q.question.subjectName})`).join("\n")}\n• 📚 **Should Practice (~15m):**\n${(p7Session.shouldPractice.length > 0 ? p7Session.shouldPractice : p7Session.allQuestions.slice(2, 4)).map((q) => `   - ${q.question.chapterTitle}`).join("\n")}\n\n*${p7Session.honestDisclaimer}*`;
+    }
+
+    case "test_me_chapter": {
+      return `Namaste ${profileName}! 📝 Open **Exam Center -> Adaptive Practice** ya **Question Bank** to start a timed chapter test with instant answer evaluation and explanation breakdown!`;
+    }
+
+    case "what_to_revise_before_practice": {
+      const mistakes = loadEnhancedMistakes(profile?.id || "default");
+      const topIssues = mistakes.slice(0, 2).map((m) => `${m.chapterTitle} (${m.mistakeType})`);
+      return `Namaste ${profileName}! 📖 **Pre-Practice Revision Recommendations:**\n\n• 📌 Review formula notes and definitions on: ${topIssues.length > 0 ? topIssues.join(", ") : "your high-priority syllabus topics"}.\n• ✍️ Keep rough work organized for numerical calculations.\n• 🎯 Read each question stem carefully before selecting your option.`;
+    }
+
+    case "practice_coverage": {
+      const attempts = loadStudentPracticeAttempts(profile?.id || "default");
+      const cov = analyzePracticeCoverage({
+        attempts,
+        classLevel: profile?.classLevel || "Class 12",
+        stream: profile?.stream || "Commerce",
+      });
+      return `Namaste ${profileName}! 📊 **Practice Coverage Intelligence:**\n\n• 🎯 **Coverage:** ${cov.coveragePercentage}% (${cov.practicedTopicsCount} of ${cov.totalAvailableTopics} topics attempted)\n• 🔍 **Low Coverage Chapters:**\n${cov.lowCoverageChapters.slice(0, 3).map((ch) => `   - ${ch}`).join("\n")}\n\n*${cov.unevenSubjectsAlerts.length > 0 ? cov.unevenSubjectsAlerts[0] : "Maintain balanced practice across all syllabus chapters!"}*`;
+    }
+
+    case "is_practice_helping": {
+      const attempts = loadStudentPracticeAttempts(profile?.id || "default");
+      const mistakes = loadEnhancedMistakes(profile?.id || "default");
+      const eff = calculatePracticeEffectiveness({
+        attempts,
+        enhancedMistakes: mistakes,
+      });
+      if (eff.totalQuestionsAttempted === 0) {
+        return `Namaste ${profileName}! Abhi mere paas enough practice data nahi hai. Question Bank me jaakar session start karein taaki performance trend measure kiya ja sake!`;
+      }
+      return `Namaste ${profileName}! 📈 **Practice Effectiveness Signals:**\n\n• 📝 **Total Questions Attempted:** ${eff.totalQuestionsAttempted}\n• 🎯 **Accuracy:** ${eff.accuracyPct}%\n• 🔄 **Retry Resolution:** ${eff.retryImprovementPct}% (${eff.retriesSuccessful} mistakes corrected)\n• 💡 **Observed Trend:** ${eff.effectivenessSignal}\n\n*${eff.honestStatement}*`;
+    }
+
+    case "mock_score_improvement": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      if (!p6.scoreOpportunity.hasEnoughData) {
+        return `Namaste ${profileName}! Abhi mere paas enough mock performance data nahi hai. Score improvement diagnose karne ke liye pehle Exam Center me kam se kam 1 mock test record karein!`;
+      }
+      const opp = p6.scoreOpportunity;
+      return `Namaste ${profileName}! 📈 **Exam Score Opportunity Analysis:**\n\n• 🎯 **Observed Score:** ${opp.observedScore}/${opp.maxScore}\n• 💡 **Potential Improvement Areas:**\n${opp.potentialImprovementAreas.map((p) => `   - ${p}`).join("\n")}\n• 🔍 **Observed Issues:**\n${opp.observedIssues.map((i) => `   - ${i}`).join("\n")}\n\n*${opp.honestStatement}*`;
+    }
+
+    case "marks_loss_analysis": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const ml = p6.marksLossAnalysis;
+      if (!ml.isAvailable) {
+        return `Namaste ${profileName}! Marks-loss breakdown unavailable from current data. Exam Center me mock test ke answers aur mistakes record karein taaki detailed marks-loss breakdown generate ho sake!`;
+      }
+      return `Namaste ${profileName}! 📉 **Transparent Marks-Loss Breakdown:**\n\n• ⚠️ **Total Marks Lost:** ${ml.totalMarksLost}\n• 🎯 **Primary Loss Category:** ${ml.primaryLossCategory}\n• 📊 **Categorized Loss:**\n   - Concept Errors: ~${ml.conceptLossMarks} marks\n   - Calculation Errors: ~${ml.calculationLossMarks} marks\n   - Careless Slips: ~${ml.carelessLossMarks} marks\n   - Unattempted Questions: ~${ml.unattemptedLossMarks} marks\n\n*${ml.explanation}*`;
+    }
+
+    case "before_exam_strategy": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const days = p6.examContext.daysRemaining;
+      if (p6.last24HoursStrategy?.isActive) {
+        return `Namaste ${profileName}! ⏳ **Last 24 Hours Strategy (Final Prep):**\n\n• 🛑 **No Heavy Cramming:** Do not start new topics today.\n• 📋 **Material Checklist:**\n${p6.last24HoursStrategy.materialChecklist.map((c) => `   - ${c}`).join("\n")}\n• 🛌 **Sleep Discipline:** ${p6.last24HoursStrategy.restGuideline}`;
+      }
+      if (p6.last7DaysStrategy?.isActive) {
+        return `Namaste ${profileName}! 🗓️ **Last-7-Days Exam Strategy (${days} Days Remaining):**\n\n${p6.last7DaysStrategy.schedule.map((s) => `• **${s.dayRange} (${s.theme}):** ${s.suggestedFocus}`).join("\n")}\n\n*Zero all-nighters: healthy rest secures numerical accuracy.*`;
+      }
+      return `Namaste ${profileName}! 🎯 **Exam Preparation Strategy (${days} Days Remaining):**\n\n• 📚 **Top Revision Focus:** ${p6.examRevisionPriorities[0]?.chapterTitle || "High-weightage chapters"}\n• ⚡ **Time Allocation:** Phase-wise paper execution with 20m review buffer.\n• 🛡️ **Status:** ${p6.examContext.dateProvenanceNote}`;
+    }
+
+    case "paper_attempt_strategy": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const phases = p6.timeManagementStrategy.personalTimePlan.phases;
+      return `Namaste ${profileName}! 📝 **Personal Paper Attempt Strategy (180 Minutes):**\n\n${phases.map((p) => `• **${p.phaseName} (~${p.durationMinutes}m):** ${p.targetActivity}\n   *Rule:* ${p.strategyRule}`).join("\n\n")}\n\n*Personal strategy recommendation based on observed mock time distribution.*`;
+    }
+
+    case "chapter_score_opportunity": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const highOpp = p6.chapterScoreOpportunities.filter((c) => c.classification === "High opportunity");
+      if (highOpp.length === 0) {
+        return `Namaste ${profileName}! Abhi kisi chapter me critical 'High opportunity' score gap detect nahi hua hai. Chapter opportunities practice accuracy aur mistake backlog ke base par calculate hoti hain. Regular practice jari rakhein!`;
+      }
+      return `Namaste ${profileName}! 🎯 **High Score Opportunity Chapters:**\n\n${highOpp.slice(0, 3).map((c) => `• **${c.chapterTitle}** (${c.subjectName}): ${c.reason}\n   *Evidence:* ${c.evidence}`).join("\n\n")}\n\n*In chapters me targeted drilling se marks recovery potential sabse zyada hai.*`;
+    }
+
+    case "mock_score_drop": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const traj = p6.scoreTrajectory;
+      if (traj.totalMocks < 2) {
+        return `Namaste ${profileName}! Score trend evaluate karne ke liye kam se kam 2 mock tests ka data chahiye. Keep practicing and record your scores!`;
+      }
+      return `Namaste ${profileName}! 📊 **Mock Score Trajectory Review:**\n\n• 📉 **Trend:** ${traj.trend}\n• 💡 **Observed Signal:** ${traj.mainImprovementSignal}\n• 🔍 **Evidence:** ${traj.evidenceSummary}\n\n*Mock score ke fluctuations se panic mat karo. Specific careless ya concept errors ko target karke next mock solve karo!*`;
+    }
+
+    case "costly_mistakes": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const issues = p6.scoreOpportunity.observedIssues;
+      return `Namaste ${profileName}! ⚠️ **Mistakes Costing You Marks:**\n\n${issues.map((i) => `• ${i}`).join("\n")}\n\n*Next Step:* Garia OS Mistake Intelligence queue me jakar in questions ko 'Retry' mark karein!`;
+    }
+
+    case "exam_time_management": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const recs = p6.timeManagementStrategy.recommendations;
+      return `Namaste ${profileName}! ⏱️ **Exam Time Management Intelligence:**\n\n${recs.map((r) => `• ${r}`).join("\n")}\n\n• 📌 **Checkpoint Advice:** ${p6.timeManagementStrategy.personalTimePlan.checkpointAdvice}`;
+    }
+
+    case "make_exam_strategy": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const prof = p6.strategyProfile;
+      return `Namaste ${profileName}! 🎯 **Your Personalized Exam Strategy:**\n\n• 🎯 **Accuracy Rating:** ${prof.accuracyRating}\n• ⚡ **Pacing:** ${prof.speedRating}\n• ⚠️ **Careless Error Risk:** ${prof.carelessMistakeRisk}\n• 🛡️ **Recommended Adjustments:**\n${prof.possibleStrategyImprovements.map((s) => `   - ${s}`).join("\n")}\n\n*Application-derived strategy recommendation based on your verified practice signals.*`;
+    }
+
+    case "latest_mock_analysis": {
+      const p6 = generateExamStrategyReport({
+        student: profile,
+        examProfile: examProfile as any,
+        subjects: subjects as any,
+        chapters,
+        examTestRecords: tests as any,
+      });
+      const pm = p6.postMockReview;
+      if (!pm.hasMock) {
+        return `Namaste ${profileName}! Abhi koi recent mock examination record nahi hui hai. Exam Center me jaakar apna test score add karein!`;
+      }
+      return `Namaste ${profileName}! 📊 **Post-Mock Diagnostic Review:**\n\n• 📝 **What Happened:** ${pm.whatHappened}\n• 🔍 **Why:** ${pm.why}\n• 🛠️ **What Should Change:** ${pm.whatShouldChange}\n• 🎯 **Next Practice:**\n${pm.whatShouldIPracticeNext.map((p) => `   - ${p}`).join("\n")}`;
+    }
+
     case "improving_check": {
       const p5Report = generateLearningEffectivenessReport({
         student: profile,

@@ -56,6 +56,7 @@ import {
   generateExamStudyPlan,
 } from "../utils/examEngine";
 import { generateExamIntelligenceReport } from "../utils/examIntelligenceEngine";
+import { generateExamStrategyReport } from "../utils/examStrategyEngine";
 import { ExamTestLoggerModal } from "../components/ExamTestLoggerModal";
 import { PerformanceTrendChart } from "../components/PerformanceTrendChart";
 import { SubjectPerformanceAnalysisSection } from "../components/SubjectPerformanceAnalysisSection";
@@ -65,6 +66,7 @@ import { ExamReadinessScoreCard } from "../components/ExamReadinessScoreCard";
 import { CalendarSyncDropdown } from "../components/CalendarSyncDropdown";
 import { CurriculumHierarchyExplorer } from "../components/CurriculumHierarchyExplorer";
 import { CurriculumStatusBadge } from "../components/CurriculumStatusBadge";
+import { AdaptivePracticeSection } from "../components/AdaptivePracticeSection";
 import {
   exportExamMilestoneIcs,
   exportAllMilestonesIcs,
@@ -76,6 +78,7 @@ import { getTodayString } from "../utils/storage";
 import { Download } from "lucide-react";
 
 interface ExamCenterPageProps {
+  activeStudent?: StudentProfile;
   examProfile: ExamProfile;
   examMilestones: ExamMilestone[];
   examMockTests: ExamMockTest[];
@@ -102,6 +105,7 @@ interface ExamCenterPageProps {
 }
 
 export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
+  activeStudent,
   examProfile,
   examMilestones,
   examMockTests,
@@ -127,7 +131,7 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
   onBack,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
-    "overview" | "syllabus" | "queue" | "revision" | "tests" | "plan" | "milestones"
+    "overview" | "strategy" | "adaptive_practice" | "syllabus" | "queue" | "revision" | "tests" | "plan" | "milestones"
   >("overview");
   const [syllabusViewMode, setSyllabusViewMode] = useState<"hierarchy" | "tracker">("hierarchy");
 
@@ -185,6 +189,29 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
     practiceSessions,
     careerProfile
   );
+
+  // P6 Exam Strategy & Score Opportunity Report
+  const p6StrategyReport = useMemo(() => {
+    return generateExamStrategyReport({
+      student: activeStudentProfile,
+      examProfile,
+      subjects: academicSubjects,
+      chapters: academicChapters,
+      practiceSessions,
+      revisions,
+      examTestRecords,
+      examMockTests,
+    });
+  }, [
+    activeStudentProfile,
+    examProfile,
+    academicSubjects,
+    academicChapters,
+    practiceSessions,
+    revisions,
+    examTestRecords,
+    examMockTests,
+  ]);
 
   // Test Form state
   const [testForm, setTestForm] = useState({
@@ -591,6 +618,8 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
               className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
             >
               <option value="overview" className="bg-slate-900 text-white">Dashboard</option>
+              <option value="strategy" className="bg-slate-900 text-white">Exam Strategy & Score Opportunity</option>
+              <option value="adaptive_practice" className="bg-slate-900 text-white">Adaptive Practice & Questions (P7)</option>
               <option value="syllabus" className="bg-slate-900 text-white">Syllabus Planner</option>
               <option value="queue" className="bg-slate-900 text-white">Prep Queue ({prepQueue.filter((q) => q.score >= 50).length})</option>
               <option value="revision" className="bg-slate-900 text-white">Revision Scheduler ({revisionQueue.length})</option>
@@ -684,6 +713,32 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* P7 Adaptive Practice Quick Entry */}
+          <div className="glass-card p-5 rounded-3xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 to-purple-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                <Target className="w-5 h-5" />
+              </span>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>P7 Adaptive Practice & Question Intelligence</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">Active</span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Adaptive question engine with difficulty stepping, mistake recovery drills, and transparent score breakdowns.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("adaptive_practice")}
+              className="px-4 py-2 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20 shrink-0"
+            >
+              <span>Start Adaptive Practice</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Urgent Preparation Queue Preview & Weakness Detection */}
@@ -812,6 +867,308 @@ export const ExamCenterPage: React.FC<ExamCenterPageProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ==========================================
+          SUB TAB: EXAM STRATEGY & SCORE OPPORTUNITY (P6)
+      ========================================== */}
+      {activeSubTab === "strategy" && (
+        <div className="space-y-6">
+          {/* Header Banner: Exam Context & Provenance */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-cyan-950/20">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                    Phase 6 Intelligence
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    Exam Strategy & Score Optimization
+                  </span>
+                  <CurriculumStatusBadge
+                    status={p6StrategyReport.examContext.curriculumVerificationStatus}
+                    academicYear="2026-27"
+                    sourceNote={p6StrategyReport.examContext.dateProvenanceNote}
+                    variant="compact"
+                  />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-white font-heading flex items-center gap-2">
+                  <Target className="w-6 h-6 text-cyan-400" />
+                  <span>{p6StrategyReport.examContext.examName} Strategy</span>
+                </h2>
+                <p className="text-xs text-slate-300 max-w-2xl">
+                  {p6StrategyReport.examContext.dateProvenanceNote} •{" "}
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {p6StrategyReport.examContext.daysRemaining} days remaining
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAskAbyaWithContext(
+                      `Give me an actionable exam strategy and score improvement plan based on my latest mock and mistake records for ${p6StrategyReport.examContext.examName}.`
+                    )
+                  }
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 min-h-[44px] transition-all"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Ask Abya Strategy</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Strategy Profile & Score Opportunity Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Exam Strategy Profile Card */}
+            <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-bold text-white font-heading flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-cyan-400" />
+                  <span>Strategy Profile (Evidence-Derived)</span>
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                  Application-Derived
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 block text-[10px]">Accuracy:</span>
+                  <span className="font-bold text-white text-xs">{p6StrategyReport.strategyProfile.accuracyRating}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 block text-[10px]">Pacing/Speed:</span>
+                  <span className="font-bold text-white text-xs">{p6StrategyReport.strategyProfile.speedRating}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 block text-[10px]">Careless Risk:</span>
+                  <span className={`font-bold text-xs ${p6StrategyReport.strategyProfile.carelessMistakeRisk === "High" ? "text-rose-400" : "text-emerald-400"}`}>
+                    {p6StrategyReport.strategyProfile.carelessMistakeRisk}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 block text-[10px]">Repeat Errors:</span>
+                  <span className={`font-bold text-xs ${p6StrategyReport.strategyProfile.repeatedMistakeRisk === "High" ? "text-rose-400" : "text-emerald-400"}`}>
+                    {p6StrategyReport.strategyProfile.repeatedMistakeRisk}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                  Recommended Strategy Adjustments:
+                </span>
+                <ul className="space-y-1.5 text-slate-300 text-[11px]">
+                  {p6StrategyReport.strategyProfile.possibleStrategyImprovements.map((imp, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="text-cyan-400 font-bold">•</span>
+                      <span>{imp}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="text-[11px] text-slate-400 italic pt-1 border-t border-white/5">
+                {p6StrategyReport.strategyProfile.summary}
+              </p>
+            </div>
+
+            {/* Score Opportunity & Marks-Loss Breakdown */}
+            <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-bold text-white font-heading flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  <span>Score Opportunity & Marks-Loss</span>
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  Non-Causal Estimate
+                </span>
+              </div>
+
+              {p6StrategyReport.scoreOpportunity.hasEnoughData ? (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">Observed Latest Mock Score:</span>
+                      <span className="text-lg font-black text-white">
+                        {p6StrategyReport.scoreOpportunity.observedScore} / {p6StrategyReport.scoreOpportunity.maxScore}
+                      </span>
+                    </div>
+                    {p6StrategyReport.scoreOpportunity.recoverableMarksEstimate && (
+                      <div className="text-right">
+                        <span className="text-slate-400 text-[10px] block">Recoverable Potential:</span>
+                        <span className="text-lg font-black text-emerald-400">
+                          ~{p6StrategyReport.scoreOpportunity.recoverableMarksEstimate.totalRecoverablePotential} Marks
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Concept Slips:</span>
+                      <span className="font-bold text-white">~{p6StrategyReport.marksLossAnalysis.conceptLossMarks} marks</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Calculation Slips:</span>
+                      <span className="font-bold text-white">~{p6StrategyReport.marksLossAnalysis.calculationLossMarks} marks</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Careless Slips:</span>
+                      <span className="font-bold text-white">~{p6StrategyReport.marksLossAnalysis.carelessLossMarks} marks</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                      <span className="text-slate-400 block text-[10px]">Unattempted:</span>
+                      <span className="font-bold text-white">~{p6StrategyReport.marksLossAnalysis.unattemptedLossMarks} marks</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 italic pt-1 border-t border-white/5">
+                    *{p6StrategyReport.scoreOpportunity.honestStatement}*
+                  </p>
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 text-center space-y-2">
+                  <Info className="w-6 h-6 text-slate-500 mx-auto" />
+                  <p className="text-xs text-slate-400 font-medium">{p6StrategyReport.scoreOpportunity.honestStatement}</p>
+                  <p className="text-[11px] text-slate-500">Record a mock examination in Exam Center to unlock evidence-based marks opportunity diagnostics.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Time Management 4-Phase Plan & Question Selection Rules */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-white font-heading flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" />
+                <span>180-Minute Exam Execution Time Plan</span>
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                Personal Strategy Recommendation
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              {p6StrategyReport.timeManagementStrategy.personalTimePlan.phases.map((ph) => (
+                <div key={ph.phaseNumber} className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-cyan-300">Phase {ph.phaseNumber}</span>
+                    <span className="font-mono text-slate-400 font-bold">~{ph.durationMinutes}m</span>
+                  </div>
+                  <p className="text-white font-semibold text-[11px]">{ph.phaseName.split(": ")[1] || ph.phaseName}</p>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">{ph.targetActivity}</p>
+                  <div className="pt-1 border-t border-slate-800">
+                    <span className="text-[10px] text-amber-300 font-medium">Rule: {ph.strategyRule}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-900/50 border border-white/5 space-y-2">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                Evidence-Based Question Selection Rules:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px] text-slate-300">
+                {p6StrategyReport.questionSelectionStrategy.selectionRules.map((rule, rIdx) => (
+                  <p key={rIdx} className="flex items-start gap-1.5">
+                    <span className="text-cyan-400 font-bold">•</span>
+                    <span>{rule}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Top 5 Exam Revision Priorities */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-bold text-white font-heading flex items-center gap-2">
+                <ListOrdered className="w-5 h-5 text-purple-400" />
+                <span>Top 5 Exam Revision Priorities (Recoverable Focus)</span>
+              </h3>
+              <span className="text-[10px] font-mono text-slate-400">Max 5 Priorities</span>
+            </div>
+
+            {p6StrategyReport.examRevisionPriorities.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {p6StrategyReport.examRevisionPriorities.map((item) => (
+                  <div
+                    key={item.rank}
+                    className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-cyan-300 font-mono text-xs">#{item.rank} {item.subjectName}</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                        {item.estimatedTimeMinutes}m drill
+                      </span>
+                    </div>
+                    <p className="font-bold text-white text-xs">{item.chapterTitle}</p>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">{item.reason}</p>
+                    <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                      <span>Evidence: {item.evidence}</span>
+                      <span className="text-emerald-400 font-semibold">{item.confidence} Confidence</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                Log practice drills or mock tests to calculate prioritized revision recommendations.
+              </div>
+            )}
+          </div>
+
+          {/* Trajectory & Strategy Effectiveness */}
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-bold text-white font-heading flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-cyan-400" />
+                <span>Score Trajectory & Strategy Effectiveness</span>
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                Trend: {p6StrategyReport.scoreTrajectory.trend}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">Score Trajectory Signal:</span>
+                <p className="text-white font-semibold text-xs">{p6StrategyReport.scoreTrajectory.mainImprovementSignal}</p>
+                <p className="text-[11px] text-slate-400">{p6StrategyReport.scoreTrajectory.evidenceSummary}</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">Strategy Effectiveness:</span>
+                <p className="text-white font-semibold text-xs">{p6StrategyReport.strategyEffectiveness.signalMessage}</p>
+                <p className="text-[11px] text-slate-400 italic">
+                  Non-causal association based on consecutive test performance and error logs.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          SUB TAB: ADAPTIVE PRACTICE & QUESTION INTELLIGENCE (P7)
+      ========================================== */}
+      {activeSubTab === "adaptive_practice" && (
+        <AdaptivePracticeSection
+          student={activeStudent}
+          examProfile={examProfile}
+          academicSubjects={academicSubjects}
+          academicChapters={academicChapters}
+          revisions={revisions}
+          practiceSessions={practiceSessions}
+          examTestRecords={examTestRecords}
+          p6Report={p6StrategyReport}
+          onNavigate={onNavigate}
+        />
       )}
 
       {/* ==========================================

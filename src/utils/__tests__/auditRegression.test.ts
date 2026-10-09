@@ -26,7 +26,7 @@ import {
 import { hashPassword } from "../auth";
 import { enqueueOfflineAction, getPendingQueue, removePendingAction } from "../offlineQueue";
 import { executeAbyaModuleAction } from "../abyaModuleActions";
-import { Habit, Task, UserSettings } from "../../types";
+import { Habit, Task, UserSettings, StudentProfile, AcademicSubject } from "../../types";
 import {
   generateUnifiedAdaptiveState,
   calculateNormalizedPriority,
@@ -55,6 +55,33 @@ import {
   logMistakeRetryAttempt,
 } from "../learningEffectivenessEngine";
 import { generateAbyaFallbackResponse } from "../abyaFallbackEngine";
+import {
+  generateExamStrategyReport,
+  resolveStructuredExamContext,
+  analyzeMockTest2,
+  calculateScoreOpportunity,
+  buildExamStrategyProfile,
+  buildQuestionSelectionStrategy,
+  buildTimeManagementStrategy,
+  evaluateChapterScoreOpportunities,
+  rankExamRevisionPriorities,
+  generatePostMockReviewFlow,
+  calculateScoreImprovementTrajectory,
+  evaluateStrategyEffectiveness,
+} from "../examStrategyEngine";
+import {
+  buildUnifiedAdaptiveQuestionPool,
+  calculateAdaptiveQuestionScore,
+  buildAdaptivePracticeSession,
+  recommendNextAdaptiveQuestion,
+  recordAdaptivePracticeAttempt,
+  calculatePracticeEffectiveness,
+  analyzePracticeCoverage,
+  auditQuestionBankQuality,
+  convertPracticePlanToStudyActions,
+  loadStudentPracticeAttempts,
+  StudentPracticeAttempt,
+} from "../adaptivePracticeEngine";
 
 function expect(actual: any) {
   return {
@@ -3932,6 +3959,605 @@ describe("Garia OS Production Audit Regression Suite", () => {
       } as any
     );
     expect(abyaSubjectAttention.includes("Priority") || abyaSubjectAttention.includes("Accountancy")).toBe(true);
+  });
+
+  // =========================================================================
+  // SUBTEST 30: P6 EXAM STRATEGY & SCORE IMPROVEMENT INTELLIGENCE
+  // =========================================================================
+  it("30. P6 Exam Strategy & Score Improvement Intelligence: verifies exam context provenance separation, exam strategy profile, mock analysis 2.0, evidence-derived score opportunity, marks-loss analysis, question selection strategy, time management, chapter opportunity, exam revision priority, score trajectory, and Abya AI strategy guidance", async () => {
+    const studentP6: StudentProfile = {
+      id: "student-p6-rohit",
+      name: "Rohit Kumar",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+      targetExam: "BSEB Class 12 Commerce Board 2027",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const examProfileP6 = {
+      id: "ep-p6",
+      examName: "BSEB Class 12 Commerce",
+      targetDate: "2027-02-15",
+      dailyStudyHours: 3,
+      stream: "Commerce",
+      classLevel: "Class 12",
+      board: "BSEB",
+    };
+
+    // 1. Exam Context: Provenance separation (Target Date vs Official Gazette vs Historical)
+    const ctxTarget = resolveStructuredExamContext({
+      examProfile: examProfileP6 as any,
+    });
+    expect(ctxTarget.activeDateType).toBe("STUDENT_TARGET_DATE");
+    expect(ctxTarget.studentTargetDate).toBe("2027-02-15");
+    expect(ctxTarget.officialDateVerified).toBe(false);
+
+    const ctxOfficial = resolveStructuredExamContext({
+      examProfile: {
+        ...examProfileP6,
+        officialVerifiedExamDate: "2027-02-01",
+        isOfficialDateVerified: true,
+      } as any,
+    });
+    expect(ctxOfficial.officialDateVerified).toBe(true);
+    expect(ctxOfficial.activeDateType).toBe("OFFICIAL_EXAM_DATE");
+    expect(ctxOfficial.officialExamDate).toBe("2027-02-01");
+
+    // 2. Exam Strategy Profile: multi-signal assessment
+    const stratProfile = buildExamStrategyProfile({
+      mockAnalysis: {
+        score: 75,
+        maxScore: 100,
+        marksObtained: 75,
+        maxMarks: 100,
+        accuracyPercentage: 75,
+        attemptedCount: 45,
+        correctCount: 38,
+        incorrectCount: 7,
+        skippedCount: 5,
+        timeUsedMinutes: 165,
+        errorCategories: {
+          conceptErrors: 2,
+          calculationErrors: 3,
+          carelessSlips: 1,
+          timePressureErrors: 1,
+          unattemptedQuestions: 5,
+        },
+        timeManagementEvaluation: {
+          totalTimeSpentMinutes: 165,
+          pacingPointers: [],
+        },
+        chapterWiseBreakdown: [],
+      } as any,
+      practiceSessions: [
+        {
+          id: "ps-1",
+          chapterTitle: "Issue of Shares",
+          subjectName: "Accountancy",
+          accuracyPercentage: 85,
+          totalQuestions: 20,
+          correctCount: 17,
+        } as any,
+      ],
+      enhancedMistakes: [
+        {
+          id: "m-1",
+          questionText: "Sample",
+          mistakeType: "Calculation error",
+          lifecycleStatus: "New",
+        } as any,
+      ],
+    });
+    expect(stratProfile.accuracyRating !== undefined).toBe(true);
+    expect(stratProfile.speedRating !== undefined).toBe(true);
+    expect(stratProfile.possibleStrategyImprovements.length > 0).toBe(true);
+
+    // 3. Mock Analysis 2.0: score, accuracy, attempted, correct, incorrect, skipped, timing
+    const mockAnalysis = analyzeMockTest2({
+      test: {
+        id: "mock-full-1",
+        testName: "Commerce Full Mock 1",
+        subjectName: "Accountancy",
+        testType: "Mock Exam",
+        marksObtained: 75,
+        maxMarks: 100,
+        date: "2026-10-01",
+        timeSpentMinutes: 180,
+      } as any,
+    });
+    expect(mockAnalysis.totalScore).toBe(75);
+    expect(mockAnalysis.maxMarks).toBe(100);
+    expect(mockAnalysis.accuracyPercentage).toBe(75);
+    expect(mockAnalysis.timeUsedMinutes).toBe(180);
+
+    // 4. Score Opportunity: Evidence-derived & Non-causal honest wording
+    const scoreOpp = calculateScoreOpportunity({
+      mockTests: [
+        {
+          id: "m-test",
+          marksObtained: 68,
+          maxMarks: 100,
+          date: "2026-09-30",
+        } as any,
+      ],
+      mistakes: [
+        {
+          chapterTitle: "Accounting for Share Capital",
+          mistakeType: "Calculation error",
+          lifecycleStatus: "New",
+        } as any,
+      ],
+    });
+    expect(scoreOpp.hasEnoughData).toBe(true);
+    expect(scoreOpp.observedScore).toBe(68);
+    expect(scoreOpp.potentialImprovementAreas.length > 0).toBe(true);
+    expect(scoreOpp.honestStatement.includes("Does not promise or guarantee future marks")).toBe(true);
+
+    // 5. Marks-Loss Analysis & P6 Full Report
+    const p6Report = generateExamStrategyReport({
+      student: studentP6,
+      examProfile: examProfileP6 as any,
+      subjects: [{ id: "sub-acc", name: "Accountancy", color: "#10b981" } as AcademicSubject],
+      chapters: [
+        {
+          id: "ch-sh",
+          title: "Accounting for Share Capital",
+          subjectId: "sub-acc",
+          subjectName: "Accountancy",
+        } as any,
+      ],
+      examTestRecords: [
+        {
+          id: "rec-1",
+          testName: "Accountancy Pre-Board Mock",
+          subjectName: "Accountancy",
+          marksObtained: 70,
+          maxMarks: 100,
+          date: "2026-09-28",
+        } as any,
+      ],
+    });
+    expect(p6Report.profileId).toBe(studentP6.id);
+    expect(p6Report.marksLossAnalysis.totalMarksLost).toBe(30);
+    expect(p6Report.questionSelectionStrategy.selectionRules.length > 0).toBe(true);
+    expect(p6Report.timeManagementStrategy.personalTimePlan.phases.length >= 3).toBe(true);
+    expect(p6Report.examRevisionPriorities.length <= 5).toBe(true);
+
+    // 6. Post-Mock Loop Flow
+    const postMock = generatePostMockReviewFlow({
+      latestMock: {
+        id: "m-loop",
+        marksObtained: 72,
+        maxMarks: 100,
+        subjectName: "Accountancy",
+      } as any,
+      weakChapters: ["Cash Flow Statement"],
+      mistakes: [],
+    });
+    expect(postMock.loopSequence.length).toBe(5);
+    expect(postMock.loopSequence[0].step).toBe("1. Mock Attempt");
+    expect(postMock.loopSequence[1].step).toBe("2. Automated Diagnosis");
+    expect(postMock.loopSequence[2].step).toBe("3. P4 Study Action");
+    expect(postMock.loopSequence[3].step).toBe("4. Adaptive Practice");
+    expect(postMock.loopSequence[4].step).toBe("5. Targeted Retry");
+
+    // 7. Score Trajectory: Improving / Stable / Declining
+    const trajImproving = calculateScoreImprovementTrajectory({
+      mockTests: [
+        { id: "m1", marksObtained: 60, maxMarks: 100, date: "2026-09-10" } as any,
+        { id: "m2", marksObtained: 75, maxMarks: 100, date: "2026-09-25" } as any,
+      ],
+    });
+    expect(trajImproving.trajectoryDirection).toBe("Improving");
+    expect(trajImproving.scoreDeltaPct).toBe(15);
+
+    const trajDeclining = calculateScoreImprovementTrajectory({
+      mockTests: [
+        { id: "m1", marksObtained: 80, maxMarks: 100, date: "2026-09-10" } as any,
+        { id: "m2", marksObtained: 65, maxMarks: 100, date: "2026-09-25" } as any,
+      ],
+    });
+    expect(trajDeclining.trajectoryDirection).toBe("Declining");
+
+    // 8. Strategy Effectiveness: returns "Not enough data yet." when insufficient
+    const effNoData = evaluateStrategyEffectiveness({
+      mockTests: [{ id: "m1", marksObtained: 70, maxMarks: 100, date: "2026-09-10" } as any],
+    });
+    expect(effNoData.hasEnoughData).toBe(false);
+    expect(effNoData.signalMessage).toBe("Not enough data yet.");
+
+    // 9. Abya AI P6 Routes
+    const abyaScoreImprovement = generateAbyaFallbackResponse(
+      "general",
+      "how can i improve my mock score?",
+      {
+        profile: studentP6,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [{ id: "t1", marksObtained: 70, maxMarks: 100, date: "2026-09-20" } as any],
+      } as any
+    );
+    expect(abyaScoreImprovement.includes("Score Opportunity") || abyaScoreImprovement.includes("Mock")).toBe(true);
+
+    const abyaMarksLoss = generateAbyaFallbackResponse(
+      "general",
+      "where am i losing marks in my exam?",
+      {
+        profile: studentP6,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [{ id: "t1", marksObtained: 70, maxMarks: 100, date: "2026-09-20" } as any],
+      } as any
+    );
+    expect(abyaMarksLoss.includes("Marks-Loss") || abyaMarksLoss.includes("Lost")).toBe(true);
+
+    const abyaBeforeExam = generateAbyaFallbackResponse(
+      "general",
+      "what should i do before my exam?",
+      {
+        profile: studentP6,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaBeforeExam.includes("Checklist") || abyaBeforeExam.includes("Exam")).toBe(true);
+  });
+
+  // =========================================================================
+  // SUBTEST 31: P7 ADAPTIVE PRACTICE & QUESTION INTELLIGENCE 2.0
+  // =========================================================================
+  it("31. P7 Adaptive Practice & Question Intelligence 2.0: verifies unified question bank pool, provenance classification, transparent adaptive scoring formula, session builder (10m-45m), dynamic next-question recommendations, practice attempt logging with P5 mistake integration, practice effectiveness metrics, practice coverage intelligence, question bank quality audit, P4 study action conversion, profile isolation, and Abya AI adaptive practice routing", async () => {
+    const studentP7A: StudentProfile = {
+      id: "student-p7-priya",
+      name: "Priya Sharma",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const studentP7B: StudentProfile = {
+      id: "student-p7-arav",
+      name: "Arav Verma",
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    // 1. Unified Question Bank Pool & Provenance Classification
+    const pool = buildUnifiedAdaptiveQuestionPool({
+      classLevel: "Class 12",
+      stream: "Commerce",
+      board: "BSEB",
+    });
+    expect(pool.length > 0).toBe(true);
+
+    // Provenance types verified
+    const provenanceTypes = new Set(pool.map((q) => q.provenanceType));
+    expect(
+      provenanceTypes.has("VERIFIED HISTORICAL PYQ") ||
+      provenanceTypes.has("OFFICIAL MODEL PAPER") ||
+      provenanceTypes.has("APPLICATION-DERIVED PRACTICE") ||
+      provenanceTypes.has("SAMPLE PRACTICE")
+    ).toBe(true);
+
+    // Difficulty sources verified
+    for (const q of pool.slice(0, 10)) {
+      expect(["Source-provided", "Application-derived", "Unknown"].includes(q.difficultySource)).toBe(true);
+      expect(q.marks !== undefined && q.marks > 0).toBe(true);
+    }
+
+    // 2. Transparent Adaptive Question Scoring Engine
+    const sampleQ = pool[0];
+    const scoreBreakdown = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [],
+        revisions: [],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreBreakdown.totalAdaptiveScore >= 0).toBe(true);
+    expect(scoreBreakdown.selectionReason.length > 0).toBe(true);
+    expect(scoreBreakdown.evidenceExplanation.includes("Adaptive Score")).toBe(true);
+
+    // Mode-specific multiplier check: WEAK_TOPIC prioritizes weakness
+    const scoreWeakMode = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "WEAK_TOPIC",
+      context: {
+        student: studentP7A,
+        practiceSessions: [
+          {
+            chapterTitle: sampleQ.chapterTitle,
+            subjectName: sampleQ.subjectName,
+            accuracyPercentage: 40,
+            totalQuestions: 10,
+            correctCount: 4,
+          } as any,
+        ],
+        enhancedMistakes: [],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreWeakMode.topicWeaknessFactor >= 35).toBe(true);
+
+    // 3. Adaptive Practice Session Builder (10m, 20m, 30m, 45m)
+    const session10 = buildAdaptivePracticeSession({
+      config: {
+        profileId: studentP7A.id,
+        durationMinutes: 10,
+        mode: "BALANCED",
+      },
+      context: {
+        student: studentP7A,
+      },
+    });
+    expect(session10.targetDurationMinutes).toBe(10);
+    expect(session10.totalQuestions <= 5).toBe(true);
+    expect(session10.honestDisclaimer.includes("Does not guarantee future examination marks")).toBe(true);
+
+    const session30 = buildAdaptivePracticeSession({
+      config: {
+        profileId: studentP7A.id,
+        durationMinutes: 30,
+        mode: "MISTAKE_RECOVERY",
+      },
+      context: {
+        student: studentP7A,
+      },
+    });
+    expect(session30.targetDurationMinutes).toBe(30);
+    expect(session30.totalQuestions >= 5).toBe(true);
+    expect(session30.focusSubjects.length > 0).toBe(true);
+
+    // Categories Must Practice / Should Practice / Maintenance
+    const categories = new Set(session30.allQuestions.map((q) => q.category));
+    expect(categories.has("Must Practice") || categories.has("Should Practice") || categories.has("Maintenance")).toBe(true);
+
+    // 4. Dynamic Next-Question Decision Engine
+    const fakeAttemptCorrect: StudentPracticeAttempt = {
+      id: "att-1",
+      profileId: studentP7A.id,
+      questionId: pool[0].id,
+      subjectName: pool[0].subjectName,
+      chapterTitle: pool[0].chapterTitle,
+      questionType: "MCQ",
+      difficulty: "Easy",
+      isCorrect: true,
+      timeSpentSeconds: 30,
+      attemptNumber: 1,
+      timestamp: Date.now(),
+    };
+
+    const nextAfterCorrect = recommendNextAdaptiveQuestion({
+      lastAttempt: fakeAttemptCorrect,
+      availableQuestions: pool,
+      completedQuestionIds: [pool[0].id],
+      context: { student: studentP7A },
+    });
+    expect(nextAfterCorrect.actionType !== "COMPLETED").toBe(true);
+    expect(nextAfterCorrect.nextQuestion !== null).toBe(true);
+
+    const fakeAttemptCalcError: StudentPracticeAttempt = {
+      id: "att-2",
+      profileId: studentP7A.id,
+      questionId: pool[0].id,
+      subjectName: pool[0].subjectName,
+      chapterTitle: pool[0].chapterTitle,
+      questionType: "Numerical",
+      difficulty: "Medium",
+      isCorrect: false,
+      mistakeType: "Calculation error",
+      timeSpentSeconds: 90,
+      attemptNumber: 1,
+      timestamp: Date.now(),
+    };
+
+    const nextAfterError = recommendNextAdaptiveQuestion({
+      lastAttempt: fakeAttemptCalcError,
+      availableQuestions: pool,
+      completedQuestionIds: [pool[0].id],
+      context: { student: studentP7A },
+    });
+    expect(nextAfterError.actionType).toBe("SIMILAR_CONCEPT");
+    expect(nextAfterError.reason.includes("calculation") || nextAfterError.reason.includes("reinforcing")).toBe(true);
+
+    // 5. Practice Attempt Recording & P5 Mistake Intelligence Closed Loop
+    const targetQ = pool[0];
+
+    // Student A records an incorrect attempt
+    const resA1 = recordAdaptivePracticeAttempt({
+      profileId: studentP7A.id,
+      question: targetQ,
+      isCorrect: false,
+      selectedOption: 0,
+      timeSpentSeconds: 45,
+      attemptNumber: 1,
+      mistakeType: "Calculation error",
+      notes: "Arithmetical slip in ledger addition",
+    });
+    expect(resA1.attempt.isCorrect).toBe(false);
+    expect(resA1.attempt.mistakeType).toBe("Calculation error");
+
+    // Verifies P5 EnhancedMistakeRecord was created
+    const p5MistakesA1 = loadEnhancedMistakes(studentP7A.id);
+    const createdMistake = p5MistakesA1.find((m) => m.questionText === targetQ.questionText);
+    expect(createdMistake !== undefined).toBe(true);
+    expect(createdMistake!.lifecycleStatus).toBe("New");
+    expect(createdMistake!.mistakeCategory).toBe("calculation");
+
+    // Student A retries the question and gets it correct!
+    const resA2 = recordAdaptivePracticeAttempt({
+      profileId: studentP7A.id,
+      question: targetQ,
+      isCorrect: true,
+      selectedOption: targetQ.correctOptionIndex,
+      timeSpentSeconds: 35,
+      attemptNumber: 2,
+      notes: "Resolved after double-checking columnar arithmetic",
+    });
+    expect(resA2.attempt.isCorrect).toBe(true);
+    expect(resA2.attempt.attemptNumber).toBe(2);
+
+    // Verifies P5 EnhancedMistake was promoted to 'Corrected'!
+    const p5MistakesA2 = loadEnhancedMistakes(studentP7A.id);
+    const correctedMistake = p5MistakesA2.find((m) => m.questionText === targetQ.questionText);
+    expect(correctedMistake !== undefined).toBe(true);
+    expect(correctedMistake!.lifecycleStatus).toBe("Corrected");
+    expect(correctedMistake!.correctionAttempts >= 1).toBe(true);
+
+    // 6. Practice Effectiveness: Non-causal wording & Honest Metrics
+    const effEmpty = calculatePracticeEffectiveness({
+      attempts: [],
+      enhancedMistakes: [],
+    });
+    expect(effEmpty.totalQuestionsAttempted).toBe(0);
+    expect(effEmpty.effectivenessSignal).toBe("Not enough practice data yet.");
+
+    const effWithAttempts = calculatePracticeEffectiveness({
+      attempts: resA2.allAttempts,
+      enhancedMistakes: p5MistakesA2,
+    });
+    expect(effWithAttempts.totalQuestionsAttempted >= 2).toBe(true);
+    expect(effWithAttempts.retriesAttempted >= 1).toBe(true);
+    expect(effWithAttempts.retriesSuccessful >= 1).toBe(true);
+    expect(effWithAttempts.retryImprovementPct >= 50).toBe(true);
+    expect(effWithAttempts.honestStatement.includes("Does not imply guaranteed future marks")).toBe(true);
+
+    // 7. Practice Coverage Intelligence
+    const covReport = analyzePracticeCoverage({
+      attempts: resA2.allAttempts,
+      classLevel: "Class 12",
+      stream: "Commerce",
+    });
+    expect(covReport.totalAvailableTopics > 0).toBe(true);
+    expect(covReport.practicedTopicsCount >= 1).toBe(true);
+    expect(covReport.untouchedTopics.length > 0).toBe(true);
+
+    // 8. Question Bank Quality & Duplicate Audit
+    const auditRes = auditQuestionBankQuality();
+    expect(auditRes.totalQuestions > 0).toBe(true);
+    expect(auditRes.validQuestionsCount > 0).toBe(true);
+    expect(auditRes.duplicateAudit.uniqueCount > 0).toBe(true);
+
+    // 9. P4 Study Action Converter
+    const studyActions = convertPracticePlanToStudyActions(session30);
+    expect(studyActions.length <= 3).toBe(true);
+    expect(studyActions[0].rank).toBe(1);
+    expect(studyActions[0].title.includes("Practice:")).toBe(true);
+    expect(studyActions[0].durationMinutes > 0).toBe(true);
+    expect(studyActions[0].reason.length > 0).toBe(true);
+
+    // 10. Multi-Student Profile Isolation
+    const attemptsStudentB = loadStudentPracticeAttempts(studentP7B.id);
+    expect(attemptsStudentB.length).toBe(0); // Student B must have ZERO attempts
+    const mistakesStudentB = loadEnhancedMistakes(studentP7B.id);
+    expect(mistakesStudentB.some((m) => m.questionText === targetQ.questionText)).toBe(false);
+
+    // 11. Abya AI P7 Routes Verification
+    const abyaPracticeToday = generateAbyaFallbackResponse(
+      "general",
+      "what should i practice today?",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaPracticeToday.includes("Adaptive Practice") || abyaPracticeToday.includes("Questions")).toBe(true);
+
+    const abyaWeakPractice = generateAbyaFallbackResponse(
+      "general",
+      "practice my weak topics",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [{ id: "sub-acc", name: "Accountancy" }],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaWeakPractice.includes("Weak-Topic") || abyaWeakPractice.includes("Practice")).toBe(true);
+
+    const abyaMistakesPractice = generateAbyaFallbackResponse(
+      "general",
+      "practice my mistakes",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaMistakesPractice.includes("Mistake") || abyaMistakesPractice.includes("resolved")).toBe(true);
+
+    const abyaWhySelected = generateAbyaFallbackResponse(
+      "general",
+      "why did you select this question?",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaWhySelected.includes("Topic Weakness") && abyaWhySelected.includes("Mistake Recurrence")).toBe(true);
+
+    const abyaQuick30m = generateAbyaFallbackResponse(
+      "general",
+      "give me a 30 minute practice plan",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaQuick30m.includes("Must Practice") || abyaQuick30m.includes("Practice Plan")).toBe(true);
+
+    const abyaCoverage = generateAbyaFallbackResponse(
+      "general",
+      "what is my practice coverage?",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaCoverage.includes("Coverage") || abyaCoverage.includes("topics")).toBe(true);
+
+    const abyaHelping = generateAbyaFallbackResponse(
+      "general",
+      "is practice helping me improve?",
+      {
+        profile: studentP7A,
+        tasks: [],
+        subjects: [],
+        chapters: [],
+        tests: [],
+      } as any
+    );
+    expect(abyaHelping.includes("Effectiveness") || abyaHelping.includes("Questions Attempted") || abyaHelping.includes("enough practice data")).toBe(true);
   });
 });
 

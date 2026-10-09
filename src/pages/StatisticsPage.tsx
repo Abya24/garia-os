@@ -39,6 +39,12 @@ import {
 import { getTodayString } from "../utils/storage";
 import { computePerformanceIntelligence } from "../utils/studentPerformanceAnalytics";
 import { loadQuestionBankProgress } from "../utils/questionBankEngine";
+import {
+  calculatePracticeEffectiveness,
+  analyzePracticeCoverage,
+  loadStudentPracticeAttempts,
+} from "../utils/adaptivePracticeEngine";
+import { loadEnhancedMistakes } from "../utils/learningEffectivenessEngine";
 import { PerformanceOverviewSection } from "../components/analytics/PerformanceOverviewSection";
 import { SubjectAnalyticsSection } from "../components/analytics/SubjectAnalyticsSection";
 import { ReadinessTrendsSection } from "../components/analytics/ReadinessTrendsSection";
@@ -114,6 +120,29 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
   const qbankProgress: QuestionBankProfileProgress = useMemo(() => {
     return loadQuestionBankProgress(profileId);
   }, [profileId]);
+
+  const practiceAttempts = useMemo(() => {
+    return loadStudentPracticeAttempts(profileId);
+  }, [profileId]);
+
+  const enhancedMistakes = useMemo(() => {
+    return loadEnhancedMistakes(profileId);
+  }, [profileId]);
+
+  const practiceEffectiveness = useMemo(() => {
+    return calculatePracticeEffectiveness({
+      attempts: practiceAttempts,
+      enhancedMistakes,
+    });
+  }, [practiceAttempts, enhancedMistakes]);
+
+  const practiceCoverage = useMemo(() => {
+    return analyzePracticeCoverage({
+      attempts: practiceAttempts,
+      classLevel: activeStudent?.classLevel || "Class 12",
+      stream: activeStudent?.stream || "Commerce",
+    });
+  }, [practiceAttempts, activeStudent]);
 
   // Compute comprehensive student performance intelligence (memoized for instant rendering)
   const performanceData = useMemo(() => {
@@ -298,6 +327,57 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({
         {/* SECTION 1: Performance Overview */}
         {(activeSubTab === "all" || activeSubTab === "overview") && (
           <PerformanceOverviewSection data={performanceData} />
+        )}
+
+        {/* SECTION 1A: P7 Adaptive Practice & Question Intelligence */}
+        {(activeSubTab === "all" || activeSubTab === "overview" || activeSubTab === "subjects") && (
+          <div className="glass-card p-5 sm:p-6 rounded-3xl border border-cyan-500/20 bg-slate-900/90 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">
+                  <Target className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                    <span>Adaptive Practice & Question Intelligence</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                      P7 Evidence
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {practiceEffectiveness.effectivenessSignal}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-[11px] font-mono text-slate-400 italic">
+                ⚖️ {practiceEffectiveness.honestStatement}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Attempted</span>
+                <p className="text-xl font-black text-white">{practiceEffectiveness.totalQuestionsAttempted}</p>
+                <span className="text-[9px] text-slate-400">Questions logged</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Accuracy</span>
+                <p className="text-xl font-black text-cyan-300">{practiceEffectiveness.accuracyPct}%</p>
+                <span className="text-[9px] text-slate-400">Success rate</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Retry Improvement</span>
+                <p className="text-xl font-black text-emerald-300">{practiceEffectiveness.retryImprovementPct}%</p>
+                <span className="text-[9px] text-slate-400">{practiceEffectiveness.retriesSuccessful} of {practiceEffectiveness.retriesAttempted || 0} retries</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Topic Coverage</span>
+                <p className="text-xl font-black text-purple-300">{practiceCoverage.coveragePercentage}%</p>
+                <span className="text-[9px] text-slate-400">{practiceCoverage.practicedTopicsCount} topics practiced</span>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* SECTION 1B: Weekly Productivity Insights (Recharts: Hours Studied vs Goals Met) */}
