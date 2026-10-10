@@ -81,6 +81,7 @@ import {
   convertPracticePlanToStudyActions,
   loadStudentPracticeAttempts,
   StudentPracticeAttempt,
+  AdaptiveQuestion,
 } from "../adaptivePracticeEngine";
 
 function expect(actual: any) {
@@ -4273,26 +4274,233 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(scoreBreakdown.selectionReason.length > 0).toBe(true);
     expect(scoreBreakdown.evidenceExplanation.includes("Adaptive Score")).toBe(true);
 
-    // Mode-specific multiplier check: WEAK_TOPIC prioritizes weakness
-    const scoreWeakMode = calculateAdaptiveQuestionScore({
+    // 2.1 Independent Factor Verification:
+    // Factor 1: Topic Weakness Factor
+    const scoreWeakHigh = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: 30 } as any],
+        enhancedMistakes: [],
+        revisions: [],
+      },
+      attemptHistory: [{ questionId: sampleQ.id, chapterTitle: sampleQ.chapterTitle } as any],
+    });
+    const scoreWeakLow = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: 90 } as any],
+        enhancedMistakes: [],
+        revisions: [],
+      },
+      attemptHistory: [{ questionId: sampleQ.id, chapterTitle: sampleQ.chapterTitle } as any],
+    });
+    expect(scoreWeakHigh.topicWeaknessFactor).toBe(35);
+    expect(scoreWeakLow.topicWeaknessFactor).toBe(0);
+    expect(scoreWeakHigh.totalAdaptiveScore > scoreWeakLow.totalAdaptiveScore).toBe(true);
+
+    // Factor 2: Mistake Recurrence Factor
+    const scoreMistakeRepeated = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, lifecycleStatus: "Repeated" } as any],
+        revisions: [],
+      },
+      attemptHistory: [],
+    });
+    const scoreMistakeNone = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [],
+        revisions: [],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreMistakeRepeated.mistakeRecurrenceFactor).toBe(30);
+    expect(scoreMistakeNone.mistakeRecurrenceFactor).toBe(0);
+    expect(scoreMistakeRepeated.totalAdaptiveScore > scoreMistakeNone.totalAdaptiveScore).toBe(true);
+
+    // Factor 3: Revision Need Factor
+    const scoreRevPending = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [],
+        revisions: [{ chapterTitle: sampleQ.chapterTitle, completed: false } as any],
+      },
+      attemptHistory: [],
+    });
+    const scoreRevDone = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [],
+        revisions: [{ chapterTitle: sampleQ.chapterTitle, completed: true } as any],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreRevPending.revisionNeedFactor).toBe(20);
+    expect(scoreRevDone.revisionNeedFactor).toBe(0);
+
+    // Factor 4: Exam Strategy Factor (P6 report)
+    const scoreStrategyP6 = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        student: studentP7A,
+        practiceSessions: [],
+        enhancedMistakes: [],
+        revisions: [],
+        p6Report: {
+          examRevisionPriorities: [{ chapterTitle: sampleQ.chapterTitle }],
+          marksLossAnalysis: { primaryLossCategory: "Conceptual understanding" },
+        } as any,
+      },
+      attemptHistory: [],
+    });
+    expect(scoreStrategyP6.examStrategyFactor >= 15).toBe(true);
+
+    // Factor 5: Coverage Gap Factor
+    const scoreUnattempted = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: { student: studentP7A, practiceSessions: [], enhancedMistakes: [], revisions: [] },
+      attemptHistory: [],
+    });
+    const scoreAttempted = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: { student: studentP7A, practiceSessions: [], enhancedMistakes: [], revisions: [] },
+      attemptHistory: [{ questionId: sampleQ.id, chapterTitle: sampleQ.chapterTitle } as any],
+    });
+    expect(scoreUnattempted.coverageGapFactor > scoreAttempted.coverageGapFactor).toBe(true);
+
+    // Factor 6: Mastery State Factor
+    expect(scoreUnattempted.masteryStateFactor >= 2 && scoreUnattempted.masteryStateFactor <= 10).toBe(true);
+
+    // 2.2 Independent Practice Mode Multiplier Verifications:
+    // WEAK_TOPIC mode (mWeak=1.6)
+    const scoreModeWeak = calculateAdaptiveQuestionScore({
       question: sampleQ,
       mode: "WEAK_TOPIC",
       context: {
         student: studentP7A,
-        practiceSessions: [
-          {
-            chapterTitle: sampleQ.chapterTitle,
-            subjectName: sampleQ.subjectName,
-            accuracyPercentage: 40,
-            totalQuestions: 10,
-            correctCount: 4,
-          } as any,
-        ],
-        enhancedMistakes: [],
+        practiceSessions: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: 40 } as any],
       },
       attemptHistory: [],
     });
-    expect(scoreWeakMode.topicWeaknessFactor >= 35).toBe(true);
+    expect(scoreModeWeak.topicWeaknessFactor).toBe(Math.round(35 * 1.6));
+
+    // MISTAKE_RECOVERY mode (mMistake=2.0)
+    const scoreModeMistake = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "MISTAKE_RECOVERY",
+      context: {
+        student: studentP7A,
+        enhancedMistakes: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, lifecycleStatus: "Repeated" } as any],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreModeMistake.mistakeRecurrenceFactor).toBe(Math.round(30 * 2.0));
+
+    // REVISION_PRACTICE mode (mRev=1.8)
+    const scoreModeRev = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "REVISION_PRACTICE",
+      context: {
+        student: studentP7A,
+        revisions: [{ chapterTitle: sampleQ.chapterTitle, completed: false } as any],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreModeRev.revisionNeedFactor).toBe(Math.round(20 * 1.8));
+
+    // EXAM_STRATEGY mode (mExam=1.8)
+    const scoreModeExam = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "EXAM_STRATEGY",
+      context: {
+        student: studentP7A,
+        p6Report: {
+          examRevisionPriorities: [{ chapterTitle: sampleQ.chapterTitle }],
+          marksLossAnalysis: { primaryLossCategory: "Unknown" },
+        } as any,
+      },
+      attemptHistory: [],
+    });
+    expect(scoreModeExam.examStrategyFactor).toBe(Math.round(15 * 1.8));
+
+    // QUICK_PRACTICE mode (mWeak=1.2, mExam=1.2)
+    const scoreModeQuick = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "QUICK_PRACTICE",
+      context: {
+        student: studentP7A,
+        practiceSessions: [{ chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: 40 } as any],
+      },
+      attemptHistory: [],
+    });
+    expect(scoreModeQuick.topicWeaknessFactor).toBe(Math.round(35 * 1.2));
+
+    // 2.3 Equal-Score Deterministic Tie-Breaking Verification
+    const dummyQ1: AdaptiveQuestion = {
+      ...sampleQ,
+      id: "q-tie-b",
+      questionText: "Dummy Tie Question B",
+    };
+    const dummyQ2: AdaptiveQuestion = {
+      ...sampleQ,
+      id: "q-tie-a",
+      questionText: "Dummy Tie Question A",
+    };
+    const scoreQ1 = calculateAdaptiveQuestionScore({ question: dummyQ1, mode: "BALANCED", context: {}, attemptHistory: [] });
+    const scoreQ2 = calculateAdaptiveQuestionScore({ question: dummyQ2, mode: "BALANCED", context: {}, attemptHistory: [] });
+    expect(scoreQ1.totalAdaptiveScore).toBe(scoreQ2.totalAdaptiveScore);
+
+    const tieList = [
+      { question: dummyQ1, scoreBreakdown: scoreQ1, category: "Maintenance" as const, estimatedTimeMinutes: 2 },
+      { question: dummyQ2, scoreBreakdown: scoreQ2, category: "Maintenance" as const, estimatedTimeMinutes: 2 },
+    ];
+    tieList.sort((a, b) => {
+      const diff = b.scoreBreakdown.totalAdaptiveScore - a.scoreBreakdown.totalAdaptiveScore;
+      if (diff !== 0) return diff;
+      return a.question.id.localeCompare(b.question.id);
+    });
+    expect(tieList[0].question.id).toBe("q-tie-a");
+    expect(tieList[1].question.id).toBe("q-tie-b");
+
+    // 2.4 Missing, Empty & Malformed Context Resiliency Verification
+    const scoreEmpty = calculateAdaptiveQuestionScore({
+      question: sampleQ,
+      mode: "BALANCED",
+      context: {
+        practiceSessions: [
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: NaN } as any,
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: undefined } as any,
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: null } as any,
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: Infinity } as any,
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: -50 } as any,
+          { chapterTitle: sampleQ.chapterTitle, subjectName: sampleQ.subjectName, accuracyPercentage: 999 } as any,
+        ],
+      },
+      attemptHistory: [],
+    });
+    expect(Number.isFinite(scoreEmpty.totalAdaptiveScore)).toBe(true);
+    expect(Number.isNaN(scoreEmpty.totalAdaptiveScore)).toBe(false);
+    expect(scoreEmpty.totalAdaptiveScore >= 0).toBe(true);
 
     // 3. Adaptive Practice Session Builder (10m, 20m, 30m, 45m)
     const session10 = buildAdaptivePracticeSession({

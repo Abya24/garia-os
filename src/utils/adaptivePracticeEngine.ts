@@ -421,8 +421,15 @@ export function calculateAdaptiveQuestionScore(params: {
       p.subjectName.toLowerCase() === question.subjectName.toLowerCase()
   );
   if (chapPractices.length > 0) {
+    const validAccuracies = chapPractices
+      .map((p) => {
+        const val = typeof p.accuracyPercentage === "number" && Number.isFinite(p.accuracyPercentage)
+          ? p.accuracyPercentage
+          : 0;
+        return Math.max(0, Math.min(100, val));
+      });
     const avgAcc =
-      chapPractices.reduce((acc, p) => acc + (p.accuracyPercentage || 0), 0) /
+      validAccuracies.reduce((acc, val) => acc + val, 0) /
       chapPractices.length;
     if (avgAcc < 50) topicWeaknessFactor = 35;
     else if (avgAcc < 65) topicWeaknessFactor = 25;
@@ -551,8 +558,11 @@ export function calculateAdaptiveQuestionScore(params: {
   const finalCov = Math.round(coverageGapFactor * mCov);
   const finalMastery = masteryStateFactor;
 
-  const totalAdaptiveScore =
+  const rawAdaptiveScore =
     finalWeak + finalMistake + finalRev + finalExam + finalCov + finalMastery;
+  const totalAdaptiveScore = Number.isFinite(rawAdaptiveScore)
+    ? Math.max(0, Math.round(rawAdaptiveScore))
+    : 0;
 
   // Build transparent reasons
   const reasons: string[] = [];
