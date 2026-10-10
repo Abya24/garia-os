@@ -653,10 +653,12 @@ export function buildAdaptivePracticeSession(params: {
     };
   });
 
-  // Sort descending by adaptive score
-  scoredQuestions.sort(
-    (a, b) => b.scoreBreakdown.totalAdaptiveScore - a.scoreBreakdown.totalAdaptiveScore
-  );
+  // Sort descending by adaptive score with deterministic tie-breaker on question id
+  scoredQuestions.sort((a, b) => {
+    const diff = b.scoreBreakdown.totalAdaptiveScore - a.scoreBreakdown.totalAdaptiveScore;
+    if (diff !== 0) return diff;
+    return a.question.id.localeCompare(b.question.id);
+  });
 
   // Allocate questions based on session duration
   // 10m -> 4 questions; 20m -> 7 questions; 30m -> 10 questions; 45m -> 15 questions
