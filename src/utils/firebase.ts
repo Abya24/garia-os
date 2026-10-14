@@ -27,9 +27,33 @@ import {
 import firebaseConfig from "../../firebase-applet-config.json";
 import { APP_VERSION } from "../constants/version";
 
+// Safely extract environment across client (Vite ESM) and server (Node CJS)
+const getClientEnv = (key: string): string | undefined => {
+  try {
+    const metaEnv = Function("try { return import.meta.env; } catch { return undefined; }")();
+    if (metaEnv && typeof metaEnv[key] === "string") return metaEnv[key];
+  } catch {
+    // ignore
+  }
+  if (typeof process !== "undefined" && process?.env && typeof process.env[key] === "string") {
+    return process.env[key];
+  }
+  return undefined;
+};
+
+const getIsDev = (): boolean => {
+  try {
+    const metaEnv = Function("try { return import.meta.env; } catch { return undefined; }")();
+    if (metaEnv && typeof metaEnv.DEV === "boolean") return metaEnv.DEV;
+  } catch {
+    // ignore
+  }
+  return typeof process !== "undefined" && process?.env?.NODE_ENV !== "production";
+};
+
 // Resolve Firebase API key securely from environment variable or configuration
 const resolvedApiKey: string =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FIREBASE_API_KEY) ||
+  getClientEnv("VITE_FIREBASE_API_KEY") ||
   (firebaseConfig as any).apiKey ||
   "";
 
@@ -91,7 +115,7 @@ export function handleFirestoreError(
   path: string | null
 ): never {
   const currentUser = auth.currentUser;
-  const isDev = Boolean(typeof import.meta !== "undefined" && (import.meta as any).env?.DEV);
+  const isDev = getIsDev();
 
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),

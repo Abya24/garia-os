@@ -1383,7 +1383,7 @@ export default function App() {
   // Live Abya AI Provider Diagnostics State
   const [abyaDiagnostics, setAbyaDiagnostics] = useState<AbyaDiagnosticsInfo>({
     provider: "online_ai",
-    activeModel: "gemini-3.7-flash",
+    activeModel: "gemini-3.8-flash",
     latencyMs: 0,
     lastStatus: "idle",
     lastFallbackReason: "none",
@@ -1429,7 +1429,7 @@ export default function App() {
       setAbyaDiagnostics((prev) => ({
         ...prev,
         provider: "online_ai",
-        activeModel: data.defaultModel || "gemini-3.7-flash",
+        activeModel: data.defaultModel || "gemini-3.8-flash",
         latencyMs: latency,
         lastStatus: data.configured ? "online" : "fallback",
         lastFallbackReason: data.configured ? "none" : "api_error",

@@ -4767,5 +4767,35 @@ describe("Garia OS Production Audit Regression Suite", () => {
     );
     expect(abyaHelping.includes("Effectiveness") || abyaHelping.includes("Questions Attempted") || abyaHelping.includes("enough practice data")).toBe(true);
   });
+
+  it("32. Gemini Model Deprecation & Migration: verifies deprecated gemini-3.7-flash is absent and gemini-3.8-flash is active across client and server", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    const appSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/App.tsx"),
+      "utf-8"
+    );
+    const serverSource = fs.readFileSync(
+      path.resolve(process.cwd(), "server.ts"),
+      "utf-8"
+    );
+
+    // Verify deprecated model is completely purged
+    expect(appSource.includes("gemini-3.7-flash")).toBe(false);
+    expect(serverSource.includes("gemini-3.7-flash")).toBe(false);
+
+    // Verify gemini-3.8-flash is active default
+    expect(appSource.includes('activeModel: "gemini-3.8-flash"')).toBe(true);
+    expect(serverSource.includes('defaultModel: "gemini-3.8-flash"')).toBe(true);
+    expect(serverSource.includes('"gemini-3.8-flash"')).toBe(true);
+
+    // Verify Live API uses specialized audio models, never replacing them with flash
+    expect(serverSource.includes('"gemini-3.8-live"')).toBe(true);
+    expect(serverSource.includes('"gemini-3.8-live-extended-thinking"')).toBe(true);
+
+    // Verify configuration safety: no deprecated thinking_budget passed to gemini-3.8-flash
+    expect(serverSource.includes("thinking_budget")).toBe(false);
+  });
 });
 

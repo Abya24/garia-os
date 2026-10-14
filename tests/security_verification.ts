@@ -308,7 +308,11 @@ async function runTests() {
 
   // TEST 10: Fake user UID -> Expected: authentication failure (401)
   try {
-    const forgedToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6InVua25vd24ta2V5In0.eyJzdWIiOiJmYWtlX2F0dGFja2VyIiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL3Rva3lvLXBpcGUtbGY2anIiLCJhdWQiOiJ0b2t5by1waXBlLWxmNmpyIn0.ZmFrZV9zaWduYXR1cmU";
+    // Generate valid test token and tamper only the signature to verify cryptographic rejection without issuer literals
+    const syntheticToken = generateDevTestToken("synthetic_test_attacker_uid");
+    const [headerB64, payloadB64] = syntheticToken.split(".");
+    const forgedSignature = Buffer.from("synthetic_test_invalid_signature").toString("base64url");
+    const forgedToken = `${headerB64}.${payloadB64}.${forgedSignature}`;
     const res = await fetch(`${baseUrl}/api/ai/chat`, {
       method: "POST",
       headers: {
@@ -318,7 +322,7 @@ async function runTests() {
       body: JSON.stringify({ prompt: "Testing forged token" }),
     });
     const data = await res.json();
-    const passed = res.status === 401 && (data.code === "INVALID_TOKEN" || data.code === "INVALID_SIGNATURE" || data.code === "UNAUTHENTICATED" || data.code === "EXPIRED_TOKEN");
+    const passed = res.status === 401 && data.code === "INVALID_SIGNATURE";
     results.push({
       name: "TEST 10: Fake user UID / Forged token rejection",
       passed,

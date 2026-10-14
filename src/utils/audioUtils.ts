@@ -1,4 +1,4 @@
-// Real-time PCM audio streaming utilities for Gemini Live API (gemini-3.1-flash-live-preview)
+// Real-time PCM audio streaming utilities for Gemini Live API (gemini-3.8-live)
 
 /**
  * Converts Float32 audio samples from Web Audio API (16kHz) to Base64 16-bit Linear PCM Little-Endian

@@ -45,11 +45,15 @@ export default defineConfig(() => {
             if (id.includes('careerDatabase') || id.includes('careerEngine')) {
               return 'data-career-engine';
             }
-            if (id.includes('questionBankEngine') || id.includes('examIntelligenceEngine') || id.includes('examEngine')) {
-              return 'data-exam-engine';
-            }
-            if (id.includes('academicEngine') || id.includes('academicDecisionEngine') || id.includes('abyaFallbackEngine')) {
-              return 'data-academic-engine';
+            if (
+              id.includes('questionBankEngine') ||
+              id.includes('examIntelligenceEngine') ||
+              id.includes('examEngine') ||
+              id.includes('academicEngine') ||
+              id.includes('academicDecisionEngine') ||
+              id.includes('abyaFallbackEngine')
+            ) {
+              return 'data-academic-exam-engine';
             }
             if (id.includes('quotes')) {
               return 'data-quotes';
