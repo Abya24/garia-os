@@ -4797,5 +4797,66 @@ describe("Garia OS Production Audit Regression Suite", () => {
     // Verify configuration safety: no deprecated thinking_budget passed to gemini-3.8-flash
     expect(serverSource.includes("thinking_budget")).toBe(false);
   });
+
+  it("33. Security Hardening & Model Centralization: verifies versioned PBKDF2 PIN KDF, static Vite env, CSP headers, minimal healthcheck, and centralized model registry", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { hashPin, verifyPin } = await import("../security.ts");
+    const { AI_MODELS, MODEL_REGISTRY } = await import("../../constants/aiModels.ts");
+
+    // 1. Versioned salted PBKDF2 PIN verification
+    const pin = "5678";
+    const v2Hash = await hashPin(pin);
+    expect(v2Hash.startsWith("v2$")).toBe(true);
+    expect(v2Hash.split("$").length).toBe(3);
+    expect(await verifyPin(pin, v2Hash)).toBe(true);
+    expect(await verifyPin("0000", v2Hash)).toBe(false);
+
+    // 2. Legacy v1 SHA-256 migration compatibility
+    const legacySalt = "garia_os_secure_pin_salt_v2026";
+    const encoder = new TextEncoder();
+    const legacyBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(`${legacySalt}_${pin}_${legacySalt}`)
+    );
+    const legacyHex = Array.from(new Uint8Array(legacyBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    expect(await verifyPin(pin, legacyHex)).toBe(true);
+    expect(await verifyPin("9999", legacyHex)).toBe(false);
+
+    // 3. Statically analyzable Vite env (No Function() usage)
+    const firebaseSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/utils/firebase.ts"),
+      "utf-8"
+    );
+    expect(firebaseSource.includes("Function(")).toBe(false);
+
+    // 4. Server Security Headers & Minimal /api/health
+    const serverSource = fs.readFileSync(
+      path.resolve(process.cwd(), "server.ts"),
+      "utf-8"
+    );
+    expect(serverSource.includes("Content-Security-Policy")).toBe(true);
+    expect(serverSource.includes("default-src 'self'")).toBe(true);
+    expect(serverSource.includes("object-src 'none'")).toBe(true);
+
+    // /api/health does not leak internal model names
+    const healthRouteRegex = /app\.get\("\/api\/health",\s*\([a-zA-Z,\s]+\)\s*=>\s*\{([\s\S]*?)\}\);/;
+    const healthMatch = serverSource.match(healthRouteRegex);
+    expect(Boolean(healthMatch)).toBe(true);
+    expect(healthMatch![1].includes("geminiFeatures")).toBe(false);
+
+    // /api/ai/diagnostics requires authentication
+    expect(serverSource.includes('error: "Authentication required to access AI diagnostics."')).toBe(true);
+
+    // 5. Centralized AI Model registry
+    expect(AI_MODELS.DEFAULT_TEXT).toBe("gemini-3.8-flash");
+    expect(AI_MODELS.LOW_LATENCY).toBe("gemini-3.1-flash-lite");
+    expect(AI_MODELS.LIVE_VOICE).toBe("gemini-3.8-live");
+    expect(MODEL_REGISTRY["gemini-3.8-flash"].isStable).toBe(true);
+    expect(MODEL_REGISTRY["gemini-3.1-pro-preview"].isStable).toBe(false);
+  });
 });
+
 

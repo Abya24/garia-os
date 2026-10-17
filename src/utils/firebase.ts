@@ -30,8 +30,10 @@ import { APP_VERSION } from "../constants/version";
 // Safely extract environment across client (Vite ESM) and server (Node CJS)
 const getClientEnv = (key: string): string | undefined => {
   try {
-    const metaEnv = Function("try { return import.meta.env; } catch { return undefined; }")();
-    if (metaEnv && typeof metaEnv[key] === "string") return metaEnv[key];
+    const metaEnv = (import.meta as unknown as { env?: Record<string, any> })?.env;
+    if (metaEnv && typeof metaEnv[key] === "string") {
+      return metaEnv[key];
+    }
   } catch {
     // ignore
   }
@@ -43,8 +45,10 @@ const getClientEnv = (key: string): string | undefined => {
 
 const getIsDev = (): boolean => {
   try {
-    const metaEnv = Function("try { return import.meta.env; } catch { return undefined; }")();
-    if (metaEnv && typeof metaEnv.DEV === "boolean") return metaEnv.DEV;
+    const metaEnv = (import.meta as unknown as { env?: Record<string, any> })?.env;
+    if (metaEnv && typeof metaEnv.DEV === "boolean") {
+      return metaEnv.DEV;
+    }
   } catch {
     // ignore
   }

@@ -12,6 +12,7 @@ import {
   suggestSmartTagsFromContent,
   parseSmartTagsResponse,
 } from "./src/utils/noteFeatures.ts";
+import { SERVER_AI_MODELS, SERVER_SUPPORTED_MODELS } from "./server/aiModels.ts";
 
 dotenv.config();
 
@@ -40,6 +41,20 @@ async function startServer() {
       "Permissions-Policy",
       "camera=(), geolocation=(self), microphone=(self), payment=(), usb=()"
     );
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://apis.google.com https://*.firebaseapp.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com",
+      "media-src 'self' blob: data:",
+      "connect-src 'self' https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com wss: ws:",
+      "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join("; ");
+    res.setHeader("Content-Security-Policy", csp);
     next();
   });
 
@@ -96,19 +111,12 @@ async function startServer() {
     return cleaned || fallback;
   }
 
-  // API Health Endpoint
+  // Minimal API Health Endpoint (No sensitive or stale model configurations leaked)
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
       app: "Garia OS",
       version: "3.1.0",
-      geminiFeatures: [
-        "high_thinking (gemini-3.1-pro-preview)",
-        "image_analysis (gemini-3.1-pro-preview)",
-        "low_latency (gemini-3.1-flash-lite)",
-        "search_grounding (gemini-3.5-flash)",
-        "live_voice (gemini-3.8-live)",
-      ],
     });
   });
 
@@ -220,6 +228,12 @@ async function startServer() {
       },
     ]);
   });
+
+  // Architecture & Deployment Constraint Note:
+  // Garia OS uses an in-process MemoryRateLimiter and ephemeral live-voice ticket Map.
+  // This enforces a single-instance container deployment topology (e.g. Cloud Run min/max = 1).
+  // For horizontally scaled multi-instance deployments, rate-limiting and ticket state must be
+  // backed by an external atomic distributed store (e.g., Redis or Firestore transactions).
 
   // Bounded Memory Rate Limiter for abuse prevention
   interface RateLimitRecord {
@@ -397,19 +411,22 @@ async function startServer() {
     res.json({ ticket, uid, expiresInSeconds: 60 });
   });
 
-  // Abya AI Provider Diagnostics & Health Check Endpoint
-  app.get("/api/ai/diagnostics", (req, res) => {
+  // Abya AI Provider Diagnostics & Health Check Endpoint (Authenticated to protect internal model configuration)
+  app.get("/api/ai/diagnostics", async (req, res) => {
+    const authResult = await verifyFirebaseIdToken(req.headers.authorization);
+    if (!authResult.valid || !authResult.user?.uid) {
+      return res.status(401).json({
+        error: "Authentication required to access AI diagnostics.",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
     const hasEnvKey = !!process.env.GEMINI_API_KEY;
     res.json({
       status: "ok",
       provider: "online_ai",
-      defaultModel: "gemini-3.8-flash",
-      supportedModels: [
-        "gemini-3.8-flash",
-        "gemini-3.1-pro-preview",
-        "gemini-3.1-flash-lite",
-        "gemini-3.8-live",
-      ],
+      defaultModel: "gemini-3.8-flash", // matches SERVER_AI_MODELS.DEFAULT_TEXT
+      supportedModels: SERVER_SUPPORTED_MODELS,
       configured: hasEnvKey,
       timestamp: Date.now(),
     });

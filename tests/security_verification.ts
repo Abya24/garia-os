@@ -583,11 +583,12 @@ async function runTests() {
     const frame = res.headers.get("x-frame-options") === "SAMEORIGIN";
     const hsts = (res.headers.get("strict-transport-security") || "").includes("max-age=31536000");
     const perms = (res.headers.get("permissions-policy") || "").includes("camera=()");
-    const passed = nosniff && referrer && frame && hsts && perms;
+    const csp = (res.headers.get("content-security-policy") || "").includes("default-src 'self'");
+    const passed = nosniff && referrer && frame && hsts && perms && csp;
     results.push({
       name: "TEST 19: Production Security Headers present",
       passed,
-      details: `nosniff=${nosniff}, referrer=${referrer}, frame=${frame}, hsts=${hsts}, perms=${perms}`,
+      details: `nosniff=${nosniff}, referrer=${referrer}, frame=${frame}, hsts=${hsts}, perms=${perms}, csp=${csp}`,
     });
   } catch (err: any) {
     results.push({

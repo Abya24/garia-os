@@ -51,35 +51,105 @@ export function isValidPinFormat(pin: string): boolean {
 }
 
 /**
- * Robust SHA-256 hash for PIN
+ * Versioned salted slow KDF for client-side PIN security (PBKDF2-HMAC-SHA256, 100,000 iterations).
+ * NOTE: Local PIN lock is a client-side convenience barrier, not server-side authorization.
+ * Fails closed if secure Web Crypto is unavailable (never uses fast/non-cryptographic fallbacks).
  */
 export async function hashPin(pin: string): Promise<string> {
-  if (!pin) return "";
+  if (!pin || typeof pin !== "string") return "";
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    // Fail closed: Do NOT fallback to insecure fast hashes
+    return "";
+  }
+
   try {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const saltHex = Array.from(salt)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     const encoder = new TextEncoder();
-    const data = encoder.encode(`${PIN_SALT}_${pin.trim()}_${PIN_SALT}`);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(pin.trim()),
+      { name: "PBKDF2" },
+      false,
+      ["deriveBits"]
+    );
+    const derived = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: 100000,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      256
+    );
+    const derivedHex = Array.from(new Uint8Array(derived))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return `v2$${saltHex}$${derivedHex}`;
   } catch {
-    // Fallback deterministic hash
-    let hash = 0x811c9dc5;
-    const str = `${PIN_SALT}_${pin.trim()}_${PIN_SALT}`;
-    for (let i = 0; i < str.length; i++) {
-      hash ^= str.charCodeAt(i);
-      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-    }
-    return `ph_${Math.abs(hash).toString(16)}`;
+    // Fail closed
+    return "";
   }
 }
 
 /**
- * Synchronous comparison / verify helper
+ * Verify helper with backward-compatible migration for legacy v1 SHA-256 hashes.
+ * Fails closed if crypto is unavailable or verification fails.
  */
 export async function verifyPin(enteredPin: string, storedHash: string): Promise<boolean> {
-  if (!enteredPin || !storedHash) return false;
-  const computedHash = await hashPin(enteredPin);
-  return computedHash === storedHash;
+  if (!enteredPin || !storedHash || typeof enteredPin !== "string" || typeof storedHash !== "string") {
+    return false;
+  }
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    return false;
+  }
+
+  try {
+    // Check v2 format: v2$<saltHex>$<derivedHex>
+    if (storedHash.startsWith("v2$")) {
+      const parts = storedHash.split("$");
+      if (parts.length !== 3 || !parts[1] || !parts[2]) return false;
+      const saltMatches = parts[1].match(/.{1,2}/g);
+      if (!saltMatches) return false;
+      const salt = new Uint8Array(saltMatches.map((byte) => parseInt(byte, 16)));
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(enteredPin.trim()),
+        { name: "PBKDF2" },
+        false,
+        ["deriveBits"]
+      );
+      const derived = await crypto.subtle.deriveBits(
+        {
+          name: "PBKDF2",
+          salt,
+          iterations: 100000,
+          hash: "SHA-256",
+        },
+        keyMaterial,
+        256
+      );
+      const derivedHex = Array.from(new Uint8Array(derived))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      return derivedHex === parts[2];
+    }
+
+    // Backward compatibility for legacy v1 SHA-256 hashes
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${PIN_SALT}_${enteredPin.trim()}_${PIN_SALT}`);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const legacyHex = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return legacyHex === storedHash;
+  } catch {
+    return false;
+  }
 }
 
 /**

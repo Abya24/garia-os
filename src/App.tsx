@@ -1423,20 +1423,35 @@ export default function App() {
   const handleTestAbyaDiagnostics = async () => {
     const start = Date.now();
     try {
-      const res = await fetch("/api/ai/diagnostics");
+      const idToken = await getValidClientAuthToken();
+      const headers: Record<string, string> = {};
+      if (idToken) headers["Authorization"] = `Bearer ${idToken}`;
+      const res = await fetch("/api/ai/diagnostics", { headers });
       const data = await res.json();
       const latency = Date.now() - start;
-      setAbyaDiagnostics((prev) => ({
-        ...prev,
-        provider: "online_ai",
-        activeModel: data.defaultModel || "gemini-3.8-flash",
-        latencyMs: latency,
-        lastStatus: data.configured ? "online" : "fallback",
-        lastFallbackReason: data.configured ? "none" : "api_error",
-        isOnlineNetwork: true,
-        lastCheckedAt: Date.now(),
-        lastErrorDetails: data.configured ? undefined : "API key not configured in environment.",
-      }));
+      if (res.ok) {
+        setAbyaDiagnostics((prev) => ({
+          ...prev,
+          provider: "online_ai",
+          activeModel: data.defaultModel || "gemini-3.8-flash",
+          latencyMs: latency,
+          lastStatus: data.configured ? "online" : "fallback",
+          lastFallbackReason: data.configured ? "none" : "api_error",
+          isOnlineNetwork: true,
+          lastCheckedAt: Date.now(),
+          lastErrorDetails: data.configured ? undefined : "API key not configured in environment.",
+        }));
+      } else {
+        setAbyaDiagnostics((prev) => ({
+          ...prev,
+          latencyMs: latency,
+          lastStatus: "fallback",
+          lastFallbackReason: res.status === 401 ? "none" : "api_error",
+          isOnlineNetwork: true,
+          lastCheckedAt: Date.now(),
+          lastErrorDetails: res.status === 401 ? "Sign in to inspect online AI diagnostics." : (data.error || `HTTP ${res.status}`),
+        }));
+      }
     } catch (err: any) {
       const latency = Date.now() - start;
       const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
