@@ -134,7 +134,7 @@ import {
   executeAbyaModuleAction,
 } from "./utils/abyaModuleActions";
 
-import { hashPassword } from "./utils/auth";
+import { hashPassword, verifyPassword } from "./utils/auth";
 import { auth, getValidClientAuthToken } from "./utils/firebase";
 import { AppLanguage, getStoredLanguage, saveStoredLanguage } from "./utils/i18n";
 import { loadQuestionBankProgress } from "./utils/questionBankEngine";
@@ -2095,18 +2095,24 @@ export default function App() {
   };
 
   const handleWelcomeLogin = async (email: string, pass: string): Promise<boolean> => {
-    const hashed = await hashPassword(pass);
     const allProfs = loadProfiles();
     for (const prof of allProfs) {
       const profSettings = loadSettings(prof.id);
       if (
         profSettings.account &&
         profSettings.account.email.toLowerCase() === email.toLowerCase() &&
-        Boolean(profSettings.account.passwordHash) &&
-        profSettings.account.passwordHash === hashed
+        Boolean(profSettings.account.passwordHash)
       ) {
-        reloadAllDataForProfile(prof.id);
-        return true;
+        const isMatch = await verifyPassword(pass, profSettings.account.passwordHash);
+        if (isMatch) {
+          // If legacy hash, migrate to modern PBKDF2 pwd_v2$ automatically
+          if (!profSettings.account.passwordHash.startsWith("pwd_v2$")) {
+            profSettings.account.passwordHash = await hashPassword(pass);
+            saveSettings(profSettings, prof.id);
+          }
+          reloadAllDataForProfile(prof.id);
+          return true;
+        }
       }
     }
     return false;

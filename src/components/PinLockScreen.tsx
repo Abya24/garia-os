@@ -36,7 +36,7 @@ import {
   MAX_PIN_LENGTH,
   isValidPinFormat,
 } from "../utils/security";
-import { hashPassword } from "../utils/auth";
+import { hashPassword, verifyPassword } from "../utils/auth";
 import { signInWithEmail } from "../utils/firebase";
 import { getStudentDisplayName, getStudentAvatarInitials } from "../utils/studentNameUtils";
 import { GariaLogo } from "./GariaLogo";
@@ -289,8 +289,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
     // Check stored passwordHash
     if (settings.account?.passwordHash) {
-      const enteredHash = await hashPassword(passTrimmed);
-      if (enteredHash === settings.account.passwordHash) {
+      const isMatch = await verifyPassword(passTrimmed, settings.account.passwordHash);
+      if (isMatch) {
         setRecoveryStep("new_pin");
         return;
       }

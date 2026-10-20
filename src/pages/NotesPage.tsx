@@ -1365,7 +1365,7 @@ export const NotesPage: React.FC<NotesPageProps> = ({
     setIsEditorFocused(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
@@ -1412,9 +1412,12 @@ export const NotesPage: React.FC<NotesPageProps> = ({
     const shouldEncrypt = (isEncrypted || Boolean(trimmedPassword)) && Boolean(trimmedPassword);
     const rawContent = content.trim();
     const finalContent = shouldEncrypt
-      ? encryptNoteContent(rawContent, trimmedPassword)
+      ? await encryptNoteContent(rawContent, trimmedPassword)
       : rawContent;
-    const finalIsEncrypted = shouldEncrypt || finalContent.startsWith("ENCv1:");
+    const finalIsEncrypted =
+      shouldEncrypt ||
+      finalContent.startsWith("ENCv2:") ||
+      finalContent.startsWith("ENCv1:");
     const cleanReminder = reminderDate.trim() ? reminderDate.trim() : undefined;
 
     // Include any pending collaborator email typed in shareEmailInput
@@ -3979,7 +3982,7 @@ export const NoteCard: React.FC<{
   const createdTimestamp = note.createdAt || Date.now();
   const modifiedTimestamp = note.updatedAt || createdTimestamp;
 
-  const handleUnlockNote = (e?: React.FormEvent) => {
+  const handleUnlockNote = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const pwd = unlockPasswordInput.trim();
     if (!pwd) {
@@ -3987,7 +3990,7 @@ export const NoteCard: React.FC<{
       return;
     }
     const payload = note.content || note.encryptedContent || "";
-    const decrypted = decryptNoteContent(payload, pwd);
+    const decrypted = await decryptNoteContent(payload, pwd);
     if (decrypted === null) {
       setUnlockError("Incorrect password. Unable to decrypt note.");
       return;

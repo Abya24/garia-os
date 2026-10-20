@@ -33,6 +33,9 @@ export interface QuickFocusSessionState {
   updatedAt: number;
   activeTaskId?: string;
   activeTaskTitle?: string;
+  isExpired?: boolean;
+  hasTriggeredCompletion?: boolean;
+  completedAt?: number;
 }
 
 export function playFocusTimerChime(
@@ -64,38 +67,82 @@ export function playFocusTimerChime(
 
 export function saveQuickFocusSessionState(state: QuickFocusSessionState | null) {
   try {
+    if (typeof sessionStorage === "undefined") return;
     if (!state) {
       sessionStorage.removeItem(QUICK_FOCUS_SESSION_KEY);
       return;
     }
     sessionStorage.setItem(QUICK_FOCUS_SESSION_KEY, JSON.stringify(state));
   } catch {
-    // Ignore storage errors
+    // Ignore storage errors in restricted contexts
   }
 }
 
 export function loadQuickFocusSessionState(): QuickFocusSessionState | null {
   try {
+    if (typeof sessionStorage === "undefined") return null;
     const raw = sessionStorage.getItem(QUICK_FOCUS_SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as QuickFocusSessionState;
     if (
       !parsed ||
+      typeof parsed !== "object" ||
       typeof parsed.remainingSeconds !== "number" ||
-      typeof parsed.durationMinutes !== "number"
+      typeof parsed.durationMinutes !== "number" ||
+      isNaN(parsed.remainingSeconds) ||
+      isNaN(parsed.durationMinutes) ||
+      (parsed.mode !== "focus" && parsed.mode !== "break") ||
+      parsed.durationMinutes <= 0 ||
+      parsed.durationMinutes > 240 ||
+      parsed.remainingSeconds < 0
     ) {
       return null;
     }
-    if (parsed.isRunning && parsed.updatedAt) {
-      const elapsed = Math.max(0, Math.floor((Date.now() - parsed.updatedAt) / 1000));
-      const adjusted = Math.max(1, parsed.remainingSeconds - elapsed);
+
+    // Validate persisted timestamp
+    if (
+      typeof parsed.updatedAt !== "number" ||
+      isNaN(parsed.updatedAt) ||
+      parsed.updatedAt <= 0
+    ) {
+      return null;
+    }
+
+    const now = Date.now();
+    // Stale session defense: discard sessions older than 24 hours or in the future (>2m clock skew)
+    if (now - parsed.updatedAt > 24 * 60 * 60 * 1000 || parsed.updatedAt - now > 2 * 60 * 1000) {
+      return null;
+    }
+
+    if (parsed.isRunning) {
+      const elapsed = Math.max(0, Math.floor((now - parsed.updatedAt) / 1000));
+      const adjusted = parsed.remainingSeconds - elapsed;
+
+      if (adjusted <= 0) {
+        // Timer expired while backgrounded or away. Treat as expired, remaining 0, isRunning false.
+        // NEVER force to 1s.
+        return {
+          ...parsed,
+          remainingSeconds: 0,
+          isRunning: false,
+          isExpired: true,
+          updatedAt: now,
+        };
+      }
+
       return {
         ...parsed,
         remainingSeconds: adjusted,
-        updatedAt: Date.now(),
+        isRunning: true,
+        isExpired: false,
+        updatedAt: now,
       };
     }
-    return parsed;
+
+    return {
+      ...parsed,
+      isExpired: parsed.remainingSeconds <= 0,
+    };
   } catch {
     return null;
   }
@@ -153,6 +200,9 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     initialQuickSession ? initialQuickSession.isRunning : false
   );
   const [statusToast, setStatusToast] = useState<string | null>(null);
+  const completionFiredRef = useRef<boolean>(
+    Boolean(initialQuickSession?.hasTriggeredCompletion)
+  );
 
   // Task integration state
   const [localTasks, setLocalTasks] = useState<Task[]>(() => loadTasks());
@@ -294,8 +344,22 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
       updatedAt: Date.now(),
       activeTaskId: activeTask?.id,
       activeTaskTitle: activeTask?.title,
+      hasTriggeredCompletion: completionFiredRef.current,
+      isExpired: secondsLeft <= 0,
     });
   }, [isRunning, mode, focusDuration, breakDuration, secondsLeft, activeTask?.id, activeTask?.title]);
+
+  // Mount restoration: if the session expired while in the background or away, trigger completion at most once
+  useEffect(() => {
+    if (
+      initialQuickSession &&
+      initialQuickSession.isExpired &&
+      !initialQuickSession.hasTriggeredCompletion &&
+      !completionFiredRef.current
+    ) {
+      handleSessionComplete();
+    }
+  }, []);
 
   // Countdown tick
   useEffect(() => {
@@ -314,6 +378,10 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   }, [isRunning, mode, focusDuration, breakDuration]);
 
   const handleSessionComplete = () => {
+    if (completionFiredRef.current && !isRunning) {
+      return;
+    }
+    completionFiredRef.current = true;
     setIsRunning(false);
     playFocusTimerChime();
 
@@ -323,6 +391,17 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
       durationMinutes: completedMinutes,
       completedAt: Date.now(),
       date: getTodayString(),
+    });
+
+    saveQuickFocusSessionState({
+      isRunning: false,
+      mode,
+      durationMinutes: completedMinutes,
+      remainingSeconds: 0,
+      updatedAt: Date.now(),
+      hasTriggeredCompletion: true,
+      isExpired: true,
+      completedAt: Date.now(),
     });
 
     if (mode === "focus") {
@@ -344,6 +423,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   };
 
   const handleSelectPreset = (preset: typeof FOCUS_PRESETS[number]) => {
+    completionFiredRef.current = false;
     setIsRunning(false);
     setMode(preset.mode);
     if (preset.mode === "focus") {
@@ -355,6 +435,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   };
 
   const handleReset = () => {
+    completionFiredRef.current = false;
     setIsRunning(false);
     const mins = mode === "focus" ? focusDuration : breakDuration;
     setSecondsLeft(mins * 60);
@@ -793,7 +874,14 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
             <button
               type="button"
               id="focus-timer-start-pause-btn"
-              onClick={() => setIsRunning((prev) => !prev)}
+              onClick={() => {
+                setIsRunning((prev) => {
+                  if (!prev) {
+                    completionFiredRef.current = false;
+                  }
+                  return !prev;
+                });
+              }}
               className={`min-h-[46px] px-7 py-3 rounded-2xl font-extrabold text-sm inline-flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
                 isRunning
                   ? "bg-amber-500 hover:bg-amber-400 text-slate-950"

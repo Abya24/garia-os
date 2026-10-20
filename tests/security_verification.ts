@@ -757,6 +757,99 @@ async function runTests() {
     });
   }
 
+  // TEST 24: Cross-Site WebSocket Hijacking (CSWSH) Origin Protection
+  try {
+    const cswshTicketRes = await fetch(`${baseUrl}/api/live-voice/ticket`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${validToken}`,
+        "X-Forwarded-For": "10.20.30.25",
+      },
+    });
+    const cswshTicketData = await cswshTicketRes.json();
+    const cswshTicket = cswshTicketData.ticket;
+
+    let rejectedUntrustedOrigin = false;
+    if (cswshTicket) {
+      rejectedUntrustedOrigin = await new Promise<boolean>((resolve) => {
+        const ws = new WebSocket(
+          `ws://127.0.0.1:3000/api/live-voice?ticket=${cswshTicket}`,
+          {
+            headers: {
+              Origin: "https://malicious-attacker-domain.com",
+            },
+          }
+        );
+        const timer = setTimeout(() => {
+          ws.close();
+          resolve(false);
+        }, 3000);
+
+        ws.on("open", () => {
+          clearTimeout(timer);
+          ws.close();
+          resolve(false); // Should NOT connect with untrusted origin!
+        });
+
+        ws.on("unexpected-response", (req, res) => {
+          clearTimeout(timer);
+          resolve(res.statusCode === 403);
+        });
+
+        ws.on("error", () => {
+          clearTimeout(timer);
+          resolve(true);
+        });
+      });
+    }
+
+    results.push({
+      name: "TEST 24: CSWSH Protection rejects untrusted WebSocket Origin (403)",
+      passed: rejectedUntrustedOrigin,
+      details: `Untrusted Origin rejected with 403: ${rejectedUntrustedOrigin}`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 24: CSWSH Protection rejects untrusted WebSocket Origin (403)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
+  // TEST 25: Protected AI Diagnostics Endpoint Authentication & Info Leak Prevention
+  try {
+    // Unauthenticated call must fail with 401
+    const unauthDiag = await fetch(`${baseUrl}/api/ai/diagnostics`);
+    const unauthData = await unauthDiag.json();
+
+    // Authenticated call must succeed with 200
+    const authDiag = await fetch(`${baseUrl}/api/ai/diagnostics`, {
+      headers: {
+        Authorization: `Bearer ${validToken}`,
+      },
+    });
+    const authData = await authDiag.json();
+
+    const passed =
+      unauthDiag.status === 401 &&
+      unauthData.code === "UNAUTHENTICATED" &&
+      authDiag.status === 200 &&
+      authData.configured === true;
+
+    results.push({
+      name: "TEST 25: AI Diagnostics requires auth (401 unauth, 200 auth)",
+      passed,
+      details: `unauthStatus=${unauthDiag.status} (${unauthData.code}), authStatus=${authDiag.status} (configured=${authData.configured})`,
+    });
+  } catch (err: any) {
+    results.push({
+      name: "TEST 25: AI Diagnostics requires auth (401 unauth, 200 auth)",
+      passed: false,
+      details: err.message,
+    });
+  }
+
   // Summary
   console.log("\n--- TEST RESULTS SUMMARY ---");
   let allPassed = true;

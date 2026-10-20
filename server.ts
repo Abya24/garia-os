@@ -33,6 +33,9 @@ async function startServer() {
 
   // Production Security Headers Middleware
   app.use((req, res, next) => {
+    const nonce = crypto.randomBytes(16).toString("base64");
+    res.locals.cspNonce = nonce;
+
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
@@ -41,9 +44,9 @@ async function startServer() {
       "Permissions-Policy",
       "camera=(), geolocation=(self), microphone=(self), payment=(), usb=()"
     );
-    const csp = [
+    const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://apis.google.com https://*.firebaseapp.com",
+      `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' https://apis.google.com https://*.firebaseapp.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com",
@@ -53,8 +56,28 @@ async function startServer() {
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
-    ].join("; ");
-    res.setHeader("Content-Security-Policy", csp);
+    ];
+    const csp = cspDirectives.join("; ");
+    if (process.env.CSP_REPORT_ONLY === "true") {
+      res.setHeader("Content-Security-Policy-Report-Only", csp);
+    } else {
+      res.setHeader("Content-Security-Policy", csp);
+    }
+    next();
+  });
+
+  // Global 30-Second API Timeout Middleware to prevent socket hanging
+  app.use("/api", (req, res, next) => {
+    const apiTimeout = setTimeout(() => {
+      if (!res.headersSent && !res.destroyed) {
+        res.status(504).json({
+          error: "Gateway Timeout: API request exceeded 30 seconds limit.",
+          code: "REQUEST_TIMEOUT",
+        });
+      }
+    }, 30000);
+    res.on("finish", () => clearTimeout(apiTimeout));
+    res.on("close", () => clearTimeout(apiTimeout));
     next();
   });
 
@@ -1188,11 +1211,64 @@ ${examContext ? `- Target Exam: "${safeExamName}", ${safeDaysRemaining} days rem
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
+  function isTrustedWebSocketOrigin(origin: string | undefined, host?: string): boolean {
+    if (!origin) return true; // Allow native/embedded clients without origin header
+    try {
+      const originUrl = new URL(origin);
+      const originHost = originUrl.host.toLowerCase();
+      const targetHost = (host || "").toLowerCase();
+
+      // 1. Same-origin match
+      if (targetHost && originHost === targetHost) return true;
+
+      // 2. Local development hosts
+      if (
+        originHost.startsWith("localhost") ||
+        originHost.startsWith("127.0.0.1") ||
+        originHost.startsWith("0.0.0.0")
+      ) {
+        return true;
+      }
+
+      // 3. Configured APP_URL
+      if (process.env.APP_URL) {
+        try {
+          const appUrl = new URL(process.env.APP_URL);
+          if (originHost === appUrl.host.toLowerCase()) return true;
+        } catch {}
+      }
+
+      // 4. Trusted Cloud Run & Google AI Studio domains
+      if (
+        originHost.endsWith(".run.app") ||
+        originHost.endsWith(".ai.studio") ||
+        originHost.endsWith(".google.com")
+      ) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   server.on("upgrade", (request, socket, head) => {
     try {
       const url = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
       const pathname = url.pathname;
       if (pathname === "/api/live-voice" || pathname === "/api/live" || pathname === "/live") {
+        // Cross-Site WebSocket Hijacking (CSWSH) protection: check Origin header
+        const origin = request.headers.origin;
+        const host = request.headers.host;
+        if (origin && !isTrustedWebSocketOrigin(origin, host)) {
+          socket.write(
+            "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nUntrusted WebSocket origin.\r\n"
+          );
+          socket.destroy();
+          return;
+        }
+
         const ticket = url.searchParams.get("ticket");
         if (!ticket) {
           socket.write(

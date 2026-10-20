@@ -1,6 +1,8 @@
 import type { Note, NoteColorLabel, NoteTemplate, NoteVersion } from "../types.ts";
 
-export const ENCRYPTED_NOTE_PREFIX = "ENCv1:";
+export const ENCRYPTED_NOTE_PREFIX = "ENCv2:";
+export const ENCRYPTED_NOTE_PREFIX_V2 = "ENCv2:";
+export const ENCRYPTED_NOTE_PREFIX_V1 = "ENCv1:";
 export const NOTE_TEMPLATES_STORAGE_KEY = "garia_custom_note_templates_v1";
 export const NOTE_LABEL_COLORS_STORAGE_KEY = "garia_custom_note_label_colors_v1";
 
@@ -925,9 +927,9 @@ export function exportNoteAsPdfFile(
 }
 
 /**
- * Generates a 32-bit FNV-1a hash with round mixing for key derivation and authentication.
+ * Legacy 32-bit FNV-1a key derivation kept strictly for backward-compatible decryption of ENCv1 notes.
  */
-function deriveKeyBytes(password: string, salt: string, length: number): number[] {
+function deriveKeyBytesLegacy(password: string, salt: string, length: number): number[] {
   const seedInput = `${salt}::garia_note_kdf_v1::${password}`;
   let h1 = 0x811c9dc5;
   let h2 = 0x9e3779b9;
@@ -952,8 +954,8 @@ function deriveKeyBytes(password: string, salt: string, length: number): number[
   return stream;
 }
 
-function computeVerifierTag(password: string, salt: string, plainBytes: Uint8Array): string {
-  const keyTag = deriveKeyBytes(password, `${salt}::mac`, 16);
+function computeVerifierTagLegacy(password: string, salt: string, plainBytes: Uint8Array): string {
+  const keyTag = deriveKeyBytesLegacy(password, `${salt}::mac`, 16);
   let acc1 = 0x811c9dc5;
   let acc2 = 0x1b873593;
   for (let i = 0; i < plainBytes.length; i++) {
@@ -986,9 +988,36 @@ function hexToBytes(hex: string): Uint8Array | null {
 }
 
 /**
- * Encrypts note plaintext client-side using a user password before saving to state.
+ * Derives a 256-bit AES-GCM key from password and random salt using PBKDF2-HMAC-SHA-256 (100,000 rounds).
  */
-export function encryptNoteContent(
+async function deriveAesGcmKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+/**
+ * Legacy ENCv1 encryption (kept strictly for generating v1 test fixtures or backward-compatibility verification).
+ */
+export function encryptNoteContentLegacyV1(
   plaintext: string,
   password: string,
   customSalt?: string
@@ -999,32 +1028,29 @@ export function encryptNoteContent(
     Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const encoder = new TextEncoder();
   const plainBytes = encoder.encode(plaintext ?? "");
-  const keyStream = deriveKeyBytes(password, salt, plainBytes.length);
+  const keyStream = deriveKeyBytesLegacy(password, salt, plainBytes.length);
   const cipherBytes = new Uint8Array(plainBytes.length);
 
   for (let i = 0; i < plainBytes.length; i++) {
     cipherBytes[i] = plainBytes[i] ^ keyStream[i];
   }
 
-  const verifier = computeVerifierTag(password, salt, plainBytes);
+  const verifier = computeVerifierTagLegacy(password, salt, plainBytes);
   const cipherHex = bytesToHex(cipherBytes);
-  return `${ENCRYPTED_NOTE_PREFIX}${salt}:${verifier}:${cipherHex}`;
+  return `${ENCRYPTED_NOTE_PREFIX_V1}${salt}:${verifier}:${cipherHex}`;
 }
 
 /**
- * Decrypts client-side encrypted note content with the user's password.
- * Returns the original plaintext if the password is valid, or `null` if the password is incorrect.
+ * Legacy ENCv1 decryption helper.
  */
-export function decryptNoteContent(
+export function decryptNoteContentLegacyV1(
   encryptedPayload: string,
   password: string
 ): string | null {
   if (!encryptedPayload || !password) return null;
-  if (!encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX)) {
-    return encryptedPayload;
-  }
+  if (!encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V1)) return null;
 
-  const rawBody = encryptedPayload.slice(ENCRYPTED_NOTE_PREFIX.length);
+  const rawBody = encryptedPayload.slice(ENCRYPTED_NOTE_PREFIX_V1.length);
   const parts = rawBody.split(":");
   if (parts.length !== 3) return null;
 
@@ -1032,14 +1058,14 @@ export function decryptNoteContent(
   const cipherBytes = hexToBytes(cipherHex);
   if (!cipherBytes) return null;
 
-  const keyStream = deriveKeyBytes(password, salt, cipherBytes.length);
+  const keyStream = deriveKeyBytesLegacy(password, salt, cipherBytes.length);
   const plainBytes = new Uint8Array(cipherBytes.length);
 
   for (let i = 0; i < cipherBytes.length; i++) {
     plainBytes[i] = cipherBytes[i] ^ keyStream[i];
   }
 
-  const actualVerifier = computeVerifierTag(password, salt, plainBytes);
+  const actualVerifier = computeVerifierTagLegacy(password, salt, plainBytes);
   if (actualVerifier !== expectedVerifier) {
     return null;
   }
@@ -1049,15 +1075,139 @@ export function decryptNoteContent(
 }
 
 /**
+ * Encrypts note plaintext client-side using standard Web Crypto AES-256-GCM and PBKDF2 key derivation.
+ * Output format: ENCv2:<salt_hex>:<iv_hex>:<ciphertext_and_tag_hex>
+ */
+export async function encryptNoteContent(
+  plaintext: string,
+  password: string,
+  options?: { version?: "v1" | "v2" }
+): Promise<string> {
+  if (!password) return plaintext;
+
+  if (options?.version === "v1") {
+    return encryptNoteContentLegacyV1(plaintext, password);
+  }
+
+  const encoder = new TextEncoder();
+  const plainBytes = encoder.encode(plaintext ?? "");
+
+  // Generate unique cryptographically secure IVs and salts
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+
+  const iv = new Uint8Array(12);
+  crypto.getRandomValues(iv);
+
+  const key = await deriveAesGcmKey(password, salt);
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, tagLength: 128 },
+    key,
+    plainBytes
+  );
+
+  const cipherBytes = new Uint8Array(cipherBuffer);
+  return `${ENCRYPTED_NOTE_PREFIX_V2}${bytesToHex(salt)}:${bytesToHex(iv)}:${bytesToHex(cipherBytes)}`;
+}
+
+/**
+ * Decrypts client-side encrypted note content with the user's password.
+ * Supports both modern ENCv2 (AES-GCM) and legacy ENCv1 (with safe migration).
+ * Returns the original plaintext if the password is valid, or `null` if the password is incorrect or ciphertext is tampered.
+ */
+export async function decryptNoteContent(
+  encryptedPayload: string,
+  password: string
+): Promise<string | null> {
+  if (!encryptedPayload || !password) return null;
+  if (
+    !encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V2) &&
+    !encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V1)
+  ) {
+    return encryptedPayload;
+  }
+
+  // Version 2: Web Crypto AES-256-GCM with PBKDF2
+  if (encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V2)) {
+    try {
+      const rawBody = encryptedPayload.slice(ENCRYPTED_NOTE_PREFIX_V2.length);
+      const parts = rawBody.split(":");
+      if (parts.length !== 3) return null;
+
+      const [saltHex, ivHex, cipherHex] = parts;
+      const salt = hexToBytes(saltHex);
+      const iv = hexToBytes(ivHex);
+      const cipherBytes = hexToBytes(cipherHex);
+
+      if (!salt || !iv || !cipherBytes || salt.length !== 16 || iv.length !== 12 || cipherBytes.length < 16) {
+        return null;
+      }
+
+      const key = await deriveAesGcmKey(password, salt);
+      const decryptedBuf = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv, tagLength: 128 },
+        key,
+        cipherBytes
+      );
+
+      const decoder = new TextDecoder();
+      return decoder.decode(decryptedBuf);
+    } catch {
+      // OperationError from tag mismatch or incorrect password
+      return null;
+    }
+  }
+
+  // Version 1: Legacy XOR & FNV-1a verifier fallback (safe backward compatibility)
+  if (encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V1)) {
+    return decryptNoteContentLegacyV1(encryptedPayload, password);
+  }
+
+  return null;
+}
+
+/**
+ * Safe migration helper: upgrades legacy ENCv1 encrypted note to modern ENCv2 AES-GCM format.
+ * Never overwrites or destroys existing notes if password verification or migration fails.
+ */
+export async function migrateNoteEncryption(
+  encryptedPayload: string,
+  password: string
+): Promise<{ success: boolean; migratedPayload?: string; error?: string }> {
+  if (!encryptedPayload) return { success: false, error: "Empty payload." };
+  if (encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V2)) {
+    return { success: true, migratedPayload: encryptedPayload };
+  }
+  if (!encryptedPayload.startsWith(ENCRYPTED_NOTE_PREFIX_V1)) {
+    return { success: false, error: "Not an encrypted note payload." };
+  }
+
+  const decrypted = await decryptNoteContent(encryptedPayload, password);
+  if (decrypted === null) {
+    return { success: false, error: "Incorrect password for legacy note decryption." };
+  }
+
+  try {
+    const migratedPayload = await encryptNoteContent(decrypted, password);
+    return { success: true, migratedPayload };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Encryption failed during migration." };
+  }
+}
+
+/**
  * Checks whether a note object is password-protected / encrypted.
  */
 export function isNoteEncrypted(note: Partial<Note> | null | undefined): boolean {
   if (!note) return false;
   return (
     Boolean(note.isEncrypted) ||
-    (typeof note.content === "string" && note.content.startsWith(ENCRYPTED_NOTE_PREFIX)) ||
+    (typeof note.content === "string" &&
+      (note.content.startsWith(ENCRYPTED_NOTE_PREFIX_V2) ||
+        note.content.startsWith(ENCRYPTED_NOTE_PREFIX_V1))) ||
     (typeof note.encryptedContent === "string" &&
-      note.encryptedContent.startsWith(ENCRYPTED_NOTE_PREFIX))
+      (note.encryptedContent.startsWith(ENCRYPTED_NOTE_PREFIX_V2) ||
+        note.encryptedContent.startsWith(ENCRYPTED_NOTE_PREFIX_V1)))
   );
 }
 

@@ -27,16 +27,28 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+const GARIA_CACHE_PREFIX = "garia-os-";
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          // Strictly delete ONLY obsolete caches owned by Garia OS.
+          // Never delete unrelated origin caches or shared hosting apps.
+          if (
+            typeof cacheName === "string" &&
+            cacheName.startsWith(GARIA_CACHE_PREFIX) &&
+            cacheName !== CACHE_NAME
+          ) {
+            console.log(`[ServiceWorker] Removing obsolete Garia OS cache: ${cacheName}`);
             return caches.delete(cacheName);
           }
+          return Promise.resolve(false);
         })
       );
+    }).catch((err) => {
+      console.warn("[ServiceWorker] Cache activation cleanup error:", err);
     })
   );
   self.clients.claim();
@@ -78,9 +90,16 @@ self.addEventListener("fetch", (event) => {
             });
           }
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseToCache).catch((err) => {
+                console.warn("[ServiceWorker] cache.put skipped or failed:", err);
+              });
+            })
+            .catch((err) => {
+              console.warn("[ServiceWorker] caches.open failed:", err);
+            });
         }
         return networkResponse;
       })

@@ -589,14 +589,14 @@ describe("Garia OS Production Audit Regression Suite", () => {
       board: "CBSE",
     });
 
-    // 1. Client-side encryption & decryption
+    // 1. Client-side encryption & decryption (Web Crypto AES-256-GCM)
     const sensitivePlaintext = "My confidential exam scholarship credentials: 9482-ABCD";
-    const encryptedPayload = encryptNoteContent(sensitivePlaintext, "MyStrongPass123!");
+    const encryptedPayload = await encryptNoteContent(sensitivePlaintext, "MyStrongPass123!");
 
-    expect(encryptedPayload.startsWith("ENCv1:")).toBe(true);
+    expect(encryptedPayload.startsWith("ENCv2:") || encryptedPayload.startsWith("ENCv1:")).toBe(true);
     expect(encryptedPayload.includes(sensitivePlaintext)).toBe(false);
-    expect(decryptNoteContent(encryptedPayload, "WrongPassword")).toBe(null);
-    expect(decryptNoteContent(encryptedPayload, "MyStrongPass123!")).toBe(
+    expect(await decryptNoteContent(encryptedPayload, "WrongPassword")).toBe(null);
+    expect(await decryptNoteContent(encryptedPayload, "MyStrongPass123!")).toBe(
       sensitivePlaintext
     );
 
@@ -4856,6 +4856,102 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(AI_MODELS.LIVE_VOICE).toBe("gemini-3.8-live");
     expect(MODEL_REGISTRY["gemini-3.8-flash"].isStable).toBe(true);
     expect(MODEL_REGISTRY["gemini-3.1-pro-preview"].isStable).toBe(false);
+  });
+
+  it("34. Cryptography & Password Hardening: verifies Web Crypto AES-GCM note encryption, tamper rejection, legacy migration, and PBKDF2 password hashing", async () => {
+    const {
+      encryptNoteContent,
+      decryptNoteContent,
+      migrateNoteEncryption,
+      encryptNoteContentLegacyV1,
+      decryptNoteContentLegacyV1,
+    } = await import("../noteFeatures");
+    const { hashPassword, verifyPassword } = await import("../auth");
+
+    // --- 1. Note Encryption Web Crypto AES-GCM (ENCv2) ---
+    const secretContent = "Top-secret scholarship formula: E = mc^2 + delta";
+    const notePass = "ComplexSecretPass#2026";
+    const v2Encrypted = await encryptNoteContent(secretContent, notePass);
+
+    expect(v2Encrypted.startsWith("ENCv2:")).toBe(true);
+    const parts = v2Encrypted.slice("ENCv2:".length).split(":");
+    expect(parts.length).toBe(3);
+    const [saltHex, ivHex, cipherHex] = parts;
+    expect(saltHex.length).toBe(32); // 16 bytes = 32 hex chars
+    expect(ivHex.length).toBe(24);   // 12 bytes = 24 hex chars
+    expect(cipherHex.length > 32).toBe(true); // ciphertext + 16-byte auth tag
+
+    // Decrypt with correct password
+    const decryptedV2 = await decryptNoteContent(v2Encrypted, notePass);
+    expect(decryptedV2).toBe(secretContent);
+
+    // Decrypt with wrong password -> null
+    const wrongPassDecrypted = await decryptNoteContent(v2Encrypted, "WrongPassword#999");
+    expect(wrongPassDecrypted).toBe(null);
+
+    // Tampered ciphertext (modify 1 character of ciphertext) -> null (AES-GCM auth tag verification failure)
+    const tamperedHex = cipherHex.slice(0, 10) + (cipherHex[10] === "a" ? "b" : "a") + cipherHex.slice(11);
+    const tamperedPayload = `ENCv2:${saltHex}:${ivHex}:${tamperedHex}`;
+    const tamperedDecrypted = await decryptNoteContent(tamperedPayload, notePass);
+    expect(tamperedDecrypted).toBe(null);
+
+    // --- 2. Legacy ENCv1 Backward Compatibility & Safe Migration ---
+    const legacyPlaintext = "Legacy Class 11 notes from session 2024-25";
+    const legacyPass = "StudentOldPass123";
+    const legacyEncrypted = encryptNoteContentLegacyV1(legacyPlaintext, legacyPass);
+    expect(legacyEncrypted.startsWith("ENCv1:")).toBe(true);
+
+    // Verify legacy decryption works seamlessly
+    const decryptedLegacy = await decryptNoteContent(legacyEncrypted, legacyPass);
+    expect(decryptedLegacy).toBe(legacyPlaintext);
+    const wrongLegacyDecrypted = await decryptNoteContent(legacyEncrypted, "WrongLegacyPass");
+    expect(wrongLegacyDecrypted).toBe(null);
+
+    // Safe migration from ENCv1 to ENCv2
+    const migrationResult = await migrateNoteEncryption(legacyEncrypted, legacyPass);
+    expect(migrationResult.success).toBe(true);
+    expect(migrationResult.migratedPayload).toBeDefined();
+    expect(migrationResult.migratedPayload!.startsWith("ENCv2:")).toBe(true);
+
+    // Verify migrated note decrypts with modern AES-GCM
+    const decryptedMigrated = await decryptNoteContent(migrationResult.migratedPayload!, legacyPass);
+    expect(decryptedMigrated).toBe(legacyPlaintext);
+
+    // Safe migration failure handling (wrong password does not crash or corrupt note)
+    const failedMigration = await migrateNoteEncryption(legacyEncrypted, "WrongPassForMigration");
+    expect(failedMigration.success).toBe(false);
+    expect(failedMigration.error).toBeDefined();
+
+    // --- 3. Password Security: PBKDF2-HMAC-SHA-256 (pwd_v2$) & Legacy Migration ---
+    const userPass = "GariaStudent#Vault2026!";
+    const newHash1 = await hashPassword(userPass);
+    const newHash2 = await hashPassword(userPass);
+
+    expect(newHash1.startsWith("pwd_v2$")).toBe(true);
+    expect(newHash2.startsWith("pwd_v2$")).toBe(true);
+    // Different salts ensure hashes are unique
+    expect(newHash1 !== newHash2).toBe(true);
+
+    // verifyPassword validates against both independent hashes
+    expect(await verifyPassword(userPass, newHash1)).toBe(true);
+    expect(await verifyPassword(userPass, newHash2)).toBe(true);
+    expect(await verifyPassword("IncorrectPassword#000", newHash1)).toBe(false);
+
+    // Legacy fixed-salt hash backward compatibility
+    const encoder = new TextEncoder();
+    const data = encoder.encode("LegacyUserPass_garia_os_v2_salt");
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const legacyHashHex = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    expect(await verifyPassword("LegacyUserPass", legacyHashHex)).toBe(true);
+    expect(await verifyPassword("WrongLegacyUserPass", legacyHashHex)).toBe(false);
+
+    // Fail closed on invalid inputs
+    expect(await verifyPassword("", newHash1)).toBe(false);
+    expect(await verifyPassword(userPass, "")).toBe(false);
+    expect(await verifyPassword(userPass, "malformed$hash")).toBe(false);
   });
 });
 
