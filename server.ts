@@ -25,8 +25,10 @@ process.on("uncaughtException", (err) => {
 });
 
 async function startServer() {
+  const portArgIndex = process.argv.indexOf("--port");
+  const cliPort = portArgIndex !== -1 ? Number(process.argv[portArgIndex + 1]) : NaN;
+  const PORT = !isNaN(cliPort) && cliPort > 0 ? cliPort : (process.env.PORT ? Number(process.env.PORT) : 3000);
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
 
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
