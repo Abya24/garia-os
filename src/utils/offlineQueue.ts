@@ -88,6 +88,7 @@ export interface OfflineQueueState {
   lastReconciliationStatus: "idle" | "syncing" | "success" | "partial" | "failed";
   lastError?: string;
   isOnline: boolean;
+  storageQuotaWarning?: boolean;
 }
 
 export const OFFLINE_QUEUE_KEY = "garia_offline_pending_queue_v1";
@@ -99,6 +100,102 @@ const listeners: Set<QueueListener> = new Set();
 
 let isReconcilingInProgress = false;
 let autoRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const IDB_QUEUE_DB_NAME = "garia_offline_db_v1";
+export const IDB_QUEUE_STORE_NAME = "pending_queue";
+
+function getIndexedDb(): IDBFactory | undefined {
+  if (typeof window !== "undefined" && window.indexedDB) {
+    return window.indexedDB;
+  }
+  if (typeof indexedDB !== "undefined") {
+    return indexedDB;
+  }
+  return undefined;
+}
+
+export function openQueueDatabase(): Promise<IDBDatabase | null> {
+  const idb = getIndexedDb();
+  if (!idb) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    try {
+      const request = idb.open(IDB_QUEUE_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(IDB_QUEUE_STORE_NAME)) {
+          db.createObjectStore(IDB_QUEUE_STORE_NAME, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        console.warn("[OfflineQueue] Failed to open IndexedDB", request.error);
+        resolve(null);
+      };
+      request.onblocked = () => {
+        console.warn("[OfflineQueue] IndexedDB open blocked");
+        resolve(null);
+      };
+    } catch (e) {
+      console.warn("[OfflineQueue] Error accessing IndexedDB", e);
+      resolve(null);
+    }
+  });
+}
+
+export async function saveQueueToIndexedDb(queue: PendingOfflineAction[]): Promise<boolean> {
+  const db = await openQueueDatabase();
+  if (!db) return false;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_QUEUE_STORE_NAME, "readwrite");
+      const store = tx.objectStore(IDB_QUEUE_STORE_NAME);
+      store.clear();
+      for (const action of queue) {
+        store.put(action);
+      }
+      tx.oncomplete = () => {
+        db.close();
+        resolve(true);
+      };
+      tx.onerror = () => {
+        console.warn("[OfflineQueue] IndexedDB transaction error", tx.error);
+        db.close();
+        resolve(false);
+      };
+    } catch (e) {
+      console.warn("[OfflineQueue] Failed to save queue to IndexedDB", e);
+      db.close();
+      resolve(false);
+    }
+  });
+}
+
+export async function loadQueueFromIndexedDb(): Promise<PendingOfflineAction[] | null> {
+  const db = await openQueueDatabase();
+  if (!db) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_QUEUE_STORE_NAME, "readonly");
+      const store = tx.objectStore(IDB_QUEUE_STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        db.close();
+        const results = req.result as PendingOfflineAction[];
+        resolve(Array.isArray(results) ? results.sort((a, b) => a.timestamp - b.timestamp) : []);
+      };
+      req.onerror = () => {
+        db.close();
+        resolve(null);
+      };
+    } catch {
+      db.close();
+      resolve(null);
+    }
+  });
+}
 
 function loadStoredQueue(): PendingOfflineAction[] {
   if (typeof localStorage === "undefined") return [];
@@ -112,36 +209,42 @@ function loadStoredQueue(): PendingOfflineAction[] {
 }
 
 function saveStoredQueue(queue: PendingOfflineAction[]): void {
+  // Always asynchronously persist untruncated queue to IndexedDB
+  saveQueueToIndexedDb(queue).catch((err) => {
+    console.warn("[OfflineQueue] IndexedDB backup notice:", err);
+  });
+
   if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
-  } catch (e) {
-    console.warn("[OfflineQueue] Quota pressure while saving pending queue; attempting recovery...", e);
-    try {
-      // 1. Evict non-essential or oldest failed snapshot entries first
-      const compacted = queue
-        .filter((item) => item.retryCount < MAX_OFFLINE_RETRY_COUNT)
-        .slice(-50)
-        .map((item) => {
-          if (item.payload && typeof item.payload === "object") {
-            const nextPayload = { ...item.payload };
-            if (Array.isArray(nextPayload.versions)) {
-              nextPayload.versions = [];
-            }
-            if (typeof nextPayload.content === "string" && nextPayload.content.length > 10000) {
-              nextPayload.content = nextPayload.content.slice(0, 10000);
-            }
-            return {
-              ...item,
-              payload: nextPayload,
-            };
-          }
-          return item;
-        });
-      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(compacted));
-    } catch (retryErr) {
-      console.error("[OfflineQueue] Error saving pending queue to localStorage after recovery attempt", retryErr);
+    if (currentState.storageQuotaWarning) {
+      currentState = { ...currentState, storageQuotaWarning: false };
+      notifyListeners();
     }
+  } catch (e: any) {
+    const isQuota =
+      e &&
+      (e.name === "QuotaExceededError" ||
+        e.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        e.code === 22 ||
+        e.code === 1014);
+
+    console.warn(
+      `[OfflineQueue] Local storage write notice (${isQuota ? "QuotaExceededError" : "StorageError"}). Pending queue operations are preserved in-memory and persistent database. Original user content and versions are NEVER truncated or deleted.`,
+      e
+    );
+
+    // CRITICAL RELIABILITY:
+    // Never discard, truncate, or mutate pending user-data operations without explicit user consent.
+    // Preserve original payloads, versions, and action order in memory and persistent storage.
+    currentState = {
+      ...currentState,
+      storageQuotaWarning: true,
+      lastError: isQuota
+        ? "Storage quota exhausted in browser local storage. Pending operations safely preserved in memory and persistent database."
+        : "Storage error while persisting offline queue.",
+    };
+    notifyListeners();
   }
 }
 
@@ -433,6 +536,66 @@ export function reloadOfflineQueueFromStorage(): PendingOfflineAction[] {
   return [...stored];
 }
 
+/**
+ * Hydrates pending queue from IndexedDB persistent storage, ensuring no data loss across reloads.
+ */
+export async function hydrateQueueFromPersistentStorage(): Promise<PendingOfflineAction[]> {
+  try {
+    const idbQueue = await loadQueueFromIndexedDb();
+    if (idbQueue && idbQueue.length > 0) {
+      const mergedMap = new Map<string, PendingOfflineAction>();
+      for (const act of idbQueue) {
+        mergedMap.set(act.id, act);
+      }
+      for (const act of currentState.pendingActions) {
+        mergedMap.set(act.id, act);
+      }
+      const fullQueue = Array.from(mergedMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+      currentState = {
+        ...currentState,
+        pendingActions: fullQueue,
+        pendingCount: fullQueue.length,
+        syncProgress: {
+          ...currentState.syncProgress,
+          total: fullQueue.length,
+        },
+      };
+      notifyListeners();
+      return fullQueue;
+    }
+  } catch (e) {
+    console.warn("[OfflineQueue] Error hydrating queue from persistent storage:", e);
+  }
+  return getPendingQueue();
+}
+
+/**
+ * Recovers and retries all failed actions in the offline queue without dropping user data.
+ */
+export function retryFailedActions(): void {
+  const updated = currentState.pendingActions.map((a) => {
+    if (a.status === "failed") {
+      return {
+        ...a,
+        status: "pending" as const,
+        lastError: undefined,
+      };
+    }
+    return a;
+  });
+  saveStoredQueue(updated);
+  currentState = {
+    ...currentState,
+    pendingActions: updated,
+    pendingCount: updated.length,
+    lastError: undefined,
+  };
+  notifyListeners();
+  if (typeof navigator !== "undefined" && navigator.onLine) {
+    reconcilePendingQueueWithFirestore().catch(() => {});
+  }
+}
+
 let customTestPersistExecutor:
   | ((userId: string, action: PendingOfflineAction) => Promise<void>)
   | null = null;
@@ -679,10 +842,12 @@ export async function reconcilePendingQueueWithFirestore(
         persistedIds.add(action.id);
       } else {
         lastErrorMsg = actionErr;
-        if (isPermanentFailure || (action.retryCount || 0) + 1 >= MAX_OFFLINE_RETRY_COUNT) {
-          // Drop permanently unrecoverable action so it cannot block the queue indefinitely
+        if (isPermanentFailure) {
+          // Drop permanently unrecoverable action ONLY when the entity is completely unsupported
           persistedIds.add(action.id);
         } else {
+          // Never discard, truncate, or mutate pending user-data operations without explicit user consent.
+          // Preserve action in queue marked as failed with exact error for user retry.
           failedActionErrors.set(action.id, actionErr || "Persistence failed");
         }
       }

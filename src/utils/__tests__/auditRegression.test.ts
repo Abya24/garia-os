@@ -95,6 +95,35 @@ function expect(actual: any) {
     toBeDefined() {
       assert.notStrictEqual(actual, undefined);
     },
+    toBeNull() {
+      assert.strictEqual(actual, null);
+    },
+    toEqual(expected: any) {
+      assert.deepStrictEqual(actual, expected);
+    },
+    toContain(expected: any) {
+      if (typeof actual === "string") {
+        assert.ok(actual.includes(expected), `Expected "${actual}" to contain "${expected}"`);
+      } else if (Array.isArray(actual)) {
+        assert.ok(actual.includes(expected), `Expected array to contain item`);
+      } else {
+        assert.ok(false, `toContain not supported for ${typeof actual}`);
+      }
+    },
+    toBeGreaterThanOrEqual(expected: number) {
+      assert.ok(actual >= expected, `Expected ${actual} >= ${expected}`);
+    },
+    not: {
+      toBeNull() {
+        assert.notStrictEqual(actual, null);
+      },
+      toBe(expected: any) {
+        assert.notStrictEqual(actual, expected);
+      },
+      toBeDefined() {
+        assert.strictEqual(actual, undefined);
+      },
+    },
   };
 }
 
@@ -1738,12 +1767,15 @@ describe("Garia OS Production Audit Regression Suite", () => {
         },
       });
       expect(quotaThrownOnce).toBe(true);
-      const savedRawAfterQuota = localStorage.getItem(OFFLINE_QUEUE_STORAGE_KEY);
-      const savedParsedAfterQuota = JSON.parse(savedRawAfterQuota || "[]");
-      const compactedNote = savedParsedAfterQuota.find((q: any) => q.payload?.id === "note-large");
-      expect(Boolean(compactedNote)).toBe(true);
-      expect(Array.isArray(compactedNote?.payload.versions)).toBe(true);
-      expect(compactedNote?.payload.versions.length).toBe(0);
+      const pendingQueue = getPendingQueue();
+      const preservedNote = pendingQueue.find((q: any) => q.payload?.id === "note-large");
+      expect(Boolean(preservedNote)).toBe(true);
+      expect(Array.isArray(preservedNote?.payload.versions)).toBe(true);
+      // RELIABILITY VERIFICATION: user versions and content are NEVER truncated or deleted
+      expect(preservedNote?.payload.versions.length).toBe(1);
+      expect(preservedNote?.payload.content.length).toBe("Largebody".repeat(200).length);
+      const queueState = (await import("../offlineQueue")).getOfflineQueueState();
+      expect(queueState.storageQuotaWarning).toBe(true);
     } finally {
       localStorage.setItem = origSetItem;
       setSimulatedOnlineStateForTesting(null);
@@ -1835,6 +1867,8 @@ describe("Garia OS Production Audit Regression Suite", () => {
 
     // 1. Install & Activate lifecycle + stale cache cleanup
     cacheStore.set("garia-os-old-stale-cache-v1", new Map());
+    cacheStore.set("shared-origin-other-app-v1", new Map());
+    cacheStore.set("firebase-heartbeat", new Map());
     let installPromise: Promise<any> = Promise.resolve();
     listeners.install({
       waitUntil: (p: Promise<any>) => {
@@ -1851,8 +1885,13 @@ describe("Garia OS Production Audit Regression Suite", () => {
       },
     });
     await activatePromise;
+    // Obsolete Garia OS cache deleted
     expect(cacheStore.has("garia-os-old-stale-cache-v1")).toBe(false);
+    // Current Garia OS cache preserved
     expect(cacheStore.has("garia-os-v3.2.0-cache-v4")).toBe(true);
+    // Unrelated origin caches strictly preserved
+    expect(cacheStore.has("shared-origin-other-app-v1")).toBe(true);
+    expect(cacheStore.has("firebase-heartbeat")).toBe(true);
 
     // Helper to dispatch fetch event to sw.js
     const dispatchSwFetch = async (url: string, method = "GET", mode = "cors") => {
@@ -4952,6 +4991,224 @@ describe("Garia OS Production Audit Regression Suite", () => {
     expect(await verifyPassword("", newHash1)).toBe(false);
     expect(await verifyPassword(userPass, "")).toBe(false);
     expect(await verifyPassword(userPass, "malformed$hash")).toBe(false);
+  });
+
+  it("35. Reliability & Reliability Hardening: verifies offline queue data preservation, focus timer restoration, sw cache isolation & typed storage error recovery", async () => {
+    // --- 1. Focus Timer Restoration ---
+    const {
+      loadQuickFocusSessionState,
+      saveQuickFocusSessionState,
+      QUICK_FOCUS_SESSION_KEY,
+    } = await import("../../pages/FocusTimer");
+
+    // A. Normal restoration with elapsed time
+    const now = Date.now();
+    saveQuickFocusSessionState({
+      isRunning: true,
+      mode: "focus",
+      durationMinutes: 25,
+      remainingSeconds: 1500,
+      updatedAt: now - 300 * 1000, // 5 minutes ago
+    });
+    const restoredRunning = loadQuickFocusSessionState();
+    expect(restoredRunning).not.toBeNull();
+    expect(restoredRunning?.isRunning).toBe(true);
+    expect(restoredRunning?.remainingSeconds).toBe(1200);
+    expect(restoredRunning?.isExpired).toBe(false);
+
+    // B. Expired timer: elapsed time exceeds remaining seconds (Must NOT be forced to 1 second!)
+    saveQuickFocusSessionState({
+      isRunning: true,
+      mode: "focus",
+      durationMinutes: 25,
+      remainingSeconds: 60,
+      updatedAt: now - 120 * 1000, // 2 minutes ago (expired 1m ago)
+    });
+    const restoredExpired = loadQuickFocusSessionState();
+    expect(restoredExpired).not.toBeNull();
+    // RELIABILITY FIX: Expired session has remainingSeconds: 0 and isRunning: false (NEVER forced to 1s)
+    expect(restoredExpired?.remainingSeconds).toBe(0);
+    expect(restoredExpired?.isRunning).toBe(false);
+    expect(restoredExpired?.isExpired).toBe(true);
+
+    // C. Malformed and invalid session states return null safely
+    sessionStorage.setItem(QUICK_FOCUS_SESSION_KEY, "invalid-json{");
+    expect(loadQuickFocusSessionState()).toBeNull();
+
+    sessionStorage.setItem(
+      QUICK_FOCUS_SESSION_KEY,
+      JSON.stringify({ isRunning: true, durationMinutes: -5, remainingSeconds: -10 })
+    );
+    expect(loadQuickFocusSessionState()).toBeNull();
+
+    // Outdated session (> 24 hours) discarded safely
+    sessionStorage.setItem(
+      QUICK_FOCUS_SESSION_KEY,
+      JSON.stringify({
+        isRunning: false,
+        mode: "focus",
+        durationMinutes: 25,
+        remainingSeconds: 500,
+        updatedAt: now - 30 * 60 * 60 * 1000,
+      })
+    );
+    expect(loadQuickFocusSessionState()).toBeNull();
+
+    saveQuickFocusSessionState(null);
+    expect(loadQuickFocusSessionState()).toBeNull();
+
+    // --- 2. Storage Write Failures & Typed Storage Operation Result ---
+    const {
+      setItem,
+      setItemOrThrow,
+      getItem,
+      onStorageFailure,
+      saveTasks,
+      StorageError,
+    } = await import("../storage");
+
+    // A. Successful write returns typed success result
+    const successRes = setItem("test_valid_key", { test: 123 });
+    expect(successRes.success).toBe(true);
+    expect(successRes.key).toBe("test_valid_key");
+    expect(successRes.data).toEqual({ test: 123 });
+
+    // B. Quota exhaustion simulation returns typed QUOTA_EXCEEDED without deleting user data
+    const origSet = localStorage.setItem.bind(localStorage);
+    let capturedFailure: any = null;
+    const unsubFailure = onStorageFailure((res) => {
+      capturedFailure = res;
+    });
+
+    localStorage.setItem("garia_existing_user_doc", "important_user_value");
+    localStorage.setItem = () => {
+      const err = new Error("QuotaExceededError");
+      err.name = "QuotaExceededError";
+      throw err;
+    };
+
+    const quotaRes = setItem("test_quota_key", { large: "data" });
+    expect(quotaRes.success).toBe(false);
+    expect(quotaRes.error?.code).toBe("QUOTA_EXCEEDED");
+    expect(capturedFailure?.error?.code).toBe("QUOTA_EXCEEDED");
+    // Prove existing user data was preserved and NOT deleted during quota recovery
+    localStorage.setItem = origSet;
+    expect(localStorage.getItem("garia_existing_user_doc")).toBe("important_user_value");
+
+    // C. setItemOrThrow throws StorageError with exact code and key
+    let caughtStorageError: any = null;
+    localStorage.setItem = () => {
+      const err = new Error("QuotaExceededError");
+      err.name = "QuotaExceededError";
+      throw err;
+    };
+    try {
+      setItemOrThrow("test_throw_key", "val");
+    } catch (e) {
+      caughtStorageError = e;
+    }
+    localStorage.setItem = origSet;
+    expect(caughtStorageError instanceof StorageError).toBe(true);
+    expect(caughtStorageError?.code).toBe("QUOTA_EXCEEDED");
+    expect(caughtStorageError?.key).toBe("test_throw_key");
+
+    // D. Corrupted JSON recovery in getItem
+    localStorage.setItem("corrupted_test_key", "{\"broken\": json...");
+    const recovered = getItem("corrupted_test_key", { fallback: true });
+    expect(recovered).toEqual({ fallback: true });
+    // Preserves raw value without destructive wipe
+    expect(localStorage.getItem("corrupted_test_key")).toBe("{\"broken\": json...");
+
+    // E. Typed result on saveTasks
+    const taskRes = saveTasks([
+      {
+        id: "t1",
+        title: "Task 1",
+        completed: false,
+        priority: "high",
+        date: "2026-10-24",
+        category: "study",
+        createdAt: 1000,
+      },
+    ], "test_prof");
+    expect(taskRes.success).toBe(true);
+    expect(taskRes.key).toContain("test_prof");
+
+    unsubFailure();
+    localStorage.removeItem("test_valid_key");
+    localStorage.removeItem("garia_existing_user_doc");
+    localStorage.removeItem("corrupted_test_key");
+
+    // --- 3. Offline Queue Data Preservation & Recovery ---
+    const {
+      enqueueOfflineAction,
+      getPendingQueue,
+      clearPendingQueue,
+      retryFailedActions,
+      reconcilePendingQueueWithFirestore,
+      setOfflineSyncExecutorForTesting,
+      setSimulatedOnlineStateForTesting,
+    } = await import("../offlineQueue");
+
+    clearPendingQueue();
+
+    // Large note with full version history is preserved without truncation
+    const largeNotePayload = {
+      id: "note-huge-1",
+      title: "Comprehensive Research Note",
+      content: "DeepStudyContent-".repeat(1000), // > 15,000 characters
+      versions: [
+        { id: "v1", content: "InitialDraft-".repeat(500), timestamp: 1000 },
+        { id: "v2", content: "SecondDraft-".repeat(600), timestamp: 2000 },
+      ],
+    };
+
+    enqueueOfflineAction({
+      type: "CREATE_NOTE",
+      entityName: "notes",
+      action: "create",
+      profileId: "prof_X",
+      payload: largeNotePayload,
+    });
+
+    const queuedNote = getPendingQueue().find((a) => a.payload?.id === "note-huge-1");
+    expect(queuedNote).toBeDefined();
+    // Verify content length is NOT truncated to 10,000
+    expect(queuedNote?.payload.content.length).toBe("DeepStudyContent-".repeat(1000).length);
+    // Verify version history is 100% intact
+    expect(queuedNote?.payload.versions.length).toBe(2);
+
+    // Failed uploads are NOT deleted on failure; preserved with status 'failed'
+    setSimulatedOnlineStateForTesting(true);
+    setOfflineSyncExecutorForTesting(async () => {
+      throw new Error("503 Service Unavailable");
+    });
+
+    const failedSync = await reconcilePendingQueueWithFirestore("test_user_id", 1);
+    expect(failedSync.success).toBe(false);
+    expect(failedSync.remaining).toBe(1);
+
+    const failedQueued = getPendingQueue()[0];
+    expect(failedQueued.status).toBe("failed");
+    expect(failedQueued.retryCount).toBeGreaterThanOrEqual(1);
+    expect(failedQueued.lastError).toBe("503 Service Unavailable");
+
+    // retryFailedActions resets status to pending without data mutation
+    retryFailedActions();
+    expect(getPendingQueue()[0].status).toBe("pending");
+
+    // Successful flush once remote server confirms
+    setOfflineSyncExecutorForTesting(async () => {
+      // Remote server confirmed
+    });
+    const recoveredSync = await reconcilePendingQueueWithFirestore("test_user_id", 1);
+    expect(recoveredSync.success).toBe(true);
+    expect(recoveredSync.remaining).toBe(0);
+    expect(getPendingQueue().length).toBe(0);
+
+    setOfflineSyncExecutorForTesting(null);
+    setSimulatedOnlineStateForTesting(null);
+    clearPendingQueue();
   });
 });
 

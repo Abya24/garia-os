@@ -134,24 +134,95 @@ export const getProfileKey = (profileId: string, baseKey: string): string => {
   return `garia_p_${profileId}_${baseKey}`;
 };
 
+export type StorageErrorCode =
+  | "QUOTA_EXCEEDED"
+  | "STORAGE_UNAVAILABLE"
+  | "SERIALIZATION_FAILED"
+  | "CORRUPTED_VALUE"
+  | "WRITE_FAILED";
+
+export interface StorageOperationResult<T = unknown> {
+  success: boolean;
+  key: string;
+  data?: T;
+  error?: {
+    code: StorageErrorCode;
+    message: string;
+    originalError?: unknown;
+  };
+}
+
+export class StorageError extends Error {
+  code: StorageErrorCode;
+  key: string;
+  originalError?: unknown;
+
+  constructor(message: string, code: StorageErrorCode, key: string, originalError?: unknown) {
+    super(message);
+    this.name = "StorageError";
+    this.code = code;
+    this.key = key;
+    this.originalError = originalError;
+  }
+}
+
+export type StorageFailureListener = (result: StorageOperationResult) => void;
+const storageFailureListeners = new Set<StorageFailureListener>();
+
+export function onStorageFailure(listener: StorageFailureListener): () => void {
+  storageFailureListeners.add(listener);
+  return () => storageFailureListeners.delete(listener);
+}
+
+export function notifyStorageFailure(result: StorageOperationResult): void {
+  storageFailureListeners.forEach((fn) => {
+    try {
+      fn(result);
+    } catch (e) {
+      console.error("[Storage] Error in storage failure listener", e);
+    }
+  });
+}
+
 // Helper Storage Functions
-function getItem<T>(key: string, defaultValue: T): T {
+export function getItem<T>(key: string, defaultValue: T): T {
   try {
     if (typeof localStorage === "undefined") return defaultValue;
     const item = localStorage.getItem(key);
     if (!item) return defaultValue;
-    const parsed = JSON.parse(item);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(item);
+    } catch (parseErr) {
+      console.error(`[Storage] Corrupted JSON value for key "${key}". Preserving stored data and recovering with default value.`, parseErr);
+      notifyStorageFailure({
+        success: false,
+        key,
+        error: {
+          code: "CORRUPTED_VALUE",
+          message: `Corrupted JSON found in localStorage for "${key}"`,
+          originalError: parseErr,
+        },
+      });
+      return defaultValue;
+    }
     if (parsed === null || parsed === undefined) return defaultValue;
 
     // Array type defense: prevent object/primitive from corrupting array state
     if (Array.isArray(defaultValue)) {
-      if (!Array.isArray(parsed)) return defaultValue;
+      if (!Array.isArray(parsed)) {
+        console.warn(`[Storage] Expected array for key "${key}" but found ${typeof parsed}. Returning default.`);
+        return defaultValue;
+      }
       return parsed as unknown as T;
     }
 
     // Object type defense: merge defaults to backfill missing fields from schema updates
     if (typeof defaultValue === "object" && defaultValue !== null) {
-      if (typeof parsed !== "object" || Array.isArray(parsed)) return defaultValue;
+      if (typeof parsed !== "object" || Array.isArray(parsed)) {
+        console.warn(`[Storage] Expected object for key "${key}" but found ${typeof parsed}. Returning default.`);
+        return defaultValue;
+      }
       return { ...defaultValue, ...parsed };
     }
 
@@ -162,27 +233,85 @@ function getItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-function setItem<T>(key: string, value: T): void {
-  if (typeof localStorage === "undefined") return;
+export function setItem<T>(key: string, value: T): StorageOperationResult<T> {
+  if (typeof localStorage === "undefined") {
+    const errorResult: StorageOperationResult<T> = {
+      success: false,
+      key,
+      error: {
+        code: "STORAGE_UNAVAILABLE",
+        message: `localStorage is not available in current environment for key "${key}"`,
+      },
+    };
+    notifyStorageFailure(errorResult);
+    return errorResult;
+  }
+
+  let serialized: string;
   try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e: any) {
-    if (e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014)) {
-      console.warn(`[Storage] QuotaExceededError writing ${key}. Purging non-critical cached logs...`);
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith("garia_shared_activities") || k.startsWith("garia_collab_notifications"))) {
-            localStorage.removeItem(k);
-          }
-        }
-        localStorage.setItem(key, JSON.stringify(value));
-        return;
-      } catch (retryErr) {
-        console.error(`[Storage] Retry saving ${key} failed:`, retryErr);
-      }
-    }
-    console.error(`Error saving ${key} to localStorage`, e);
+    serialized = JSON.stringify(value);
+  } catch (err: any) {
+    const errorResult: StorageOperationResult<T> = {
+      success: false,
+      key,
+      error: {
+        code: "SERIALIZATION_FAILED",
+        message: `Failed to serialize value for key "${key}": ${err?.message || String(err)}`,
+        originalError: err,
+      },
+    };
+    notifyStorageFailure(errorResult);
+    return errorResult;
+  }
+
+  try {
+    localStorage.setItem(key, serialized);
+    return {
+      success: true,
+      key,
+      data: value,
+    };
+  } catch (err: any) {
+    const isQuota =
+      err &&
+      (err.name === "QuotaExceededError" ||
+        err.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        err.code === 22 ||
+        err.code === 1014);
+
+    const code: StorageErrorCode = isQuota ? "QUOTA_EXCEEDED" : "WRITE_FAILED";
+    const message = isQuota
+      ? `Storage quota exceeded writing ${key}. Preserving existing data without destructive automatic deletion.`
+      : `Failed to write key "${key}" to localStorage: ${err?.message || String(err)}`;
+
+    console.error(`[Storage] ${message}`, err);
+
+    // CRITICAL RELIABILITY:
+    // Never delete user data as an automatic recovery strategy.
+    // The previous valid data at key is preserved by localStorage.
+    const errorResult: StorageOperationResult<T> = {
+      success: false,
+      key,
+      error: {
+        code,
+        message,
+        originalError: err,
+      },
+    };
+    notifyStorageFailure(errorResult);
+    return errorResult;
+  }
+}
+
+export function setItemOrThrow<T>(key: string, value: T): void {
+  const result = setItem(key, value);
+  if (!result.success && result.error) {
+    throw new StorageError(
+      result.error.message,
+      result.error.code,
+      result.key,
+      result.error.originalError
+    );
   }
 }
 
@@ -957,10 +1086,10 @@ export const loadTasks = (profileId?: string): Task[] => {
   const pId = profileId || loadActiveProfileId();
   return getItem(getProfileKey(pId, STORAGE_KEYS.TASKS), defaultTasks);
 };
-export const saveTasks = (tasks: Task[], profileId?: string): void => {
+export const saveTasks = (tasks: Task[], profileId?: string): StorageOperationResult<Task[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.TASKS), tasks);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.TASKS), tasks);
 };
 
 const CLASS10_DEFAULT_NAMES = new Set(["mathematics", "science", "social science", "english", "hindi"]);
@@ -1265,20 +1394,20 @@ export const loadNotes = (profileId?: string): Note[] => {
   const raw = getItem(getProfileKey(pId, STORAGE_KEYS.NOTES), defaultNotes);
   return sortNotesPinnedFirst(raw);
 };
-export const saveNotes = (notes: Note[], profileId?: string): void => {
+export const saveNotes = (notes: Note[], profileId?: string): StorageOperationResult<Note[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.NOTES), sortNotesPinnedFirst(notes));
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.NOTES), sortNotesPinnedFirst(notes));
 };
 
 export const loadHabits = (profileId?: string): Habit[] => {
   const pId = profileId || loadActiveProfileId();
   return getItem(getProfileKey(pId, STORAGE_KEYS.HABITS), defaultHabits);
 };
-export const saveHabits = (habits: Habit[], profileId?: string): void => {
+export const saveHabits = (habits: Habit[], profileId?: string): StorageOperationResult<Habit[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.HABITS), habits);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.HABITS), habits);
 };
 
 export const loadWater = (profileId?: string): WaterLog => {
@@ -1297,10 +1426,10 @@ export const loadWater = (profileId?: string): WaterLog => {
   }
   return water;
 };
-export const saveWater = (water: WaterLog, profileId?: string): void => {
+export const saveWater = (water: WaterLog, profileId?: string): StorageOperationResult<WaterLog> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.WATER), water);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.WATER), water);
 };
 
 export const loadFocusSessions = (profileId?: string): FocusSessionLog[] => {
@@ -1308,30 +1437,30 @@ export const loadFocusSessions = (profileId?: string): FocusSessionLog[] => {
   const defaultFocusLogs: FocusSessionLog[] = [];
   return getItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), defaultFocusLogs);
 };
-export const saveFocusSessions = (focus: FocusSessionLog[], profileId?: string): void => {
+export const saveFocusSessions = (focus: FocusSessionLog[], profileId?: string): StorageOperationResult<FocusSessionLog[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), focus);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.FOCUS), focus);
 };
 
 export const loadGoals = (profileId?: string): Goal[] => {
   const pId = profileId || loadActiveProfileId();
   return getItem(getProfileKey(pId, STORAGE_KEYS.GOALS), defaultGoals);
 };
-export const saveGoals = (goals: Goal[], profileId?: string): void => {
+export const saveGoals = (goals: Goal[], profileId?: string): StorageOperationResult<Goal[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.GOALS), goals);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.GOALS), goals);
 };
 
 export const loadCalendarEvents = (profileId?: string): CalendarEvent[] => {
   const pId = profileId || loadActiveProfileId();
   return getItem(getProfileKey(pId, STORAGE_KEYS.CALENDAR_EVENTS), defaultCalendarEvents);
 };
-export const saveCalendarEvents = (events: CalendarEvent[], profileId?: string): void => {
+export const saveCalendarEvents = (events: CalendarEvent[], profileId?: string): StorageOperationResult<CalendarEvent[]> => {
   const pId = profileId || loadActiveProfileId();
-  if (!pId) return;
-  setItem(getProfileKey(pId, STORAGE_KEYS.CALENDAR_EVENTS), events);
+  if (!pId) return { success: false, key: "", error: { code: "STORAGE_UNAVAILABLE", message: "No active profile ID" } };
+  return setItem(getProfileKey(pId, STORAGE_KEYS.CALENDAR_EVENTS), events);
 };
 
 export const loadAbyaChat = (profileId?: string): AbyaMessage[] => {

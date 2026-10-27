@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { CloudCheck, CheckCircle2, Cloud, Sparkles, X, ArrowUpRight, Database } from "lucide-react";
+import { CheckCircle2, AlertTriangle, X, Database, HardDrive } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { subscribeToOfflineQueue, OfflineQueueState } from "../utils/offlineQueue";
+import { onStorageFailure, StorageOperationResult } from "../utils/storage";
 import { AppLanguage } from "../utils/i18n";
 
 interface OfflineSyncToastProps {
@@ -12,8 +13,9 @@ interface ToastPayload {
   id: string;
   title: string;
   description: string;
-  syncedCount: number;
+  syncedCount?: number;
   timestamp: number;
+  variant: "success" | "warning";
 }
 
 export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
@@ -25,7 +27,37 @@ export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const unsub = subscribeToOfflineQueue((state: OfflineQueueState) => {
+    // 1. Listen for storage write errors (quota exceeded, storage unavailable, serialization failure)
+    const unsubStorage = onStorageFailure((result: StorageOperationResult) => {
+      if (result.error) {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+        const isQuota = result.error.code === "QUOTA_EXCEEDED";
+        const newToast: ToastPayload = {
+          id: `storage-toast-${Date.now()}`,
+          title:
+            currentLanguage === "hi"
+              ? isQuota
+                ? "चेतावनी: स्टोरेज कोटा भर गया"
+                : "स्टोरेज चेतावनी: डेटा सहेज नहीं पाया"
+              : isQuota
+              ? "Storage Warning: Quota Reached"
+              : "Storage Warning: Unsaved Changes",
+          description:
+            currentLanguage === "hi"
+              ? "ब्राउज़र का लोकल स्टोरेज भर गया है। आपके बदलाव मेमोरी में सुरक्षित हैं, कृपया क्लाउड सिंक करें।"
+              : "Browser storage is full. Your pending changes are safely held in memory and will sync when online.",
+          variant: "warning",
+          timestamp: Date.now(),
+        };
+        setActiveToast(newToast);
+        toastTimeoutRef.current = setTimeout(() => {
+          setActiveToast(null);
+        }, 7000);
+      }
+    });
+
+    // 2. Listen for offline queue flush updates
+    const unsubQueue = subscribeToOfflineQueue((state: OfflineQueueState) => {
       const wasReconciling = prevReconcilingRef.current;
       const isNowFinished = wasReconciling && !state.isReconciling;
       const hadPending = prevPendingCountRef.current > 0;
@@ -47,6 +79,7 @@ export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
               ? `${count} ऑफ़लाइन बदलाव क्लाउड डेटाबेस में सुरक्षित हो गए हैं। आपका डेटा अप-टू-डेट है।`
               : `${count} offline action${count > 1 ? "s" : ""} flushed to cloud. Your academic data is now up-to-date.`,
           syncedCount: count,
+          variant: "success",
           timestamp: Date.now(),
         };
 
@@ -65,7 +98,8 @@ export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
     });
 
     return () => {
-      unsub();
+      unsubStorage();
+      unsubQueue();
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
@@ -82,19 +116,37 @@ export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 15, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
-            className="pointer-events-auto w-full glass-card p-4 rounded-2xl border border-emerald-500/30 bg-slate-950/90 shadow-2xl backdrop-blur-xl flex items-start gap-3.5 relative overflow-hidden"
+            className={`pointer-events-auto w-full glass-card p-4 rounded-2xl border shadow-2xl backdrop-blur-xl flex items-start gap-3.5 relative overflow-hidden ${
+              activeToast.variant === "warning"
+                ? "border-amber-500/40 bg-slate-950/95 shadow-amber-500/10"
+                : "border-emerald-500/30 bg-slate-950/90 shadow-emerald-500/20"
+            }`}
           >
             {/* Top Accent Light Bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
+            <div
+              className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
+                activeToast.variant === "warning"
+                  ? "from-amber-500 via-orange-400 to-amber-600"
+                  : "from-emerald-500 via-teal-400 to-cyan-500"
+              }`}
+            />
 
-            {/* Glowing Icon with Checkmark Animation */}
+            {/* Glowing Icon */}
             <motion.div
               initial={{ scale: 0.5, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 20, delay: 0.1 }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20"
+              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 shadow-lg ${
+                activeToast.variant === "warning"
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-amber-500/20"
+                  : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20"
+              }`}
             >
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              {activeToast.variant === "warning" ? (
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              )}
             </motion.div>
 
             {/* Content */}
@@ -103,16 +155,33 @@ export const OfflineSyncToast: React.FC<OfflineSyncToastProps> = ({
                 <span className="text-xs font-bold font-heading text-white tracking-tight">
                   {activeToast.title}
                 </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                  {activeToast.syncedCount} Synced
-                </span>
+                {typeof activeToast.syncedCount === "number" && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                    {activeToast.syncedCount} Synced
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-300 mt-1 leading-snug">
                 {activeToast.description}
               </p>
-              <div className="flex items-center gap-1 mt-2 text-[10px] text-emerald-400/90 font-medium">
-                <Database className="w-3 h-3 text-emerald-400" />
-                <span>Cloud Firestore Database Up-to-Date</span>
+              <div
+                className={`flex items-center gap-1 mt-2 text-[10px] font-medium ${
+                  activeToast.variant === "warning"
+                    ? "text-amber-400/90"
+                    : "text-emerald-400/90"
+                }`}
+              >
+                {activeToast.variant === "warning" ? (
+                  <>
+                    <HardDrive className="w-3 h-3 text-amber-400" />
+                    <span>Memory & Queue Protected</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3 h-3 text-emerald-400" />
+                    <span>Cloud Firestore Database Up-to-Date</span>
+                  </>
+                )}
               </div>
             </div>
 
