@@ -4,6 +4,13 @@ All notable changes to the Garia OS codebase are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-10-27
+
+### Reliability & Release Hardening
+- **Server Initialization & Cloud Port Handling:** Fixed Express application instantiation (`const app = express()`) within `server.ts:startServer()`, resolving startup `ReferenceError`. Added unified port resolution supporting both development `--port` flags and Cloud Run container `process.env.PORT`.
+- **Offline & Storage Reliability:** Added Subtest 35 to the regression suite verifying non-destructive offline queue behavior, precise focus timer restoration from persisted timestamps, service worker cache isolation, and typed storage failure recovery.
+- **Lockfile & Clean Dependencies:** Removed obsolete, out-of-sync `bun.lock`, standardizing on authoritative `package-lock.json` (npm v10 / lockfileVersion 3). All 60 automated tests (35 regression tests + 25 live security tests) pass with zero errors.
+
 ---
 
 ## [3.3.0] - 2026-10-20

@@ -25,9 +25,9 @@
 Every command listed below was directly executed against the workspace. All outputs and exit codes were captured synchronously.
 
 ### 2.1 Dependency Installation & Lockfile Synchronization
-* **Command:** `npm install --package-lock-only && npm audit fix && bun install`
+* **Command:** `npm install --package-lock-only && npm audit fix`
 * **Exit Code:** `0`
-* **Result:** Clean, consistent `package-lock.json` and `bun.lock`. 0 unresolved critical vulnerabilities.
+* **Result:** Clean, authoritative `package-lock.json` (lockfileVersion 3). Obsolete/stale `bun.lock` removed to ensure single package manager consistency. 0 unresolved critical vulnerabilities.
 
 ### 2.2 TypeScript Typecheck & Static Analysis
 * **Command:** `npm run lint` (`tsc --noEmit`)
@@ -37,12 +37,14 @@ Every command listed below was directly executed against the workspace. All outp
 ### 2.3 Unit & Core Regression Suite
 * **Command:** `npm test` (`tsx --test src/utils/__tests__/auditRegression.test.ts`)
 * **Exit Code:** `0`
-* **Result:** **34/34 Subtests Passed** (100% pass, 0 fail, 0 cancelled, 0 skipped, duration: ~5.40s).
+* **Result:** **35/35 Subtests Passed** (100% pass, 0 fail, 0 cancelled, 0 skipped, duration: ~5.85s).
 * **Key Tests Covered:**
   * Test 11: Note encryption & reminder alerts.
   * Test 18: Firestore ownership rules, no local token minting, dual UID+IP rate limiting, and security headers.
   * Test 21: PWA / Service Worker runtime verification (`sw.js`).
   * Test 22: Storage architecture, profile isolation, and corrupted JSON recovery.
+  * Test 34: Web Crypto AES-256-GCM note encryption (`ENCv2:`), tamper rejection, legacy `ENCv1:` migration, and PBKDF2-HMAC-SHA-256 password security (`pwd_v2$`).
+  * Test 35: Reliability & Reliability Hardening (offline queue data preservation, focus timer restoration, sw cache isolation & typed storage error recovery).
   * Test 32: Deprecated model purging (`gemini-3.7-flash` absent, `gemini-3.8-flash` active).
   * Test 33: Versioned PBKDF2 PIN KDF, static Vite env, CSP headers, minimal healthcheck, and centralized model registry.
   * **Test 34 (NEW):** Web Crypto AES-256-GCM note encryption (`ENCv2:`), tamper rejection, legacy `ENCv1:` migration, and PBKDF2-HMAC-SHA-256 password security (`pwd_v2$`).
@@ -69,7 +71,7 @@ Every command listed below was directly executed against the workspace. All outp
 ### 2.5 Combined Verification Pipeline
 * **Command:** `npm run test:all`
 * **Exit Code:** `0`
-* **Result:** **All 59 tests passed** (34 regression tests + 25 security tests).
+* **Result:** **All 60 tests passed** (35 regression tests + 25 security tests).
 
 ### 2.6 Production Build
 * **Command:** `npm run build`
@@ -102,5 +104,5 @@ Every command listed below was directly executed against the workspace. All outp
 
 # **PASSED — PRODUCTION READY**
 
-* **Status:** Clean build, 0 lint errors, 59/59 automated tests passing.
+* **Status:** Clean build, 0 lint errors, 60/60 automated tests passing.
 * **Distribution Archive:** `garia-os-final-verified.zip`
