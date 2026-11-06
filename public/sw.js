@@ -14,6 +14,7 @@ const ASSETS_TO_CACHE = [
   "/icon-maskable-512.png",
   "/icon.png",
   "/apple-touch-icon.png",
+  "/favicon.ico",
 ];
 
 self.addEventListener("install", (event) => {
